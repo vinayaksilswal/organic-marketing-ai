@@ -1,9 +1,9 @@
 """
 =============================================================================
-QuantCAI — FastAPI Application Entry Point
+Organic Marketing AI — FastAPI Application Entry Point
 =============================================================================
 This is the control center for the entire autonomous e-commerce platform.
-It hosts the admin UI, AI chatbot, marketing automation scheduler, and all
+It hosts the AI chatbot, marketing automation scheduler, and all
 API endpoints for CJ Dropshipping, Meta Graph, and Resend integrations.
 
 CRITICAL ARCHITECTURE DECISION:
@@ -86,7 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from services.scheduler import create_scheduler, shutdown_scheduler
 
     logger.info("=" * 60)
-    logger.info("QuantCAI Autonomous E-Commerce Platform — Starting Up")
+    logger.info("Organic Marketing AI Platform — Starting Up")
     logger.info(f"Environment: {settings.environment}")
     logger.info("=" * 60)
 
@@ -148,13 +148,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("APScheduler started (bi-hourly marketing loop active)")
 
     logger.info("=" * 60)
-    logger.info("QuantCAI is ready to serve requests")
+    logger.info("Organic Marketing AI is ready to serve requests")
     logger.info("=" * 60)
 
     yield  # --- Application is running ---
 
     # --- Shutdown: Clean up resources in reverse order ---
-    logger.info("Shutting down QuantCAI...")
+    logger.info("Shutting down Organic Marketing AI...")
 
     shutdown_scheduler(scheduler)
     logger.info("Scheduler stopped")
@@ -163,15 +163,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await prisma_client.disconnect()
     logger.info("Prisma ORM disconnected")
 
-    logger.info("QuantCAI shutdown complete.")
+    logger.info("Organic Marketing AI shutdown complete.")
 
 
 # =============================================================================
 # FastAPI Application Instance
 # =============================================================================
 app = FastAPI(
-    title="QuantCAI Admin & Automation",
-    description="AI-Powered Autonomous E-Commerce Platform with Marketing Automation",
+    title="Organic Marketing AI Automation",
+    description="AI-Powered Autonomous Organic Marketing Platform",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -280,12 +280,11 @@ templates = Jinja2Templates(directory="templates")
 # Import and include all routers. The ai_chat router has been consolidated
 # into the chat_agent service + the api router.
 # =============================================================================
-from routers import admin, api, auth, marketing, user_api  # noqa: E402
+from routers import api, auth, marketing, user_api  # noqa: E402
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(auth.router)
-app.include_router(admin.router)
 app.include_router(marketing.router)
 app.include_router(api.router)
 app.include_router(api.public_router)
@@ -297,8 +296,8 @@ app.include_router(user_api.router)
 # =============================================================================
 @app.get("/")
 async def root() -> RedirectResponse:
-    """Redirect the root URL to the admin dashboard."""
-    return RedirectResponse(url="/admin", status_code=303)
+    """Redirect the root URL to the API docs."""
+    return RedirectResponse(url="/docs", status_code=303)
 
 
 # =============================================================================

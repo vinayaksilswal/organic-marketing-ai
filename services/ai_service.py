@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — OpenRouter LLM Client (AI Copy & Marketing Asset Generation)
+Organic Marketing AI — OpenRouter LLM Client (AI Copy & Marketing Asset Generation)
 =============================================================================
 Integrates with OpenRouter's API at https://openrouter.ai/api/v1/chat/completions
 using the tencent/hy3:free model for marketing copy generation.
@@ -80,8 +80,8 @@ async def _call_openrouter(
     headers = {
         "Authorization": f"Bearer {settings.openrouter_api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://quantcai.in",
-        "X-Title": "QuantCAI Marketing AI",
+        "HTTP-Referer": "https://organicmarketing.ai",
+        "X-Title": "Organic Marketing AI",
     }
 
     messages: list[dict[str, str]] = []
@@ -140,7 +140,7 @@ async def generate_campaign_email(campaign: Any) -> dict[str, str]:
     for a social campaign.
     """
     system_prompt = (
-        "You are an elite B2B enterprise SaaS marketing copywriter for QuantCAI, a premium AI automation brand. "
+        "You are an elite marketing copywriter for Organic Marketing AI. "
         "Your goal is to drive high-value organic conversions, highlighting ROI, scalability, and seamless integration. "
         "Your output MUST be a valid JSON object with EXACTLY 5 keys: "
         "subject, headline, subheadline, body_copy, cta_text. "
@@ -167,7 +167,7 @@ Return a JSON object with:
     
     # Defaults in case of failure or missing keys
     content = {
-        "subject": "Transform your business with QuantCAI",
+        "subject": "Transform your business with Organic Marketing AI",
         "headline": "Unlock Enterprise AI",
         "subheadline": "Automate your workflows today.",
         "body_copy": "Check out our latest automation tools to help you scale.",
@@ -178,7 +178,7 @@ Return a JSON object with:
         content.update(parsed)
         
     # Prepare template variables (with UTM tracking)
-    campaign_url = f"https://quantcai.in/?utm_source=auto_email&utm_medium=organic&utm_campaign=ai_loop_{campaign.id}"
+    campaign_url = f"https://organicmarketing.ai/?utm_source=auto_email&utm_medium=organic&utm_campaign=ai_loop_{campaign.id}"
     
     # Premium Enterprise HTML Layout
     body_html = f"""
@@ -192,7 +192,7 @@ Return a JSON object with:
                         <!-- Header -->
                         <tr>
                             <td style="padding: 40px 40px 20px; text-align: center; background-color: #0f172a;">
-                                <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Quant<span style="color: #6366f1;">CAI</span></h1>
+                                <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Organic<span style="color: #6366f1;">Marketing</span></h1>
                             </td>
                         </tr>
                         <!-- Hero Section -->
@@ -223,8 +223,8 @@ Return a JSON object with:
                         <!-- Footer -->
                         <tr>
                             <td style="padding: 30px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-                                <p style="margin: 0; color: #94a3b8; font-size: 13px;">Enterprise AI Infrastructure for the Modern Web.</p>
-                                <p style="margin: 10px 0 0; color: #94a3b8; font-size: 12px;">You're receiving this because you're part of the QuantCAI community. <a href="https://quantcai.in/unsubscribe" style="color: #64748b; text-decoration: underline;">Unsubscribe</a></p>
+                                <p style="margin: 0; color: #94a3b8; font-size: 13px;">Enterprise Marketing Automation Infrastructure.</p>
+                                <p style="margin: 10px 0 0; color: #94a3b8; font-size: 12px;">You're receiving this because you're part of the Organic Marketing AI community. <a href="https://organicmarketing.ai/unsubscribe" style="color: #64748b; text-decoration: underline;">Unsubscribe</a></p>
                             </td>
                         </tr>
                     </table>
@@ -251,8 +251,8 @@ async def generate_campaign_variation(base_caption: str) -> str:
     """
     prompt = f"""Rewrite the following base social media caption to create a highly engaging, professional yet energetic variation for an enterprise B2B audience.
 The goal is to drive organic engagement, establish authority, and compel users to click the link.
-Use modern business-friendly formatting, targeted high-value hashtags (#EnterpriseAI, #Automation, #SaaS), and strategic emojis.
-Appened this link at the end of the post (it includes UTM tracking): https://quantcai.in/?utm_source=auto_social&utm_medium=organic&utm_campaign=ai_loop
+Use modern formatting, targeted high-value hashtags, and strategic emojis.
+Appened this link at the end of the post (it includes UTM tracking): https://organicmarketing.ai/?utm_source=auto_social&utm_medium=organic&utm_campaign=ai_loop
 
 Base Caption:
 {base_caption}
@@ -320,7 +320,7 @@ Return a JSON object with:
     if parsed and isinstance(parsed, dict):
         content.update(parsed)
 
-    product_url = "https://quantcai.in/" # default url
+    product_url = "https://organicmarketing.ai/" # default url
     
     img_url = ""
     if hasattr(product, 'productImage') and product.productImage:
@@ -372,8 +372,8 @@ Return a JSON object with:
                         <!-- Footer -->
                         <tr>
                             <td style="padding: 30px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;">
-                                <p style="margin: 0; color: #94a3b8; font-size: 13px;">Enterprise Quantum Security & Simulation Infrastructure.</p>
-                                <p style="margin: 10px 0 0; color: #94a3b8; font-size: 12px;">You're receiving this because you're part of the QuantCAI community. <a href="https://quantcai.in/unsubscribe" style="color: #64748b; text-decoration: underline;">Unsubscribe</a></p>
+                                <p style="margin: 0; color: #94a3b8; font-size: 13px;">Enterprise Marketing Automation Infrastructure.</p>
+                                <p style="margin: 10px 0 0; color: #94a3b8; font-size: 12px;">You're receiving this because you're part of the Organic Marketing AI community. <a href="https://organicmarketing.ai/unsubscribe" style="color: #64748b; text-decoration: underline;">Unsubscribe</a></p>
                             </td>
                         </tr>
                     </table>
@@ -405,7 +405,7 @@ RULES:
 - Write exactly 3 posts for an X thread. Each post MUST be under 280 characters.
 - Post 1: Hook — summarize what the paper discovered in a punchy, engaging way. Use an emoji opener.
 - Post 2: Technical implications — what this means for Python/Qiskit developers. Include a hypothetical code snippet or library reference if relevant.
-- Post 3: Call-to-action — direct readers to explore this concept on QuantCAI. Use the CTA link provided.
+- Post 3: Call-to-action — direct readers to explore this concept on Organic Marketing AI. Use the CTA link provided.
 - Be technically accurate but accessible. No hype or buzzwords.
 - Include 3-5 relevant hashtags separately.
 
@@ -425,7 +425,7 @@ RULES:
 - Frame the research around the NSA CNSA 2.0 mandate (PQC in all new software by 2030, full replacement by 2033).
 - Emphasize the shrinking timeline for Post-Quantum Cryptography (PQC) migration.
 - Reference the average data breach cost ($4.44M) and the regulatory implications.
-- End with a clear call-to-action to assess cryptographic posture using QuantCAI's PQC scanner at https://quantcai.in/pqc-scanner
+- End with a clear call-to-action to assess cryptographic posture using Organic Marketing AI's PQC scanner at https://organicmarketing.ai/pqc-scanner
 - Include 3-5 professional hashtags separately.
 - Do NOT use emojis. Use professional tone throughout.
 
@@ -453,7 +453,7 @@ def _classify_paper_category(title: str, abstract: str) -> str:
 
 def _build_arxiv_cta_link(category: str, arxiv_id: str) -> str:
     """Build a trackable CTA link based on the paper's category."""
-    base = "https://quantcai.in"
+    base = "https://organicmarketing.ai"
     utm = f"utm_source=arxiv_newsroom&utm_medium=social&utm_campaign={arxiv_id}"
     if category == "cybersecurity":
         return f"{base}/pqc-scanner?{utm}"
@@ -494,7 +494,7 @@ CTA Link to include in post 3: {cta_link}"""
         "post_1": f"🔬 New research: {title[:200]}",
         "post_2": f"Read the full paper: https://arxiv.org/abs/{arxiv_id}",
         "post_3": f"Explore quantum concepts interactively → {cta_link}",
-        "hashtags": ["#Quantum", "#Research", "#QuantCAI"],
+        "hashtags": ["#Quantum", "#Research", "#OrganicMarketingAI"],
     }
 
 

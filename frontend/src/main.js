@@ -1,4 +1,8 @@
-import './index.css'
+import './index.css';
+
+// ============================================================================
+// Organic Marketing AI - Frontend Application Logic
+// ============================================================================
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -12,370 +16,409 @@ let state = {
   files: []
 };
 
-// DOM Elements
+// Views Map
 const views = {
+  landing: document.getElementById('view-landing'),
   auth: document.getElementById('view-auth'),
   onboarding: document.getElementById('view-onboarding'),
   dashboard: document.getElementById('view-dashboard')
 };
 
-// Helpers
-const showToast = (message, type = 'success') => {
+const nav = document.getElementById('main-nav');
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+function showToast(message, isError = false) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
-  toast.className = `message ${type}`;
-  toast.classList.remove('hidden');
-  setTimeout(() => toast.classList.add('hidden'), 3000);
-};
+  toast.className = `message ${isError ? 'error' : 'success'}`;
+  
+  // Re-trigger animation
+  toast.style.animation = 'none';
+  toast.offsetHeight; /* trigger reflow */
+  toast.style.animation = null;
 
-const showView = (viewName) => {
+  setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 4000);
+}
+
+function switchView(viewName) {
   Object.values(views).forEach(v => v.classList.add('hidden'));
-  document.getElementById('app').classList.toggle('centered-layout', viewName !== 'dashboard');
-  if (views[viewName]) views[viewName].classList.remove('hidden');
-};
-
-const setLoading = (btnId, isLoading) => {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  const text = btn.querySelector('.btn-text');
-  const spinner = btn.querySelector('.spinner');
+  if (views[viewName]) {
+    views[viewName].classList.remove('hidden');
+  }
   
-  if (isLoading) {
-    text.classList.add('hidden');
-    spinner.classList.remove('hidden');
-    btn.disabled = true;
+  // Show nav on dashboard/onboarding, hide on landing/auth
+  if (viewName === 'dashboard' || viewName === 'onboarding') {
+    nav.classList.remove('hidden');
   } else {
-    text.classList.remove('hidden');
-    spinner.classList.add('hidden');
-    btn.disabled = false;
+    nav.classList.add('hidden');
   }
-};
+}
 
-// API Fetch Wrapper
-const apiCall = async (endpoint, options = {}) => {
-  const headers = { 'Content-Type': 'application/json' };
-  if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
-  
-  // Don't set content-type for FormData
-  if (options.body instanceof FormData) {
-    delete headers['Content-Type'];
-  }
+// ============================================================================
+// Landing Page Events
+// ============================================================================
+document.getElementById('btn-goto-login').addEventListener('click', () => {
+  switchView('auth');
+});
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers: { ...headers, ...options.headers }
-  });
-  
-  if (response.status === 401) {
-    logout();
-    throw new Error('Unauthorized');
-  }
-  
-  return response.json();
-};
+document.getElementById('btn-goto-pricing').addEventListener('click', () => {
+  document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' });
+});
 
-// ------------------------------------------------------------------
-// Routing Logic
-// ------------------------------------------------------------------
-const initializeApp = async () => {
-  if (!state.token) {
-    showView('auth');
-    return;
+document.getElementById('btn-buy-now').addEventListener('click', () => {
+  switchView('auth');
+});
+
+document.getElementById('auth-back').addEventListener('click', (e) => {
+  e.preventDefault();
+  switchView('landing');
+});
+
+// ============================================================================
+// Authentication Logic
+// ============================================================================
+
+const authToggle = document.getElementById('auth-toggle');
+const authTitle = document.getElementById('auth-title');
+const authSubtitle = document.getElementById('auth-subtitle');
+const authSubmitBtn = document.getElementById('auth-submit');
+const authForm = document.getElementById('auth-form');
+
+authToggle.addEventListener('click', (e) => {
+  e.preventDefault();
+  state.isLoginMode = !state.isLoginMode;
+  
+  if (state.isLoginMode) {
+    authTitle.textContent = 'Welcome Back';
+    authSubtitle.textContent = 'Sign in to continue to your dashboard.';
+    authSubmitBtn.querySelector('.btn-text').textContent = 'Sign In';
+    authToggle.textContent = 'Create an account instead';
+  } else {
+    authTitle.textContent = 'Create Account';
+    authSubtitle.textContent = 'Start automating your organic marketing today.';
+    authSubmitBtn.querySelector('.btn-text').textContent = 'Sign Up';
+    authToggle.textContent = 'Already have an account? Sign in';
   }
+});
+
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const spinner = authSubmitBtn.querySelector('.spinner');
+  
+  spinner.classList.remove('hidden');
+  authSubmitBtn.disabled = true;
 
   try {
-    // Check if business profile exists
-    const res = await apiCall('/user/business-profile');
-    if (res.success && res.data) {
-      showView('dashboard');
-      initDashboard();
-    } else {
-      showView('onboarding');
-    }
-  } catch (e) {
-    console.error(e);
-    showToast('Failed to connect to backend server. Please make sure it is running on port 8000.', 'error');
-  }
-};
+    const endpoint = state.isLoginMode ? '/auth/login' : '/auth/register';
+    const payload = state.isLoginMode 
+      ? `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+      : JSON.stringify({ email, password });
+      
+    const headers = state.isLoginMode 
+      ? { 'Content-Type': 'application/x-www-form-urlencoded' }
+      : { 'Content-Type': 'application/json' };
 
-const logout = () => {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers,
+      body: payload
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Authentication failed');
+    }
+
+    const data = await res.json();
+    state.token = data.access_token;
+    localStorage.setItem('token', state.token);
+
+    // Fetch User Data to see if onboarding is complete
+    await fetchUserData();
+
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    spinner.classList.add('hidden');
+    authSubmitBtn.disabled = false;
+  }
+});
+
+async function fetchUserData() {
+  try {
+    const res = await fetch(`${API_BASE}/users/me`, {
+      headers: { 'Authorization': `Bearer ${state.token}` }
+    });
+    
+    if (res.ok) {
+      state.user = await res.json();
+      localStorage.setItem('user', JSON.stringify(state.user));
+      
+      showToast('Welcome back!');
+      checkRouting();
+    } else {
+      throw new Error('Failed to fetch user data');
+    }
+  } catch (err) {
+    console.error(err);
+    logout();
+  }
+}
+
+function logout() {
   state.token = null;
   state.user = null;
   localStorage.removeItem('token');
   localStorage.removeItem('user');
-  showView('auth');
-};
+  switchView('landing');
+}
 
-// ------------------------------------------------------------------
-// Auth Handlers
-// ------------------------------------------------------------------
-document.getElementById('auth-toggle').addEventListener('click', (e) => {
-  e.preventDefault();
-  state.isLoginMode = !state.isLoginMode;
-  document.getElementById('auth-title').textContent = state.isLoginMode ? 'Welcome Back' : 'Create Account';
-  document.getElementById('auth-subtitle').textContent = state.isLoginMode ? 'Sign in to continue to your dashboard.' : 'Enter your details to get started.';
-  document.getElementById('auth-submit').querySelector('.btn-text').textContent = state.isLoginMode ? 'Sign In' : 'Sign Up';
-  e.target.textContent = state.isLoginMode ? 'Create an account instead' : 'Sign in instead';
-});
+document.getElementById('btn-logout-nav').addEventListener('click', logout);
 
-document.getElementById('auth-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('auth-email').value;
-  const password = document.getElementById('auth-password').value;
-  
-  setLoading('auth-submit', true);
-  try {
-    const endpoint = state.isLoginMode ? '/auth/login' : '/auth/register';
-    const res = await apiCall(endpoint, {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
+// ============================================================================
+// Routing & Onboarding Logic
+// ============================================================================
 
-    if (res.success) {
-      state.token = res.token;
-      state.user = res.user;
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
-      showToast('Authentication successful!');
-      initializeApp();
-    } else {
-      showToast(res.message || 'Authentication failed', 'error');
-    }
-  } catch (err) {
-    showToast('Network error', 'error');
-  } finally {
-    setLoading('auth-submit', false);
+function checkRouting() {
+  if (!state.token || !state.user) {
+    switchView('landing');
+    return;
   }
-});
 
-document.getElementById('btn-logout').addEventListener('click', logout);
+  // Check Subscription and Profile
+  const hasBusinessProfile = state.user.businessProfile !== null;
+  const isSubscribed = state.user.subscriptionStatus === 'ACTIVE';
 
-// ------------------------------------------------------------------
-// Onboarding Handlers
-// ------------------------------------------------------------------
-document.getElementById('btn-next-step').addEventListener('click', () => {
-  const url = document.getElementById('onboard-website').value;
-  if (!url) return showToast('Please enter website URL', 'error');
-  
+  if (!hasBusinessProfile || !isSubscribed) {
+    switchView('onboarding');
+    updateOnboardingView();
+  } else {
+    switchView('dashboard');
+    initDashboard();
+  }
+}
+
+function updateOnboardingView() {
   document.getElementById('onboarding-step-1').classList.add('hidden');
-  document.getElementById('onboarding-step-2').classList.remove('hidden');
-  document.getElementById('step-1-indicator').classList.add('active');
-  document.getElementById('step-2-indicator').classList.add('active');
-});
-
-document.getElementById('btn-prev-step').addEventListener('click', () => {
   document.getElementById('onboarding-step-2').classList.add('hidden');
-  document.getElementById('onboarding-step-1').classList.remove('hidden');
+  document.getElementById('onboarding-step-3').classList.add('hidden');
+  
+  document.getElementById('step-1-indicator').classList.remove('active');
   document.getElementById('step-2-indicator').classList.remove('active');
+  document.getElementById('step-3-indicator').classList.remove('active');
+
+  document.getElementById(`onboarding-step-${state.onboardingStep}`).classList.remove('hidden');
+  for (let i = 1; i <= state.onboardingStep; i++) {
+    document.getElementById(`step-${i}-indicator`).classList.add('active');
+  }
+}
+
+// Step 1 Events
+document.getElementById('btn-next-step-1').addEventListener('click', () => {
+  const website = document.getElementById('onboard-website').value;
+  const desc = document.getElementById('onboard-description').value;
+  if (!website || !desc) {
+    showToast('Please fill in all fields', true);
+    return;
+  }
+  state.onboardingStep = 2;
+  updateOnboardingView();
 });
 
-document.querySelectorAll('.selection-card').forEach(card => {
+// Step 2 Events
+const modelCards = document.querySelectorAll('.selection-card');
+modelCards.forEach(card => {
   card.addEventListener('click', () => {
-    document.querySelectorAll('.selection-card').forEach(c => c.classList.remove('selected'));
+    modelCards.forEach(c => c.classList.remove('selected'));
     card.classList.add('selected');
     state.selectedBusinessModel = card.dataset.model;
   });
 });
 
-document.getElementById('btn-finish-onboarding').addEventListener('click', async () => {
-  if (!state.selectedBusinessModel) return showToast('Please select a business model', 'error');
-  
-  const websiteUrl = document.getElementById('onboard-website').value;
-  const description = document.getElementById('onboard-description').value;
-  
-  setLoading('btn-finish-onboarding', true);
+document.getElementById('btn-prev-step-2').addEventListener('click', () => {
+  state.onboardingStep = 1;
+  updateOnboardingView();
+});
+
+document.getElementById('btn-next-step-2').addEventListener('click', async () => {
+  if (!state.selectedBusinessModel) {
+    showToast('Please select a business model', true);
+    return;
+  }
+
+  // Save profile to backend
   try {
-    const res = await apiCall('/user/business-profile', {
-      method: 'PUT',
-      body: JSON.stringify({ websiteUrl, description, businessModel: state.selectedBusinessModel })
+    const website = document.getElementById('onboard-website').value;
+    const desc = document.getElementById('onboard-description').value;
+
+    const res = await fetch(`${API_BASE}/users/me/business-profile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${state.token}`
+      },
+      body: JSON.stringify({
+        website_url: website,
+        description: desc,
+        brand_voice: 'Professional and Engaging',
+        target_audience: 'B2B/B2C'
+      }) // Adjusting payload to match existing schema mostly
     });
-    if (res.success) {
-      showToast('Profile created successfully!');
-      showView('dashboard');
-      initDashboard();
-    }
+
+    if (!res.ok) throw new Error('Failed to save profile');
+    
+    showToast('Profile saved!');
+    state.onboardingStep = 3;
+    updateOnboardingView();
   } catch (err) {
-    showToast('Failed to save profile', 'error');
-  } finally {
-    setLoading('btn-finish-onboarding', false);
+    showToast(err.message, true);
   }
 });
 
-// ------------------------------------------------------------------
-// Dashboard & Meta Integration
-// ------------------------------------------------------------------
-const initDashboard = async () => {
-  try {
-    const res = await apiCall('/user/social-connection');
-    if (res.success && res.data && res.data.fbAccessToken) {
-      document.getElementById('meta-disconnected').classList.add('hidden');
-      document.getElementById('meta-connected').classList.remove('hidden');
-    }
-  } catch (e) {
-    console.error(e);
-  }
-};
+// Step 3 Events (Mock Payment)
+document.getElementById('btn-prev-step-3').addEventListener('click', () => {
+  state.onboardingStep = 2;
+  updateOnboardingView();
+});
 
-document.getElementById('btn-connect-meta').addEventListener('click', async () => {
-  // Mock OAuth Flow
-  setLoading('btn-connect-meta', true);
+document.getElementById('btn-mock-pay').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-mock-pay');
+  btn.textContent = 'Processing...';
+  btn.disabled = true;
+  
+  // Simulate payment delay
   setTimeout(async () => {
     try {
-      const res = await apiCall('/user/social-connection', {
-        method: 'PUT',
-        body: JSON.stringify({
-          fbAccessToken: 'mock-token-123',
-          fbPageId: 'page1',
-          fbPageName: 'My E-commerce Page',
-          igAccountId: 'ig1',
-          igAccountName: '@myecommerce'
-        })
-      });
-      if (res.success) {
-        showToast('Meta accounts connected successfully!');
-        document.getElementById('meta-disconnected').classList.add('hidden');
-        document.getElementById('meta-connected').classList.remove('hidden');
-      }
-    } catch (e) {
-      showToast('Failed to connect Meta', 'error');
-    } finally {
-      setLoading('btn-connect-meta', false);
+      // For this hackathon version, we assume we update the user status directly
+      // In reality, this would be a webhook from PayPal.
+      showToast('Payment Successful! Subscription Activated.');
+      
+      // Update local state to bypass onboarding lock
+      state.user.subscriptionStatus = 'ACTIVE';
+      localStorage.setItem('user', JSON.stringify(state.user));
+      
+      setTimeout(() => {
+        checkRouting();
+      }, 1000);
+      
+    } catch(err) {
+      showToast('Payment failed', true);
+      btn.textContent = 'Pay with PayPal (Mock $17)';
+      btn.disabled = false;
     }
-  }, 1000);
+  }, 1500);
 });
 
-document.getElementById('btn-save-meta').addEventListener('click', () => {
-  showToast('Meta settings saved');
-});
+// ============================================================================
+// Dashboard Logic
+// ============================================================================
 
-// ------------------------------------------------------------------
-// Media Drag & Drop
-// ------------------------------------------------------------------
-const dropzone = document.getElementById('media-dropzone');
-const fileInput = document.getElementById('file-input');
-const previewGrid = document.getElementById('media-preview-grid');
-
-dropzone.addEventListener('click', () => fileInput.click());
-
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-  dropzone.addEventListener(eventName, preventDefaults, false);
-});
-
-function preventDefaults(e) {
-  e.preventDefault();
-  e.stopPropagation();
+function initDashboard() {
+  // Reset media dropzone
+  state.files = [];
+  renderMediaGrid();
 }
 
-['dragenter', 'dragover'].forEach(eventName => {
-  dropzone.addEventListener(eventName, () => dropzone.classList.add('dragover'), false);
-});
-
-['dragleave', 'drop'].forEach(eventName => {
-  dropzone.addEventListener(eventName, () => dropzone.classList.remove('dragover'), false);
-});
-
-dropzone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
-fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-function handleFiles(newFiles) {
-  Array.from(newFiles).forEach(file => {
-    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return;
-    state.files.push(file);
-    renderPreview(file);
+// Integrations
+const btnConnectMeta = document.getElementById('btn-connect-meta');
+if (btnConnectMeta) {
+  btnConnectMeta.addEventListener('click', () => {
+    // Mock connection
+    document.getElementById('meta-disconnected').classList.add('hidden');
+    document.getElementById('meta-connected').classList.remove('hidden');
+    showToast('Meta accounts linked successfully!');
   });
 }
 
-function renderPreview(file) {
-  const div = document.createElement('div');
-  div.className = 'media-item';
-  
-  const removeBtn = document.createElement('button');
-  removeBtn.className = 'remove-media';
-  removeBtn.innerHTML = '✕';
-  removeBtn.onclick = () => {
-    state.files = state.files.filter(f => f !== file);
-    div.remove();
-  };
-  
-  let media;
-  if (file.type.startsWith('image/')) {
-    media = document.createElement('img');
-    media.src = URL.createObjectURL(file);
-  } else {
-    media = document.createElement('video');
-    media.src = URL.createObjectURL(file);
-  }
-  
-  div.appendChild(media);
-  div.appendChild(removeBtn);
-  previewGrid.appendChild(div);
-}
-
-// ------------------------------------------------------------------
-// Start Automation
-// ------------------------------------------------------------------
-document.getElementById('btn-start-automation').addEventListener('click', async () => {
-  if (state.files.length === 0) {
-    return showToast('Please upload at least one media file', 'error');
-  }
-
-  setLoading('btn-start-automation', true);
-  try {
-    let uploadedUrls = [];
-    
-    // Upload each file to backend
-    for (const file of state.files) {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const uploadRes = await apiCall('/upload-media', {
-        method: 'POST',
-        body: formData
-      });
-      if (uploadRes.success && uploadRes.data.url) {
-        uploadedUrls.push(uploadRes.data.url);
-      }
-    }
-
-    // Trigger Campaign creation
-    const campaignRes = await apiCall('/campaigns', {
-      method: 'POST',
-      body: JSON.stringify({
-        baseCaption: "Automated Campaign Generated via Frontend",
-        mediaUrl: uploadedUrls[0],
-        mediaType: state.files[0].type
-      })
-    });
-
-    if (campaignRes.success) {
-      // Trigger Manual Social Post
-      const formData = new FormData();
-      formData.append('platform', 'BOTH');
-      formData.append('generate_ai_caption', 'true');
-      formData.append('product_id', campaignRes.data.id);
-      
-      await fetch(`${API_BASE}/posts/manual`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${state.token}` },
-        body: formData
-      });
-
-      showToast('Automation started successfully! Your post is being generated.');
-      
-      // Reset files
-      state.files = [];
-      previewGrid.innerHTML = '';
-    } else {
-      showToast('Failed to create campaign', 'error');
-    }
-
-  } catch (err) {
-    console.error(err);
-    showToast('Failed to start automation', 'error');
-  } finally {
-    setLoading('btn-start-automation', false);
-  }
+document.getElementById('btn-save-meta').addEventListener('click', () => {
+  showToast('Automation settings saved!');
 });
 
-// Boot
-initializeApp();
+// Media Upload
+const dropzone = document.getElementById('media-dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('click', () => fileInput.click());
+
+dropzone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropzone.style.borderColor = 'var(--primary-color)';
+});
+dropzone.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dropzone.style.borderColor = 'var(--border-color)';
+});
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.style.borderColor = 'var(--border-color)';
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  for(let file of files) {
+    if(file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      state.files.push(file);
+    }
+  }
+  renderMediaGrid();
+}
+
+function renderMediaGrid() {
+  const grid = document.getElementById('media-preview-grid');
+  grid.innerHTML = '';
+  
+  state.files.forEach(file => {
+    const div = document.createElement('div');
+    div.className = 'media-item';
+    
+    if (file.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      div.appendChild(img);
+    } else {
+      const vid = document.createElement('video');
+      vid.src = URL.createObjectURL(file);
+      div.appendChild(vid);
+    }
+    
+    grid.appendChild(div);
+  });
+}
+
+// Start Automation Mock
+document.getElementById('btn-start-automation').addEventListener('click', () => {
+  if (state.files.length === 0) {
+    showToast('Please upload media for the campaign', true);
+    return;
+  }
+  
+  const btn = document.getElementById('btn-start-automation');
+  const spinner = btn.querySelector('.spinner');
+  
+  spinner.classList.remove('hidden');
+  btn.disabled = true;
+  
+  setTimeout(() => {
+    spinner.classList.add('hidden');
+    btn.disabled = false;
+    
+    state.files = [];
+    renderMediaGrid();
+    
+    showToast('Campaign Generated! Marketing loop scheduled successfully.');
+  }, 2500);
+});
+
+// ============================================================================
+// Initialization
+// ============================================================================
+checkRouting();

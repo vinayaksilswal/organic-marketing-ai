@@ -4,16 +4,88 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Organic Marketing AI</title>
+    <title>Organic Marketing AI | Automate Your Growth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="app" class="centered-layout">
-      <!-- Error/Success Toast -->
-      <div id="toast" class="message hidden" style="position: fixed; top: 20px; right: 20px; z-index: 1000;"></div>
+    <div id="app">
+      <!-- Toast Notifications -->
+      <div id="toast" class="message hidden"></div>
+
+      <!-- Navigation Bar -->
+      <nav class="navbar hidden" id="main-nav">
+        <div class="nav-brand">Organic<span>Marketing AI</span></div>
+        <div class="nav-links">
+          <button class="btn btn-secondary" id="btn-logout-nav">Sign Out</button>
+        </div>
+      </nav>
 
       <div id="app-views">
-        <!-- Login / Register View -->
-        <div id="view-auth" class="view hidden">
+        
+        <!-- ========================================== -->
+        <!-- LANDING PAGE VIEW                          -->
+        <!-- ========================================== -->
+        <div id="view-landing" class="view">
+          <!-- Hero Section -->
+          <header class="hero">
+            <div class="container hero-content">
+              <h1>Automate your <span class="gradient-text">organic growth</span> on autopilot.</h1>
+              <p>The enterprise-grade AI marketing system built for SaaS, E-Commerce, and Influencers. Generate converting content and schedule it automatically.</p>
+              <div class="hero-cta">
+                <button class="btn btn-primary btn-large" id="btn-goto-login">Start Automating Today</button>
+                <button class="btn btn-secondary btn-large" id="btn-goto-pricing">View Pricing</button>
+              </div>
+            </div>
+            
+            <div class="hero-stats container">
+              <div class="stat-card">
+                <h3>SaaS</h3>
+                <p>Generate highly-converting LinkedIn & Twitter threads for developers and B2B buyers.</p>
+              </div>
+              <div class="stat-card">
+                <h3>E-Commerce</h3>
+                <p>Push engaging product videos & carousels directly to Instagram and Facebook.</p>
+              </div>
+              <div class="stat-card">
+                <h3>Influencers</h3>
+                <p>Maintain an active presence across all platforms without burning out.</p>
+              </div>
+            </div>
+          </header>
+
+          <!-- Pricing Section -->
+          <section id="pricing" class="pricing-section">
+            <div class="container">
+              <div class="pricing-header">
+                <h2>Simple, transparent pricing.</h2>
+                <p>Everything you need to scale your organic presence, for one flat monthly rate.</p>
+              </div>
+              
+              <div class="pricing-card">
+                <div class="pricing-card-header">
+                  <h3>Pro Tier</h3>
+                  <div class="price"><span class="currency">$</span>17<span class="period">/mo</span></div>
+                  <p>Full access to the Organic Marketing AI platform.</p>
+                </div>
+                <ul class="pricing-features">
+                  <li>✅ Unlimited AI Content Generation</li>
+                  <li>✅ Facebook & Instagram Automation</li>
+                  <li>✅ X (Twitter) & LinkedIn Integration</li>
+                  <li>✅ Custom Business Context (SaaS, E-Com)</li>
+                  <li>✅ Automated Email Marketing Drips</li>
+                </ul>
+                <button class="btn btn-primary" style="width: 100%;" id="btn-buy-now">Get Started for $17</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- AUTH VIEW (Login/Register)                 -->
+        <!-- ========================================== -->
+        <div id="view-auth" class="view hidden centered-layout">
           <div class="glass-panel card">
             <h1 id="auth-title">Welcome Back</h1>
             <p id="auth-subtitle" style="margin-bottom: 2rem;">Sign in to continue to your dashboard.</p>
@@ -35,18 +107,24 @@
             <div style="text-align: center;">
               <a href="#" id="auth-toggle" style="color: var(--primary-color); text-decoration: none; font-size: 0.875rem;">Create an account instead</a>
             </div>
+            <div style="text-align: center; margin-top: 1rem;">
+              <a href="#" id="auth-back" style="color: var(--text-muted); text-decoration: none; font-size: 0.875rem;">&larr; Back to Home</a>
+            </div>
           </div>
         </div>
 
-        <!-- Onboarding Wizard View -->
-        <div id="view-onboarding" class="view hidden">
+        <!-- ========================================== -->
+        <!-- ONBOARDING WIZARD                          -->
+        <!-- ========================================== -->
+        <div id="view-onboarding" class="view hidden centered-layout">
           <div class="glass-panel card" style="max-width: 600px;">
             <div class="wizard-progress">
               <div class="wizard-step active" id="step-1-indicator"></div>
               <div class="wizard-step" id="step-2-indicator"></div>
+              <div class="wizard-step" id="step-3-indicator"></div>
             </div>
 
-            <!-- Step 1 -->
+            <!-- Step 1: Business Details -->
             <div id="onboarding-step-1">
               <h1>Business Identity</h1>
               <p style="margin-bottom: 2rem;">Let's set up your core business details.</p>
@@ -61,13 +139,13 @@
                 <textarea id="onboard-description" rows="4" placeholder="What does your business do?"></textarea>
               </div>
 
-              <button class="btn btn-primary" id="btn-next-step" style="float: right;">Next Step &rarr;</button>
+              <button class="btn btn-primary" id="btn-next-step-1" style="float: right;">Next Step &rarr;</button>
             </div>
 
-            <!-- Step 2 -->
+            <!-- Step 2: Business Model -->
             <div id="onboarding-step-2" class="hidden">
               <h1>Business Model</h1>
-              <p style="margin-bottom: 2rem;">Select the category that best describes your business.</p>
+              <p style="margin-bottom: 2rem;">Select the category that best describes your business so the AI can tailor its content.</p>
               
               <div class="selection-grid" id="business-model-grid">
                 <div class="selection-card" data-model="AI Influencer">🌟<br/><br/>AI Influencer</div>
@@ -79,50 +157,77 @@
               </div>
 
               <div style="display: flex; justify-content: space-between;">
-                <button class="btn btn-secondary" id="btn-prev-step">&larr; Back</button>
-                <button class="btn btn-primary" id="btn-finish-onboarding">
-                  <span class="btn-text">Complete Setup</span>
-                  <span class="spinner hidden"></span>
-                </button>
+                <button class="btn btn-secondary" id="btn-prev-step-2">&larr; Back</button>
+                <button class="btn btn-primary" id="btn-next-step-2">Next Step &rarr;</button>
               </div>
             </div>
+
+            <!-- Step 3: Subscription ($17/mo) -->
+            <div id="onboarding-step-3" class="hidden">
+              <h1>Activate Subscription</h1>
+              <p style="margin-bottom: 2rem;">To access the dashboard and begin automation, activate your Pro plan for $17/mo.</p>
+              
+              <div class="payment-box">
+                <div class="payment-header">
+                  <h3>Pro Plan</h3>
+                  <div class="price">$17<span>/mo</span></div>
+                </div>
+                
+                <div id="paypal-button-container" style="margin-top: 2rem;">
+                  <!-- PayPal Button will render here -->
+                  <button class="btn btn-primary" style="width: 100%;" id="btn-mock-pay">Pay with PayPal (Mock $17)</button>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; margin-top: 2rem;">
+                <button class="btn btn-secondary" id="btn-prev-step-3">&larr; Back</button>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Dashboard View (Meta Integration & Automation) -->
+        <!-- ========================================== -->
+        <!-- DASHBOARD VIEW                             -->
+        <!-- ========================================== -->
         <div id="view-dashboard" class="view hidden">
-          <div class="container">
+          <div class="container" style="padding: 2rem 0;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-              <h1>Automation Dashboard</h1>
-              <button class="btn btn-secondary" id="btn-logout">Sign Out</button>
+              <div>
+                <h1>Automation Dashboard</h1>
+                <p class="text-muted">Your subscription is <span class="badge active">Active</span></p>
+              </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
-              <!-- Sidebar: Meta Connection -->
+              <!-- Sidebar: Integrations -->
               <div>
                 <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 2rem;">
-                  <h3>Meta Accounts</h3>
-                  <p style="font-size: 0.875rem; margin-bottom: 1.5rem;">Connect your Facebook and Instagram accounts for automation.</p>
+                  <h3>Integrations</h3>
+                  <p style="font-size: 0.875rem; margin-bottom: 1.5rem; color: var(--text-muted);">Connect your social accounts for automation.</p>
                   
                   <div id="meta-disconnected">
-                    <button class="btn btn-primary" id="btn-connect-meta" style="width: 100%; margin-bottom: 1rem;">
-                      Connect Facebook
+                    <button class="btn btn-secondary" id="btn-connect-meta" style="width: 100%; margin-bottom: 1rem;">
+                      Connect Facebook/IG
                     </button>
                   </div>
                   
                   <div id="meta-connected" class="hidden">
-                    <div class="input-group">
+                    <div class="integration-status">
+                      <span class="status-dot green"></span> Meta Connected
+                    </div>
+                    <div class="input-group" style="margin-top: 1rem;">
                       <label>Facebook Page</label>
                       <select id="select-fb-page">
                         <option value="">Select a Page...</option>
-                        <option value="page1">My E-commerce Page</option>
+                        <option value="page1">My Business Page</option>
                       </select>
                     </div>
                     <div class="input-group">
                       <label>Instagram Account</label>
                       <select id="select-ig-account">
                         <option value="">Select an Account...</option>
-                        <option value="ig1">@myecommerce</option>
+                        <option value="ig1">@mybusiness</option>
                       </select>
                     </div>
                     <button class="btn btn-secondary" id="btn-save-meta" style="width: 100%; margin-top: 1rem;">Save Accounts</button>
@@ -130,11 +235,11 @@
                 </div>
               </div>
 
-              <!-- Main Content: Automation & Media -->
+              <!-- Main Content: Campaign Automation -->
               <div>
                 <div class="glass-panel" style="padding: 2rem;">
-                  <h3>Create Campaign</h3>
-                  <p style="margin-bottom: 1.5rem;">Upload media to trigger an automated marketing campaign.</p>
+                  <h3>Create AI Campaign</h3>
+                  <p style="margin-bottom: 1.5rem; color: var(--text-muted);">Upload media (images/videos) and our AI will generate targeted copy based on your business model and post it automatically.</p>
                   
                   <div class="dropzone" id="media-dropzone">
                     <div class="dropzone-icon">📁</div>
@@ -148,7 +253,7 @@
                   </div>
 
                   <button class="btn btn-primary" id="btn-start-automation" style="width: 100%; padding: 1rem; font-size: 1.125rem;">
-                    <span class="btn-text">Start Automation</span>
+                    <span class="btn-text">Generate & Schedule Campaign</span>
                     <span class="spinner hidden"></span>
                   </button>
                 </div>

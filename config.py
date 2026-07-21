@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — Centralized Configuration (Pydantic Settings)
+Organic Marketing AI — Centralized Configuration (Pydantic Settings)
 =============================================================================
 All environment variables are loaded here via pydantic-settings and exposed
 as a singleton `settings` instance. Every service imports from this module
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # Resend API (Transactional & Marketing Email)
     # =========================================================================
     resend_api_key: str | None = None
-    resend_from_email: str = "QuantCAI <support@quantcai.in>"
+    resend_from_email: str = "Organic Marketing AI <support@organicmarketing.ai>"
 
     # =========================================================================
     # Gemini API Key (legacy — kept for backward compat if needed)

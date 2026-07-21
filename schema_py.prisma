@@ -176,11 +176,15 @@ model DripStep {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String   // Hashed password
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  email                String   @unique
+  password             String   // Hashed password
+  subscriptionPlan     String   @default("FREE") // FREE, PRO ($17)
+  paypalSubscriptionId String?
+  subscriptionStatus   String   @default("INACTIVE") // INACTIVE, ACTIVE, CANCELLED
+  subscriptionExpiresAt DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   businessProfile   BusinessProfile?
   socialConnection  SocialConnection?
