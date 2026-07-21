@@ -13,8 +13,9 @@ directory (or the root .env via env_file config).
 
 from __future__ import annotations
 
+import sys
 import warnings
-from pydantic import model_validator
+from pydantic import model_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,13 +34,13 @@ class Settings(BaseSettings):
     # =========================================================================
     # Database (PostgreSQL via Prisma)
     # =========================================================================
-    database_url: str
+    database_url: str = "postgresql://postgres:password@localhost:5432/quantcai"
 
     # =========================================================================
     # Admin Authentication (JWT-based cookie auth)
     # =========================================================================
-    admin_username: str
-    admin_password: str
+    admin_username: str = "admin"
+    admin_password: str = "admin"
     jwt_secret: str | None = None
     jwt_algorithm: str = "HS256"
 
@@ -82,6 +83,10 @@ class Settings(BaseSettings):
         if self.environment == "production":
             if not self.jwt_secret or self.jwt_secret == "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7":
                 raise ValueError("CRITICAL: JWT_SECRET must be securely set in production environment variables.")
+            if self.database_url == "postgresql://postgres:password@localhost:5432/quantcai":
+                raise ValueError("CRITICAL: DATABASE_URL must be set to a real production database URL.")
+            if self.admin_username == "admin" or self.admin_password == "admin":
+                raise ValueError("CRITICAL: ADMIN_USERNAME and ADMIN_PASSWORD must be changed in production.")
         elif not self.jwt_secret:
             self.jwt_secret = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
             warnings.warn("Using default JWT_SECRET for development. Do NOT use in production.")
@@ -91,4 +96,15 @@ class Settings(BaseSettings):
 # =============================================================================
 # Global Singleton Instance
 # =============================================================================
-settings = Settings()
+try:
+    settings = Settings()
+except ValidationError as e:
+    print("=" * 70, file=sys.stderr)
+    print("CRITICAL CONFIGURATION ERROR: APPLICATION FAILED TO START", file=sys.stderr)
+    print("The application cannot start because of the following validation errors:", file=sys.stderr)
+    for err in e.errors():
+        field_path = ".".join(str(loc) for loc in err.get("loc", []))
+        message = err.get("msg", "")
+        print(f" ❌ {field_path.upper()}: {message}", file=sys.stderr)
+    print("=" * 70, file=sys.stderr)
+    sys.exit(1)
