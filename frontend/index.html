@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Organic Marketing AI</title>
+  </head>
+  <body>
+    <div id="app" class="centered-layout">
+      <!-- Error/Success Toast -->
+      <div id="toast" class="message hidden" style="position: fixed; top: 20px; right: 20px; z-index: 1000;"></div>
+
+      <div id="app-views">
+        <!-- Login / Register View -->
+        <div id="view-auth" class="view hidden">
+          <div class="glass-panel card">
+            <h1 id="auth-title">Welcome Back</h1>
+            <p id="auth-subtitle" style="margin-bottom: 2rem;">Sign in to continue to your dashboard.</p>
+            
+            <form id="auth-form">
+              <div class="input-group">
+                <label>Email Address</label>
+                <input type="email" id="auth-email" required placeholder="you@example.com" />
+              </div>
+              <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="auth-password" required placeholder="••••••••" />
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" id="auth-submit">
+                <span class="btn-text">Sign In</span>
+                <span class="spinner hidden"></span>
+              </button>
+            </form>
+            <div style="text-align: center;">
+              <a href="#" id="auth-toggle" style="color: var(--primary-color); text-decoration: none; font-size: 0.875rem;">Create an account instead</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Onboarding Wizard View -->
+        <div id="view-onboarding" class="view hidden">
+          <div class="glass-panel card" style="max-width: 600px;">
+            <div class="wizard-progress">
+              <div class="wizard-step active" id="step-1-indicator"></div>
+              <div class="wizard-step" id="step-2-indicator"></div>
+            </div>
+
+            <!-- Step 1 -->
+            <div id="onboarding-step-1">
+              <h1>Business Identity</h1>
+              <p style="margin-bottom: 2rem;">Let's set up your core business details.</p>
+              
+              <div class="input-group">
+                <label>Website URL</label>
+                <input type="url" id="onboard-website" placeholder="https://example.com" />
+              </div>
+              
+              <div class="input-group">
+                <label>Business Description</label>
+                <textarea id="onboard-description" rows="4" placeholder="What does your business do?"></textarea>
+              </div>
+
+              <button class="btn btn-primary" id="btn-next-step" style="float: right;">Next Step &rarr;</button>
+            </div>
+
+            <!-- Step 2 -->
+            <div id="onboarding-step-2" class="hidden">
+              <h1>Business Model</h1>
+              <p style="margin-bottom: 2rem;">Select the category that best describes your business.</p>
+              
+              <div class="selection-grid" id="business-model-grid">
+                <div class="selection-card" data-model="AI Influencer">🌟<br/><br/>AI Influencer</div>
+                <div class="selection-card" data-model="SaaS">💻<br/><br/>SaaS</div>
+                <div class="selection-card" data-model="E-commerce">🛒<br/><br/>E-commerce</div>
+                <div class="selection-card" data-model="Creator">🎨<br/><br/>Creator</div>
+                <div class="selection-card" data-model="Local Business">🏪<br/><br/>Local Business</div>
+                <div class="selection-card" data-model="Agency">🤝<br/><br/>Agency</div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between;">
+                <button class="btn btn-secondary" id="btn-prev-step">&larr; Back</button>
+                <button class="btn btn-primary" id="btn-finish-onboarding">
+                  <span class="btn-text">Complete Setup</span>
+                  <span class="spinner hidden"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard View (Meta Integration & Automation) -->
+        <div id="view-dashboard" class="view hidden">
+          <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+              <h1>Automation Dashboard</h1>
+              <button class="btn btn-secondary" id="btn-logout">Sign Out</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+              <!-- Sidebar: Meta Connection -->
+              <div>
+                <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 2rem;">
+                  <h3>Meta Accounts</h3>
+                  <p style="font-size: 0.875rem; margin-bottom: 1.5rem;">Connect your Facebook and Instagram accounts for automation.</p>
+                  
+                  <div id="meta-disconnected">
+                    <button class="btn btn-primary" id="btn-connect-meta" style="width: 100%; margin-bottom: 1rem;">
+                      Connect Facebook
+                    </button>
+                  </div>
+                  
+                  <div id="meta-connected" class="hidden">
+                    <div class="input-group">
+                      <label>Facebook Page</label>
+                      <select id="select-fb-page">
+                        <option value="">Select a Page...</option>
+                        <option value="page1">My E-commerce Page</option>
+                      </select>
+                    </div>
+                    <div class="input-group">
+                      <label>Instagram Account</label>
+                      <select id="select-ig-account">
+                        <option value="">Select an Account...</option>
+                        <option value="ig1">@myecommerce</option>
+                      </select>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-save-meta" style="width: 100%; margin-top: 1rem;">Save Accounts</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Main Content: Automation & Media -->
+              <div>
+                <div class="glass-panel" style="padding: 2rem;">
+                  <h3>Create Campaign</h3>
+                  <p style="margin-bottom: 1.5rem;">Upload media to trigger an automated marketing campaign.</p>
+                  
+                  <div class="dropzone" id="media-dropzone">
+                    <div class="dropzone-icon">📁</div>
+                    <h4>Drag & Drop media here</h4>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem;">or click to browse files (Images & Videos)</p>
+                    <input type="file" id="file-input" multiple accept="image/*,video/*" class="hidden" />
+                  </div>
+
+                  <div class="media-grid" id="media-preview-grid">
+                    <!-- Previews injected here -->
+                  </div>
+
+                  <button class="btn btn-primary" id="btn-start-automation" style="width: 100%; padding: 1rem; font-size: 1.125rem;">
+                    <span class="btn-text">Start Automation</span>
+                    <span class="spinner hidden"></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

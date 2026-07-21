@@ -1,0 +1,216 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+model Audience {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  phone        String?
+  source       String   @default("checkout")  // checkout, newsletter, organic, manual, referral
+  unsubscribed Boolean  @default(false)
+  lastEngaged  DateTime?
+  tags         String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model MarketingState {
+  id            String   @id @default("singleton")
+  lastSocialIdx Int      @default(0)
+  lastEmailIdx  Int      @default(0)
+  autoApprove   Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+}
+
+model SocialPost {
+  id           String   @id @default(cuid())
+  campaignId   String?
+  campaign     SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  platform     String   // FACEBOOK, INSTAGRAM, BOTH, TWITTER, LINKEDIN
+  type         String   @default("AUTO") // AUTO or MANUAL
+  caption      String   @db.Text
+  mediaUrls    String[]
+  scheduledAt  DateTime
+  postedAt     DateTime?
+  status       String   @default("DRAFT") // DRAFT, POSTED, FAILED
+  errorLog     String?  @db.Text
+  fbPostId     String?
+  igPostId     String?
+  twitterPostId String?
+  linkedinPostId String?
+  abTestGroup  String?  // "A" or "B" for A/B testing
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  engagementMetrics EngagementMetrics[]
+}
+
+model EmailCampaign {
+  id             String   @id @default(cuid())
+  campaignId     String?
+  campaign       SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  type           String   @default("AUTO") // AUTO, MANUAL, DRIP
+  subject        String
+  bodyText       String   @db.Text
+  bodyHtml       String   @db.Text
+  scheduledAt    DateTime
+  sentAt         DateTime?
+  status         String   @default("DRAFT") // DRAFT, SENT, FAILED
+  errorLog       String?  @db.Text
+  recipientCount Int      @default(0)
+  openCount      Int      @default(0)
+  clickCount     Int      @default(0)
+  bounceCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
+model SocialCampaign {
+  id           String   @id @default(cuid())
+  baseCaption  String   @db.Text
+  mediaUrl     String   
+  mediaType    String   
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  socialPosts     SocialPost[]
+  emailCampaigns  EmailCampaign[]
+  marketingLogs   MarketingLog[]
+  contentCalendar ContentCalendar[]
+  abTests         ABTest[]
+}
+
+model MarketingLog {
+  id          String   @id @default(cuid())
+  campaignId  String?
+  campaign    SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  status      String   // SUCCESS, PARTIAL, FAILED
+  socialSuccess Boolean
+  emailSuccess  Boolean
+  emailCount    Int      @default(0)
+  errorLog      String?  @db.Text
+  createdAt     DateTime @default(now())
+}
+
+// ─── NEW: Post-Publish Engagement Tracking ──────────────────────────
+model EngagementMetrics {
+  id            String   @id @default(cuid())
+  postId        String
+  post          SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platform      String   // FACEBOOK, INSTAGRAM, TWITTER, LINKEDIN
+  reach         Int      @default(0)
+  impressions   Int      @default(0)
+  likes         Int      @default(0)
+  comments      Int      @default(0)
+  shares        Int      @default(0)
+  clicks        Int      @default(0)
+  engagementRate Float   @default(0)
+  fetchedAt     DateTime @default(now())
+}
+
+// ─── NEW: Pre-Planned Content Calendar ──────────────────────────────
+model ContentCalendar {
+  id           String   @id @default(cuid())
+  campaignId   String?
+  campaign     SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  contentType  String   // EDUCATIONAL, PROMOTIONAL, ENGAGEMENT, SOCIAL_PROOF, CASE_STUDY
+  platform     String   // FACEBOOK, INSTAGRAM, TWITTER, LINKEDIN, ALL
+  scheduledFor DateTime
+  caption      String?  @db.Text
+  mediaUrls    String[]
+  status       String   @default("PLANNED") // PLANNED, GENERATED, PUBLISHED, SKIPPED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── NEW: A/B Test Tracking ─────────────────────────────────────────
+model ABTest {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     SocialCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  captionA     String   @db.Text
+  captionB     String   @db.Text
+  winnerGroup  String?  // "A" or "B" — set after analysis
+  reachA       Int      @default(0)
+  reachB       Int      @default(0)
+  engagementA  Float    @default(0)
+  engagementB  Float    @default(0)
+  status       String   @default("RUNNING") // RUNNING, COMPLETE
+  createdAt    DateTime @default(now())
+  analyzedAt   DateTime?
+}
+
+// ─── NEW: Drip Campaign Sequences ───────────────────────────────────
+model DripSequence {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Welcome Series", "PQC Education"
+  isActive    Boolean  @default(true)
+  steps       DripStep[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DripStep {
+  id           String   @id @default(cuid())
+  sequenceId   String
+  sequence     DripSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  stepOrder    Int      // 0, 1, 2, 3...
+  delayDays    Int      // Days after subscription to send (0 = immediate)
+  subject      String
+  bodyText     String   @db.Text
+  bodyHtml     String   @db.Text
+  createdAt    DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Hashed password
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessProfile   BusinessProfile?
+  socialConnection  SocialConnection?
+}
+
+model BusinessProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  websiteUrl    String?
+  description   String?  @db.Text
+  businessModel String?  // e.g. "SaaS", "E-commerce", "AI Influencer"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SocialConnection {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fbAccessToken   String?
+  fbPageId        String?
+  fbPageName      String?
+  igAccountId     String?
+  igAccountName   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+generator py {
+  provider             = "prisma-client-py"
+  recursive_type_depth = 5
+}
