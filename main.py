@@ -280,7 +280,14 @@ templates = Jinja2Templates(directory="templates")
 # Import and include all routers. The ai_chat router has been consolidated
 # into the chat_agent service + the api router.
 # =============================================================================
-from routers import api, auth, marketing, user_api  # noqa: E402
+from routers import api, auth, marketing, user_api, stripe_webhook  # noqa: E402
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -289,6 +296,7 @@ app.include_router(marketing.router)
 app.include_router(api.router)
 app.include_router(api.public_router)
 app.include_router(user_api.router)
+app.include_router(stripe_webhook.router)
 
 
 # =============================================================================

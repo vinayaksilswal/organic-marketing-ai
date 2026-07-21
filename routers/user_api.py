@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from routers.auth import verify_user
 
 router = APIRouter(
-    prefix="/api/v1/user",
+    prefix="/api/v1/users/me",
     tags=["User API"],
     dependencies=[Depends(verify_user)],
 )
@@ -21,14 +21,23 @@ class SocialConnectionUpdate(BaseModel):
     igAccountId: Optional[str] = None
     igAccountName: Optional[str] = None
 
-@router.get("/business-profile")
-async def get_business_profile(request: Request, user_id: str = Depends(verify_user)):
+@router.get("")
+async def get_current_user(request: Request, user_id: str = Depends(verify_user)):
     prisma = request.app.state.prisma
-    profile = await prisma.businessprofile.find_unique(where={"userId": user_id})
-    return {"success": True, "data": profile.model_dump() if profile else None}
+    user = await prisma.user.find_unique(
+        where={"id": user_id},
+        include={"businessProfile": True, "socialConnection": True}
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Do not leak hashed password
+    user_data = user.model_dump()
+    user_data.pop("password", None)
+    return user_data
 
-@router.put("/business-profile")
-async def update_business_profile(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
+@router.post("/business-profile")
+async def update_business_profile_post(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
     prisma = request.app.state.prisma
     profile = await prisma.businessprofile.upsert(
         where={"userId": user_id},
@@ -47,6 +56,24 @@ async def update_business_profile(data: BusinessProfileUpdate, request: Request,
         }
     )
     return {"success": True, "data": profile.model_dump()}
+
+@router.put("/business-profile")
+async def update_business_profile(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
+    return await update_business_profile_post(data, request, user_id)
+
+@router.post("/subscribe")
+async def activate_subscription(request: Request, user_id: str = Depends(verify_user)):
+    prisma = request.app.state.prisma
+    
+    # Mocking successful payment update
+    user = await prisma.user.update(
+        where={"id": user_id},
+        data={
+            "subscriptionPlan": "PRO",
+            "subscriptionStatus": "ACTIVE"
+        }
+    )
+    return {"success": True, "message": "Subscription activated successfully"}
 
 @router.get("/social-connection")
 async def get_social_connection(request: Request, user_id: str = Depends(verify_user)):

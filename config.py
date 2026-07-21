@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     resend_from_email: str = "Organic Marketing AI <support@organicmarketing.ai>"
 
     # =========================================================================
+    # Stripe (Monetization & Webhooks)
+    # =========================================================================
+    stripe_secret_key: str | None = None
+    stripe_webhook_secret: str | None = None
+
+    # =========================================================================
     # Gemini API Key (legacy — kept for backward compat if needed)
     # =========================================================================
     gemini_api_key: str | None = None

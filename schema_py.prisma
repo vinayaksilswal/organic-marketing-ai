@@ -180,7 +180,8 @@ model User {
   email                String   @unique
   password             String   // Hashed password
   subscriptionPlan     String   @default("FREE") // FREE, PRO ($17)
-  paypalSubscriptionId String?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
   subscriptionStatus   String   @default("INACTIVE") // INACTIVE, ACTIVE, CANCELLED
   subscriptionExpiresAt DateTime?
   createdAt            DateTime @default(now())

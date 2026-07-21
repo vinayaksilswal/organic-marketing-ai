@@ -44,3 +44,7 @@ loguru
 
 # --- Monitoring ---
 prometheus-fastapi-instrumentator
+
+# --- Monetization & Security ---
+stripe
+slowapi
