@@ -37,6 +37,7 @@ tweepy
 
 # --- Authentication ---
 pyjwt
+bcrypt
 
 # --- Logging ---
 loguru
