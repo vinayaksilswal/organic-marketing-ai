@@ -3,11 +3,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model Audience {
   id           String   @id @default(cuid())
-  email        String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email        String
   name         String?
   phone        String?
   source       String   @default("checkout")  // checkout, newsletter, organic, manual, referral
@@ -16,10 +16,14 @@ model Audience {
   tags         String[] @default([])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@unique([userId, email])
 }
 
 model MarketingState {
-  id            String   @id @default("singleton")
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastSocialIdx Int      @default(0)
   lastEmailIdx  Int      @default(0)
   autoApprove   Boolean  @default(false)
@@ -27,30 +31,35 @@ model MarketingState {
 }
 
 model SocialPost {
-  id           String   @id @default(cuid())
-  campaignId   String?
-  campaign     SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  platform     String   // FACEBOOK, INSTAGRAM, BOTH, TWITTER, LINKEDIN
-  type         String   @default("AUTO") // AUTO or MANUAL
-  caption      String   @db.Text
-  mediaUrls    String[]
-  scheduledAt  DateTime
-  postedAt     DateTime?
-  status       String   @default("DRAFT") // DRAFT, POSTED, FAILED
-  errorLog     String?  @db.Text
-  fbPostId     String?
-  igPostId     String?
-  twitterPostId String?
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  platform       String   // FACEBOOK, INSTAGRAM, BOTH, TWITTER, LINKEDIN
+  type           String   @default("AUTO") // AUTO or MANUAL
+  caption        String   @db.Text
+  mediaUrls      String[]
+  scheduledAt    DateTime
+  postedAt       DateTime?
+  status         String   @default("DRAFT") // DRAFT, POSTED, FAILED
+  errorLog       String?  @db.Text
+  retryCount     Int      @default(0)
+  fbPostId       String?
+  igPostId       String?
+  twitterPostId  String?
   linkedinPostId String?
-  abTestGroup  String?  // "A" or "B" for A/B testing
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  abTestGroup    String?  // "A" or "B" for A/B testing
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   engagementMetrics EngagementMetrics[]
 }
 
 model EmailCampaign {
   id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaignId     String?
   campaign       SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   type           String   @default("AUTO") // AUTO, MANUAL, DRIP
@@ -61,6 +70,7 @@ model EmailCampaign {
   sentAt         DateTime?
   status         String   @default("DRAFT") // DRAFT, SENT, FAILED
   errorLog       String?  @db.Text
+  retryCount     Int      @default(0)
   recipientCount Int      @default(0)
   openCount      Int      @default(0)
   clickCount     Int      @default(0)
@@ -70,15 +80,20 @@ model EmailCampaign {
 }
 
 model Media {
-  id        String   @id @default(cuid())
-  filename  String
-  mimeType  String
-  data      Bytes
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename    String
+  mimeType    String
+  url         String
+  storageKey  String?
+  createdAt   DateTime @default(now())
 }
 
 model SocialCampaign {
   id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   baseCaption  String   @db.Text
   mediaUrl     String   
   mediaType    String   
@@ -94,10 +109,12 @@ model SocialCampaign {
 }
 
 model MarketingLog {
-  id          String   @id @default(cuid())
-  campaignId  String?
-  campaign    SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  status      String   // SUCCESS, PARTIAL, FAILED
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId    String?
+  campaign      SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  status        String   // SUCCESS, PARTIAL, FAILED
   socialSuccess Boolean
   emailSuccess  Boolean
   emailCount    Int      @default(0)
@@ -108,6 +125,8 @@ model MarketingLog {
 // ─── NEW: Post-Publish Engagement Tracking ──────────────────────────
 model EngagementMetrics {
   id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   postId        String
   post          SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   platform      String   // FACEBOOK, INSTAGRAM, TWITTER, LINKEDIN
@@ -124,6 +143,8 @@ model EngagementMetrics {
 // ─── NEW: Pre-Planned Content Calendar ──────────────────────────────
 model ContentCalendar {
   id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaignId   String?
   campaign     SocialCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   contentType  String   // EDUCATIONAL, PROMOTIONAL, ENGAGEMENT, SOCIAL_PROOF, CASE_STUDY
@@ -139,6 +160,8 @@ model ContentCalendar {
 // ─── NEW: A/B Test Tracking ─────────────────────────────────────────
 model ABTest {
   id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaignId   String
   campaign     SocialCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   captionA     String   @db.Text
@@ -156,6 +179,8 @@ model ABTest {
 // ─── NEW: Drip Campaign Sequences ───────────────────────────────────
 model DripSequence {
   id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String   // e.g., "Welcome Series", "PQC Education"
   isActive    Boolean  @default(true)
   steps       DripStep[]
@@ -189,6 +214,19 @@ model User {
 
   businessProfile   BusinessProfile?
   socialConnection  SocialConnection?
+  marketingState    MarketingState?
+  
+  // Relations mapped from other models
+  audiences         Audience[]
+  socialPosts       SocialPost[]
+  emailCampaigns    EmailCampaign[]
+  media             Media[]
+  socialCampaigns   SocialCampaign[]
+  marketingLogs     MarketingLog[]
+  engagementMetrics EngagementMetrics[]
+  contentCalendars  ContentCalendar[]
+  abTests           ABTest[]
+  dripSequences     DripSequence[]
 }
 
 model BusinessProfile {
@@ -203,16 +241,18 @@ model BusinessProfile {
 }
 
 model SocialConnection {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fbAccessToken   String?
-  fbPageId        String?
-  fbPageName      String?
-  igAccountId     String?
-  igAccountName   String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fbAccessToken    String?
+  fbRefreshToken   String?
+  fbTokenExpiresAt DateTime?
+  fbPageId         String?
+  fbPageName       String?
+  igAccountId      String?
+  igAccountName    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 generator py {
