@@ -9,9 +9,12 @@ Uses SQLAlchemy 2.0 + asyncpg. Zero external Rust/Node binary dependencies.
 
 from __future__ import annotations
 
+import asyncio
+import ssl
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy import (
     Boolean,
@@ -68,7 +71,6 @@ class User(Base):
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
-    # Relationships
     businessProfile = relationship("BusinessProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     socialConnection = relationship("SocialConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     audiences = relationship("Audience", back_populates="user", cascade="all, delete-orphan")
@@ -217,13 +219,24 @@ class Media(Base):
 # =============================================================================
 # Database Connection Manager
 # =============================================================================
-def get_async_database_url(url: str) -> str:
+def get_async_database_url(url: str) -> tuple[str, dict]:
     """Format connection string for SQLAlchemy asyncpg driver."""
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    if url.startswith("postgres://"):
-        return url.replace("postgres://", "postgresql+asyncpg://", 1)
-    return url
+    clean_url = url
+    if clean_url.startswith("postgresql://"):
+        clean_url = clean_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif clean_url.startswith("postgres://"):
+        clean_url = clean_url.replace("postgres://", "postgresql+asyncpg://", 1)
+
+    connect_args = {"timeout": 10.0}
+
+    # Handle SSL mode if requested in URL
+    if "sslmode=require" in clean_url or "ssl=true" in clean_url.lower():
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        connect_args["ssl"] = ctx
+
+    return clean_url, connect_args
 
 
 engine: Optional[AsyncEngine] = None
@@ -234,8 +247,8 @@ async def init_db() -> AsyncEngine:
     """Initialize SQLAlchemy async engine and create tables."""
     global engine, AsyncSessionLocal
 
-    db_url = get_async_database_url(settings.database_url)
-    logger.info(f"Initializing SQLAlchemy AsyncEngine with PostgreSQL...")
+    db_url, connect_args = get_async_database_url(settings.database_url)
+    logger.info("Initializing SQLAlchemy AsyncEngine with PostgreSQL...")
 
     engine = create_async_engine(
         db_url,
@@ -243,6 +256,7 @@ async def init_db() -> AsyncEngine:
         pool_pre_ping=True,
         pool_size=10,
         max_overflow=20,
+        connect_args=connect_args,
     )
 
     AsyncSessionLocal = async_sessionmaker(
@@ -252,11 +266,15 @@ async def init_db() -> AsyncEngine:
         autoflush=False,
     )
 
-    # Auto-create all tables in PostgreSQL
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Auto-create tables with 5-second timeout safeguard
+    try:
+        async with asyncio.timeout(5.0):
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        logger.info("SQLAlchemy ORM tables initialized successfully")
+    except Exception as e:
+        logger.warning(f"Table initialization skipped or timed out ({e})")
 
-    logger.info("SQLAlchemy ORM tables initialized successfully")
     return engine
 
 
