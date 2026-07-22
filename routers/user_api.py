@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from routers.auth import verify_user
+from routers.auth import verify_user, get_prisma
 
 router = APIRouter(
     prefix="/api/v1/users/me",
@@ -23,7 +23,7 @@ class SocialConnectionUpdate(BaseModel):
 
 @router.get("")
 async def get_current_user(request: Request, user_id: str = Depends(verify_user)):
-    prisma = request.app.state.prisma
+    prisma = await get_prisma(request)
     user = await prisma.user.find_unique(
         where={"id": user_id},
         include={"businessProfile": True, "socialConnection": True}
@@ -38,7 +38,7 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
 
 @router.post("/business-profile")
 async def update_business_profile_post(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
-    prisma = request.app.state.prisma
+    prisma = await get_prisma(request)
     profile = await prisma.businessprofile.upsert(
         where={"userId": user_id},
         data={

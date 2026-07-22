@@ -132,8 +132,8 @@ class UserLogin(BaseModel):
 
 async def get_prisma(request: Request):
     """
-    Helper dependency to retrieve connected Prisma client, attempting
-    on-demand connection if it failed during cold startup.
+    Helper dependency to retrieve connected Prisma client, creating a fresh
+    connected instance if missing or disconnected.
     """
     prisma = getattr(request.app.state, "prisma", None)
     if prisma and prisma.is_connected():
@@ -141,18 +141,18 @@ async def get_prisma(request: Request):
 
     try:
         from prisma import Prisma
-        if not prisma:
-            prisma = Prisma()
-            request.app.state.prisma = prisma
-        if not prisma.is_connected():
-            await prisma.connect()
-            if hasattr(request.app.state, "prisma_error"):
-                delattr(request.app.state, "prisma_error")
-        return prisma
+        fresh_prisma = Prisma()
+        await fresh_prisma.connect()
+        request.app.state.prisma = fresh_prisma
+        if hasattr(request.app.state, "prisma_error"):
+            delattr(request.app.state, "prisma_error")
+        return fresh_prisma
     except Exception as e:
+        from loguru import logger
+        logger.error(f"Failed to connect Prisma client on-demand: {e}")
         raise HTTPException(
             status_code=503,
-            detail=f"Service database unavailable: {str(e)}",
+            detail=f"Database connection error: {str(e)}",
         )
 
 
