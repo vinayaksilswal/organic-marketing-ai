@@ -62,73 +62,72 @@ else:
 
 def resolve_prisma_engine() -> str | None:
     """
-    Locates and verifies an executable Prisma query engine binary, setting
-    PRISMA_QUERY_ENGINE_BINARY.
+    Locates or fetches the Prisma query engine binary at runtime, copying it
+    into site-packages/prisma to ensure persistence across Render container restarts.
     """
-    existing = os.environ.get("PRISMA_QUERY_ENGINE_BINARY")
-    if existing and os.path.isfile(existing):
-        try:
-            os.chmod(existing, 0o777)
-        except Exception:
-            pass
-        logger.info(f"Using existing PRISMA_QUERY_ENGINE_BINARY: {existing}")
-        return existing
-
+    import sys
+    import shutil
     import subprocess
     import prisma
 
     prisma_dir = os.path.dirname(prisma.__file__)
     engine_name = "prisma-query-engine-debian-openssl-3.0.x"
+    target_path = os.path.join(prisma_dir, engine_name)
 
-    explicit_paths = [
-        f"/opt/render/project/src/{engine_name}",
-        f"/opt/render/.cache/prisma-python/binaries/5.17.0/393aa359c9ad4a4bb28630fb5613f9c281cde053/{engine_name}",
-        engine_name,
-        "query-engine-debian-openssl-3.0.x",
-        os.path.join(prisma_dir, engine_name),
-        os.path.join(prisma_dir, "bin", "query-engine"),
-    ]
+    # Check if target already exists in site-packages/prisma
+    if os.path.isfile(target_path):
+        try:
+            os.chmod(target_path, 0o777)
+            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
+            logger.info(f"Using persistent Prisma engine binary at: {target_path}")
+            return target_path
+        except Exception as e:
+            logger.warning(f"Error using existing target path {target_path}: {e}")
 
-    for path in explicit_paths:
-        abs_path = os.path.abspath(path)
-        if os.path.isfile(abs_path):
-            try:
-                os.chmod(abs_path, 0o777)
-                res = subprocess.run([abs_path, "--version"], capture_output=True, timeout=5)
-                if res.returncode == 0:
-                    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = abs_path
-                    logger.info(f"Verified executable Prisma engine at: {abs_path}")
-                    return abs_path
-            except Exception as e:
-                logger.warning(f"Engine candidate at {abs_path} failed execution check: {e}")
-
-    # Recursive fallback search
+    # Search recursively in site-packages, project, and cache
     search_roots = [
-        "/opt/render",
         prisma_dir,
+        os.getcwd(),
         os.path.expanduser("~/.cache"),
-        "/root/.cache",
+        "/opt/render/.cache",
         "/tmp",
-        ".",
     ]
 
     for root_dir in search_roots:
         if os.path.exists(root_dir):
             for root, _, files in os.walk(root_dir):
-                for file in files:
-                    if "query-engine" in file and not file.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
-                        full_path = os.path.join(root, file)
+                for f in files:
+                    if "query-engine" in f and not f.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
+                        src_path = os.path.abspath(os.path.join(root, f))
                         try:
-                            os.chmod(full_path, 0o777)
-                            res = subprocess.run([full_path, "--version"], capture_output=True, timeout=5)
-                            if res.returncode == 0:
-                                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = full_path
-                                logger.info(f"Verified executable Prisma engine binary at: {full_path}")
-                                return full_path
-                        except Exception:
-                            pass
+                            os.chmod(src_path, 0o777)
+                            shutil.copy2(src_path, target_path)
+                            os.chmod(target_path, 0o777)
+                            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
+                            logger.info(f"Persisted Prisma engine binary to: {target_path}")
+                            return target_path
+                        except Exception as err:
+                            logger.warning(f"Failed to copy candidate {src_path}: {err}")
 
-    logger.warning("Could not locate verified executable Prisma query engine binary")
+    # Fallback: Fetch binary directly at runtime if missing
+    logger.warning("Prisma engine binary missing at startup. Executing runtime 'prisma py fetch'...")
+    try:
+        subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=False)
+        for root_dir in [prisma_dir, os.path.expanduser("~/.cache"), "/tmp"]:
+            if os.path.exists(root_dir):
+                for root, _, files in os.walk(root_dir):
+                    for f in files:
+                        if "query-engine" in f and not f.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
+                            src_path = os.path.abspath(os.path.join(root, f))
+                            os.chmod(src_path, 0o777)
+                            shutil.copy2(src_path, target_path)
+                            os.chmod(target_path, 0o777)
+                            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
+                            logger.info(f"Runtime fetch succeeded. Engine at: {target_path}")
+                            return target_path
+    except Exception as fetch_err:
+        logger.error(f"Runtime engine fetch failed: {fetch_err}")
+
     return None
 
 
