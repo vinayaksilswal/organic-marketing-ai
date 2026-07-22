@@ -59,7 +59,11 @@ const Auth = ({ onLogin, showToast }) => {
          throw new Error('Failed to fetch user data');
       }
     } catch (err) {
-      showToast(err.message, true);
+      if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+        showToast('Waking up server instance... Please try again in 5 seconds.', true);
+      } else {
+        showToast(err.message || 'Authentication failed', true);
+      }
     } finally {
       setLoading(false);
     }
