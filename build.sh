@@ -7,33 +7,37 @@ export PRISMA_CLI_QUERY_ENGINE_TYPE="binary"
 
 pip install --no-cache-dir -r requirements.txt
 
-echo "Locating Prisma package inside .venv and fetching query engine..."
+echo "Generating Prisma client (downloads query engine)..."
+prisma generate --schema=schema_py.prisma
+
+echo "Copying query engine into persistent .venv site-packages/prisma directory..."
 python -c "
 import os, sys, shutil, glob
 import prisma
-from prisma.binaries import fetch_binaries
 
 prisma_dir = os.path.dirname(prisma.__file__)
-print('Prisma package directory inside .venv:', prisma_dir)
+print('Target Prisma package directory inside .venv:', prisma_dir)
 
-fetch_binaries(prisma_dir)
+# Find the query engine downloaded by prisma generate in system cache
+found = glob.glob(os.path.expanduser('~/.cache/**/query-engine*'), recursive=True) + \
+        glob.glob('/tmp/**/query-engine*', recursive=True) + \
+        glob.glob('/opt/render/.cache/**/query-engine*', recursive=True)
 
-found = [f for f in glob.glob(os.path.join(prisma_dir, '**', '*query-engine*'), recursive=True) if 'node_modules' not in f] + \
-        [f for f in glob.glob(os.path.expanduser('~/.cache/**/*query-engine*'), recursive=True) if 'node_modules' not in f]
+print('Discovered engine candidates:', found)
 
 if found:
     src_engine = found[0]
     target_engine = os.path.join(prisma_dir, 'prisma-query-engine-debian-openssl-3.0.x')
     print(f'Copying engine from {src_engine} to {target_engine}')
-    shutil.copy(src_engine, target_engine)
+    shutil.copyfile(src_engine, target_engine)
     os.chmod(target_engine, 0o755)
-    print('Engine placed successfully inside .venv!')
+    print('SUCCESSFULLY COPIED ENGINE TO:', target_engine)
 else:
-    print('WARNING: Could not locate engine file via glob')
+    print('ERROR: Could not locate query-engine binary in cache!')
+    sys.exit(1)
 "
 
-prisma generate --schema=schema_py.prisma
 prisma db push --schema=schema_py.prisma
 
-echo "Build complete! Prisma engine stored safely in .venv"
+echo "Build complete! Prisma query engine safely secured in .venv"
 
