@@ -93,70 +93,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # --- Step 1: Instantiate and connect Prisma INSIDE the lifespan ---
     # This is the critical fix: creating Prisma() here ensures it uses
     # the current running event loop, not a stale or non-existent one.
-    import subprocess
-    import sys
     import os
-    import glob
-    import shutil
-    logger.info("Ensuring Prisma engine is available at runtime...")
-    try:
-        os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
-        os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
-        
-        cache_dir = os.path.join(os.getcwd(), ".prisma_binaries")
-        os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        venv_dir = os.path.join(base_dir, ".venv")
-        if not os.path.exists(venv_dir):
-            venv_dir = os.environ.get("VIRTUAL_ENV", sys.prefix)
-            
-        bin_dir = os.path.join(venv_dir, "bin")
-        if not os.path.exists(bin_dir) and platform.system() == "Windows":
-            bin_dir = os.path.join(venv_dir, "Scripts")
-            
-        existing_engines = glob.glob(os.path.join(bin_dir, "prisma-query-engine-*"))
-        
-        if existing_engines:
-            engine_path = os.path.abspath(existing_engines[0])
-            os.chmod(engine_path, 0o755)
-            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = engine_path
-            logger.info(f"Prisma engine already exists locally: {engine_path}, skipping fetch.")
-        else:
-            logger.warning("Prisma engine not found locally! Fetching at runtime (this may cause Gunicorn timeout in production).")
-            subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=True)
-            
-            engines = []
-            for root, dirs, files in os.walk(cache_dir):
-                for file in files:
-                    if "query-engine" in file:
-                        engines.append(os.path.join(root, file))
-            
-            if not engines:
-                home = os.path.expanduser("~")
-                for root, dirs, files in os.walk(os.path.join(home, ".cache", "prisma-python")):
-                    for file in files:
-                        if "query-engine" in file:
-                            engines.append(os.path.join(root, file))
-                            
-            if engines:
-                fetched_engine = engines[0]
-                expected_name = "prisma-" + os.path.basename(fetched_engine)
-                shutil.copy(fetched_engine, expected_name)
-                os.chmod(expected_name, 0o755)
-                
-                final_path = os.path.abspath(expected_name)
-                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = final_path
-                logger.info(f"Fixed Prisma path bug: Copied {fetched_engine} to {expected_name} and set PRISMA_QUERY_ENGINE_BINARY")
-            else:
-                logger.warning("Could not find downloaded Prisma engine in cache directory.")
-    except Exception as e:
-        logger.error(f"Failed to fetch/setup Prisma engine: {e}")
+    
+    # Point Prisma to the persistent cache directory created during the build phase
+    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".prisma_cache")
+    os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
 
-    prisma_client = Prisma()
-    os.environ["DATABASE_URL"] = settings.database_url
-    await prisma_client.connect()
-    app.state.prisma = prisma_client
-    logger.info("Prisma ORM connected to PostgreSQL")
+    try:
+        prisma_client = Prisma()
+        os.environ["DATABASE_URL"] = settings.database_url
+        await prisma_client.connect()
+        app.state.prisma = prisma_client
+        logger.info("Prisma ORM connected to PostgreSQL")
+    except Exception as e:
+        logger.error(f"Failed to connect Prisma engine: {e}")
 
     # --- Step 2: Initialize and start the marketing scheduler ---
     # The scheduler receives the prisma client so it doesn't create its own.
