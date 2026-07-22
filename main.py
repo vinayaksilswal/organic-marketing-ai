@@ -103,6 +103,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
         os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
         
+        cache_dir = os.path.join(os.getcwd(), ".prisma_binaries")
+        os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
+        
         existing_engines = glob.glob("prisma-query-engine-*")
         if existing_engines:
             logger.info(f"Prisma engine already exists locally: {existing_engines[0]}, skipping fetch.")
@@ -110,31 +113,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.warning("Prisma engine not found locally! Fetching at runtime (this may cause Gunicorn timeout in production).")
             subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=True)
             
-            # Prisma Python bug: The engine is downloaded to node_modules/@prisma/engines/
-            # but the python client looks for it in the current directory or node_modules/prisma/
-            cache_dir = "/opt/render/.cache/prisma-python/binaries/*/*/"
-            engines = (
-                glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*") +
-                glob.glob(cache_dir + "node_modules/prisma/query-engine-*") +
-                glob.glob(cache_dir + "query-engine-*") +
-                glob.glob(cache_dir + "prisma-query-engine-*")
-            )
+            engines = []
+            for root, dirs, files in os.walk(cache_dir):
+                for file in files:
+                    if "query-engine" in file:
+                        engines.append(os.path.join(root, file))
             
-            # If not on Render, try local user cache (for local development)
             if not engines:
-                import platform
                 home = os.path.expanduser("~")
-                cache_dir = os.path.join(home, ".cache", "prisma-python", "binaries", "*", "*", "")
-                engines = (
-                    glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*") +
-                    glob.glob(cache_dir + "node_modules/prisma/query-engine-*") +
-                    glob.glob(cache_dir + "query-engine-*") +
-                    glob.glob(cache_dir + "prisma-query-engine-*")
-                )
-                
+                for root, dirs, files in os.walk(os.path.join(home, ".cache", "prisma-python")):
+                    for file in files:
+                        if "query-engine" in file:
+                            engines.append(os.path.join(root, file))
+                            
             if engines:
                 engine_path = engines[0]
-                # Copy to python_admin current directory with the "prisma-" prefix it expects
                 expected_name = "prisma-" + os.path.basename(engine_path)
                 shutil.copy(engine_path, expected_name)
                 os.chmod(expected_name, 0o755)

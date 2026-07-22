@@ -8,31 +8,24 @@ print("Fetching Prisma engine...")
 os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
 os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
 
+cache_dir = os.path.join(os.getcwd(), ".prisma_binaries")
+os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
+
 subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=True)
 
-# Try Render cache directory first
-cache_dir = "/opt/render/.cache/prisma-python/binaries/*/*/"
-engines = (
-    glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*") +
-    glob.glob(cache_dir + "node_modules/prisma/query-engine-*") +
-    glob.glob(cache_dir + "query-engine-*") +
-    glob.glob(cache_dir + "prisma-query-engine-*")
-)
+engines = []
+for root, dirs, files in os.walk(cache_dir):
+    for file in files:
+        if "query-engine" in file:
+            engines.append(os.path.join(root, file))
 
-# If not on Render, try local user cache (for local development)
 if not engines:
-    import platform
+    # Fallback to home dir cache if PRISMA_BINARY_CACHE_DIR was ignored
     home = os.path.expanduser("~")
-    if platform.system() == "Windows":
-        cache_dir = os.path.join(home, ".cache", "prisma-python", "binaries", "*", "*", "")
-    else:
-        cache_dir = os.path.join(home, ".cache", "prisma-python", "binaries", "*", "*", "")
-    engines = (
-        glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*") +
-        glob.glob(cache_dir + "node_modules/prisma/query-engine-*") +
-        glob.glob(cache_dir + "query-engine-*") +
-        glob.glob(cache_dir + "prisma-query-engine-*")
-    )
+    for root, dirs, files in os.walk(os.path.join(home, ".cache", "prisma-python")):
+        for file in files:
+            if "query-engine" in file:
+                engines.append(os.path.join(root, file))
 
 if engines:
     engine_path = engines[0]
