@@ -97,6 +97,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     os.environ["PRISMA_BINARY_CACHE_DIR"] = "/opt/render/project/src/.venv/prisma_engine"
     os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
     os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
+    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = "/opt/render/project/src/.venv/prisma_engine/prisma-query-engine-debian-openssl-3.0.x"
 
     prisma_client = None
     try:
