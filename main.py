@@ -62,39 +62,41 @@ else:
 
 def resolve_prisma_engine() -> str | None:
     """
-    Locates the Prisma query engine binary in standard Python package and cache
-    locations, and sets PRISMA_QUERY_ENGINE_BINARY environment variable.
+    Recursively locates the Prisma query engine binary across system and cache
+    directories, explicitly setting PRISMA_QUERY_ENGINE_BINARY.
     """
     existing = os.environ.get("PRISMA_QUERY_ENGINE_BINARY")
     if existing and os.path.isfile(existing):
         logger.info(f"Using existing PRISMA_QUERY_ENGINE_BINARY: {existing}")
         return existing
 
-    import glob
+    import os
     import prisma
 
     prisma_dir = os.path.dirname(prisma.__file__)
-    search_dirs = [
+    search_roots = [
         prisma_dir,
-        os.path.join(prisma_dir, "bin"),
-        os.path.expanduser("~/.cache/prisma-python/bin"),
-        "/root/.cache/prisma-python/bin",
-        "/tmp/prisma-python/bin",
+        os.path.expanduser("~/.cache"),
+        "/root/.cache",
+        "/tmp",
+        "/app",
     ]
 
-    for directory in search_dirs:
-        if os.path.exists(directory):
-            for candidate in glob.glob(os.path.join(directory, "*query-engine*")):
-                if os.path.isfile(candidate) and not candidate.endswith((".gz", ".py", ".pyc")):
-                    try:
-                        os.chmod(candidate, 0o755)
-                    except Exception:
-                        pass
-                    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = candidate
-                    logger.info(f"Auto-resolved Prisma engine binary: {candidate}")
-                    return candidate
+    for root_dir in search_roots:
+        if os.path.exists(root_dir):
+            for root, _, files in os.walk(root_dir):
+                for file in files:
+                    if "query-engine" in file and not file.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
+                        full_path = os.path.join(root, file)
+                        try:
+                            os.chmod(full_path, 0o755)
+                        except Exception:
+                            pass
+                        os.environ["PRISMA_QUERY_ENGINE_BINARY"] = full_path
+                        logger.info(f"Auto-resolved Prisma engine binary at: {full_path}")
+                        return full_path
 
-    logger.warning("Could not auto-resolve Prisma engine binary in standard search paths")
+    logger.warning("Could not locate Prisma query engine binary in recursive search")
     return None
 
 

@@ -2,47 +2,49 @@
 # =============================================================================
 # Organic Marketing AI — Render Build Script
 # =============================================================================
-# This script runs during Render's build phase. It installs dependencies,
-# fetches the correct Prisma query engine binary for the host OS, generates
-# the Prisma client, and pushes the database schema.
-# =============================================================================
 set -o errexit
 
 echo "=== Organic Marketing AI Build ==="
 
-# Force Prisma to use the binary engine (not Node-API/WASM)
+# Force Prisma binary engine
 export PRISMA_CLIENT_ENGINE_TYPE="binary"
 export PRISMA_CLI_QUERY_ENGINE_TYPE="binary"
 
 # Install Python dependencies
 pip install --no-cache-dir -r requirements.txt
 
-# Fetch the correct Prisma query engine for this OS
+# Fetch the Prisma engine binary
 echo "Fetching Prisma query engine binaries..."
-python -m prisma py fetch || echo "Warning: prisma py fetch returned non-zero (may already exist)"
+python -m prisma py fetch || echo "Warning: prisma py fetch warning"
 
-# Generate the Prisma Python client from our schema
+# Generate the Prisma Python client
 echo "Generating Prisma client..."
 python -m prisma generate --schema=schema_py.prisma
 
-# Push schema to the database (creates/alters tables)
-echo "Pushing database schema..."
-python -m prisma db push --schema=schema_py.prisma --accept-data-loss || echo "Warning: db push had issues"
-
-# Verify the engine binary exists
-echo "Verifying Prisma engine binary..."
+# Find downloaded binary and place a copy in prisma package bin folder
 python -c "
-import prisma, os, glob
-d = os.path.dirname(prisma.__file__)
-bins = [f for f in glob.glob(os.path.join(d, '*query-engine*'))
-        if os.path.isfile(f) and not f.endswith(('.gz','.py','.pyc'))]
-if bins:
-    print(f'Found Prisma engine: {bins[0]}')
-else:
-    print('WARNING: No Prisma engine binary found!')
-    # Try one more time
-    import subprocess, sys
-    subprocess.run([sys.executable, '-m', 'prisma', 'py', 'fetch'], check=False)
+import os, glob, shutil, prisma
+prisma_dir = os.path.dirname(prisma.__file__)
+bin_dir = os.path.join(prisma_dir, 'bin')
+os.makedirs(bin_dir, exist_ok=True)
+
+# Search recursively for downloaded engine
+for search_base in [os.path.expanduser('~/.cache'), '/root/.cache', '/tmp', prisma_dir]:
+    if os.path.exists(search_base):
+        for root, dirs, files in os.walk(search_base):
+            for file in files:
+                if 'query-engine' in file and not file.endswith(('.gz', '.py', '.pyc', '.json', '.lock')):
+                    src = os.path.join(root, file)
+                    os.chmod(src, 0o755)
+                    # Copy to prisma bin folder as query-engine
+                    dest = os.path.join(bin_dir, file)
+                    shutil.copy2(src, dest)
+                    print(f'Copied Prisma engine to: {dest}')
+                    os.environ['PRISMA_QUERY_ENGINE_BINARY'] = dest
 "
+
+# Push schema to database
+echo "Pushing database schema..."
+python -m prisma db push --schema=schema_py.prisma --accept-data-loss || echo "Warning: db push warning"
 
 echo "=== Build Complete ==="
