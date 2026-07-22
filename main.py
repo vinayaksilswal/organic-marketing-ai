@@ -60,10 +60,21 @@ else:
     )
 
 
+def is_valid_elf_binary(path: str) -> bool:
+    """Check if file exists and starts with the Linux ELF magic header b'\\x7fELF'."""
+    if not os.path.isfile(path):
+        return False
+    try:
+        with open(path, "rb") as f:
+            return f.read(4) == b"\x7fELF"
+    except Exception:
+        return False
+
+
 def resolve_prisma_engine() -> str | None:
     """
-    Locates or fetches the Prisma query engine binary at runtime, copying it
-    into site-packages/prisma to ensure persistence across Render container restarts.
+    Locates or fetches a verified Linux ELF Prisma query engine binary at runtime,
+    persisting it inside site-packages/prisma across Render container restarts.
     """
     import sys
     import shutil
@@ -74,23 +85,29 @@ def resolve_prisma_engine() -> str | None:
     engine_name = "prisma-query-engine-debian-openssl-3.0.x"
     target_path = os.path.join(prisma_dir, engine_name)
 
-    # Check if target already exists in site-packages/prisma
-    if os.path.isfile(target_path):
+    # Check if target already exists and is a valid Linux ELF binary
+    if is_valid_elf_binary(target_path):
         try:
             os.chmod(target_path, 0o777)
             os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
-            logger.info(f"Using persistent Prisma engine binary at: {target_path}")
+            logger.info(f"Using verified Linux ELF Prisma engine at: {target_path}")
             return target_path
         except Exception as e:
-            logger.warning(f"Error using existing target path {target_path}: {e}")
+            logger.warning(f"Error using target path {target_path}: {e}")
+    elif os.path.exists(target_path):
+        # Remove non-ELF / invalid file
+        try:
+            os.remove(target_path)
+        except Exception:
+            pass
 
-    # Search recursively in site-packages, project, and cache
+    # Search recursively for a valid Linux ELF binary
     search_roots = [
         prisma_dir,
-        os.getcwd(),
         os.path.expanduser("~/.cache"),
         "/opt/render/.cache",
         "/tmp",
+        os.getcwd(),
     ]
 
     for root_dir in search_roots:
@@ -99,18 +116,19 @@ def resolve_prisma_engine() -> str | None:
                 for f in files:
                     if "query-engine" in f and not f.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
                         src_path = os.path.abspath(os.path.join(root, f))
-                        try:
-                            os.chmod(src_path, 0o777)
-                            shutil.copy2(src_path, target_path)
-                            os.chmod(target_path, 0o777)
-                            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
-                            logger.info(f"Persisted Prisma engine binary to: {target_path}")
-                            return target_path
-                        except Exception as err:
-                            logger.warning(f"Failed to copy candidate {src_path}: {err}")
+                        if is_valid_elf_binary(src_path):
+                            try:
+                                os.chmod(src_path, 0o777)
+                                shutil.copy2(src_path, target_path)
+                                os.chmod(target_path, 0o777)
+                                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
+                                logger.info(f"Persisted valid ELF Prisma engine to: {target_path}")
+                                return target_path
+                            except Exception as err:
+                                logger.warning(f"Failed copying ELF candidate {src_path}: {err}")
 
-    # Fallback: Fetch binary directly at runtime if missing
-    logger.warning("Prisma engine binary missing at startup. Executing runtime 'prisma py fetch'...")
+    # Fallback: Fetch fresh Linux binary directly at runtime
+    logger.warning("No valid ELF Prisma engine found. Executing runtime 'prisma py fetch'...")
     try:
         subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=False)
         for root_dir in [prisma_dir, os.path.expanduser("~/.cache"), "/tmp"]:
@@ -119,14 +137,15 @@ def resolve_prisma_engine() -> str | None:
                     for f in files:
                         if "query-engine" in f and not f.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
                             src_path = os.path.abspath(os.path.join(root, f))
-                            os.chmod(src_path, 0o777)
-                            shutil.copy2(src_path, target_path)
-                            os.chmod(target_path, 0o777)
-                            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
-                            logger.info(f"Runtime fetch succeeded. Engine at: {target_path}")
-                            return target_path
+                            if is_valid_elf_binary(src_path):
+                                os.chmod(src_path, 0o777)
+                                shutil.copy2(src_path, target_path)
+                                os.chmod(target_path, 0o777)
+                                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
+                                logger.info(f"Runtime fetch succeeded. ELF Engine at: {target_path}")
+                                return target_path
     except Exception as fetch_err:
-        logger.error(f"Runtime engine fetch failed: {fetch_err}")
+        logger.error(f"Runtime ELF engine fetch failed: {fetch_err}")
 
     return None
 
