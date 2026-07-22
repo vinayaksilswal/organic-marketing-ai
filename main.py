@@ -113,6 +113,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         subprocess.run(["prisma", "py", "fetch"])
         logger.info(f"Post-fetch CACHE DIR CONTENTS: {os.listdir(cache_dir) if os.path.exists(cache_dir) else 'Still missing'}")
 
+    prisma_client = None
     try:
         prisma_client = Prisma()
         os.environ["DATABASE_URL"] = settings.database_url
@@ -126,10 +127,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # --- Step 2: Initialize and start the marketing scheduler ---
     # The scheduler receives the prisma client so it doesn't create its own.
-    scheduler = create_scheduler(prisma_client)
-    scheduler.start()
-    app.state.scheduler = scheduler
-    logger.info("APScheduler started (bi-hourly marketing loop active)")
+    if prisma_client and prisma_client.is_connected():
+        scheduler = create_scheduler(prisma_client)
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("APScheduler started (bi-hourly marketing loop active)")
+    else:
+        logger.warning("Prisma client not connected, skipping scheduler startup")
+        app.state.scheduler = None
 
     logger.info("=" * 60)
     logger.info("Organic Marketing AI is ready to serve requests")
