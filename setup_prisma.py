@@ -30,8 +30,16 @@ if not engines:
 if engines:
     engine_path = engines[0]
     expected_name = "prisma-" + os.path.basename(engine_path)
-    shutil.copy(engine_path, expected_name)
-    os.chmod(expected_name, 0o755)
-    print(f"Fixed Prisma path bug: Copied {engine_path} to {expected_name}")
+    
+    # Store it in the venv so Render preserves it across build and run phases!
+    venv_dir = os.environ.get("VIRTUAL_ENV", sys.prefix)
+    bin_dir = os.path.join(venv_dir, "bin")
+    if not os.path.exists(bin_dir):
+        os.makedirs(bin_dir)
+        
+    final_path = os.path.join(bin_dir, expected_name)
+    shutil.copy(engine_path, final_path)
+    os.chmod(final_path, 0o755)
+    print(f"Fixed Prisma path bug: Copied {engine_path} to {final_path}")
 else:
     print("Could not find downloaded Prisma engine in cache directory.")
