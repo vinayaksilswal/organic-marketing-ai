@@ -81,6 +81,9 @@ async def api_register(data: UserRegister, request: Request):
     try:
         prisma = request.app.state.prisma
         existing = await prisma.user.find_unique(where={"email": data.email})
+    except Exception as e:
+        return {"success": False, "message": f"Database error: {str(e)}"}
+        
     if existing:
         return {"success": False, "message": "Email already registered"}
     
@@ -97,6 +100,9 @@ async def api_login(data: UserLogin, request: Request):
     try:
         prisma = request.app.state.prisma
         user = await prisma.user.find_unique(where={"email": data.email})
+    except Exception as e:
+        return {"success": False, "message": f"Database error: {str(e)}"}
+        
     if not user or not bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8")):
         return {"success": False, "message": "Invalid email or password"}
     
