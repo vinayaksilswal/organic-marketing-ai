@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+echo "Legacy Prisma CLI command invoked: $*"
+echo "Prisma has been upgraded to pure Python SQLAlchemy 2.0 Async ORM + asyncpg."
+exit 0
