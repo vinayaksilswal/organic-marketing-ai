@@ -93,7 +93,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # --- Step 1: Instantiate and connect Prisma INSIDE the lifespan ---
     # This is the critical fix: creating Prisma() here ensures it uses
     # the current running event loop, not a stale or non-existent one.
-
+    import os
+    os.environ["PRISMA_BINARY_CACHE_DIR"] = "/opt/render/project/src/.venv/prisma_engine"
+    os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "library"
+    os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "library"
 
     prisma_client = None
     try:
