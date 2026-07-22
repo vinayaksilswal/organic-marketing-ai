@@ -108,7 +108,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         
         existing_engines = glob.glob("prisma-query-engine-*")
         if existing_engines:
-            logger.info(f"Prisma engine already exists locally: {existing_engines[0]}, skipping fetch.")
+            engine_path = os.path.abspath(existing_engines[0])
+            os.chmod(engine_path, 0o755)
+            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = engine_path
+            logger.info(f"Prisma engine already exists locally: {engine_path}, skipping fetch.")
         else:
             logger.warning("Prisma engine not found locally! Fetching at runtime (this may cause Gunicorn timeout in production).")
             subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=True)
@@ -127,11 +130,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                             engines.append(os.path.join(root, file))
                             
             if engines:
-                engine_path = engines[0]
-                expected_name = "prisma-" + os.path.basename(engine_path)
-                shutil.copy(engine_path, expected_name)
+                fetched_engine = engines[0]
+                expected_name = "prisma-" + os.path.basename(fetched_engine)
+                shutil.copy(fetched_engine, expected_name)
                 os.chmod(expected_name, 0o755)
-                logger.info(f"Fixed Prisma path bug: Copied {engine_path} to {expected_name}")
+                
+                final_path = os.path.abspath(expected_name)
+                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = final_path
+                logger.info(f"Fixed Prisma path bug: Copied {fetched_engine} to {expected_name} and set PRISMA_QUERY_ENGINE_BINARY")
             else:
                 logger.warning("Could not find downloaded Prisma engine in cache directory.")
     except Exception as e:
