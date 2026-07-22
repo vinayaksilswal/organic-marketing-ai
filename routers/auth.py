@@ -1,28 +1,39 @@
-from fastapi import APIRouter, Request, Form, Response, Depends, HTTPException
+"""
+=============================================================================
+Organic Marketing AI — Authentication Router
+=============================================================================
+Handles admin login (cookie-based JWT) and user API authentication
+(Bearer token JWT). Includes registration and login endpoints.
+=============================================================================
+"""
+
+from __future__ import annotations
+
+import re
+import secrets
+from typing import Optional
+
+import bcrypt
+import jwt
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from config import settings
+from pydantic import BaseModel, field_validator
+
 from auth import create_access_token
-import secrets
-import jwt
-import os
+from config import settings
 
 router = APIRouter(tags=["Authentication"])
 templates = Jinja2Templates(directory="templates")
 
-@router.get("/api/v1/debug/engine")
-async def debug_engine():
-    import subprocess
-    try:
-        ls_output = subprocess.check_output(["ls", "-la", "/opt/render/project/src"]).decode("utf-8")
-        find_output = subprocess.check_output(["find", "/opt/render/project/src", "-name", "*query-engine*"]).decode("utf-8")
-        return {"ls": ls_output, "find": find_output}
-    except Exception as e:
-        return {"error": str(e)}
 
+# =============================================================================
+# Admin Login (Cookie-based — for marketing dashboard)
+# =============================================================================
 @router.get("/admin/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html")
+
 
 @router.post("/admin/login")
 async def login(response: Response, username: str = Form(...), password: str = Form(...)):
@@ -32,29 +43,43 @@ async def login(response: Response, username: str = Form(...), password: str = F
     correct_password = secrets.compare_digest(
         password.encode("utf8"), settings.admin_password.encode("utf8")
     )
-    
+
     if not (correct_username and correct_password):
-        # Redirect back to login with error
         return RedirectResponse(url="/admin/login?error=1", status_code=303)
-        
+
     token = create_access_token(data={"sub": username})
-    
+
     redirect = RedirectResponse(url="/admin", status_code=303)
     redirect.set_cookie(
         key="admin_session",
         value=token,
         httponly=True,
-        max_age=86400, # 1 day
+        max_age=86400,  # 1 day
         samesite="lax",
-        secure=(settings.environment == "production")
+        secure=(settings.environment == "production"),
     )
     return redirect
 
-def verify_user(request: Request):
+
+@router.get("/admin/logout")
+async def logout():
+    redirect = RedirectResponse(url="/admin/login", status_code=303)
+    redirect.delete_cookie("admin_session")
+    return redirect
+
+
+# =============================================================================
+# User Authentication Dependency (Bearer token)
+# =============================================================================
+def verify_user(request: Request) -> str:
+    """
+    FastAPI dependency that extracts and validates user JWT from
+    the Authorization header. Returns the user ID.
+    """
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     token = auth_header.split(" ")[1]
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
@@ -63,59 +88,102 @@ def verify_user(request: Request):
         if not user_id or token_type != "user":
             raise HTTPException(status_code=401, detail="Invalid user session")
         return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid session")
 
-@router.get("/admin/logout")
-async def logout():
-    redirect = RedirectResponse(url="/admin/login", status_code=303)
-    redirect.delete_cookie("admin_session")
-    return redirect
 
-from pydantic import BaseModel
-from typing import Optional
-import bcrypt
+# =============================================================================
+# User Registration & Login (API — Bearer token)
+# =============================================================================
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
 
 class UserRegister(BaseModel):
     email: str
     password: str
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not EMAIL_REGEX.match(v):
+            raise ValueError("Please enter a valid email address")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
 class UserLogin(BaseModel):
     email: str
     password: str
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
 @router.post("/api/v1/auth/register")
 async def api_register(data: UserRegister, request: Request):
+    """Register a new user account."""
+    # Check if Prisma is available
     if hasattr(request.app.state, "prisma_error"):
-        return {"success": False, "message": f"CRITICAL: Prisma failed to initialize on server startup: {request.app.state.prisma_error}"}
-    
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable. Please try again later.",
+        )
+
+    prisma = request.app.state.prisma
+
     try:
-        prisma = request.app.state.prisma
         existing = await prisma.user.find_unique(where={"email": data.email})
     except Exception as e:
-        return {"success": False, "message": f"Database error: {str(e)}"}
-        
+        raise HTTPException(status_code=503, detail="Database error. Please try again.")
+
     if existing:
-        return {"success": False, "message": "Email already registered"}
-    
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
     hashed = bcrypt.hashpw(data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     user = await prisma.user.create(data={"email": data.email, "password": hashed})
     token = create_access_token(data={"sub": user.id, "type": "user"})
-    return {"success": True, "token": token, "user": {"id": user.id, "email": user.email}}
+
+    return {
+        "success": True,
+        "token": token,
+        "user": {"id": user.id, "email": user.email},
+    }
+
 
 @router.post("/api/v1/auth/login")
 async def api_login(data: UserLogin, request: Request):
+    """Log in an existing user."""
     if hasattr(request.app.state, "prisma_error"):
-        return {"success": False, "message": f"CRITICAL: Prisma failed to initialize on server startup: {request.app.state.prisma_error}"}
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable. Please try again later.",
+        )
+
+    prisma = request.app.state.prisma
 
     try:
-        prisma = request.app.state.prisma
         user = await prisma.user.find_unique(where={"email": data.email})
     except Exception as e:
-        return {"success": False, "message": f"Database error: {str(e)}"}
-        
+        raise HTTPException(status_code=503, detail="Database error. Please try again.")
+
     if not user or not bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8")):
-        return {"success": False, "message": "Invalid email or password"}
-    
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
     token = create_access_token(data={"sub": user.id, "type": "user"})
-    return {"success": True, "token": token, "user": {"id": user.id, "email": user.email}}
+
+    return {
+        "success": True,
+        "token": token,
+        "user": {"id": user.id, "email": user.email},
+    }

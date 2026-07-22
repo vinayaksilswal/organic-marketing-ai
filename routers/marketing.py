@@ -101,14 +101,14 @@ async def marketing_dashboard(request: Request) -> Any:
     """Render the marketing automation dashboard page."""
     prisma = request.app.state.prisma
     audiences = await prisma.audience.find_many()
-    state = await prisma.marketingstate.find_unique(where={"id": "singleton"})
-    if not state:
-        state = await prisma.marketingstate.create(data={"id": "singleton"})
+    # Use a default admin userId for the admin dashboard marketing state
+    state = await prisma.marketingstate.find_first()
+    auto_approve = state.autoApprove if state else False
         
     return templates.TemplateResponse(
         request=request,
         name="marketing.html",
-        context={"title": "Marketing Automation", "audiences": audiences, "autoApprove": state.autoApprove},
+        context={"title": "Marketing Automation", "audiences": audiences, "autoApprove": auto_approve},
     )
 
 @router.post("/settings/auto-approve")
@@ -117,14 +117,21 @@ async def toggle_auto_approve(
 ) -> dict[str, Any]:
     prisma = request.app.state.prisma
     try:
-        state = await prisma.marketingstate.upsert(
-            where={"id": "singleton"},
-            data={
-                "create": {"id": "singleton", "autoApprove": data.autoApprove},
-                "update": {"autoApprove": data.autoApprove}
-            }
-        )
-        return {"success": True, "autoApprove": state.autoApprove}
+        # Find or create a marketing state for the admin
+        state = await prisma.marketingstate.find_first()
+        if state:
+            state = await prisma.marketingstate.update(
+                where={"id": state.id},
+                data={"autoApprove": data.autoApprove}
+            )
+        else:
+            # Create with first available user
+            first_user = await prisma.user.find_first()
+            if first_user:
+                state = await prisma.marketingstate.create(
+                    data={"userId": first_user.id, "autoApprove": data.autoApprove}
+                )
+        return {"success": True, "autoApprove": state.autoApprove if state else False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

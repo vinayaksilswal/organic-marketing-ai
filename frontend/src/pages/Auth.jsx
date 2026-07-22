@@ -14,6 +14,12 @@ const Auth = ({ onLogin, showToast }) => {
     e.preventDefault();
     setLoading(true);
 
+    if (!isLoginMode && password.length < 8) {
+      showToast('Password must be at least 8 characters', true);
+      setLoading(false);
+      return;
+    }
+
     try {
       const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
       const payload = JSON.stringify({ email, password });

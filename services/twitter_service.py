@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — Twitter/X API v2 Service (Tweepy)
+Organic Marketing AI — Twitter/X API v2 Service (Tweepy)
 =============================================================================
 Automated Twitter/X publishing via the v2 API. Supports single tweets
 and multi-tweet threads for educational content.
@@ -21,7 +21,7 @@ import os
 import logging
 from typing import Optional
 
-logger = logging.getLogger("quantcai.twitter")
+logger = logging.getLogger("organicai.twitter")
 
 
 class TwitterService:

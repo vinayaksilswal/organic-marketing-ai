@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — AI Chatbot Command Center (LLM Tool Calling Agent)
+Organic Marketing AI — AI Chatbot Command Center (LLM Tool Calling Agent)
 =============================================================================
 Implements the admin-side AI chatbot with OpenRouter's function calling
 (tool calling) capabilities. The chat model can autonomously execute backend
@@ -64,7 +64,7 @@ CHATBOT_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
 # =============================================================================
 # System Prompt — Defines the chatbot's personality and capabilities
 # =============================================================================
-SYSTEM_PROMPT = """You are the QuantCAI AI Admin Assistant — an intelligent marketing and operations agent built into the QuantCAI Admin Dashboard.
+SYSTEM_PROMPT = """You are the Organic Marketing AI Assistant — an intelligent marketing and operations agent built into the admin dashboard.
 
 Your capabilities:
 1. **Product Management**: Search and query the product catalog
@@ -405,8 +405,8 @@ async def _call_chatbot_llm(
     headers = {
         "Authorization": f"Bearer {settings.openrouter_api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://quantcai.in",
-        "X-Title": "QuantCAI Admin Chatbot",
+        "HTTP-Referer": "https://organicmarketing.ai",
+        "X-Title": "Organic Marketing AI Chatbot",
     }
 
     payload: dict[str, Any] = {

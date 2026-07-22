@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
@@ -8,6 +8,34 @@ import Navbar from './components/Navbar';
 import Toast from './components/Toast';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai1.onrender.com/api/v1';
+
+/**
+ * Helper: make authenticated API requests with automatic 401 handling.
+ * Redirects to login on expired/invalid tokens instead of showing cryptic errors.
+ */
+export const authFetch = async (url, options = {}, token, onLogout) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(options.headers || {}),
+  };
+
+  try {
+    const res = await fetch(url, { ...options, headers });
+
+    if (res.status === 401) {
+      // Token expired or invalid — auto-logout
+      if (onLogout) onLogout();
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    return res;
+  } catch (err) {
+    // Network errors
+    if (err.message === 'Session expired. Please log in again.') throw err;
+    throw new Error('Network error. Please check your connection.');
+  }
+};
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -28,35 +56,36 @@ function App() {
     showToast('Welcome back!');
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/');
-  };
+  }, [navigate]);
 
   useEffect(() => {
     if (token && !user?.subscriptionStatus) {
       // Re-fetch user to check onboarding/subscription status if incomplete
-      fetch(`${API_BASE}/users/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        setUser(data);
-        localStorage.setItem('user', JSON.stringify(data));
-      })
-      .catch(err => {
-        console.error('Failed to fetch user', err);
-        handleLogout();
-      });
+      authFetch(`${API_BASE}/users/me`, {}, token, handleLogout)
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to fetch user');
+          return res.json();
+        })
+        .then(data => {
+          setUser(data);
+          localStorage.setItem('user', JSON.stringify(data));
+        })
+        .catch(err => {
+          console.error('Failed to fetch user', err);
+          handleLogout();
+        });
     }
-  }, [token]);
+  }, [token, handleLogout]);
 
   const requireAuth = (Component) => {
     if (!token) return <Navigate to="/auth" />;
-    return <Component user={user} token={token} showToast={showToast} updateAuth={(data) => {
+    return <Component user={user} token={token} showToast={showToast} onLogout={handleLogout} updateAuth={(data) => {
       setUser(data);
       localStorage.setItem('user', JSON.stringify(data));
     }} />;

@@ -2,9 +2,9 @@
 =============================================================================
 Organic Marketing AI — FastAPI Application Entry Point
 =============================================================================
-This is the control center for the entire autonomous e-commerce platform.
+This is the control center for the entire autonomous marketing platform.
 It hosts the AI chatbot, marketing automation scheduler, and all
-API endpoints for CJ Dropshipping, Meta Graph, and Resend integrations.
+API endpoints for social media, email, and Stripe integrations.
 
 CRITICAL ARCHITECTURE DECISION:
   The Prisma client is instantiated and connected INSIDE the async lifespan
@@ -13,7 +13,6 @@ CRITICAL ARCHITECTURE DECISION:
   that occur when Prisma is created before the loop starts.
 
 Run locally:
-  cd python_admin
   uvicorn main:app --reload --port 8000
 =============================================================================
 """
@@ -22,6 +21,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -41,16 +41,12 @@ from config import settings
 # =============================================================================
 # Loguru Configuration
 # =============================================================================
-# Remove default stderr handler and configure based on environment.
-# Production: JSON-serialized structured logs for log aggregation.
-# Development: Human-readable colored output for debugging.
-# =============================================================================
 logger.remove()
 if settings.environment == "production":
     logger.add(
         sys.stdout,
         format="{time} | {level} | {name}:{function}:{line} - {message}",
-        serialize=True,  # JSON output for production log aggregators
+        serialize=True,
     )
 else:
     logger.add(
@@ -67,22 +63,16 @@ else:
 # =============================================================================
 # Application Lifespan — Async Context Manager
 # =============================================================================
-# This is the ONLY place where Prisma is instantiated and connected.
-# The scheduler is also initialized here. Both are torn down on shutdown.
-# =============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Manages the lifecycle of critical application resources:
     1. Prisma ORM client (PostgreSQL connection)
-    2. APScheduler (bi-hourly marketing automation loop)
+    2. APScheduler (marketing automation loop)
 
     CRUCIAL: Prisma MUST be instantiated inside this async context to bind
-    to the active Uvicorn event loop. Creating it at module level causes
-    asyncio.locks.Event errors because the event loop doesn't exist yet
-    at import time.
+    to the active Uvicorn event loop.
     """
-    # --- Import scheduler here to avoid circular imports ---
     from services.scheduler import create_scheduler, shutdown_scheduler
 
     logger.info("=" * 60)
@@ -90,51 +80,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Environment: {settings.environment}")
     logger.info("=" * 60)
 
-    import os
-    import gzip
-    import urllib.request
-    import prisma
-
-    prisma_dir = os.path.dirname(prisma.__file__)
-    engine_path = os.path.join(prisma_dir, "prisma-query-engine-debian-openssl-3.0.x")
-
-    def ensure_prisma_engine(target_path: str):
-        if os.path.exists(target_path) and os.path.getsize(target_path) > 1000000:
-            logger.info(f"Prisma query engine verified at {target_path}")
-            return
-        
-        logger.info(f"Engine missing. Downloading directly from Prisma CDN to {target_path}...")
-        url = "https://binaries.prisma.sh/all_commits/393aa359c9ad4a4bb28630fb5613f9c281cde053/debian-openssl-3.0.x/query-engine.gz"
-        gz_path = target_path + ".gz"
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        
-        urllib.request.urlretrieve(url, gz_path)
-        with gzip.open(gz_path, "rb") as f_in:
-            with open(target_path, "wb") as f_out:
-                f_out.write(f_in.read())
-        
-        if os.path.exists(gz_path):
-            os.remove(gz_path)
-        os.chmod(target_path, 0o755)
-        logger.info("Prisma engine downloaded & decompressed successfully!")
-
-    try:
-        ensure_prisma_engine(engine_path)
-    except Exception as e:
-        logger.error(f"Failed to download Prisma engine via urllib: {e}")
-
-    os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
-    os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
-    os.environ["PRISMA_BINARY_CACHE_DIR"] = prisma_dir
-    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = engine_path
-
+    # --- Step 1: Connect Prisma ORM ---
     prisma_client = None
     try:
-        prisma_client = Prisma()
         os.environ["DATABASE_URL"] = settings.database_url
+        prisma_client = Prisma()
         await prisma_client.connect()
         app.state.prisma = prisma_client
-        logger.info("Prisma ORM connected to PostgreSQL")
+        logger.info("Prisma ORM connected to PostgreSQL successfully")
     except Exception as e:
         logger.error(f"Failed to connect Prisma engine: {e}")
         app.state.prisma_error = str(e)
@@ -144,7 +97,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         scheduler = create_scheduler(prisma_client)
         scheduler.start()
         app.state.scheduler = scheduler
-        logger.info("APScheduler started (bi-hourly marketing loop active)")
+        logger.info("APScheduler started (marketing automation loop active)")
     else:
         logger.warning("Prisma client not connected, skipping scheduler startup")
         app.state.scheduler = None
@@ -158,7 +111,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # --- Shutdown: Clean up resources in reverse order ---
     logger.info("Shutting down Organic Marketing AI...")
 
-    if app.state.scheduler:
+    if getattr(app.state, "scheduler", None):
         shutdown_scheduler(app.state.scheduler)
         logger.info("Scheduler stopped")
 
@@ -173,10 +126,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 # FastAPI Application Instance
 # =============================================================================
 app = FastAPI(
-    title="Organic Marketing AI Automation",
+    title="Organic Marketing AI",
     description="AI-Powered Autonomous Organic Marketing Platform",
     version="2.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if settings.environment != "production" else None,
+    redoc_url=None,
 )
 
 # --- Prometheus metrics endpoint at /metrics ---
@@ -186,17 +141,14 @@ Instrumentator().instrument(app).expose(app)
 # =============================================================================
 # Middleware Stack
 # =============================================================================
-# Order matters: GZip → TrustedHost → CORS
-# =============================================================================
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173", 
-        "http://localhost:3000", 
+        "http://localhost:5173",
+        "http://localhost:3000",
         "https://organic-marketing-ai.vercel.app",
-        "https://organic-marketing-ai.vercel.app/"
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
@@ -230,8 +182,6 @@ async def custom_http_exception_handler(
     )
 
 
-import uuid
-
 @app.exception_handler(Exception)
 async def global_exception_handler(
     request: Request, exc: Exception
@@ -239,30 +189,37 @@ async def global_exception_handler(
     """Catch-all handler to prevent 500 errors from leaking stack traces."""
     error_id = str(uuid.uuid4())
     logger.exception(f"Unhandled Exception on {request.method} {request.url.path} (Error ID: {error_id})")
+    
+    # Don't leak internal error details in production
+    detail = "An internal error occurred. Please try again later."
+    if settings.environment != "production":
+        detail = str(exc)
+    
     return JSONResponse(
         status_code=500,
-        content={"success": False, "message": f"Internal Server Error: {str(exc)}", "error_id": error_id},
+        content={"success": False, "message": detail, "error_id": error_id},
     )
 
 
 # =============================================================================
 # Health Check Endpoint
 # =============================================================================
-@app.get("/logo.png", tags=["System"])
-async def serve_logo() -> FileResponse:
-    """Serve the application logo."""
-    return FileResponse("templates/logo.png")
-
-@app.get("/health", response_model=None)
-async def health_check(request: Request) -> dict | JSONResponse:
+@app.get("/health", tags=["System"])
+async def health_check(request: Request) -> JSONResponse:
     """
-    Health check endpoint for Render's health monitoring.
+    Health check endpoint for Render/Docker monitoring.
     Verifies database connectivity with a simple query.
     """
+    db_status = "disconnected"
     try:
+        if hasattr(request.app.state, "prisma_error"):
+            return JSONResponse(
+                status_code=503,
+                content={"status": "unhealthy", "database": "failed", "error": request.app.state.prisma_error},
+            )
         prisma: Prisma = request.app.state.prisma
         await prisma.query_raw("SELECT 1")
-        return {"status": "healthy", "database": "connected"}
+        db_status = "connected"
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return JSONResponse(
@@ -270,12 +227,20 @@ async def health_check(request: Request) -> dict | JSONResponse:
             content={"status": "unhealthy", "database": "disconnected"},
         )
 
+    return JSONResponse(
+        status_code=200,
+        content={"status": "healthy", "database": db_status},
+    )
+
+
+@app.get("/logo.png", tags=["System"])
+async def serve_logo() -> FileResponse:
+    """Serve the application logo."""
+    return FileResponse("templates/logo.png")
+
 
 # =============================================================================
 # Static Files & Templates
-# =============================================================================
-# Mount the templates directory for serving CSS/JS assets and the uploads
-# directory for manually uploaded media files.
 # =============================================================================
 app.mount("/static", StaticFiles(directory="templates"), name="static")
 os.makedirs("uploads", exist_ok=True)
@@ -286,9 +251,6 @@ templates = Jinja2Templates(directory="templates")
 # =============================================================================
 # Router Registration
 # =============================================================================
-# Import and include all routers. The ai_chat router has been consolidated
-# into the chat_agent service + the api router.
-# =============================================================================
 from routers import api, auth, marketing, user_api, stripe_webhook  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -298,8 +260,6 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(auth.router)
 app.include_router(marketing.router)
 app.include_router(api.router)
@@ -309,20 +269,13 @@ app.include_router(stripe_webhook.router)
 
 
 # =============================================================================
-# Health Check Endpoint
-# =============================================================================
-@app.get("/health")
-async def health_check() -> dict:
-    """Health check endpoint for Docker and Render."""
-    return {"status": "healthy"}
-
-
-# =============================================================================
 # Root Redirect
 # =============================================================================
 @app.get("/")
 async def root() -> RedirectResponse:
-    """Redirect the root URL to the API docs."""
+    """Redirect the root URL to the API docs (dev) or health check (prod)."""
+    if settings.environment == "production":
+        return RedirectResponse(url="/health", status_code=303)
     return RedirectResponse(url="/docs", status_code=303)
 
 
@@ -334,13 +287,16 @@ async def get_stats(request: Request) -> dict:
     """Return high-level platform statistics for the admin dashboard."""
     prisma: Prisma = request.app.state.prisma
     audience_count = await prisma.audience.count()
+    user_count = await prisma.user.count()
+    post_count = await prisma.socialpost.count()
+    campaign_count = await prisma.socialcampaign.count()
 
     return {
         "success": True,
         "data": {
-            "users": 0,
-            "orders": 0,
+            "users": user_count,
             "audience": audience_count,
-            "products": 0,
+            "posts": post_count,
+            "campaigns": campaign_count,
         },
     }

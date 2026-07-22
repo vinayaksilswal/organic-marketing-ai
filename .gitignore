@@ -1,10 +1,43 @@
+# =============================================================================
+# Organic Marketing AI — Git Ignore
+# =============================================================================
+
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+
+# Environment
 .env
+.env.local
+.env.production
+
+# Node
 node_modules/
+
+# Uploads & Cache
 uploads/
+.prisma_cache/
+.prisma_binaries/
+
+# Secrets & tokens
 .cj_token.json
 
-# Prisma
-.prisma_binaries/
+# Build artifacts
+dist/
+build/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

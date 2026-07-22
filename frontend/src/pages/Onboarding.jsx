@@ -162,7 +162,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
               </ul>
               
               <button className="btn btn-primary btn-large" style={{ width: '100%' }} onClick={handlePayment} disabled={loading}>
-                {loading ? 'Processing...' : 'Complete Payment (Mock $17)'}
+                {loading ? 'Processing...' : 'Complete Payment'}
               </button>
               <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Secure payment processing via Stripe/PayPal</p>
             </div>

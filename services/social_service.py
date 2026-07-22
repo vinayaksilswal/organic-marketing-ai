@@ -151,7 +151,7 @@ async def post_to_facebook(
         media_urls = []
 
     # Ensure absolute URLs for Facebook API
-    media_urls = [f"https://quantcai.in{url}" if url.startswith("/") else url for url in media_urls]
+    media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
 
     video_urls = [url for url in media_urls if _is_video(url)]
     image_urls = [url for url in media_urls if not _is_video(url)]
@@ -347,7 +347,7 @@ async def post_to_instagram(
         return None
 
     # Ensure absolute URLs for Instagram API
-    media_urls = [f"https://quantcai.in{url}" if url.startswith("/") else url for url in media_urls]
+    media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
 
     # Separate videos and images
     video_urls = [url for url in media_urls if _is_video(url)]

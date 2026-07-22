@@ -205,7 +205,7 @@ Return a JSON object with:
                         <!-- Media -->
                         <tr>
                             <td style="padding: 0 40px;">
-                                <img src="{campaign.mediaUrl}" alt="QuantCAI Showcase" style="width: 100%; max-width: 520px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; display: block; margin: 0 auto;" />
+                                <img src="{campaign.mediaUrl}" alt="Organic Marketing AI" style="width: 100%; max-width: 520px; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; display: block; margin: 0 auto;" />
                             </td>
                         </tr>
                         <!-- Body Copy -->
@@ -486,7 +486,7 @@ CTA Link to include in post 3: {cta_link}"""
             "post_1": str(parsed.get("post_1", ""))[:280],
             "post_2": str(parsed.get("post_2", ""))[:280],
             "post_3": str(parsed.get("post_3", ""))[:280],
-            "hashtags": parsed.get("hashtags", ["#Quantum", "#QuantCAI"]),
+            "hashtags": parsed.get("hashtags", ["#Quantum", "#OrganicAI"]),
         }
 
     # Fallback if LLM fails

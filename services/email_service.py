@@ -1,15 +1,15 @@
 """
 =============================================================================
-QuantCAI — Resend Email Client
+Organic Marketing AI — Resend Email Client
 =============================================================================
 Handles transactional and marketing email delivery via the Resend SDK.
 Replaces the previous SMTP-based email service with Resend's modern API.
 
-Sender: support@quantcai.in (configured via settings)
+Sender: support@organicmarketing.ai (configured via settings)
 
 Prerequisites:
   1. Resend account with API key (set RESEND_API_KEY in env)
-  2. DNS domain verification for quantcai.in (MX, SPF, DKIM records)
+  2. DNS domain verification for organicmarketing.ai (MX, SPF, DKIM records)
      See: https://resend.com/docs/dashboard/domains/introduction
 
 Key Functions:

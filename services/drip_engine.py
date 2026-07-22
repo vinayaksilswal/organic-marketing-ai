@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — Behavioral Drip Engine
+Organic Marketing AI — Behavioral Drip Engine
 =============================================================================
 Parses the marketing/email_flows.json configurations and executes behavioral
 email drips for users based on their lifecycle stage (onboarding, CISO nurture,
@@ -10,7 +10,7 @@ Uses Prisma to query user state (e.g., account age, last login, role) and
 dispatches emails via Resend. Integrates directly into the APScheduler 
 marketing loop.
 
-Copyright (c) 2026 QuantCAI — All rights reserved.
+Copyright (c) 2026 Organic Marketing AI — All rights reserved.
 =============================================================================
 """
 
@@ -42,7 +42,7 @@ class DripEngine:
             return {}
 
     def _build_html_template(self, subject: str, headline: str, body_html: str, cta_text: str, cta_link: str) -> str:
-        """Constructs the standard QuantCAI email template."""
+        """Constructs the standard Organic Marketing AI email template."""
         return f"""
         <!DOCTYPE html>
         <html>
@@ -54,7 +54,7 @@ class DripEngine:
                             <!-- Header -->
                             <tr>
                                 <td style="padding: 40px; text-align: center; background-color: #0f172a;">
-                                    <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Quant<span style="color: #6366f1;">CAI</span></h1>
+                                    <h1 style="margin: 0; color: #ffffff; font-size: 28px;">Organic<span style="color: #6366f1;">AI</span></h1>
                                 </td>
                             </tr>
                             <!-- Content -->
@@ -72,8 +72,8 @@ class DripEngine:
                             <!-- Footer -->
                             <tr>
                                 <td style="padding: 30px; background-color: #f8fafc; text-align: center; border-top: 1px solid #e2e8f0;">
-                                    <p style="margin: 0; color: #94a3b8; font-size: 13px;">Enterprise Quantum Security & Simulation Infrastructure.</p>
-                                    <p style="margin: 10px 0 0; color: #94a3b8; font-size: 12px;"><a href="https://quantcai.in/unsubscribe" style="color: #64748b;">Unsubscribe</a></p>
+                                    <p style="margin: 0; color: #94a3b8; font-size: 13px;">Enterprise Marketing Automation Infrastructure.</p>
+                                    <p style="margin: 10px 0 0; color: #94a3b8; font-size: 12px;"><a href="https://organicmarketing.ai/unsubscribe" style="color: #64748b;">Unsubscribe</a></p>
                                 </td>
                             </tr>
                         </table>

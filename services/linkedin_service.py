@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — LinkedIn API Service
+Organic Marketing AI — LinkedIn API Service
 =============================================================================
 Automated LinkedIn Company Page publishing via the LinkedIn REST API.
 Supports text posts and article sharing with rich media previews.
@@ -22,7 +22,7 @@ from typing import Optional
 
 import httpx
 
-logger = logging.getLogger("quantcai.linkedin")
+logger = logging.getLogger("organicai.linkedin")
 
 LINKEDIN_API_BASE = "https://api.linkedin.com"
 LINKEDIN_API_VERSION = "202406"  # LinkedIn versioned API: YYYYMM
@@ -165,7 +165,7 @@ class LinkedInService:
             logger.error(f"LinkedIn API error: {e}")
             return None
 
-    async def format_b2b_copy(self, caption: str, cta_url: str = "https://quantcai.in") -> str:
+    async def format_b2b_copy(self, caption: str, cta_url: str = "https://organicmarketing.ai") -> str:
         """
         Format a marketing caption into LinkedIn-optimized B2B copy.
         LinkedIn posts perform best with:

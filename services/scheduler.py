@@ -1,6 +1,6 @@
 """
 =============================================================================
-QuantCAI — Marketing Automation Scheduler (6-Hour Autonomous Loop)
+Organic Marketing AI — Marketing Automation Scheduler (6-Hour Autonomous Loop)
 =============================================================================
 Implements the autonomous marketing loop that runs every 6 hours:
 
@@ -71,9 +71,14 @@ async def _get_next_campaign(
         logger.info("No active campaigns in database for marketing rotation")
         return None
 
-    state = await prisma.marketingstate.find_unique(where={"id": "singleton"})
+    state = await prisma.marketingstate.find_first()
     if not state:
-        state = await prisma.marketingstate.create(data={"id": "singleton"})
+        first_user = await prisma.user.find_first()
+        if first_user:
+            state = await prisma.marketingstate.create(data={"userId": first_user.id})
+        else:
+            logger.warning(f"No users exist yet — skipping marketing rotation")
+            return None
 
     idx_field = "lastSocialIdx" if marketing_type == "social" else "lastEmailIdx"
     current_idx: int = getattr(state, idx_field)
@@ -84,7 +89,7 @@ async def _get_next_campaign(
         logger.info(f"Marketing rotation ({marketing_type}): wrapped around to campaign 0")
 
     await prisma.marketingstate.update(
-        where={"id": "singleton"},
+        where={"id": state.id},
         data={idx_field: next_idx},
     )
 
@@ -143,7 +148,7 @@ async def execute_marketing_loop() -> None:
         logger.info("[MARKETING LOOP] No active campaigns available — skipping cycle")
         return
 
-    state = await prisma.marketingstate.find_unique(where={"id": "singleton"})
+    state = await prisma.marketingstate.find_first()
     auto_approve = state.autoApprove if state else False
     logger.info(f"[MARKETING LOOP] Auto-Approve is {'ON' if auto_approve else 'OFF'}")
 
@@ -167,21 +172,21 @@ async def execute_marketing_loop() -> None:
     try:
         caption = await generate_campaign_variation(campaign.baseCaption)
         email_content = await generate_campaign_email(campaign)
-        email_subject = email_content.get("subject", "QuantCAI Update")
+        email_subject = email_content.get("subject", "Organic Marketing AI Update")
         email_text = email_content.get("bodyText", "")
         email_html = email_content.get("bodyHtml", "")
         logger.info("[MARKETING LOOP] ✓ AI campaign content generated")
     except Exception as e:
         logger.error(f"[MARKETING LOOP] AI generation failed: {e}")
         caption = campaign.baseCaption
-        email_subject = "QuantCAI Update"
+        email_subject = "Organic Marketing AI Update"
         email_text = campaign.baseCaption
         email_html = f"<p>{campaign.baseCaption}</p>"
 
     # Ensure media URL is absolute
     vid_url = campaign.mediaUrl
     if vid_url.startswith("/"):
-        vid_url = f"https://quantcai.in{vid_url}"
+        vid_url = f"https://organicmarketing.ai{vid_url}"
     media_urls = [vid_url]
 
     # --- Step 4: Post to social media (error-isolated) ---
@@ -194,7 +199,7 @@ async def execute_marketing_loop() -> None:
                 "type": "AUTO",
                 "caption": caption,
                 "mediaUrls": media_urls,
-                "scheduledAt": datetime.now(),
+                "scheduledAt": datetime.now(timezone.utc),
                 "status": "DRAFT",
             }
         )
@@ -224,7 +229,7 @@ async def execute_marketing_loop() -> None:
                 try:
                     # For Twitter, generate a thread if caption is long
                     if len(caption) > 280:
-                        tweets = await twitter_service.generate_thread_from_caption(caption, "#QuantCAI #PQC")
+                        tweets = await twitter_service.generate_thread_from_caption(caption, "#OrganicAI #Marketing")
                         thread_ids = await twitter_service.post_thread(tweets)
                         if thread_ids:
                             tw_post_id = thread_ids[0]
@@ -242,8 +247,8 @@ async def execute_marketing_loop() -> None:
                     li_copy = await linkedin_service.format_b2b_copy(caption)
                     li_post_id = await linkedin_service.post_article(
                         text=li_copy,
-                        article_url=media_urls[0] if media_urls else "https://quantcai.in",
-                        article_title="QuantCAI Enterprise Infrastructure",
+                        article_url=media_urls[0] if media_urls else "https://organicmarketing.ai",
+                        article_title="Organic Marketing AI",
                     )
                     if not li_post_id:
                         social_errors.append("LI: Post returned None")
@@ -256,7 +261,7 @@ async def execute_marketing_loop() -> None:
                 where={"id": social_post.id},
                 data={
                     "status": "POSTED" if social_success else "FAILED",
-                    "postedAt": datetime.now() if social_success else None,
+                    "postedAt": datetime.now(timezone.utc) if social_success else None,
                     "fbPostId": fb_post_id,
                     "igPostId": ig_post_id,
                     "twitterPostId": tw_post_id,
@@ -313,7 +318,7 @@ async def execute_marketing_loop() -> None:
                     where={"id": email_campaign.id},
                     data={
                         "status": "SENT" if email_success else "FAILED",
-                        "sentAt": datetime.now() if email_success else None,
+                        "sentAt": datetime.now(timezone.utc) if email_success else None,
                         "recipientCount": email_count,
                         "errorLog": " | ".join(email_errors) if email_errors else None,
                     },
