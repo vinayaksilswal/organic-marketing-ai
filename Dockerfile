@@ -44,10 +44,10 @@ ENV ENVIRONMENT=production
 
 # Health check — Render uses this to verify the service is healthy
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Run with Gunicorn + Uvicorn workers
 # IMPORTANT: -w 1 (single worker) is REQUIRED because APScheduler runs
 # the bi-hourly marketing loop. Multiple workers would cause duplicate
 # social posts and email blasts.
-CMD ["sh", "-c", "prisma db push --schema=schema_py.prisma && gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000"]
+CMD ["sh", "-c", "prisma db push --schema=schema_py.prisma && gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-8000}"]

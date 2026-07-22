@@ -1,14 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, TrendingUp, Sparkles, Zap, PlayCircle, Users, ShieldCheck } from 'lucide-react';
+import { 
+  CheckCircle2, TrendingUp, Sparkles, Zap, PlayCircle, Users, 
+  ShieldCheck, ChevronDown, MessageSquare, ArrowRight, Star,
+  BarChart3, Link, Target
+} from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [activeFaq, setActiveFaq] = useState(null);
 
   const scrollToPricing = () => {
     document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const toggleFaq = (index) => {
+    setActiveFaq(activeFaq === index ? null : index);
+  };
+
+  const faqs = [
+    {
+      question: "Do I need technical skills to use OrganicAI?",
+      answer: "Not at all. We built OrganicAI to be as simple as connecting your social accounts and telling us your target audience. Our AI handles the generation, scheduling, and posting automatically."
+    },
+    {
+      question: "Can I review the content before it's posted?",
+      answer: "Yes! While you can put it on full autopilot, we also offer a 'Review Mode' where you can approve, edit, or reject AI-generated drafts before they go live."
+    },
+    {
+      question: "Which platforms do you currently support?",
+      answer: "We currently support direct integrations with LinkedIn, X (Twitter), Facebook, and Instagram. We are constantly working on adding more platforms like TikTok and Pinterest."
+    },
+    {
+      question: "Is there a long-term contract?",
+      answer: "No, our pricing is strictly month-to-month. You can cancel at any time directly from your dashboard with just two clicks, no questions asked."
+    },
+    {
+      question: "Will the AI sound like a robot?",
+      answer: "Our Custom Business Context Engine analyzes your brand voice, previous posts, and target audience to write exactly like you do. Over time, it learns what gets the highest engagement."
+    }
+  ];
 
   return (
     <div className="view">
@@ -16,6 +48,7 @@ const Landing = () => {
         <title>OrganicAI | Automate your organic growth on autopilot</title>
         <meta name="description" content="The enterprise-grade AI marketing system built for SaaS, E-Commerce, and Influencers. Generate high-converting content and schedule it automatically across all platforms." />
       </Helmet>
+      
       {/* Navbar */}
       <nav className="navbar">
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0' }}>
@@ -53,6 +86,106 @@ const Landing = () => {
             </div>
           </div>
           
+          {/* Dashboard Mockup */}
+          <div className="mockup-container">
+            <div className="mockup-header">
+              <div className="mockup-dot" style={{ background: '#ef4444' }}></div>
+              <div className="mockup-dot" style={{ background: '#f59e0b' }}></div>
+              <div className="mockup-dot" style={{ background: '#10b981' }}></div>
+            </div>
+            <div className="mockup-body" style={{ height: '400px' }}>
+              <div className="mockup-sidebar">
+                <div style={{ width: '100%', height: '24px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', marginBottom: '1.5rem' }}></div>
+                <div style={{ width: '80%', height: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '1rem' }}></div>
+                <div style={{ width: '90%', height: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '1rem' }}></div>
+                <div style={{ width: '70%', height: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '1rem' }}></div>
+              </div>
+              <div className="mockup-content">
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                  <div style={{ flex: 1, height: '100px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '12px' }}></div>
+                  <div style={{ flex: 1, height: '100px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px' }}></div>
+                  <div style={{ flex: 1, height: '100px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px' }}></div>
+                </div>
+                <div style={{ width: '100%', height: '200px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Social Proof Ticker */}
+      <section className="social-proof-section">
+        <div className="ticker-wrap">
+          <div className="ticker-content">
+            <div className="ticker-item">
+              <span className="ticker-value">50M+</span>
+              <span className="ticker-label">Impressions Generated</span>
+            </div>
+            <div className="ticker-item">
+              <span className="ticker-value">10,000+</span>
+              <span className="ticker-label">Hours Saved</span>
+            </div>
+            <div className="ticker-item">
+              <span className="ticker-value">85%</span>
+              <span className="ticker-label">Higher Engagement</span>
+            </div>
+            <div className="ticker-item">
+              <span className="ticker-value">4.9/5</span>
+              <span className="ticker-label">Customer Rating</span>
+            </div>
+            <div className="ticker-item">
+              <span className="ticker-value">2,500+</span>
+              <span className="ticker-label">Active Users</span>
+            </div>
+            {/* Duplicates for seamless looping */}
+            <div className="ticker-item">
+              <span className="ticker-value">50M+</span>
+              <span className="ticker-label">Impressions Generated</span>
+            </div>
+            <div className="ticker-item">
+              <span className="ticker-value">10,000+</span>
+              <span className="ticker-label">Hours Saved</span>
+            </div>
+            <div className="ticker-item">
+              <span className="ticker-value">85%</span>
+              <span className="ticker-label">Higher Engagement</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="how-it-works-section">
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Workflow</h4>
+            <h2>Growth on Autopilot in 3 Steps</h2>
+            <p style={{ maxWidth: '600px', margin: '0 auto' }}>You don't need to be a marketing expert. OrganicAI streamlines your entire organic funnel from ideation to distribution.</p>
+          </div>
+          
+          <div className="how-it-works-grid">
+            <div className="step-card">
+              <div className="step-number"><Link size={32} /></div>
+              <h3>1. Connect</h3>
+              <p>Link your social profiles and define your brand voice, target audience, and niche. Takes less than 2 minutes.</p>
+            </div>
+            <div className="step-card">
+              <div className="step-number"><Target size={32} /></div>
+              <h3>2. Generate</h3>
+              <p>Our AI analyzes viral trends in your niche and drafts high-converting posts, threads, and scripts perfectly tailored for you.</p>
+            </div>
+            <div className="step-card">
+              <div className="step-number"><BarChart3 size={32} /></div>
+              <h3>3. Grow</h3>
+              <p>Content is automatically scheduled and published at peak times. Watch your impressions, followers, and revenue scale.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features/Use Cases */}
+      <section style={{ padding: '4rem 0' }}>
+        <div className="container">
           <div className="hero-stats">
             <div className="stat-card">
               <div className="stat-card-icon"><Zap size={32} /></div>
@@ -71,17 +204,58 @@ const Landing = () => {
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Social Proof / Integration Section */}
-      <section style={{ padding: '4rem 0', background: 'rgba(0,0,0,0.3)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-        <div className="container" style={{ textAlign: 'center' }}>
-          <h4 style={{ color: 'var(--text-muted)', marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Seamlessly connects with</h4>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '3rem', flexWrap: 'wrap', opacity: 0.6 }}>
-            <h3 style={{ margin: 0, color: 'white' }}>Meta Graph API</h3>
-            <h3 style={{ margin: 0, color: 'white' }}>X (Twitter) API</h3>
-            <h3 style={{ margin: 0, color: 'white' }}>LinkedIn API</h3>
-            <h3 style={{ margin: 0, color: 'white' }}>Resend Email</h3>
+      {/* Testimonials / Wall of Love */}
+      <section className="testimonials-section">
+        <div className="container">
+          <div style={{ textAlign: 'center' }}>
+            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Wall of Love</h4>
+            <h2>Trusted by creators and founders</h2>
+          </div>
+          
+          <div className="testimonial-grid">
+            <div className="testimonial-card">
+              <div className="stars">
+                <Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" />
+              </div>
+              <p className="testimonial-text">"OrganicAI completely replaced our social media manager. It writes better LinkedIn posts than I do and scheduling is a breeze. My inbound leads went up 40% in month one."</p>
+              <div className="testimonial-author">
+                <div className="author-avatar">S</div>
+                <div className="author-info">
+                  <h4>Sarah Jenkins</h4>
+                  <p>Founder, TechFlow SaaS</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="testimonial-card">
+              <div className="stars">
+                <Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" />
+              </div>
+              <p className="testimonial-text">"I was struggling to keep up with Twitter and Instagram while running my agency. This tool gave me 10 hours a week back. The AI actually understands my niche."</p>
+              <div className="testimonial-author">
+                <div className="author-avatar">M</div>
+                <div className="author-info">
+                  <h4>Marcus Chen</h4>
+                  <p>Digital Agency Owner</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="testimonial-card">
+              <div className="stars">
+                <Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" /><Star size={16} fill="currentColor" />
+              </div>
+              <p className="testimonial-text">"The context engine is insane. It read my previous blog posts and now writes threads that sound exactly like me. My follower count has doubled in 6 weeks."</p>
+              <div className="testimonial-author">
+                <div className="author-avatar">E</div>
+                <div className="author-info">
+                  <h4>Elena Rodriguez</h4>
+                  <p>E-commerce Brand Creator</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -121,9 +295,46 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* FAQ Section */}
+      <section className="faq-section">
+        <div className="container">
+          <div style={{ textAlign: 'center' }}>
+            <h2>Frequently Asked Questions</h2>
+            <p>Everything you need to know about the product and billing.</p>
+          </div>
+          
+          <div className="faq-container">
+            {faqs.map((faq, index) => (
+              <div key={index} className={`faq-item ${activeFaq === index ? 'active' : ''}`}>
+                <div className="faq-question" onClick={() => toggleFaq(index)}>
+                  {faq.question}
+                  <ChevronDown className="faq-icon" size={20} />
+                </div>
+                <div className="faq-answer">
+                  {faq.answer}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
       
+      {/* Bottom CTA */}
+      <section className="bottom-cta">
+        <div className="container">
+          <h2 style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>Ready to scale your organic growth?</h2>
+          <p style={{ fontSize: '1.25rem', maxWidth: '600px', margin: '0 auto 2.5rem' }}>
+            Join thousands of creators and businesses who are automating their marketing and driving real revenue.
+          </p>
+          <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')}>
+            Start Your Journey <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
+          </button>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer style={{ padding: '4rem 0 2rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+      <footer style={{ padding: '3rem 0', textAlign: 'center', background: 'var(--bg-dark)' }}>
         <div className="container">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
             <Sparkles size={20} color="var(--primary-color)" />
