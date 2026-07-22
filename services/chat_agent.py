@@ -356,42 +356,6 @@ async def execute_tool(
                 )
             return f"✗ Email campaign failed: {error_log}"
 
-                    bodyText=body_text,
-                    bodyHtml=body_html,
-                    scheduledAt=datetime.now(),
-                    status="DRAFT",
-                )
-                session.add(campaign)
-                await session.commit()
-
-                # Send via Resend
-                try:
-                    result_data = await send_email_blast(
-                        subject=subject,
-                        html_body=body_html,
-                        text_body=body_text,
-                    )
-                    is_success = result_data.get("success", False)
-                    recipient_count = result_data.get("count", 0)
-                    error_log = result_data.get("error")
-                except Exception as e:
-                    is_success = False
-                    recipient_count = 0
-                    error_log = str(e)
-
-                campaign.status = "SENT" if is_success else "FAILED"
-                campaign.sentAt = datetime.now() if is_success else None
-                campaign.recipientCount = recipient_count
-                campaign.errorLog = error_log
-                await session.commit()
-
-                if is_success:
-                    return (
-                        f"✓ Email campaign sent for '{product.productName}'\n"
-                        f"Subject: {subject}\n"
-                        f"Recipients: {recipient_count}"
-                    )
-                return f"✗ Email campaign failed: {error_log}"
 
 
         # --- get_analytics_summary ---
