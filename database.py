@@ -276,14 +276,14 @@ async def init_db() -> AsyncEngine:
         autoflush=False,
     )
 
-    # Auto-create tables with 5-second timeout safeguard
+    # Auto-create tables with 30-second timeout safeguard (Neon cold start can be slow)
     try:
-        async with asyncio.timeout(5.0):
+        async with asyncio.timeout(30.0):
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
         logger.info("SQLAlchemy ORM tables initialized successfully")
     except Exception as e:
-        logger.warning(f"Table initialization skipped or timed out ({e})")
+        logger.error(f"Table initialization failed or timed out: {e}")
 
     return engine
 
