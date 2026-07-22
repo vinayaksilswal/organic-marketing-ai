@@ -1,13 +1,15 @@
 services:
   - type: web
     name: organic-marketing-ai
-    env: docker
-    dockerContext: .
-    dockerfilePath: ./Dockerfile
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT --timeout 120"
     region: ohio
     plan: starter
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: ENVIRONMENT
         value: production
       - key: ADMIN_USERNAME
