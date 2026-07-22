@@ -33,6 +33,7 @@ python_generator = """
 generator py {
   provider             = "prisma-client-py"
   recursive_type_depth = 5
+  engineType           = "library"
 }
 """
 if "generator py" not in content:
