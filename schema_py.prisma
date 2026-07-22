@@ -258,6 +258,5 @@ model SocialConnection {
 generator py {
   provider             = "prisma-client-py"
   recursive_type_depth = 5
-  engineType           = "library"
   binaryTargets        = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
