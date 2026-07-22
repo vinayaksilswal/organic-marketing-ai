@@ -70,7 +70,6 @@ def resolve_prisma_engine() -> str | None:
         logger.info(f"Using existing PRISMA_QUERY_ENGINE_BINARY: {existing}")
         return existing
 
-    import os
     import prisma
 
     prisma_dir = os.path.dirname(prisma.__file__)
