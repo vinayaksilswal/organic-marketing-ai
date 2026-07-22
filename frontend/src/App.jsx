@@ -7,7 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Navbar from './components/Navbar';
 import Toast from './components/Toast';
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai1.onrender.com/api/v1';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
