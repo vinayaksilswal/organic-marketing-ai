@@ -113,14 +113,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             # Prisma Python bug: The engine is downloaded to node_modules/@prisma/engines/
             # but the python client looks for it in the current directory or node_modules/prisma/
             cache_dir = "/opt/render/.cache/prisma-python/binaries/*/*/"
-            engines = glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*")
+            engines = (
+                glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*") +
+                glob.glob(cache_dir + "node_modules/prisma/query-engine-*") +
+                glob.glob(cache_dir + "query-engine-*") +
+                glob.glob(cache_dir + "prisma-query-engine-*")
+            )
             
             # If not on Render, try local user cache (for local development)
             if not engines:
                 import platform
                 home = os.path.expanduser("~")
                 cache_dir = os.path.join(home, ".cache", "prisma-python", "binaries", "*", "*", "")
-                engines = glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*")
+                engines = (
+                    glob.glob(cache_dir + "node_modules/@prisma/engines/query-engine-*") +
+                    glob.glob(cache_dir + "node_modules/prisma/query-engine-*") +
+                    glob.glob(cache_dir + "query-engine-*") +
+                    glob.glob(cache_dir + "prisma-query-engine-*")
+                )
                 
             if engines:
                 engine_path = engines[0]
