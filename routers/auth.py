@@ -75,8 +75,12 @@ class UserLogin(BaseModel):
 
 @router.post("/api/v1/auth/register")
 async def api_register(data: UserRegister, request: Request):
-    prisma = request.app.state.prisma
-    existing = await prisma.user.find_unique(where={"email": data.email})
+    if hasattr(request.app.state, "prisma_error"):
+        return {"success": False, "message": f"CRITICAL: Prisma failed to initialize on server startup: {request.app.state.prisma_error}"}
+    
+    try:
+        prisma = request.app.state.prisma
+        existing = await prisma.user.find_unique(where={"email": data.email})
     if existing:
         return {"success": False, "message": "Email already registered"}
     
@@ -87,8 +91,12 @@ async def api_register(data: UserRegister, request: Request):
 
 @router.post("/api/v1/auth/login")
 async def api_login(data: UserLogin, request: Request):
-    prisma = request.app.state.prisma
-    user = await prisma.user.find_unique(where={"email": data.email})
+    if hasattr(request.app.state, "prisma_error"):
+        return {"success": False, "message": f"CRITICAL: Prisma failed to initialize on server startup: {request.app.state.prisma_error}"}
+
+    try:
+        prisma = request.app.state.prisma
+        user = await prisma.user.find_unique(where={"email": data.email})
     if not user or not bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8")):
         return {"success": False, "message": "Invalid email or password"}
     

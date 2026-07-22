@@ -101,6 +101,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
     os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
 
+    # --- Debugging Prisma Engine ---
+    if os.path.exists(cache_dir):
+        logger.info(f"CACHE DIR EXISTS: {cache_dir}")
+        logger.info(f"CONTENTS: {os.listdir(cache_dir)}")
+    else:
+        logger.warning(f"CACHE DIR MISSING: {cache_dir}")
+        # Try to download it right now!
+        import subprocess
+        logger.info("Attempting to fetch Prisma binaries at runtime...")
+        subprocess.run(["prisma", "py", "fetch"])
+        logger.info(f"Post-fetch CACHE DIR CONTENTS: {os.listdir(cache_dir) if os.path.exists(cache_dir) else 'Still missing'}")
+
     try:
         prisma_client = Prisma()
         os.environ["DATABASE_URL"] = settings.database_url
@@ -109,6 +121,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Prisma ORM connected to PostgreSQL")
     except Exception as e:
         logger.error(f"Failed to connect Prisma engine: {e}")
+        # Save the exception to state so we can read it from an endpoint if needed
+        app.state.prisma_error = str(e)
 
     # --- Step 2: Initialize and start the marketing scheduler ---
     # The scheduler receives the prisma client so it doesn't create its own.
