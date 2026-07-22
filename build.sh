@@ -7,37 +7,40 @@ export PRISMA_CLI_QUERY_ENGINE_TYPE="binary"
 
 pip install --no-cache-dir -r requirements.txt
 
-echo "Generating Prisma client (downloads query engine)..."
-prisma generate --schema=schema_py.prisma
+# 1. Dynamically locate site-packages/prisma inside .venv
+PRISMA_DIR=$(python -c "import os, prisma; print(os.path.dirname(prisma.__file__))")
+echo "Target Prisma directory inside .venv: $PRISMA_DIR"
 
-echo "Copying query engine into persistent .venv site-packages/prisma directory..."
+# 2. Tell Prisma CLI to fetch binaries directly into site-packages/prisma
+export PRISMA_BINARY_CACHE_DIR="$PRISMA_DIR"
+
+echo "Fetching Prisma binaries natively..."
+prisma py fetch
+
+# 3. Ensure the exact binary filename expected by Prisma Python exists and is executable
 python -c "
-import os, sys, shutil, glob
-import prisma
-
+import os, sys, glob, shutil, prisma
 prisma_dir = os.path.dirname(prisma.__file__)
-print('Target Prisma package directory inside .venv:', prisma_dir)
 
-# Find the query engine downloaded by prisma generate in system cache
-found = glob.glob(os.path.expanduser('~/.cache/**/query-engine*'), recursive=True) + \
-        glob.glob('/tmp/**/query-engine*', recursive=True) + \
-        glob.glob('/opt/render/.cache/**/query-engine*', recursive=True)
+engines = glob.glob(os.path.join(prisma_dir, '**', '*query-engine*'), recursive=True) + \
+          glob.glob(os.path.expanduser('~/.cache/**/*query-engine*'), recursive=True) + \
+          glob.glob('/tmp/**/*query-engine*', recursive=True)
 
-print('Discovered engine candidates:', found)
+print('Discovered query engines:', engines)
 
-if found:
-    src_engine = found[0]
-    target_engine = os.path.join(prisma_dir, 'prisma-query-engine-debian-openssl-3.0.x')
-    print(f'Copying engine from {src_engine} to {target_engine}')
-    shutil.copyfile(src_engine, target_engine)
-    os.chmod(target_engine, 0o755)
-    print('SUCCESSFULLY COPIED ENGINE TO:', target_engine)
+if engines:
+    target = os.path.join(prisma_dir, 'prisma-query-engine-debian-openssl-3.0.x')
+    print(f'Copying {engines[0]} -> {target}')
+    shutil.copyfile(engines[0], target)
+    os.chmod(target, 0o755)
+    print('ENGINE SUCCESSFULLY VERIFIED AND PLACED AT:', target)
 else:
-    print('ERROR: Could not locate query-engine binary in cache!')
+    print('ERROR: No query engine binary found after prisma py fetch!')
     sys.exit(1)
 "
 
+prisma generate --schema=schema_py.prisma
 prisma db push --schema=schema_py.prisma
 
-echo "Build complete! Prisma query engine safely secured in .venv"
+echo "Build complete! Prisma binary secured inside .venv"
 
