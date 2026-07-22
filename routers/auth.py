@@ -3,7 +3,7 @@
 Organic Marketing AI — Authentication Router
 =============================================================================
 Handles admin login (cookie-based JWT) and user API authentication
-(Bearer token JWT). Includes registration and login endpoints.
+(Bearer token JWT) using SQLAlchemy 2.0 Async ORM.
 =============================================================================
 """
 
@@ -19,9 +19,11 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
+from sqlalchemy import select
 
 from auth import create_access_token
 from config import settings
+from database import AsyncSessionLocal, User
 
 router = APIRouter(tags=["Authentication"])
 templates = Jinja2Templates(directory="templates")
@@ -95,7 +97,7 @@ def verify_user(request: Request) -> str:
 
 
 # =============================================================================
-# User Registration & Login (API — Bearer token)
+# User Registration & Login Models
 # =============================================================================
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
@@ -130,73 +132,60 @@ class UserLogin(BaseModel):
         return v.strip().lower()
 
 
-async def get_prisma(request: Request):
-    """
-    Helper dependency to retrieve connected Prisma client, creating a fresh
-    connected instance if missing or disconnected.
-    """
-    prisma = getattr(request.app.state, "prisma", None)
-    if prisma and prisma.is_connected():
-        return prisma
-
-    try:
-        from prisma import Prisma
-        fresh_prisma = Prisma()
-        await fresh_prisma.connect()
-        request.app.state.prisma = fresh_prisma
-        if hasattr(request.app.state, "prisma_error"):
-            delattr(request.app.state, "prisma_error")
-        return fresh_prisma
-    except Exception as e:
-        from loguru import logger
-        logger.error(f"Failed to connect Prisma client on-demand: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail=f"Database connection error: {str(e)}",
-        )
-
-
+# =============================================================================
+# User Registration & Login API Endpoints
+# =============================================================================
 @router.post("/api/v1/auth/register")
 async def api_register(data: UserRegister, request: Request):
-    """Register a new user account."""
-    prisma = await get_prisma(request)
-
+    """Register a new user account using SQLAlchemy 2.0 Async Session."""
     try:
-        existing = await prisma.user.find_unique(where={"email": data.email})
+        async with AsyncSessionLocal() as session:
+            stmt = select(User).where(User.email == data.email)
+            result = await session.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                raise HTTPException(
+                    status_code=409, detail="An account with this email already exists"
+                )
+
+            hashed = bcrypt.hashpw(data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+            user = User(email=data.email, password=hashed)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+
+            token = create_access_token(data={"sub": user.id, "type": "user"})
+            return {
+                "success": True,
+                "token": token,
+                "user": {"id": user.id, "email": user.email},
+            }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database query error: {str(e)}")
-
-    if existing:
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
-
-    hashed = bcrypt.hashpw(data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    user = await prisma.user.create(data={"email": data.email, "password": hashed})
-    token = create_access_token(data={"sub": user.id, "type": "user"})
-
-    return {
-        "success": True,
-        "token": token,
-        "user": {"id": user.id, "email": user.email},
-    }
+        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
 
 
 @router.post("/api/v1/auth/login")
 async def api_login(data: UserLogin, request: Request):
-    """Log in an existing user."""
-    prisma = await get_prisma(request)
-
+    """Log in an existing user using SQLAlchemy 2.0 Async Session."""
     try:
-        user = await prisma.user.find_unique(where={"email": data.email})
+        async with AsyncSessionLocal() as session:
+            stmt = select(User).where(User.email == data.email)
+            result = await session.execute(stmt)
+            user = result.scalar_one_or_none()
+
+            if not user or not bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8")):
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+
+            token = create_access_token(data={"sub": user.id, "type": "user"})
+            return {
+                "success": True,
+                "token": token,
+                "user": {"id": user.id, "email": user.email},
+            }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database query error: {str(e)}")
-
-    if not user or not bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8")):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    token = create_access_token(data={"sub": user.id, "type": "user"})
-
-    return {
-        "success": True,
-        "token": token,
-        "user": {"id": user.id, "email": user.email},
-    }
+        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")

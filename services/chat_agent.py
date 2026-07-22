@@ -33,7 +33,8 @@ from typing import Any
 
 import httpx
 from loguru import logger
-from prisma import Prisma
+from sqlalchemy import select, func
+from database import AsyncSessionLocal, SocialCampaign, SocialPost, EmailCampaign, Audience
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -171,7 +172,7 @@ TOOLS: list[dict[str, Any]] = [
 # Tool Executor — Routes tool calls to the appropriate backend function
 # =============================================================================
 async def execute_tool(
-    name: str, args: dict[str, Any], prisma: Prisma
+    name: str, args: dict[str, Any]
 ) -> str:
     """
     Execute a tool call from the LLM and return the result as a string.
@@ -355,31 +356,56 @@ async def execute_tool(
                 )
             return f"✗ Email campaign failed: {error_log}"
 
+                    bodyText=body_text,
+                    bodyHtml=body_html,
+                    scheduledAt=datetime.now(),
+                    status="DRAFT",
+                )
+                session.add(campaign)
+                await session.commit()
 
-        # --- get_marketing_stats ---
-        elif name == "get_marketing_stats":
-            product_count = 0
-            order_count = 0
-            audience_count = await prisma.audience.count()
+                # Send via Resend
+                try:
+                    result_data = await send_email_blast(
+                        subject=subject,
+                        html_body=body_html,
+                        text_body=body_text,
+                    )
+                    is_success = result_data.get("success", False)
+                    recipient_count = result_data.get("count", 0)
+                    error_log = result_data.get("error")
+                except Exception as e:
+                    is_success = False
+                    recipient_count = 0
+                    error_log = str(e)
 
-            total_revenue = 0
+                campaign.status = "SENT" if is_success else "FAILED"
+                campaign.sentAt = datetime.now() if is_success else None
+                campaign.recipientCount = recipient_count
+                campaign.errorLog = error_log
+                await session.commit()
 
-            # Recent marketing activity
-            recent_posts = await prisma.socialpost.count(
-                where={"status": "POSTED"}
-            )
-            recent_emails = await prisma.emailcampaign.count(
-                where={"status": "SENT"}
-            )
+                if is_success:
+                    return (
+                        f"✓ Email campaign sent for '{product.productName}'\n"
+                        f"Subject: {subject}\n"
+                        f"Recipients: {recipient_count}"
+                    )
+                return f"✗ Email campaign failed: {error_log}"
+
+
+        # --- get_analytics_summary ---
+        elif name == "get_analytics_summary":
+            async with AsyncSessionLocal() as session:
+                aud_cnt = (await session.execute(select(func.count(Audience.id)))).scalar() or 0
+                post_cnt = (await session.execute(select(func.count(SocialPost.id)))).scalar() or 0
+                email_cnt = (await session.execute(select(func.count(EmailCampaign.id)))).scalar() or 0
 
             return (
-                f"Platform Statistics:\n"
-                f"  Products: {product_count}\n"
-                f"  Orders: {order_count}\n"
-                f"  Total Revenue: ${total_revenue:,.2f}\n"
-                f"  Audience Size: {audience_count}\n"
-                f"  Social Posts (posted): {recent_posts}\n"
-                f"  Email Campaigns (sent): {recent_emails}"
+                f"Analytics Summary:\n"
+                f"  Total Audience Members: {aud_cnt}\n"
+                f"  Social Posts Created: {post_cnt}\n"
+                f"  Email Campaigns Sent: {email_cnt}\n"
             )
 
         else:
@@ -424,8 +450,8 @@ async def _call_chatbot_llm(
 
 
 async def chat_with_agent(
-    messages: list[dict[str, Any]], prisma: Prisma
-) -> dict[str, str]:
+    messages: list[dict[str, Any]]
+) -> dict[str, Any]:
     """
     Send a conversation to the AI chatbot and handle tool calling.
 
@@ -473,7 +499,7 @@ async def chat_with_agent(
                         f"{func_name}({json.dumps(func_args)[:200]})"
                     )
 
-                    tool_result = await execute_tool(func_name, func_args, prisma)
+                    tool_result = await execute_tool(func_name, func_args)
 
                     logger.info(f"Tool result ({func_name}): {tool_result[:200]}...")
 

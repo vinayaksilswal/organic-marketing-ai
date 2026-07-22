@@ -2,34 +2,39 @@
 =============================================================================
 Organic Marketing AI — API Router (v1)
 =============================================================================
-Handles all REST API endpoints for:
-  - Social Campaign CRUD (scoped to authenticated user)
-  - Media upload & retrieval
-  - AI Chatbot
-  - Social media triggers & status
-
-All endpoints use request.app.state.prisma (no standalone Prisma instances).
+Handles REST API endpoints using SQLAlchemy 2.0 Async ORM:
+  - Media Upload & Public Retrieval
+  - User-Scoped Social Campaigns CRUD
+  - AI Chatbot Command Center
+  - Social Media Triggers & Status
 =============================================================================
 """
 
 from __future__ import annotations
 
-import json
 import os
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel, Field
+from sqlalchemy import select, delete
 
-from auth import verify_credentials
+from database import (
+    AsyncSessionLocal,
+    SocialCampaign,
+    SocialPost,
+    MarketingState,
+    Media,
+)
 from routers.auth import verify_user
 from services.chat_agent import chat_with_agent
 
 
 # =============================================================================
-# User-Authenticated Router (for frontend dashboard)
+# Authenticated Router
 # =============================================================================
 router = APIRouter(
     prefix="/api/v1",
@@ -39,20 +44,16 @@ router = APIRouter(
 
 
 # =============================================================================
-# Request/Response Models
+# Request / Response Models
 # =============================================================================
 class StandardResponse(BaseModel):
-    """Standard API response wrapper."""
     success: bool
     message: Optional[str] = None
     data: Optional[Any] = None
 
 
 class ChatRequest(BaseModel):
-    """Request model for the AI chatbot."""
-    messages: List[Dict[str, Any]] = Field(
-        ..., description="Conversation messages array"
-    )
+    messages: List[Dict[str, Any]] = Field(..., description="Conversation messages array")
 
 
 class CampaignCreate(BaseModel):
@@ -69,10 +70,8 @@ class CampaignUpdate(BaseModel):
 
 
 # =============================================================================
-# Upload Endpoints
+# Upload Media Endpoint
 # =============================================================================
-import base64
-
 @router.post("/upload-media", response_model=StandardResponse)
 async def upload_media(
     request: Request,
@@ -81,23 +80,21 @@ async def upload_media(
 ) -> StandardResponse:
     """Upload a video or image file to the database."""
     try:
-        import asyncpg
-        from config import settings
-
         mime_type = file.content_type or "application/octet-stream"
         file_content = await file.read()
         media_id = str(uuid.uuid4())
 
-        conn = await asyncpg.connect(settings.database_url)
-        try:
-            await conn.execute(
-                'INSERT INTO "Media" (id, "userId", filename, "mimeType", url, "createdAt") '
-                'VALUES ($1, $2, $3, $4, $5, NOW())',
-                media_id, user_id, file.filename or "upload", mime_type,
-                f"/api/v1/media/{media_id}",
+        async with AsyncSessionLocal() as session:
+            media = Media(
+                id=media_id,
+                userId=user_id,
+                filename=file.filename or "upload",
+                mimeType=mime_type,
+                url=f"/api/v1/media/{media_id}",
+                data=file_content,
             )
-        finally:
-            await conn.close()
+            session.add(media)
+            await session.commit()
 
         url_suffix = "?type=video" if mime_type.startswith("video/") else ""
         base_url = str(request.base_url).rstrip("/")
@@ -112,7 +109,7 @@ async def upload_media(
 
 
 # =============================================================================
-# Public Router (no auth required — for media serving)
+# Public Router (Media Retrieval)
 # =============================================================================
 public_router = APIRouter(
     prefix="/api/v1",
@@ -122,11 +119,7 @@ public_router = APIRouter(
 
 @public_router.get("/media/{media_id}")
 async def get_media(media_id: str, request: Request):
-    """Retrieve media from the database (PUBLIC)."""
-    import asyncpg
-    from config import settings
-    from fastapi.responses import FileResponse
-
+    """Retrieve binary media from the database (PUBLIC)."""
     cache_dir = "uploads/cache"
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, f"{media_id}.bin")
@@ -139,27 +132,22 @@ async def get_media(media_id: str, request: Request):
         with open(mime_path, "r") as f:
             mime_type = f.read().strip()
     else:
-        conn = await asyncpg.connect(settings.database_url)
-        try:
-            row = await conn.fetchrow(
-                'SELECT "mimeType", data FROM "Media" WHERE id = $1',
-                media_id,
-            )
-        finally:
-            await conn.close()
+        async with AsyncSessionLocal() as session:
+            stmt = select(Media).where(Media.id == media_id)
+            res = await session.execute(stmt)
+            row = res.scalar_one_or_none()
 
-        if not row:
-            raise HTTPException(status_code=404, detail="Media not found")
+            if not row:
+                raise HTTPException(status_code=404, detail="Media not found")
 
-        mime_type = row["mimeType"]
-        data_bytes = row["data"]
+            mime_type = row.mimeType
+            data_bytes = row.data or b""
 
-        with open(cache_path, "wb") as f:
-            f.write(data_bytes)
-        with open(mime_path, "w") as f:
-            f.write(mime_type)
+            with open(cache_path, "wb") as f:
+                f.write(data_bytes)
+            with open(mime_path, "w") as f:
+                f.write(mime_type)
 
-    # Override mime type if requested
     if req_type:
         if req_type == "video" or req_type.endswith(".mp4"):
             mime_type = "video/mp4"
@@ -184,20 +172,30 @@ async def create_campaign(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Create a new social media campaign for the authenticated user."""
-    prisma = request.app.state.prisma
-    try:
-        campaign = await prisma.socialcampaign.create(
-            data={
-                "userId": user_id,
-                "baseCaption": data.baseCaption,
-                "mediaUrl": data.mediaUrl,
-                "mediaType": data.mediaType,
-            }
+    """Create a new social campaign for the user."""
+    async with AsyncSessionLocal() as session:
+        campaign = SocialCampaign(
+            userId=user_id,
+            baseCaption=data.baseCaption,
+            mediaUrl=data.mediaUrl,
+            mediaType=data.mediaType,
         )
-        return StandardResponse(success=True, data=campaign.model_dump())
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        session.add(campaign)
+        await session.commit()
+        await session.refresh(campaign)
+
+        return StandardResponse(
+            success=True,
+            data={
+                "id": campaign.id,
+                "userId": campaign.userId,
+                "baseCaption": campaign.baseCaption,
+                "mediaUrl": campaign.mediaUrl,
+                "mediaType": campaign.mediaType,
+                "isActive": campaign.isActive,
+                "createdAt": campaign.createdAt.isoformat() if campaign.createdAt else None,
+            },
+        )
 
 
 @router.get("/campaigns", response_model=StandardResponse)
@@ -205,17 +203,29 @@ async def get_campaigns(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Get all social media campaigns for the authenticated user."""
-    prisma = request.app.state.prisma
-    try:
-        campaigns = await prisma.socialcampaign.find_many(
-            where={"userId": user_id},
-            order={"createdAt": "desc"},
+    """Get all social campaigns for the authenticated user."""
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(SocialCampaign)
+            .where(SocialCampaign.userId == user_id)
+            .order_by(SocialCampaign.createdAt.desc())
         )
-        data = [c.model_dump() for c in campaigns]
+        res = await session.execute(stmt)
+        campaigns = res.scalars().all()
+
+        data = [
+            {
+                "id": c.id,
+                "userId": c.userId,
+                "baseCaption": c.baseCaption,
+                "mediaUrl": c.mediaUrl,
+                "mediaType": c.mediaType,
+                "isActive": c.isActive,
+                "createdAt": c.createdAt.isoformat() if c.createdAt else None,
+            }
+            for c in campaigns
+        ]
         return StandardResponse(success=True, data=data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/campaigns/{cid}", response_model=StandardResponse)
@@ -225,35 +235,39 @@ async def update_campaign(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Update a social media campaign (only if owned by authenticated user)."""
-    prisma = request.app.state.prisma
-    try:
-        # Verify ownership
-        existing = await prisma.socialcampaign.find_first(
-            where={"id": cid, "userId": user_id}
+    """Update a social campaign."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(SocialCampaign).where(
+            SocialCampaign.id == cid, SocialCampaign.userId == user_id
         )
-        if not existing:
+        res = await session.execute(stmt)
+        campaign = res.scalar_one_or_none()
+
+        if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
 
-        update_data = {}
         if data.isActive is not None:
-            update_data["isActive"] = data.isActive
+            campaign.isActive = data.isActive
         if data.baseCaption is not None:
-            update_data["baseCaption"] = data.baseCaption
+            campaign.baseCaption = data.baseCaption
         if data.mediaUrl is not None:
-            update_data["mediaUrl"] = data.mediaUrl
+            campaign.mediaUrl = data.mediaUrl
         if data.mediaType is not None:
-            update_data["mediaType"] = data.mediaType
+            campaign.mediaType = data.mediaType
 
-        updated = await prisma.socialcampaign.update(
-            where={"id": cid},
-            data=update_data,
+        await session.commit()
+        await session.refresh(campaign)
+
+        return StandardResponse(
+            success=True,
+            data={
+                "id": campaign.id,
+                "baseCaption": campaign.baseCaption,
+                "mediaUrl": campaign.mediaUrl,
+                "mediaType": campaign.mediaType,
+                "isActive": campaign.isActive,
+            },
         )
-        return StandardResponse(success=True, data=updated.model_dump())
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/campaigns/{cid}", response_model=StandardResponse)
@@ -262,51 +276,43 @@ async def delete_campaign(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Delete a social media campaign (only if owned by authenticated user)."""
-    prisma = request.app.state.prisma
-    try:
-        existing = await prisma.socialcampaign.find_first(
-            where={"id": cid, "userId": user_id}
+    """Delete a social campaign."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(SocialCampaign).where(
+            SocialCampaign.id == cid, SocialCampaign.userId == user_id
         )
-        if not existing:
+        res = await session.execute(stmt)
+        campaign = res.scalar_one_or_none()
+
+        if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
 
-        await prisma.socialcampaign.delete(where={"id": cid})
+        await session.delete(campaign)
+        await session.commit()
         return StandardResponse(success=True, message="Campaign deleted")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 
 # =============================================================================
-# Chatbot Endpoint
+# Chatbot & Triggers
 # =============================================================================
 @router.post("/chat", response_model=StandardResponse)
 async def chat_api(req: ChatRequest, request: Request) -> StandardResponse:
-    """
-    AI Chatbot with LLM tool calling.
-    Accepts a conversation history and returns the assistant's response.
-    """
-    prisma = request.app.state.prisma
-    response_message = await chat_with_agent(req.messages, prisma)
+    """AI Chatbot with LLM function calling."""
+    response_message = await chat_with_agent(req.messages)
     return StandardResponse(success=True, data=response_message)
 
 
-# =============================================================================
-# Social Media — Manual Trigger & Status Endpoints
-# =============================================================================
 @router.post("/social/trigger", response_model=StandardResponse)
 async def trigger_social_post(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Manually trigger one full marketing loop iteration."""
+    """Manually trigger one marketing loop iteration."""
     import asyncio
     from services.scheduler import execute_marketing_loop
 
     logger.info(f"[MANUAL TRIGGER] User {user_id} triggered marketing loop")
-    asyncio.create_task(execute_marketing_loop())
+    asyncio.create_task(execute_marketing_loop(user_id=user_id))
     return StandardResponse(
         success=True,
         message="Marketing loop triggered. Check recent posts for results.",
@@ -318,15 +324,17 @@ async def get_recent_social_posts(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Returns the 10 most recent social post records for the authenticated user."""
-    prisma = request.app.state.prisma
-    try:
-        posts = await prisma.socialpost.find_many(
-            where={"userId": user_id},
-            order={"createdAt": "desc"},
-            take=10,
-            include={"campaign": True},
+    """Returns the 10 most recent social posts for the user."""
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(SocialPost)
+            .where(SocialPost.userId == user_id)
+            .order_by(SocialPost.createdAt.desc())
+            .limit(10)
         )
+        res = await session.execute(stmt)
+        posts = res.scalars().all()
+
         data = [
             {
                 "id": p.id,
@@ -344,9 +352,6 @@ async def get_recent_social_posts(
             for p in posts
         ]
         return StandardResponse(success=True, data=data)
-    except Exception as e:
-        logger.error(f"Failed to fetch recent social posts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/social/scheduler-status", response_model=StandardResponse)
@@ -354,10 +359,8 @@ async def get_scheduler_status(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Returns the scheduler status and auto-approve setting for the user."""
-    prisma = request.app.state.prisma
-    scheduler = request.app.state.scheduler
-
+    """Returns scheduler running status and user autoApprove setting."""
+    scheduler = getattr(request.app.state, "scheduler", None)
     next_run = None
     try:
         if scheduler:
@@ -367,14 +370,18 @@ async def get_scheduler_status(
     except Exception:
         pass
 
-    state = await prisma.marketingstate.find_unique(where={"userId": user_id})
-    return StandardResponse(
-        success=True,
-        data={
-            "schedulerRunning": scheduler.running if scheduler else False,
-            "nextRunAt": next_run,
-            "autoApprove": state.autoApprove if state else False,
-            "lastSocialIdx": state.lastSocialIdx if state else 0,
-            "lastEmailIdx": state.lastEmailIdx if state else 0,
-        },
-    )
+    async with AsyncSessionLocal() as session:
+        stmt = select(MarketingState).where(MarketingState.userId == user_id)
+        res = await session.execute(stmt)
+        state = res.scalar_one_or_none()
+
+        return StandardResponse(
+            success=True,
+            data={
+                "schedulerRunning": scheduler.running if scheduler else False,
+                "nextRunAt": next_run,
+                "autoApprove": state.autoApprove if state else False,
+                "lastSocialIdx": state.lastSocialIdx if state else 0,
+                "lastEmailIdx": state.lastEmailIdx if state else 0,
+            },
+        )

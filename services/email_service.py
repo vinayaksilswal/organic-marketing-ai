@@ -2,29 +2,18 @@
 =============================================================================
 Organic Marketing AI — Resend Email Client
 =============================================================================
-Handles transactional and marketing email delivery via the Resend SDK.
-Replaces the previous SMTP-based email service with Resend's modern API.
-
-Sender: support@organicmarketing.ai (configured via settings)
-
-Prerequisites:
-  1. Resend account with API key (set RESEND_API_KEY in env)
-  2. DNS domain verification for organicmarketing.ai (MX, SPF, DKIM records)
-     See: https://resend.com/docs/dashboard/domains/introduction
-
-Key Functions:
-  - send_email_blast(): Batch send a promotional email to all Audience
-    members, chunked to avoid rate limits.
-  - send_single_email(): Send a single email to one recipient.
+Handles transactional and marketing email delivery via the Resend SDK
+using SQLAlchemy 2.0 Async Session.
 =============================================================================
 """
 
 from __future__ import annotations
 
-from typing import Any
+import asyncio
+from typing import Any, Optional
 
 from loguru import logger
-from prisma import Prisma
+from sqlalchemy import select
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -33,201 +22,122 @@ from tenacity import (
 )
 
 from config import settings
+from database import AsyncSessionLocal, Audience
 
-# =============================================================================
-# Resend SDK Import — with graceful fallback
-# =============================================================================
 try:
     import resend
 except ImportError:
-    resend = None  # type: ignore[assignment]
-    logger.warning(
-        "Resend SDK not installed. Email sending disabled. "
-        "Install with: pip install resend"
-    )
+    resend = None
+    logger.warning("Resend SDK not installed. Install with: pip install resend")
 
-# Batch size for email sends (Resend rate limit: ~10 emails/second on free tier)
 EMAIL_BATCH_SIZE = 50
-
-# Delay between batches (seconds) to respect rate limits
 BATCH_DELAY_SECONDS = 2
 
 
-# =============================================================================
-# Resend Initialization
-# =============================================================================
 def _init_resend() -> bool:
-    """
-    Initialize the Resend SDK with the API key from settings.
-    Must be called before any send operations.
-
-    Returns:
-        True if Resend is properly configured, False otherwise
-    """
-    if resend is None:
-        logger.error("Resend SDK not available — install with: pip install resend")
+    """Initialize the Resend API key."""
+    if not resend:
         return False
-
     if not settings.resend_api_key:
-        logger.warning("RESEND_API_KEY not configured — email sending disabled")
         return False
-
     resend.api_key = settings.resend_api_key
     return True
 
 
-# =============================================================================
-# Single Email Send
-# =============================================================================
 @retry(
-    wait=wait_exponential(multiplier=1, min=1, max=10),
-    stop=stop_after_attempt(3),
     retry=retry_if_exception_type(Exception),
-    before_sleep=lambda retry_state: logger.warning(
-        f"Resend retry attempt {retry_state.attempt_number}"
-    ),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
 )
+def _send_single_resend_email(
+    to_email: str,
+    subject: str,
+    body_html: str,
+    body_text: str = "",
+) -> dict[str, Any]:
+    """Send a single email via Resend with exponential backoff retries."""
+    if not _init_resend():
+        return {"success": False, "error": "Resend API key not configured"}
+
+    params = {
+        "from": settings.resend_from_email,
+        "to": [to_email],
+        "subject": subject,
+        "html": body_html,
+    }
+    if body_text:
+        params["text"] = body_text
+
+    response = resend.Emails.send(params)
+    logger.info(f"Resend email sent to {to_email}: ID {response.get('id')}")
+    return {"success": True, "id": response.get("id")}
+
+
 async def send_single_email(
     to_email: str,
     subject: str,
-    html_body: str,
-    text_body: str | None = None,
+    body_html: str,
+    body_text: str = "",
 ) -> dict[str, Any]:
-    """
-    Send a single email via Resend.
-
-    Args:
-        to_email: Recipient email address
-        subject: Email subject line
-        html_body: HTML email body
-        text_body: Optional plain text fallback body
-
-    Returns:
-        Dict with 'success' bool and 'id' (Resend email ID) or 'error'
-    """
-    if not _init_resend():
-        return {"success": False, "error": "Resend not configured"}
-
+    """Async wrapper for sending a single email."""
     try:
-        params: dict[str, Any] = {
-            "from": settings.resend_from_email,
-            "to": [to_email],
-            "subject": subject,
-            "html": html_body,
-        }
-        if text_body:
-            params["text"] = text_body
-
-        email_response = resend.Emails.send(params)
-
-        email_id = (
-            email_response.get("id", "")
-            if isinstance(email_response, dict)
-            else getattr(email_response, "id", "")
+        return await asyncio.to_thread(
+            _send_single_resend_email, to_email, subject, body_html, body_text
         )
-        logger.info(f"✓ Email sent to {to_email}: {email_id}")
-        return {"success": True, "id": email_id}
-
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
-        raise  # Let tenacity handle retry
+        return {"success": False, "error": str(e)}
 
 
-# =============================================================================
-# Batch Email Blast
-# =============================================================================
 async def send_email_blast(
     subject: str,
-    html_body: str,
-    text_body: str = "",
-    *,
-    prisma: Prisma | None = None,
+    body_html: str,
+    body_text: str = "",
+    user_id: Optional[str] = None,
 ) -> dict[str, Any]:
-    """
-    Send a promotional email to all audience members and users.
-
-    Queries the Audience and User tables, deduplicates emails, and sends
-    in batches to respect Resend's rate limits.
-
-    Args:
-        subject: Email subject line
-        html_body: HTML email body content
-        text_body: Plain text fallback body
-        prisma: Prisma client instance (required for database queries)
-
-    Returns:
-        Dict with 'success' bool, 'count' (emails sent), and optional 'error'
-    """
+    """Send a promotional email blast to all audience members using SQLAlchemy session."""
     if not _init_resend():
         logger.warning(f"Resend not configured. Simulating email blast: {subject}")
-        return {"success": True, "count": 0, "error": "Resend not configured (simulated)"}
-
-    if not prisma:
-        logger.error("Prisma client required for email blast")
-        return {"success": False, "count": 0, "error": "No database connection"}
+        return {"success": True, "sent_count": 0, "simulated": True}
 
     try:
-        # Gather all recipients who haven't unsubscribed
-        audiences = await prisma.audience.find_many(where={"unsubscribed": False})
+        async with AsyncSessionLocal() as session:
+            stmt = select(Audience).where(Audience.unsubscribed == False)
+            if user_id:
+                stmt = stmt.where(Audience.userId == user_id)
 
-        # Deduplicate email addresses (case-insensitive)
-        email_set: set[str] = set()
-        for a in audiences:
-            email_set.add(a.email.lower().strip())
+            res = await session.execute(stmt)
+            audiences = res.scalars().all()
 
-        emails = list(email_set)
+            email_set: set[str] = set()
+            for a in audiences:
+                if a.email:
+                    email_set.add(a.email.lower().strip())
+
+            emails = list(email_set)
 
         if not emails:
-            logger.info("No recipients found for email blast")
-            return {"success": True, "count": 0}
+            logger.info("No active audience members found for email blast")
+            return {"success": True, "sent_count": 0}
 
-        logger.info(
-            f"Sending email blast to {len(emails)} recipients | "
-            f"Subject: {subject}"
-        )
-
-        # Send in batches to respect rate limits
+        logger.info(f"Starting email blast to {len(emails)} recipients...")
         sent_count = 0
-        errors: list[str] = []
 
         for i in range(0, len(emails), EMAIL_BATCH_SIZE):
             batch = emails[i : i + EMAIL_BATCH_SIZE]
-
-            for email_addr in batch:
+            for recipient in batch:
                 try:
-                    params: dict[str, Any] = {
-                        "from": settings.resend_from_email,
-                        "to": [email_addr],
-                        "subject": subject,
-                        "html": html_body,
-                    }
-                    if text_body:
-                        params["text"] = text_body
-
-                    resend.Emails.send(params)
-                    sent_count += 1
+                    res = await send_single_email(recipient, subject, body_html, body_text)
+                    if res.get("success"):
+                        sent_count += 1
                 except Exception as e:
-                    error_msg = f"{email_addr}: {str(e)}"
-                    errors.append(error_msg)
-                    logger.warning(f"Failed to send to {email_addr}: {e}")
+                    logger.error(f"Failed email blast to {recipient}: {e}")
 
-            # Delay between batches to avoid rate limiting
             if i + EMAIL_BATCH_SIZE < len(emails):
-                import asyncio
                 await asyncio.sleep(BATCH_DELAY_SECONDS)
 
-        logger.info(
-            f"✓ Email blast complete: {sent_count}/{len(emails)} sent "
-            f"({len(errors)} failures)"
-        )
-
-        return {
-            "success": sent_count > 0,
-            "count": sent_count,
-            "total_recipients": len(emails),
-            "errors": errors[:10] if errors else None,  # Limit error list
-        }
-
+        return {"success": True, "sent_count": sent_count}
     except Exception as e:
-        logger.error(f"Email blast failed: {e}")
-        return {"success": False, "count": 0, "error": str(e)}
+        logger.error(f"Email blast exception: {e}")
+        return {"success": False, "error": str(e), "sent_count": 0}

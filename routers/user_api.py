@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from routers.auth import verify_user, get_prisma
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+from database import AsyncSessionLocal, User, BusinessProfile, SocialConnection
+from routers.auth import verify_user
 
 router = APIRouter(
     prefix="/api/v1/users/me",
@@ -23,85 +27,97 @@ class SocialConnectionUpdate(BaseModel):
 
 @router.get("")
 async def get_current_user(request: Request, user_id: str = Depends(verify_user)):
-    prisma = await get_prisma(request)
-    user = await prisma.user.find_unique(
-        where={"id": user_id},
-        include={"businessProfile": True, "socialConnection": True}
-    )
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Do not leak hashed password
-    user_data = user.model_dump()
-    user_data.pop("password", None)
-    return user_data
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(User)
+            .where(User.id == user_id)
+            .options(
+                selectinload(User.businessProfile),
+                selectinload(User.socialConnection),
+            )
+        )
+        res = await session.execute(stmt)
+        user = res.scalar_one_or_none()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        profile_data = None
+        if user.businessProfile:
+            profile_data = {
+                "id": user.businessProfile.id,
+                "websiteUrl": user.businessProfile.websiteUrl,
+                "description": user.businessProfile.description,
+                "businessModel": user.businessProfile.businessModel,
+            }
+
+        social_data = None
+        if user.socialConnection:
+            social_data = {
+                "id": user.socialConnection.id,
+                "fbPageId": user.socialConnection.fbPageId,
+                "fbPageName": user.socialConnection.fbPageName,
+                "igAccountId": user.socialConnection.igAccountId,
+                "igAccountName": user.socialConnection.igAccountName,
+            }
+
+        return {
+            "id": user.id,
+            "email": user.email,
+            "subscriptionStatus": user.subscriptionStatus,
+            "businessProfile": profile_data,
+            "socialConnection": social_data,
+            "createdAt": user.createdAt.isoformat() if user.createdAt else None,
+        }
 
 @router.post("/business-profile")
-async def update_business_profile_post(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
-    prisma = await get_prisma(request)
-    profile = await prisma.businessprofile.upsert(
-        where={"userId": user_id},
-        data={
-            "create": {
-                "userId": user_id,
-                "websiteUrl": data.websiteUrl,
-                "description": data.description,
-                "businessModel": data.businessModel
-            },
-            "update": {
-                "websiteUrl": data.websiteUrl,
-                "description": data.description,
-                "businessModel": data.businessModel
-            }
-        }
-    )
-    return {"success": True, "data": profile.model_dump()}
+async def update_business_profile_post(
+    data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)
+):
+    async with AsyncSessionLocal() as session:
+        stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+        res = await session.execute(stmt)
+        profile = res.scalar_one_or_none()
 
-@router.put("/business-profile")
-async def update_business_profile(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
-    return await update_business_profile_post(data, request, user_id)
+        if profile:
+            if data.websiteUrl is not None:
+                profile.websiteUrl = data.websiteUrl
+            if data.description is not None:
+                profile.description = data.description
+            if data.businessModel is not None:
+                profile.businessModel = data.businessModel
+        else:
+            profile = BusinessProfile(
+                userId=user_id,
+                websiteUrl=data.websiteUrl,
+                description=data.description,
+                businessModel=data.businessModel,
+            )
+            session.add(profile)
+
+        await session.commit()
+        await session.refresh(profile)
+        return {
+            "success": True,
+            "data": {
+                "id": profile.id,
+                "websiteUrl": profile.websiteUrl,
+                "description": profile.description,
+                "businessModel": profile.businessModel,
+            },
+        }
 
 @router.post("/subscribe")
 async def activate_subscription(request: Request, user_id: str = Depends(verify_user)):
-    prisma = request.app.state.prisma
-    
-    # Mocking successful payment update
-    user = await prisma.user.update(
-        where={"id": user_id},
-        data={
-            "subscriptionPlan": "PRO",
-            "subscriptionStatus": "ACTIVE"
-        }
-    )
-    return {"success": True, "message": "Subscription activated successfully"}
+    """Activate subscription status for the current user."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(User).where(User.id == user_id)
+        res = await session.execute(stmt)
+        user = res.scalar_one_or_none()
 
-@router.get("/social-connection")
-async def get_social_connection(request: Request, user_id: str = Depends(verify_user)):
-    prisma = request.app.state.prisma
-    conn = await prisma.socialconnection.find_unique(where={"userId": user_id})
-    return {"success": True, "data": conn.model_dump() if conn else None}
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
-@router.put("/social-connection")
-async def update_social_connection(data: SocialConnectionUpdate, request: Request, user_id: str = Depends(verify_user)):
-    prisma = request.app.state.prisma
-    conn = await prisma.socialconnection.upsert(
-        where={"userId": user_id},
-        data={
-            "create": {
-                "userId": user_id,
-                "fbAccessToken": data.fbAccessToken,
-                "fbPageId": data.fbPageId,
-                "fbPageName": data.fbPageName,
-                "igAccountId": data.igAccountId,
-                "igAccountName": data.igAccountName
-            },
-            "update": {
-                "fbAccessToken": data.fbAccessToken,
-                "fbPageId": data.fbPageId,
-                "fbPageName": data.fbPageName,
-                "igAccountId": data.igAccountId,
-                "igAccountName": data.igAccountName
-            }
-        }
-    )
-    return {"success": True, "data": conn.model_dump()}
+        user.subscriptionStatus = "ACTIVE"
+        await session.commit()
+        return {"success": True, "message": "Subscription activated successfully"}

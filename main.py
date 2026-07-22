@@ -6,14 +6,8 @@ This is the control center for the entire autonomous marketing platform.
 It hosts the AI chatbot, marketing automation scheduler, and all
 API endpoints for social media, email, and Stripe integrations.
 
-CRITICAL ARCHITECTURE DECISION:
-  The Prisma client is instantiated and connected INSIDE the async lifespan
-  context manager — NOT at module level. This ensures the client is bound
-  to the active Uvicorn event loop, preventing asyncio.locks.Event errors
-  that occur when Prisma is created before the loop starts.
-
-Run locally:
-  uvicorn main:app --reload --port 8000
+Uses SQLAlchemy 2.0 Async ORM + asyncpg for direct, pure-Python database
+access with zero binary dependencies.
 =============================================================================
 """
 
@@ -25,18 +19,19 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from loguru import logger
-from prisma import Prisma
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy import select, func, text
 
 from config import settings
+from database import init_db, close_db, AsyncSessionLocal, User, Audience, SocialPost, SocialCampaign
 
 # =============================================================================
 # Loguru Configuration
@@ -60,108 +55,15 @@ else:
     )
 
 
-def is_valid_elf_binary(path: str) -> bool:
-    """Check if file exists and starts with the Linux ELF magic header b'\\x7fELF'."""
-    if not os.path.isfile(path):
-        return False
-    try:
-        with open(path, "rb") as f:
-            return f.read(4) == b"\x7fELF"
-    except Exception:
-        return False
-
-
-def resolve_prisma_engine() -> str | None:
-    """
-    Locates or fetches a verified Linux ELF Prisma query engine binary at runtime,
-    persisting it inside site-packages/prisma across Render container restarts.
-    """
-    import sys
-    import shutil
-    import subprocess
-    import prisma
-
-    prisma_dir = os.path.dirname(prisma.__file__)
-    engine_name = "prisma-query-engine-debian-openssl-3.0.x"
-    target_path = os.path.join(prisma_dir, engine_name)
-
-    # Check if target already exists and is a valid Linux ELF binary
-    if is_valid_elf_binary(target_path):
-        try:
-            os.chmod(target_path, 0o777)
-            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
-            logger.info(f"Using verified Linux ELF Prisma engine at: {target_path}")
-            return target_path
-        except Exception as e:
-            logger.warning(f"Error using target path {target_path}: {e}")
-    elif os.path.exists(target_path):
-        # Remove non-ELF / invalid file
-        try:
-            os.remove(target_path)
-        except Exception:
-            pass
-
-    # Search recursively for a valid Linux ELF binary
-    search_roots = [
-        prisma_dir,
-        os.path.expanduser("~/.cache"),
-        "/opt/render/.cache",
-        "/tmp",
-        os.getcwd(),
-    ]
-
-    for root_dir in search_roots:
-        if os.path.exists(root_dir):
-            for root, _, files in os.walk(root_dir):
-                for f in files:
-                    if "query-engine" in f and not f.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
-                        src_path = os.path.abspath(os.path.join(root, f))
-                        if is_valid_elf_binary(src_path):
-                            try:
-                                os.chmod(src_path, 0o777)
-                                shutil.copy2(src_path, target_path)
-                                os.chmod(target_path, 0o777)
-                                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
-                                logger.info(f"Persisted valid ELF Prisma engine to: {target_path}")
-                                return target_path
-                            except Exception as err:
-                                logger.warning(f"Failed copying ELF candidate {src_path}: {err}")
-
-    # Fallback: Fetch fresh Linux binary directly at runtime
-    logger.warning("No valid ELF Prisma engine found. Executing runtime 'prisma py fetch'...")
-    try:
-        subprocess.run([sys.executable, "-m", "prisma", "py", "fetch"], check=False)
-        for root_dir in [prisma_dir, os.path.expanduser("~/.cache"), "/tmp"]:
-            if os.path.exists(root_dir):
-                for root, _, files in os.walk(root_dir):
-                    for f in files:
-                        if "query-engine" in f and not f.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
-                            src_path = os.path.abspath(os.path.join(root, f))
-                            if is_valid_elf_binary(src_path):
-                                os.chmod(src_path, 0o777)
-                                shutil.copy2(src_path, target_path)
-                                os.chmod(target_path, 0o777)
-                                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = target_path
-                                logger.info(f"Runtime fetch succeeded. ELF Engine at: {target_path}")
-                                return target_path
-    except Exception as fetch_err:
-        logger.error(f"Runtime ELF engine fetch failed: {fetch_err}")
-
-    return None
-
-
 # =============================================================================
 # Application Lifespan — Async Context Manager
 # =============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Manages the lifecycle of critical application resources:
-    1. Prisma ORM client (PostgreSQL connection)
+    Manages the lifecycle of application resources:
+    1. SQLAlchemy 2.0 Async ORM engine & pool
     2. APScheduler (marketing automation loop)
-
-    CRUCIAL: Prisma MUST be instantiated inside this async context to bind
-    to the active Uvicorn event loop.
     """
     from services.scheduler import create_scheduler, shutdown_scheduler
 
@@ -170,31 +72,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Environment: {settings.environment}")
     logger.info("=" * 60)
 
-    # Resolve engine binary before instantiating Prisma
-    resolve_prisma_engine()
-
-    # --- Step 1: Connect Prisma ORM ---
-    prisma_client = None
+    # --- Step 1: Initialize SQLAlchemy Database Engine & Tables ---
+    engine = None
     try:
-        os.environ["DATABASE_URL"] = settings.database_url
-        prisma_client = Prisma()
-        await prisma_client.connect()
-        app.state.prisma = prisma_client
-        if hasattr(app.state, "prisma_error"):
-            delattr(app.state, "prisma_error")
-        logger.info("Prisma ORM connected to PostgreSQL successfully")
+        engine = await init_db()
+        app.state.db_engine = engine
+        app.state.db_ready = True
+        logger.info("SQLAlchemy ORM connected to PostgreSQL successfully")
     except Exception as e:
-        logger.error(f"Failed to connect Prisma engine: {e}")
-        app.state.prisma_error = str(e)
+        logger.error(f"Failed to connect SQLAlchemy database engine: {e}")
+        app.state.db_ready = False
+        app.state.db_error = str(e)
 
     # --- Step 2: Initialize and start the marketing scheduler ---
-    if prisma_client and prisma_client.is_connected():
-        scheduler = create_scheduler(prisma_client)
+    if getattr(app.state, "db_ready", False):
+        scheduler = create_scheduler()
         scheduler.start()
         app.state.scheduler = scheduler
         logger.info("APScheduler started (marketing automation loop active)")
     else:
-        logger.warning("Prisma client not connected, skipping scheduler startup")
+        logger.warning("Database not ready, skipping scheduler startup")
         app.state.scheduler = None
 
     logger.info("=" * 60)
@@ -203,18 +100,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield  # --- Application is running ---
 
-    # --- Shutdown: Clean up resources in reverse order ---
+    # --- Shutdown ---
     logger.info("Shutting down Organic Marketing AI...")
 
     if getattr(app.state, "scheduler", None):
         shutdown_scheduler(app.state.scheduler)
         logger.info("Scheduler stopped")
 
-    if prisma_client and prisma_client.is_connected():
-        await prisma_client.disconnect()
-    logger.info("Prisma ORM disconnected")
-
-    logger.info("Organic Marketing AI shutdown complete.")
+    await close_db()
+    logger.info("SQLAlchemy ORM shutdown complete.")
 
 
 # =============================================================================
@@ -229,7 +123,7 @@ app = FastAPI(
     redoc_url=None,
 )
 
-# --- Prometheus metrics endpoint at /metrics ---
+# Prometheus metrics
 Instrumentator().instrument(app).expose(app)
 
 
@@ -259,11 +153,6 @@ app.add_middleware(
 async def custom_http_exception_handler(
     request: Request, exc: HTTPException
 ) -> JSONResponse | RedirectResponse:
-    """
-    Custom HTTP exception handler:
-    - If a 401 hits an /admin page (not /admin/login), redirect to login.
-    - Otherwise, return a structured JSON error response.
-    """
     if (
         exc.status_code == 401
         and (request.url.path.startswith("/admin") or request.url.path.startswith("/marketing"))
@@ -281,11 +170,9 @@ async def custom_http_exception_handler(
 async def global_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
-    """Catch-all handler to prevent 500 errors from leaking stack traces."""
     error_id = str(uuid.uuid4())
     logger.exception(f"Unhandled Exception on {request.method} {request.url.path} (Error ID: {error_id})")
     
-    # Don't leak internal error details in production
     detail = "An internal error occurred. Please try again later."
     if settings.environment != "production":
         detail = str(exc)
@@ -301,36 +188,30 @@ async def global_exception_handler(
 # =============================================================================
 @app.get("/health", tags=["System"])
 async def health_check(request: Request) -> JSONResponse:
-    """
-    Health check endpoint for Render/Docker monitoring.
-    Returns HTTP 200 to keep the service healthy while reporting DB status.
-    """
+    """Health check endpoint for Render/Docker monitoring."""
     db_status = "disconnected"
-    prisma_err = getattr(request.app.state, "prisma_error", None)
+    db_err = getattr(request.app.state, "db_error", None)
 
-    if not prisma_err:
-        try:
-            prisma: Prisma = getattr(request.app.state, "prisma", None)
-            if prisma and prisma.is_connected():
-                await prisma.query_raw("SELECT 1")
-                db_status = "connected"
-        except Exception as e:
-            logger.error(f"Health check DB query failed: {e}")
-            db_status = f"error: {str(e)}"
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+            db_status = "connected"
+    except Exception as e:
+        logger.error(f"Health check DB query failed: {e}")
+        db_status = f"error: {str(e)}"
 
     return JSONResponse(
         status_code=200,
         content={
             "status": "healthy" if db_status == "connected" else "degraded",
             "database": db_status,
-            "error": prisma_err,
+            "error": db_err,
         },
     )
 
 
 @app.get("/logo.png", tags=["System"])
 async def serve_logo() -> FileResponse:
-    """Serve the application logo."""
     return FileResponse("templates/logo.png")
 
 
@@ -368,30 +249,34 @@ app.include_router(stripe_webhook.router)
 # =============================================================================
 @app.get("/")
 async def root() -> RedirectResponse:
-    """Redirect the root URL to the API docs (dev) or health check (prod)."""
     if settings.environment == "production":
         return RedirectResponse(url="/health", status_code=303)
     return RedirectResponse(url="/docs", status_code=303)
 
 
 # =============================================================================
-# Quick Stats API (used by the dashboard)
+# Quick Stats API
 # =============================================================================
 @app.get("/api/stats")
 async def get_stats(request: Request) -> dict:
-    """Return high-level platform statistics for the admin dashboard."""
-    prisma: Prisma = request.app.state.prisma
-    audience_count = await prisma.audience.count()
-    user_count = await prisma.user.count()
-    post_count = await prisma.socialpost.count()
-    campaign_count = await prisma.socialcampaign.count()
+    """Return high-level platform statistics using SQLAlchemy session."""
+    async with AsyncSessionLocal() as session:
+        u_stmt = select(func.count(User.id))
+        a_stmt = select(func.count(Audience.id))
+        p_stmt = select(func.count(SocialPost.id))
+        c_stmt = select(func.count(SocialCampaign.id))
+
+        users = (await session.execute(u_stmt)).scalar() or 0
+        audiences = (await session.execute(a_stmt)).scalar() or 0
+        posts = (await session.execute(p_stmt)).scalar() or 0
+        campaigns = (await session.execute(c_stmt)).scalar() or 0
 
     return {
         "success": True,
         "data": {
-            "users": user_count,
-            "audience": audience_count,
-            "posts": post_count,
-            "campaigns": campaign_count,
+            "users": users,
+            "audience": audiences,
+            "posts": posts,
+            "campaigns": campaigns,
         },
     }

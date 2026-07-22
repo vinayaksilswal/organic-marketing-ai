@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException
 from loguru import logger
 import stripe
+from sqlalchemy import select
 from config import settings
+from database import AsyncSessionLocal, User
 
 router = APIRouter(
     prefix="/api/v1/stripe",
@@ -23,60 +25,39 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload, sig_header, STRIPE_WEBHOOK_SECRET
         )
-    except ValueError as e:
+    except ValueError:
         logger.error("Invalid Stripe payload")
         raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         logger.error("Invalid Stripe signature")
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    prisma = request.app.state.prisma
+    async with AsyncSessionLocal() as session:
+        if event['type'] == 'checkout.session.completed':
+            evt_session = event['data']['object']
+            customer_id = evt_session.get('customer')
+            subscription_id = evt_session.get('subscription')
+            client_reference_id = evt_session.get('client_reference_id')
 
-    # Handle the event
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        customer_id = session.get('customer')
-        subscription_id = session.get('subscription')
-        client_reference_id = session.get('client_reference_id') # Usually the user ID
+            if client_reference_id:
+                stmt = select(User).where(User.id == client_reference_id)
+                res = await session.execute(stmt)
+                user = res.scalar_one_or_none()
+                if user:
+                    user.subscriptionStatus = "ACTIVE"
+                    await session.commit()
+                    logger.info(f"Subscription activated for user {client_reference_id}")
 
-        if client_reference_id:
-            await prisma.user.update(
-                where={"id": client_reference_id},
-                data={
-                    "stripeCustomerId": customer_id,
-                    "stripeSubscriptionId": subscription_id,
-                    "subscriptionStatus": "ACTIVE",
-                    "subscriptionPlan": "PRO"
-                }
-            )
-            logger.info(f"Subscription activated for user {client_reference_id}")
+        elif event['type'] == 'customer.subscription.deleted':
+            subscription = event['data']['object']
+            customer_id = subscription.get('customer')
 
-    elif event['type'] == 'customer.subscription.deleted':
-        subscription = event['data']['object']
-        customer_id = subscription.get('customer')
-        
-        user = await prisma.user.find_first(where={"stripeCustomerId": customer_id})
-        if user:
-            await prisma.user.update(
-                where={"id": user.id},
-                data={
-                    "subscriptionStatus": "CANCELLED"
-                }
-            )
-            logger.info(f"Subscription cancelled for user {user.id}")
-
-    elif event['type'] == 'invoice.payment_failed':
-        invoice = event['data']['object']
-        customer_id = invoice.get('customer')
-        
-        user = await prisma.user.find_first(where={"stripeCustomerId": customer_id})
-        if user:
-            await prisma.user.update(
-                where={"id": user.id},
-                data={
-                    "subscriptionStatus": "INACTIVE"
-                }
-            )
-            logger.warning(f"Payment failed for user {user.id}, subscription marked INACTIVE")
+            stmt = select(User).where(User.id == customer_id)
+            res = await session.execute(stmt)
+            user = res.scalar_one_or_none()
+            if user:
+                user.subscriptionStatus = "INACTIVE"
+                await session.commit()
+                logger.info(f"Subscription canceled for user {user.id}")
 
     return {"status": "success"}

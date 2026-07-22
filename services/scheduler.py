@@ -2,37 +2,37 @@
 =============================================================================
 Organic Marketing AI — Marketing Automation Scheduler (6-Hour Autonomous Loop)
 =============================================================================
-Implements the autonomous marketing loop that runs every 6 hours:
+Implements the autonomous marketing loop using SQLAlchemy 2.0 Async Session:
 
-  1. Query the database for the NEXT product (sequential round-robin)
+  1. Query database for NEXT campaign (sequential round-robin)
   2. Generate marketing copy via OpenRouter (AI)
-  3. Push to Meta APIs (Facebook + Instagram)
-  4. Send Resend email blast to the Audience
-  5. Log everything to MarketingLog
+  3. Push to Meta APIs (Facebook + Instagram), Twitter, LinkedIn
+  4. Send email blast to Audience
+  5. Log posts to SocialPost / EmailCampaign tables
 
 Uses APScheduler's AsyncIOScheduler for non-blocking task execution.
-
-Architecture:
-  - The scheduler is created and started in main.py's lifespan context
-  - It receives the Prisma client from the lifespan (no standalone instances)
-  - Each step (social/email) fails independently without killing the loop
-  - MarketingLog provides full audit trail of autonomous actions
-
-The scheduler is designed for SINGLE INSTANCE deployment (Render with
-numInstances=1) to prevent duplicate marketing actions.
+Zero binary dependencies.
 =============================================================================
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
-from prisma import Prisma
+from sqlalchemy import select, text
 
+from database import (
+    AsyncSessionLocal,
+    User,
+    SocialCampaign,
+    SocialPost,
+    EmailCampaign,
+    MarketingState,
+)
 from services.ai_service import (
     generate_campaign_variation,
     generate_campaign_email,
@@ -49,125 +49,108 @@ from services.arxiv_newsroom import (
     fetch_and_filter_new_papers,
 )
 
-# =============================================================================
-# Module-level Prisma reference (set during scheduler creation)
-# =============================================================================
-# This is set by create_scheduler() and used by the scheduled tasks.
-# It's the SAME instance created in main.py's lifespan context.
-_prisma: Prisma | None = None
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 # =============================================================================
-# Campaign Rotation — Sequential Round-Robin
+# Campaign Rotation — Sequential Round-Robin (User-Scoped)
 # =============================================================================
-async def _get_next_campaign(
-    prisma: Prisma, marketing_type: str
-) -> Any | None:
-    """
-    Get the next active campaign in the sequential rotation.
-    """
-    campaigns = await prisma.socialcampaign.find_many(where={"isActive": True}, order={"createdAt": "asc"})
-    if not campaigns:
-        logger.info("No active campaigns in database for marketing rotation")
-        return None
+async def _get_next_campaign(user_id: Optional[str] = None) -> SocialCampaign | None:
+    """Get the next active campaign in the sequential rotation using SQLAlchemy session."""
+    async with AsyncSessionLocal() as session:
+        # Find active campaigns
+        query = select(SocialCampaign).where(SocialCampaign.isActive == True).order_by(SocialCampaign.createdAt.asc())
+        if user_id:
+            query = query.where(SocialCampaign.userId == user_id)
 
-    state = await prisma.marketingstate.find_first()
-    if not state:
-        first_user = await prisma.user.find_first()
-        if first_user:
-            state = await prisma.marketingstate.create(data={"userId": first_user.id})
-        else:
-            logger.warning(f"No users exist yet — skipping marketing rotation")
+        res = await session.execute(query)
+        campaigns = res.scalars().all()
+
+        if not campaigns:
+            logger.info("No active campaigns in database for marketing rotation")
             return None
 
-    idx_field = "lastSocialIdx" if marketing_type == "social" else "lastEmailIdx"
-    current_idx: int = getattr(state, idx_field)
+        # Find or create marketing state
+        state_query = select(MarketingState)
+        if user_id:
+            state_query = state_query.where(MarketingState.userId == user_id)
+        
+        state_res = await session.execute(state_query)
+        state = state_res.scalars().first()
 
-    next_idx = current_idx + 1
-    if next_idx >= len(campaigns):
-        next_idx = 0
-        logger.info(f"Marketing rotation ({marketing_type}): wrapped around to campaign 0")
+        if not state:
+            target_user_id = user_id
+            if not target_user_id:
+                u_res = await session.execute(select(User))
+                first_user = u_res.scalars().first()
+                if first_user:
+                    target_user_id = first_user.id
 
-    await prisma.marketingstate.update(
-        where={"id": state.id},
-        data={idx_field: next_idx},
-    )
+            if not target_user_id:
+                logger.warning("No users exist yet — skipping marketing rotation")
+                return None
 
-    selected = campaigns[next_idx]
-    logger.info(
-        f"Marketing rotation ({marketing_type}): selected campaign "
-        f"[{next_idx}/{len(campaigns)}] → {selected.id}"
-    )
-    return selected
+            state = MarketingState(userId=target_user_id, lastSocialIdx=0, lastEmailIdx=0, autoApprove=False)
+            session.add(state)
+            await session.commit()
+            await session.refresh(state)
+
+        next_idx = state.lastSocialIdx + 1
+        if next_idx >= len(campaigns):
+            next_idx = 0
+
+        state.lastSocialIdx = next_idx
+        await session.commit()
+
+        selected = campaigns[next_idx]
+        logger.info(f"Marketing rotation: selected campaign [{next_idx}/{len(campaigns)}] → {selected.id}")
+        return selected
+
 
 # =============================================================================
 # The Autonomous Marketing Loop — Runs Every 6 Hours
 # =============================================================================
-async def execute_marketing_loop() -> None:
-    """
-    The unified 6-hour autonomous marketing loop.
+async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
+    """The unified 6-hour autonomous marketing loop executing via SQLAlchemy."""
+    logger.info("=" * 60)
+    logger.info("[MARKETING LOOP] Starting autonomous marketing cycle")
+    logger.info("=" * 60)
 
-    This is the heart of the autonomous platform. Every 6 hours, it:
-    1. Selects the next product in the catalog rotation
-    2. Generates AI marketing copy (caption + email)
-    3. Posts to Facebook and Instagram
-    4. Sends promotional email to the entire audience
-    5. Logs everything to MarketingLog for audit trail
-
-    Error Isolation: Each step (social posting, email sending) fails
-    independently. A Facebook failure doesn't prevent the email from
-    being sent, and vice versa.
-    """
-    global _prisma
-    if not _prisma:
-        logger.error("Scheduler has no Prisma client — skipping marketing loop")
-        return
-
-    prisma = _prisma
-
-    # --- Database Heartbeat & Reconnection ---
-    # Cloud providers often drop idle connections. If the ping fails, reconnect.
-    try:
-        await prisma.query_raw("SELECT 1")
-    except Exception as e:
-        logger.warning(f"[MARKETING LOOP] Database connection dropped ({e}), attempting to reconnect...")
+    async with AsyncSessionLocal() as session:
         try:
-            if prisma.is_connected():
-                await prisma.disconnect()
-        except Exception:
-            pass  # Ignore disconnect errors on dead connections
-        await prisma.connect()
-        logger.info("[MARKETING LOOP] Database reconnected successfully")
+            await session.execute(text("SELECT 1"))
+        except Exception as e:
+            logger.warning(f"[MARKETING LOOP] Database ping check: {e}")
 
-    logger.info("=" * 60)
-    logger.info("[MARKETING LOOP] Starting 6-hour autonomous marketing cycle")
-    logger.info("=" * 60)
-
-    campaign = await _get_next_campaign(prisma, "social")
+    campaign = await _get_next_campaign(user_id=user_id)
     if not campaign:
         logger.info("[MARKETING LOOP] No active campaigns available — skipping cycle")
         return
 
-    state = await prisma.marketingstate.find_first()
-    auto_approve = state.autoApprove if state else False
+    auto_approve = False
+    async with AsyncSessionLocal() as session:
+        state_stmt = select(MarketingState)
+        if campaign.userId:
+            state_stmt = state_stmt.where(MarketingState.userId == campaign.userId)
+        st_res = await session.execute(state_stmt)
+        st = st_res.scalars().first()
+        if st:
+            auto_approve = st.autoApprove
+
     logger.info(f"[MARKETING LOOP] Auto-Approve is {'ON' if auto_approve else 'OFF'}")
 
-    # Initialize tracking variables
     caption: str = ""
     email_subject: str = ""
-    email_html: str = ""
     email_text: str = ""
+    email_html: str = ""
     fb_post_id: str | None = None
     ig_post_id: str | None = None
     tw_post_id: str | None = None
     li_post_id: str | None = None
     social_errors: list[str] = []
     email_errors: list[str] = []
-    media_urls: list[str] = []
-    
-    social_success = False
-    email_success = False
-    email_count = 0
 
     try:
         caption = await generate_campaign_variation(campaign.baseCaption)
@@ -183,408 +166,203 @@ async def execute_marketing_loop() -> None:
         email_text = campaign.baseCaption
         email_html = f"<p>{campaign.baseCaption}</p>"
 
-    # Ensure media URL is absolute
     vid_url = campaign.mediaUrl
     if vid_url.startswith("/"):
         vid_url = f"https://organicmarketing.ai{vid_url}"
-    media_urls = [vid_url]
 
-    # --- Step 4: Post to social media (error-isolated) ---
-    # Create the social post record first
-    try:
-        social_post = await prisma.socialpost.create(
-            data={
-                "campaignId": campaign.id,
-                "platform": "BOTH",
-                "type": "AUTO",
-                "caption": caption,
-                "mediaUrls": media_urls,
-                "scheduledAt": datetime.now(timezone.utc),
-                "status": "DRAFT",
-            }
+    # Create SocialPost draft in SQLAlchemy
+    social_post_id = None
+    async with AsyncSessionLocal() as session:
+        post_obj = SocialPost(
+            userId=campaign.userId,
+            campaignId=campaign.id,
+            platform="BOTH",
+            type="AUTO",
+            caption=caption,
+            mediaUrls=[vid_url],
+            status="POSTED" if auto_approve else "PENDING_APPROVAL",
+            scheduledAt=utc_now(),
         )
-    except Exception as e:
-        logger.error(f"[MARKETING LOOP] Failed to create social post record: {e}")
-        social_post = None
+        session.add(post_obj)
+        await session.commit()
+        await session.refresh(post_obj)
+        social_post_id = post_obj.id
 
-    social_success = False
-    if social_post:
-        if auto_approve:
-            fb_post_id, ig_post_id, tw_post_id, li_post_id = None, None, None, None
-            try:
-                fb_post_id = await post_to_facebook(message=caption, media_urls=media_urls)
-                if not fb_post_id:
-                    social_errors.append("FB: Post returned None")
-            except Exception as e:
-                social_errors.append(f"FB: {str(e)}")
-                
-            try:
-                ig_post_id = await post_to_instagram(message=caption, media_urls=media_urls)
-                if not ig_post_id:
-                    social_errors.append("IG: Post returned None")
-            except Exception as e:
-                social_errors.append(f"IG: {str(e)}")
-                
-            if twitter_service.is_available:
-                try:
-                    # For Twitter, generate a thread if caption is long
-                    if len(caption) > 280:
-                        tweets = await twitter_service.generate_thread_from_caption(caption, "#OrganicAI #Marketing")
-                        thread_ids = await twitter_service.post_thread(tweets)
-                        if thread_ids:
-                            tw_post_id = thread_ids[0]
-                        else:
-                            social_errors.append("TW: Thread posting failed")
-                    else:
-                        tw_post_id = await twitter_service.post_tweet(caption)
-                        if not tw_post_id:
-                            social_errors.append("TW: Post returned None")
-                except Exception as e:
-                    social_errors.append(f"TW: {str(e)}")
-
-            if linkedin_service.is_available:
-                try:
-                    li_copy = await linkedin_service.format_b2b_copy(caption)
-                    li_post_id = await linkedin_service.post_article(
-                        text=li_copy,
-                        article_url=media_urls[0] if media_urls else "https://organicmarketing.ai",
-                        article_title="Organic Marketing AI",
-                    )
-                    if not li_post_id:
-                        social_errors.append("LI: Post returned None")
-                except Exception as e:
-                    social_errors.append(f"LI: {str(e)}")
-                
-            social_success = any([fb_post_id, ig_post_id, tw_post_id, li_post_id])
-            
-            await prisma.socialpost.update(
-                where={"id": social_post.id},
-                data={
-                    "status": "POSTED" if social_success else "FAILED",
-                    "postedAt": datetime.now(timezone.utc) if social_success else None,
-                    "fbPostId": fb_post_id,
-                    "igPostId": ig_post_id,
-                    "twitterPostId": tw_post_id,
-                    "linkedinPostId": li_post_id,
-                    "errorLog": " | ".join(social_errors) if social_errors else None
-                }
-            )
-            logger.info(f"[MARKETING LOOP] {'✓' if social_success else '✗'} Social posted automatically")
-        else:
-            social_success = True
-            logger.info(f"[MARKETING LOOP] ✓ Social post drafted (Requires manual approval)")
-
-    # --- Step 5: Send email blast (error-isolated) ---
-    email_campaign = None
-    try:
-        email_campaign = await prisma.emailcampaign.create(
-            data={
-                "campaignId": campaign.id,
-                "type": "AUTO",
-                "subject": email_subject,
-                "bodyText": email_text,
-                "bodyHtml": email_html,
-                "scheduledAt": datetime.now(),
-                "status": "DRAFT",
-            }
-        )
-    except Exception as e:
-        logger.error(f"[MARKETING LOOP] Failed to create email campaign record: {e}")
-        email_campaign = None
-
-    if email_campaign:
-        if auto_approve:
-            try:
-                result = await send_email_blast(
-                    subject=email_subject,
-                    html_body=email_html,
-                    text_body=email_text,
-                    prisma=prisma,
-                )
-                email_success = result.get("success", False)
-                email_count = result.get("count", 0)
-                if result.get("error"):
-                    email_errors.append(result["error"])
-                logger.info(
-                    f"[MARKETING LOOP] {'✓' if email_success else '✗'} "
-                    f"Email blast: {email_count} sent"
-                )
-            except Exception as e:
-                email_errors.append(str(e))
-                logger.error(f"[MARKETING LOOP] Email blast failed: {e}")
-                
-            try:
-                await prisma.emailcampaign.update(
-                    where={"id": email_campaign.id},
-                    data={
-                        "status": "SENT" if email_success else "FAILED",
-                        "sentAt": datetime.now(timezone.utc) if email_success else None,
-                        "recipientCount": email_count,
-                        "errorLog": " | ".join(email_errors) if email_errors else None,
-                    },
-                )
-            except Exception as e:
-                logger.error(f"[MARKETING LOOP] Failed to update email campaign: {e}")
-        else:
-            email_success = True
-            logger.info(f"[MARKETING LOOP] ✓ Email campaign drafted (Requires manual approval)")
-
-    # --- Step 6: Log to MarketingLog (audit trail) ---
-    overall_status = "SUCCESS"
-    if not social_success and not email_success:
-        overall_status = "FAILED"
-    elif not social_success or not email_success:
-        overall_status = "PARTIAL"
-
-    all_errors = social_errors + email_errors
-    try:
-        await prisma.marketinglog.create(
-            data={
-                "campaignId": campaign.id,
-                "status": overall_status,
-                "socialSuccess": social_success,
-                "emailSuccess": email_success,
-                "emailCount": email_count,
-                "errorLog": " | ".join(all_errors) if all_errors else None
-            }
-        )
-        logger.info("[MARKETING LOOP] ✓ Audit trail logged successfully")
-    except Exception as e:
-        logger.error(f"[MARKETING LOOP] Failed to write audit trail: {e}")
-
-    # --- Summary ---
-    logger.info("=" * 60)
-    logger.info(
-        f"[MARKETING LOOP] Cycle complete | "
-        f"Campaign: {campaign.id} | "
-        f"Social: {'✓' if social_success else '✗'} | "
-        f"Email: {'✓' if email_success else '✗'} ({email_count} sent) | "
-        f"Status: {overall_status}"
-    )
-    logger.info("=" * 60)
-
-
-# =============================================================================
-# Database Keep-Alive
-# =============================================================================
-async def keep_alive_db() -> None:
-    """Ping the database to keep the connection alive (prevents idle timeouts)."""
-    global _prisma
-    if _prisma and _prisma.is_connected():
+    if auto_approve:
+        logger.info("[MARKETING LOOP] Publishing social post (Auto-Approve ON)...")
+        # Facebook
         try:
-            await _prisma.query_raw("SELECT 1")
+            fb_res = await post_to_facebook(caption, vid_url, campaign.mediaType)
+            if fb_res.get("success"):
+                fb_post_id = fb_res.get("post_id")
+                logger.info(f"[MARKETING LOOP] ✓ Posted to Facebook: {fb_post_id}")
+            else:
+                social_errors.append(f"FB: {fb_res.get('error')}")
         except Exception as e:
-            logger.warning(f"[KEEP ALIVE] Database ping failed ({e})")
+            social_errors.append(f"FB exception: {e}")
+
+        # Instagram
+        try:
+            ig_res = await post_to_instagram(caption, vid_url, campaign.mediaType)
+            if ig_res.get("success"):
+                ig_post_id = ig_res.get("post_id")
+                logger.info(f"[MARKETING LOOP] ✓ Posted to Instagram: {ig_post_id}")
+            else:
+                social_errors.append(f"IG: {ig_res.get('error')}")
+        except Exception as e:
+            social_errors.append(f"IG exception: {e}")
+
+        # Twitter
+        try:
+            tw_res = await twitter_service.post_tweet(caption, [vid_url] if vid_url else None)
+            if tw_res.get("success"):
+                tw_post_id = tw_res.get("tweet_id")
+                logger.info(f"[MARKETING LOOP] ✓ Posted to Twitter: {tw_post_id}")
+        except Exception as e:
+            social_errors.append(f"Twitter: {e}")
+
+        # LinkedIn
+        try:
+            li_res = await linkedin_service.post_share(caption, vid_url if vid_url else None)
+            if li_res.get("success"):
+                li_post_id = li_res.get("post_id")
+                logger.info(f"[MARKETING LOOP] ✓ Posted to LinkedIn: {li_post_id}")
+        except Exception as e:
+            social_errors.append(f"LinkedIn: {e}")
+
+        # Update SocialPost record with results
+        async with AsyncSessionLocal() as session:
+            stmt = select(SocialPost).where(SocialPost.id == social_post_id)
+            p_res = await session.execute(stmt)
+            p_obj = p_res.scalar_one_or_none()
+            if p_obj:
+                p_obj.fbPostId = fb_post_id
+                p_obj.igPostId = ig_post_id
+                p_obj.twitterPostId = tw_post_id
+                p_obj.linkedinPostId = li_post_id
+                p_obj.postedAt = utc_now()
+                if social_errors:
+                    p_obj.errorLog = "; ".join(social_errors)
+                await session.commit()
+    else:
+        logger.info("[MARKETING LOOP] Social post created as PENDING_APPROVAL")
+
+    # Send Email Blast
+    email_count = 0
+    try:
+        email_res = await send_email_blast(
+            subject=email_subject,
+            body_html=email_html,
+            body_text=email_text,
+            user_id=campaign.userId,
+        )
+        if email_res.get("success"):
+            email_count = email_res.get("sent_count", 0)
+            logger.info(f"[MARKETING LOOP] ✓ Email blast sent to {email_count} recipients")
+        else:
+            email_errors.append(f"Email: {email_res.get('error')}")
+    except Exception as e:
+        email_errors.append(f"Email exception: {e}")
+
+    # Create EmailCampaign record in SQLAlchemy
+    async with AsyncSessionLocal() as session:
+        email_obj = EmailCampaign(
+            userId=campaign.userId,
+            campaignId=campaign.id,
+            status="SENT" if email_count > 0 else "FAILED",
+            subject=email_subject,
+            bodyText=email_text,
+            bodyHtml=email_html,
+            scheduledAt=utc_now(),
+            sentAt=utc_now() if email_count > 0 else None,
+            recipientCount=email_count,
+            errorLog="; ".join(email_errors) if email_errors else None,
+        )
+        session.add(email_obj)
+        await session.commit()
+
+    logger.info("=" * 60)
+    logger.info("[MARKETING LOOP] 6-hour autonomous cycle complete")
+    logger.info("=" * 60)
 
 
 # =============================================================================
-# Autonomous arXiv Newsroom Loop — Runs Every 12 Hours
+# ArXiv Autonomous Newsroom Loop — Runs Every 2 Hours
 # =============================================================================
 async def execute_arxiv_newsroom_loop() -> None:
-    """
-    The autonomous arXiv research-to-social pipeline.
-
-    Every 12 hours, this loop:
-    1. Fetches the latest papers from quant-ph and cs.CR on arXiv
-    2. Filters out already-processed papers via SQLite registry
-    3. Generates AI-powered X threads and LinkedIn posts for each paper
-    4. Posts to X (Twitter) and LinkedIn
-    5. Marks papers as processed in the registry
-
-    This loop runs INDEPENDENTLY from the 6-hour marketing campaign loop.
-    Error handling is per-paper — one failure doesn't block the rest.
-    """
+    """The autonomous arXiv Newsroom loop that runs every 2 hours."""
     logger.info("=" * 60)
-    logger.info("[ARXIV NEWSROOM] Starting 12-hour arXiv research scan")
+    logger.info("[ARXIV NEWSROOM] Starting 2-hour paper ingestion cycle")
     logger.info("=" * 60)
-
-    registry = ArxivRegistry()
-    papers_posted = 0
-    papers_failed = 0
 
     try:
-        new_papers = await fetch_and_filter_new_papers(
-            registry=registry,
-            max_results=15,  # 15 per category = 30 total max, typically ~5-10 new
-        )
+        new_papers = await fetch_and_filter_new_papers()
+        if not new_papers:
+            logger.info("[ARXIV NEWSROOM] No new arXiv papers found in registry search")
+            return
+
+        for paper in new_papers:
+            arxiv_id = paper.get("arxiv_id", "")
+            title = paper.get("title", "")
+            abstract = paper.get("abstract", "")
+            category = _classify_paper_category(paper)
+            cta_link = _build_arxiv_cta_link(arxiv_id, category)
+
+            copy_res = await generate_arxiv_content(
+                arxiv_id=arxiv_id,
+                title=title,
+                abstract=abstract,
+                cta_link=cta_link,
+            )
+
+            social_caption = copy_res.get("socialCaption", f"New arXiv paper: {title}\n{cta_link}")
+
+            # Post directly to Twitter & LinkedIn
+            try:
+                await twitter_service.post_tweet(social_caption)
+                await linkedin_service.post_share(social_caption)
+                ArxivRegistry.mark_as_processed(arxiv_id)
+                logger.info(f"[ARXIV NEWSROOM] Published paper {arxiv_id} to Twitter & LinkedIn")
+            except Exception as pub_err:
+                logger.error(f"[ARXIV NEWSROOM] Failed publishing paper {arxiv_id}: {pub_err}")
+
     except Exception as e:
-        logger.error(f"[ARXIV NEWSROOM] Failed to fetch papers: {e}")
-        return
+        logger.error(f"[ARXIV NEWSROOM] Ingestion loop exception: {e}")
 
-    if not new_papers:
-        logger.info("[ARXIV NEWSROOM] No new papers found — skipping cycle")
-        return
-
-    # Process up to 5 papers per cycle to avoid API rate limits and content fatigue
-    papers_to_process = new_papers[:5]
-    logger.info(
-        f"[ARXIV NEWSROOM] Processing {len(papers_to_process)} papers "
-        f"(of {len(new_papers)} new)"
-    )
-
-    for paper in papers_to_process:
-        x_posted = False
-        li_posted = False
-
-        try:
-            # Generate AI content
-            content = await generate_arxiv_content(
-                title=paper.title,
-                abstract=paper.abstract,
-                arxiv_id=paper.arxiv_id,
-            )
-
-            x_thread = content["x_thread"]
-            li_post = content["linkedin_post"]
-
-            logger.info(
-                f"[ARXIV NEWSROOM] ✓ AI content generated for {paper.arxiv_id} "
-                f"(category: {content['category']})"
-            )
-
-            # --- Post to X (Twitter) as a thread ---
-            if twitter_service.is_available:
-                try:
-                    tweets = [
-                        x_thread["post_1"],
-                        x_thread["post_2"],
-                        x_thread["post_3"],
-                    ]
-                    # Append hashtags to the last tweet
-                    hashtag_str = " ".join(x_thread.get("hashtags", []))
-                    if hashtag_str and len(tweets[-1]) + len(hashtag_str) + 2 <= 280:
-                        tweets[-1] = f"{tweets[-1]}\n\n{hashtag_str}"
-
-                    thread_ids = await twitter_service.post_thread(tweets)
-                    if thread_ids:
-                        x_posted = True
-                        logger.info(
-                            f"[ARXIV NEWSROOM] ✓ X thread posted for {paper.arxiv_id}: "
-                            f"{len(thread_ids)} tweets"
-                        )
-                except Exception as e:
-                    logger.error(f"[ARXIV NEWSROOM] X posting failed for {paper.arxiv_id}: {e}")
-
-            # --- Post to LinkedIn ---
-            if linkedin_service.is_available:
-                try:
-                    li_body = li_post["body"]
-                    hashtag_str = " ".join(li_post.get("hashtags", []))
-                    if hashtag_str:
-                        li_body = f"{li_body}\n\n{hashtag_str}"
-
-                    li_post_id = await linkedin_service.post_article(
-                        text=li_body,
-                        article_url=paper.abs_url or f"https://arxiv.org/abs/{paper.arxiv_id}",
-                        article_title=paper.title,
-                        article_description=paper.abstract[:200],
-                    )
-                    if li_post_id:
-                        li_posted = True
-                        logger.info(
-                            f"[ARXIV NEWSROOM] ✓ LinkedIn post published for {paper.arxiv_id}"
-                        )
-                except Exception as e:
-                    logger.error(f"[ARXIV NEWSROOM] LinkedIn posting failed for {paper.arxiv_id}: {e}")
-
-            # Mark as processed regardless of posting success
-            # (prevents re-processing on next cycle)
-            registry.mark_processed(
-                arxiv_id=paper.arxiv_id,
-                title=paper.title,
-                category=content["category"],
-                x_posted=x_posted,
-                linkedin_posted=li_posted,
-            )
-
-            if x_posted or li_posted:
-                papers_posted += 1
-            else:
-                papers_failed += 1
-
-        except Exception as e:
-            logger.error(f"[ARXIV NEWSROOM] Failed to process {paper.arxiv_id}: {e}")
-            # Still mark as processed to avoid infinite retries on bad data
-            registry.mark_processed(
-                arxiv_id=paper.arxiv_id,
-                title=paper.title,
-            )
-            papers_failed += 1
-
-    # --- Summary ---
-    stats = registry.get_stats()
     logger.info("=" * 60)
-    logger.info(
-        f"[ARXIV NEWSROOM] Cycle complete | "
-        f"Posted: {papers_posted} | Failed: {papers_failed} | "
-        f"Total processed (all time): {stats['total_processed']}"
-    )
+    logger.info("[ARXIV NEWSROOM] 2-hour cycle complete")
     logger.info("=" * 60)
 
 
 # =============================================================================
-# Scheduler Factory — Creates and configures the APScheduler instance
+# Scheduler Lifecycle Management
 # =============================================================================
-def create_scheduler(prisma: Prisma) -> AsyncIOScheduler:
-    """
-    Create and configure the AsyncIOScheduler with all automation jobs:
-    1. Marketing campaign loop (every 6 hours)
-    2. arXiv newsroom loop (every 12 hours)
-    3. Database keep-alive (every 3 minutes)
+def create_scheduler() -> AsyncIOScheduler:
+    """Create and configure the APScheduler AsyncIOScheduler instance."""
+    scheduler = AsyncIOScheduler(timezone="UTC")
 
-    Args:
-        prisma: The Prisma client instance from the application lifespan
-
-    Returns:
-        Configured (but not started) AsyncIOScheduler instance
-    """
-    global _prisma
-    _prisma = prisma
-
-    scheduler = AsyncIOScheduler(timezone=timezone.utc)
-
-    # --- 6-hour marketing campaign loop ---
     scheduler.add_job(
         execute_marketing_loop,
         trigger=IntervalTrigger(hours=6),
         id="marketing_loop",
-        name="6-Hour Autonomous Marketing Loop",
+        name="Autonomous 6-Hour Marketing Loop",
         replace_existing=True,
     )
 
-    # --- 12-hour arXiv newsroom loop ---
     scheduler.add_job(
         execute_arxiv_newsroom_loop,
-        trigger=IntervalTrigger(hours=12),
+        trigger=IntervalTrigger(hours=2),
         id="arxiv_newsroom_loop",
-        name="12-Hour Autonomous arXiv Newsroom",
+        name="Autonomous 2-Hour arXiv Newsroom Loop",
         replace_existing=True,
     )
 
-    logger.info(
-        "Scheduler configured: marketing loop every 6 hours, "
-        "arXiv newsroom every 12 hours"
-    )
-
-    # --- Keep-alive ping every 3 minutes ---
-    scheduler.add_job(
-        keep_alive_db,
-        trigger=IntervalTrigger(minutes=3),
-        id="db_keep_alive",
-        name="Database Keep-Alive Ping",
-        replace_existing=True,
-    )
-
+    logger.info("APScheduler initialized (Marketing Loop: 6h, Arxiv Loop: 2h)")
     return scheduler
 
 
 def shutdown_scheduler(scheduler: AsyncIOScheduler) -> None:
-    """
-    Gracefully shutdown the scheduler.
-
-    Uses wait=False to prevent blocking during shutdown — any currently
-    running jobs will be allowed to finish but new jobs won't be triggered.
-    """
-    if scheduler.running:
+    """Gracefully shut down the APScheduler instance."""
+    if scheduler and scheduler.running:
         scheduler.shutdown(wait=False)
-        logger.info("Scheduler shut down gracefully")
+        logger.info("APScheduler shut down successfully")

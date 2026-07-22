@@ -12,7 +12,7 @@ jinja2
 python-multipart
 
 # --- Database ORM ---
-prisma
+sqlalchemy[asyncio]>=2.0.0
 asyncpg
 
 # --- Configuration ---

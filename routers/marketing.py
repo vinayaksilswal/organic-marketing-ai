@@ -28,6 +28,8 @@ from fastapi import (
     Request,
     UploadFile,
 )
+from sqlalchemy import select
+from database import AsyncSessionLocal, User, Audience, MarketingState, SocialCampaign, SocialPost, EmailCampaign
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from loguru import logger
@@ -99,12 +101,14 @@ async def marketing_root() -> RedirectResponse:
 @router.get("/dashboard")
 async def marketing_dashboard(request: Request) -> Any:
     """Render the marketing automation dashboard page."""
-    prisma = request.app.state.prisma
-    audiences = await prisma.audience.find_many()
-    # Use a default admin userId for the admin dashboard marketing state
-    state = await prisma.marketingstate.find_first()
-    auto_approve = state.autoApprove if state else False
-        
+    async with AsyncSessionLocal() as session:
+        a_stmt = select(Audience)
+        audiences = (await session.execute(a_stmt)).scalars().all()
+
+        m_stmt = select(MarketingState)
+        state = (await session.execute(m_stmt)).scalars().first()
+        auto_approve = state.autoApprove if state else False
+
     return templates.TemplateResponse(
         request=request,
         name="marketing.html",
@@ -115,23 +119,23 @@ async def marketing_dashboard(request: Request) -> Any:
 async def toggle_auto_approve(
     data: AutoApproveUpdate, request: Request
 ) -> dict[str, Any]:
-    prisma = request.app.state.prisma
     try:
-        # Find or create a marketing state for the admin
-        state = await prisma.marketingstate.find_first()
-        if state:
-            state = await prisma.marketingstate.update(
-                where={"id": state.id},
-                data={"autoApprove": data.autoApprove}
-            )
-        else:
-            # Create with first available user
-            first_user = await prisma.user.find_first()
-            if first_user:
-                state = await prisma.marketingstate.create(
-                    data={"userId": first_user.id, "autoApprove": data.autoApprove}
-                )
-        return {"success": True, "autoApprove": state.autoApprove if state else False}
+        async with AsyncSessionLocal() as session:
+            stmt = select(MarketingState)
+            state = (await session.execute(stmt)).scalars().first()
+            if state:
+                state.autoApprove = data.autoApprove
+            else:
+                user_stmt = select(User)
+                first_user = (await session.execute(user_stmt)).scalars().first()
+                if first_user:
+                    state = MarketingState(userId=first_user.id, autoApprove=data.autoApprove)
+                    session.add(state)
+            if state:
+                await session.commit()
+                await session.refresh(state)
+
+            return {"success": True, "autoApprove": state.autoApprove if state else False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
