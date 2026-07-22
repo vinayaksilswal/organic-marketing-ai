@@ -90,13 +90,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Environment: {settings.environment}")
     logger.info("=" * 60)
 
-    # --- Step 1: Instantiate and connect Prisma INSIDE the lifespan ---
-    # This is the critical fix: creating Prisma() here ensures it uses
-    # the current running event loop, not a stale or non-existent one.
     import os
+    import subprocess
     os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
     os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
-    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = "/opt/render/project/src/prisma_engine_binary/prisma-query-engine-debian-openssl-3.0.x"
+    
+    print("Fetching Prisma Python engine natively at runtime...")
+    try:
+        subprocess.run(["prisma", "py", "fetch"], check=True)
+        print("Engine fetched successfully!")
+    except Exception as e:
+        print(f"Failed to fetch engine: {e}")
 
     prisma_client = None
     try:
