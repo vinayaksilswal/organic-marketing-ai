@@ -32,8 +32,17 @@ if engines:
     expected_name = "prisma-" + os.path.basename(engine_path)
     
     # Store it in the venv so Render preserves it across build and run phases!
-    venv_dir = os.environ.get("VIRTUAL_ENV", sys.prefix)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    venv_dir = os.path.join(base_dir, ".venv")
+    if not os.path.exists(venv_dir):
+        venv_dir = os.environ.get("VIRTUAL_ENV", sys.prefix)
+        
     bin_dir = os.path.join(venv_dir, "bin")
+    
+    import platform
+    if not os.path.exists(bin_dir) and platform.system() == "Windows":
+        bin_dir = os.path.join(venv_dir, "Scripts")
+        
     if not os.path.exists(bin_dir):
         os.makedirs(bin_dir)
         

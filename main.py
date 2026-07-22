@@ -105,8 +105,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         
         cache_dir = os.path.join(os.getcwd(), ".prisma_binaries")
         os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
-        venv_dir = os.environ.get("VIRTUAL_ENV", sys.prefix)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        venv_dir = os.path.join(base_dir, ".venv")
+        if not os.path.exists(venv_dir):
+            venv_dir = os.environ.get("VIRTUAL_ENV", sys.prefix)
+            
         bin_dir = os.path.join(venv_dir, "bin")
+        if not os.path.exists(bin_dir) and platform.system() == "Windows":
+            bin_dir = os.path.join(venv_dir, "Scripts")
+            
         existing_engines = glob.glob(os.path.join(bin_dir, "prisma-query-engine-*"))
         
         if existing_engines:
