@@ -5,9 +5,20 @@ from config import settings
 from auth import create_access_token
 import secrets
 import jwt
+import os
 
 router = APIRouter(tags=["Authentication"])
 templates = Jinja2Templates(directory="templates")
+
+@router.get("/api/v1/debug/engine")
+async def debug_engine():
+    import subprocess
+    try:
+        ls_output = subprocess.check_output(["ls", "-la", "/opt/render/project/src"]).decode("utf-8")
+        find_output = subprocess.check_output(["find", "/opt/render/project/src", "-name", "*query-engine*"]).decode("utf-8")
+        return {"ls": ls_output, "find": find_output}
+    except Exception as e:
+        return {"error": str(e)}
 
 @router.get("/admin/login", response_class=HTMLResponse)
 async def login_page(request: Request):
