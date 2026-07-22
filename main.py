@@ -62,8 +62,8 @@ else:
 
 def resolve_prisma_engine() -> str | None:
     """
-    Recursively locates the Prisma query engine binary across system and cache
-    directories, explicitly setting PRISMA_QUERY_ENGINE_BINARY.
+    Locates the Prisma query engine binary across explicit targets and system
+    paths, setting PRISMA_QUERY_ENGINE_BINARY.
     """
     existing = os.environ.get("PRISMA_QUERY_ENGINE_BINARY")
     if existing and os.path.isfile(existing):
@@ -73,12 +73,34 @@ def resolve_prisma_engine() -> str | None:
     import prisma
 
     prisma_dir = os.path.dirname(prisma.__file__)
+    
+    # Direct explicit file paths expected on Render
+    explicit_paths = [
+        "prisma-query-engine-debian-openssl-3.0.x",
+        "query-engine-debian-openssl-3.0.x",
+        os.path.join(prisma_dir, "prisma-query-engine-debian-openssl-3.0.x"),
+        os.path.join(prisma_dir, "bin", "query-engine"),
+    ]
+
+    for path in explicit_paths:
+        abs_path = os.path.abspath(path)
+        if os.path.isfile(abs_path):
+            try:
+                os.chmod(abs_path, 0o755)
+            except Exception:
+                pass
+            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = abs_path
+            logger.info(f"Auto-resolved Prisma engine binary at explicit path: {abs_path}")
+            return abs_path
+
+    # Recursive fallback search
     search_roots = [
         prisma_dir,
         os.path.expanduser("~/.cache"),
         "/root/.cache",
         "/tmp",
-        "/app",
+        "/opt/render",
+        ".",
     ]
 
     for root_dir in search_roots:
@@ -95,7 +117,7 @@ def resolve_prisma_engine() -> str | None:
                         logger.info(f"Auto-resolved Prisma engine binary at: {full_path}")
                         return full_path
 
-    logger.warning("Could not locate Prisma query engine binary in recursive search")
+    logger.warning("Could not locate Prisma query engine binary in search")
     return None
 
 
