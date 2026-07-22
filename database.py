@@ -240,12 +240,18 @@ def get_async_database_url(url: str) -> tuple[str, dict]:
 
 
 engine: Optional[AsyncEngine] = None
-AsyncSessionLocal: Optional[async_sessionmaker[AsyncSession]] = None
+_sessionmaker: Optional[async_sessionmaker[AsyncSession]] = None
+
+
+def AsyncSessionLocal() -> AsyncSession:
+    if not _sessionmaker:
+        raise RuntimeError("Database not initialized. Call init_db() first.")
+    return _sessionmaker()
 
 
 async def init_db() -> AsyncEngine:
     """Initialize SQLAlchemy async engine and create tables."""
-    global engine, AsyncSessionLocal
+    global engine, _sessionmaker
 
     db_url, connect_args = get_async_database_url(settings.database_url)
     logger.info("Initializing SQLAlchemy AsyncEngine with PostgreSQL...")
@@ -259,7 +265,7 @@ async def init_db() -> AsyncEngine:
         connect_args=connect_args,
     )
 
-    AsyncSessionLocal = async_sessionmaker(
+    _sessionmaker = async_sessionmaker(
         bind=engine,
         class_=AsyncSession,
         expire_on_commit=False,
@@ -288,7 +294,7 @@ async def close_db():
 
 async def get_db_session() -> AsyncSession:
     """Provide an async database session context."""
-    if not AsyncSessionLocal:
+    if not _sessionmaker:
         await init_db()
     async with AsyncSessionLocal() as session:
         yield session
