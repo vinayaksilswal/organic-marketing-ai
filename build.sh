@@ -7,40 +7,32 @@ export PRISMA_CLI_QUERY_ENGINE_TYPE="binary"
 
 pip install --no-cache-dir -r requirements.txt
 
-# 1. Dynamically locate site-packages/prisma inside .venv
-PRISMA_DIR=$(python -c "import os, prisma; print(os.path.dirname(prisma.__file__))")
-echo "Target Prisma directory inside .venv: $PRISMA_DIR"
-
-# 2. Tell Prisma CLI to fetch binaries directly into site-packages/prisma
-export PRISMA_BINARY_CACHE_DIR="$PRISMA_DIR"
-
-echo "Fetching Prisma binaries natively..."
-prisma py fetch
-
-# 3. Ensure the exact binary filename expected by Prisma Python exists and is executable
+echo "Downloading official Prisma query engine (debian-openssl-3.0.x) directly into .venv..."
 python -c "
-import os, sys, glob, shutil, prisma
+import os, gzip, urllib.request, prisma
+
 prisma_dir = os.path.dirname(prisma.__file__)
+target_path = os.path.join(prisma_dir, 'prisma-query-engine-debian-openssl-3.0.x')
 
-engines = glob.glob(os.path.join(prisma_dir, '**', '*query-engine*'), recursive=True) + \
-          glob.glob(os.path.expanduser('~/.cache/**/*query-engine*'), recursive=True) + \
-          glob.glob('/tmp/**/*query-engine*', recursive=True)
+url = 'https://binaries.prisma.sh/all_commits/393aa359c9ad4a4bb28630fb5613f9c281cde053/debian-openssl-3.0.x/query-engine.gz'
+gz_path = target_path + '.gz'
 
-print('Discovered query engines:', engines)
+print('Fetching engine from:', url)
+urllib.request.urlretrieve(url, gz_path)
 
-if engines:
-    target = os.path.join(prisma_dir, 'prisma-query-engine-debian-openssl-3.0.x')
-    print(f'Copying {engines[0]} -> {target}')
-    shutil.copyfile(engines[0], target)
-    os.chmod(target, 0o755)
-    print('ENGINE SUCCESSFULLY VERIFIED AND PLACED AT:', target)
-else:
-    print('ERROR: No query engine binary found after prisma py fetch!')
-    sys.exit(1)
+with gzip.open(gz_path, 'rb') as f_in:
+    with open(target_path, 'wb') as f_out:
+        f_out.write(f_in.read())
+
+if os.path.exists(gz_path):
+    os.remove(gz_path)
+
+os.chmod(target_path, 0o755)
+print('SUCCESSFULLY INSTALLED ENGINE AT:', target_path)
 "
 
 prisma generate --schema=schema_py.prisma
 prisma db push --schema=schema_py.prisma
 
-echo "Build complete! Prisma binary secured inside .venv"
+echo "Build complete! Prisma engine secured in .venv"
 

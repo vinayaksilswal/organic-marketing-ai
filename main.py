@@ -91,9 +91,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("=" * 60)
 
     import os
+    import gzip
+    import urllib.request
     import prisma
+
     prisma_dir = os.path.dirname(prisma.__file__)
     engine_path = os.path.join(prisma_dir, "prisma-query-engine-debian-openssl-3.0.x")
+
+    def ensure_prisma_engine(target_path: str):
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 1000000:
+            logger.info(f"Prisma query engine verified at {target_path}")
+            return
+        
+        logger.info(f"Engine missing. Downloading directly from Prisma CDN to {target_path}...")
+        url = "https://binaries.prisma.sh/all_commits/393aa359c9ad4a4bb28630fb5613f9c281cde053/debian-openssl-3.0.x/query-engine.gz"
+        gz_path = target_path + ".gz"
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        
+        urllib.request.urlretrieve(url, gz_path)
+        with gzip.open(gz_path, "rb") as f_in:
+            with open(target_path, "wb") as f_out:
+                f_out.write(f_in.read())
+        
+        if os.path.exists(gz_path):
+            os.remove(gz_path)
+        os.chmod(target_path, 0o755)
+        logger.info("Prisma engine downloaded & decompressed successfully!")
+
+    try:
+        ensure_prisma_engine(engine_path)
+    except Exception as e:
+        logger.error(f"Failed to download Prisma engine via urllib: {e}")
 
     os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
     os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
