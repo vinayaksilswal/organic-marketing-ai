@@ -208,28 +208,28 @@ async def global_exception_handler(
 async def health_check(request: Request) -> JSONResponse:
     """
     Health check endpoint for Render/Docker monitoring.
-    Verifies database connectivity with a simple query.
+    Returns HTTP 200 to keep the service healthy while reporting DB status.
     """
     db_status = "disconnected"
-    try:
-        if hasattr(request.app.state, "prisma_error"):
-            return JSONResponse(
-                status_code=503,
-                content={"status": "unhealthy", "database": "failed", "error": request.app.state.prisma_error},
-            )
-        prisma: Prisma = request.app.state.prisma
-        await prisma.query_raw("SELECT 1")
-        db_status = "connected"
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return JSONResponse(
-            status_code=503,
-            content={"status": "unhealthy", "database": "disconnected"},
-        )
+    prisma_err = getattr(request.app.state, "prisma_error", None)
+
+    if not prisma_err:
+        try:
+            prisma: Prisma = getattr(request.app.state, "prisma", None)
+            if prisma and prisma.is_connected():
+                await prisma.query_raw("SELECT 1")
+                db_status = "connected"
+        except Exception as e:
+            logger.error(f"Health check DB query failed: {e}")
+            db_status = f"error: {str(e)}"
 
     return JSONResponse(
         status_code=200,
-        content={"status": "healthy", "database": db_status},
+        content={
+            "status": "healthy" if db_status == "connected" else "degraded",
+            "database": db_status,
+            "error": prisma_err,
+        },
     )
 
 
