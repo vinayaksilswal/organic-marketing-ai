@@ -5,3 +5,7 @@ __pycache__/
 node_modules/
 uploads/
 .cj_token.json
+
+# Prisma
+prisma-query-engine-*
+.prisma_binaries/
