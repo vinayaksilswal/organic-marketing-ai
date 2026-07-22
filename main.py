@@ -94,6 +94,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # This is the critical fix: creating Prisma() here ensures it uses
     # the current running event loop, not a stale or non-existent one.
     import os
+    # Render's Python environment deletes dynamically created files in the root folder after build, 
+    # but it explicitly preserves the .venv folder! So we store the engine there!
+    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".venv", "prisma_engine")
+    os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
     os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
     os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
 

@@ -18,10 +18,11 @@ cat found_engines.txt
 
 engine_path=$(head -n 1 found_engines.txt)
 if [ -n "$engine_path" ]; then
-    echo "Copying $engine_path to $(pwd)/prisma-query-engine-debian-openssl-3.0.x"
-    cp "$engine_path" ./prisma-query-engine-debian-openssl-3.0.x
-    chmod +x ./prisma-query-engine-debian-openssl-3.0.x
-    echo "Successfully placed engine in expected path!"
+    mkdir -p .venv/prisma_engine
+    echo "Copying $engine_path to $(pwd)/.venv/prisma_engine/prisma-query-engine-debian-openssl-3.0.x"
+    cp "$engine_path" .venv/prisma_engine/prisma-query-engine-debian-openssl-3.0.x
+    chmod +x .venv/prisma_engine/prisma-query-engine-debian-openssl-3.0.x
+    echo "Successfully placed engine in preserved .venv path!"
 else
     echo "CRITICAL: Could not find any Prisma engines!"
 fi
