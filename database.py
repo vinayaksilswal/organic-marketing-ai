@@ -236,11 +236,9 @@ def get_async_database_url(url: str) -> tuple[str, dict]:
         ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = ctx
         
-        # asyncpg does not accept sslmode in the URL, so strip it
-        clean_url = clean_url.replace("?sslmode=require", "")
-        clean_url = clean_url.replace("&sslmode=require", "")
-        clean_url = clean_url.replace("?ssl=true", "")
-        clean_url = clean_url.replace("&ssl=true", "")
+    # asyncpg does not accept most psycopg2 query params (like sslmode, channel_binding)
+    # so we strip the entire query string after parsing what we need.
+    clean_url = clean_url.split("?")[0]
 
     return clean_url, connect_args
 
