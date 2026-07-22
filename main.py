@@ -91,16 +91,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("=" * 60)
 
     import os
-    import subprocess
+    os.environ["PRISMA_BINARY_CACHE_DIR"] = "/opt/render/project/src/.venv/prisma_cache"
     os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
     os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
-    
-    print("Fetching Prisma Python engine natively at runtime...")
-    try:
-        subprocess.run(["prisma", "py", "fetch"], check=True)
-        print("Engine fetched successfully!")
-    except Exception as e:
-        print(f"Failed to fetch engine: {e}")
 
     prisma_client = None
     try:
@@ -111,11 +104,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Prisma ORM connected to PostgreSQL")
     except Exception as e:
         logger.error(f"Failed to connect Prisma engine: {e}")
-        # Save the exception to state so we can read it from an endpoint if needed
         app.state.prisma_error = str(e)
 
     # --- Step 2: Initialize and start the marketing scheduler ---
-    # The scheduler receives the prisma client so it doesn't create its own.
     if prisma_client and prisma_client.is_connected():
         scheduler = create_scheduler(prisma_client)
         scheduler.start()
@@ -134,10 +125,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # --- Shutdown: Clean up resources in reverse order ---
     logger.info("Shutting down Organic Marketing AI...")
 
-    shutdown_scheduler(scheduler)
-    logger.info("Scheduler stopped")
+    if app.state.scheduler:
+        shutdown_scheduler(app.state.scheduler)
+        logger.info("Scheduler stopped")
 
-    if prisma_client.is_connected():
+    if prisma_client and prisma_client.is_connected():
         await prisma_client.disconnect()
     logger.info("Prisma ORM disconnected")
 
@@ -170,8 +162,10 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173", 
         "http://localhost:3000", 
-        "https://organic-marketing-ai.vercel.app"
+        "https://organic-marketing-ai.vercel.app",
+        "https://organic-marketing-ai.vercel.app/"
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
