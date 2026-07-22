@@ -130,22 +130,41 @@ class UserLogin(BaseModel):
         return v.strip().lower()
 
 
+async def get_prisma(request: Request):
+    """
+    Helper dependency to retrieve connected Prisma client, attempting
+    on-demand connection if it failed during cold startup.
+    """
+    prisma = getattr(request.app.state, "prisma", None)
+    if prisma and prisma.is_connected():
+        return prisma
+
+    try:
+        from prisma import Prisma
+        if not prisma:
+            prisma = Prisma()
+            request.app.state.prisma = prisma
+        if not prisma.is_connected():
+            await prisma.connect()
+            if hasattr(request.app.state, "prisma_error"):
+                delattr(request.app.state, "prisma_error")
+        return prisma
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service database unavailable: {str(e)}",
+        )
+
+
 @router.post("/api/v1/auth/register")
 async def api_register(data: UserRegister, request: Request):
     """Register a new user account."""
-    # Check if Prisma is available
-    if hasattr(request.app.state, "prisma_error"):
-        raise HTTPException(
-            status_code=503,
-            detail="Service temporarily unavailable. Please try again later.",
-        )
-
-    prisma = request.app.state.prisma
+    prisma = await get_prisma(request)
 
     try:
         existing = await prisma.user.find_unique(where={"email": data.email})
     except Exception as e:
-        raise HTTPException(status_code=503, detail="Database error. Please try again.")
+        raise HTTPException(status_code=503, detail=f"Database query error: {str(e)}")
 
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -164,18 +183,12 @@ async def api_register(data: UserRegister, request: Request):
 @router.post("/api/v1/auth/login")
 async def api_login(data: UserLogin, request: Request):
     """Log in an existing user."""
-    if hasattr(request.app.state, "prisma_error"):
-        raise HTTPException(
-            status_code=503,
-            detail="Service temporarily unavailable. Please try again later.",
-        )
-
-    prisma = request.app.state.prisma
+    prisma = await get_prisma(request)
 
     try:
         user = await prisma.user.find_unique(where={"email": data.email})
     except Exception as e:
-        raise HTTPException(status_code=503, detail="Database error. Please try again.")
+        raise HTTPException(status_code=503, detail=f"Database query error: {str(e)}")
 
     if not user or not bcrypt.checkpw(data.password.encode("utf-8"), user.password.encode("utf-8")):
         raise HTTPException(status_code=401, detail="Invalid email or password")

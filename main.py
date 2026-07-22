@@ -60,6 +60,44 @@ else:
     )
 
 
+def resolve_prisma_engine() -> str | None:
+    """
+    Locates the Prisma query engine binary in standard Python package and cache
+    locations, and sets PRISMA_QUERY_ENGINE_BINARY environment variable.
+    """
+    existing = os.environ.get("PRISMA_QUERY_ENGINE_BINARY")
+    if existing and os.path.isfile(existing):
+        logger.info(f"Using existing PRISMA_QUERY_ENGINE_BINARY: {existing}")
+        return existing
+
+    import glob
+    import prisma
+
+    prisma_dir = os.path.dirname(prisma.__file__)
+    search_dirs = [
+        prisma_dir,
+        os.path.join(prisma_dir, "bin"),
+        os.path.expanduser("~/.cache/prisma-python/bin"),
+        "/root/.cache/prisma-python/bin",
+        "/tmp/prisma-python/bin",
+    ]
+
+    for directory in search_dirs:
+        if os.path.exists(directory):
+            for candidate in glob.glob(os.path.join(directory, "*query-engine*")):
+                if os.path.isfile(candidate) and not candidate.endswith((".gz", ".py", ".pyc")):
+                    try:
+                        os.chmod(candidate, 0o755)
+                    except Exception:
+                        pass
+                    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = candidate
+                    logger.info(f"Auto-resolved Prisma engine binary: {candidate}")
+                    return candidate
+
+    logger.warning("Could not auto-resolve Prisma engine binary in standard search paths")
+    return None
+
+
 # =============================================================================
 # Application Lifespan — Async Context Manager
 # =============================================================================
@@ -80,6 +118,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Environment: {settings.environment}")
     logger.info("=" * 60)
 
+    # Resolve engine binary before instantiating Prisma
+    resolve_prisma_engine()
+
     # --- Step 1: Connect Prisma ORM ---
     prisma_client = None
     try:
@@ -87,6 +128,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         prisma_client = Prisma()
         await prisma_client.connect()
         app.state.prisma = prisma_client
+        if hasattr(app.state, "prisma_error"):
+            delattr(app.state, "prisma_error")
         logger.info("Prisma ORM connected to PostgreSQL successfully")
     except Exception as e:
         logger.error(f"Failed to connect Prisma engine: {e}")
