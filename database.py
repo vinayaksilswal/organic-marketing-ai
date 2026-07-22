@@ -235,6 +235,12 @@ def get_async_database_url(url: str) -> tuple[str, dict]:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = ctx
+        
+        # asyncpg does not accept sslmode in the URL, so strip it
+        clean_url = clean_url.replace("?sslmode=require", "")
+        clean_url = clean_url.replace("&sslmode=require", "")
+        clean_url = clean_url.replace("?ssl=true", "")
+        clean_url = clean_url.replace("&ssl=true", "")
 
     return clean_url, connect_args
 
