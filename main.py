@@ -94,24 +94,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # This is the critical fix: creating Prisma() here ensures it uses
     # the current running event loop, not a stale or non-existent one.
     import os
-    
-    # Point Prisma to the persistent cache directory created during the build phase
-    cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".prisma_cache")
-    os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
-    os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
-    os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
-
-    # --- Debugging Prisma Engine ---
-    if os.path.exists(cache_dir):
-        logger.info(f"CACHE DIR EXISTS: {cache_dir}")
-        logger.info(f"CONTENTS: {os.listdir(cache_dir)}")
-    else:
-        logger.warning(f"CACHE DIR MISSING: {cache_dir}")
-        # Try to download it right now!
-        import subprocess
-        logger.info("Attempting to fetch Prisma binaries at runtime...")
-        subprocess.run(["prisma", "py", "fetch"])
-        logger.info(f"Post-fetch CACHE DIR CONTENTS: {os.listdir(cache_dir) if os.path.exists(cache_dir) else 'Still missing'}")
 
     prisma_client = None
     try:
