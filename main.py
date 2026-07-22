@@ -98,6 +98,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Point Prisma to the persistent cache directory created during the build phase
     cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".prisma_cache")
     os.environ["PRISMA_BINARY_CACHE_DIR"] = cache_dir
+    os.environ["PRISMA_CLIENT_ENGINE_TYPE"] = "binary"
+    os.environ["PRISMA_CLI_QUERY_ENGINE_TYPE"] = "binary"
 
     try:
         prisma_client = Prisma()
@@ -204,7 +206,7 @@ async def global_exception_handler(
     logger.exception(f"Unhandled Exception on {request.method} {request.url.path} (Error ID: {error_id})")
     return JSONResponse(
         status_code=500,
-        content={"success": False, "message": "Internal Server Error", "error_id": error_id},
+        content={"success": False, "message": f"Internal Server Error: {str(exc)}", "error_id": error_id},
     )
 
 
