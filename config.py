@@ -29,7 +29,11 @@ class Settings(BaseSettings):
     # Core Application
     # =========================================================================
     environment: str = "development"
-    allowed_origins: list[str] = ["*"]
+    allowed_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://organic-marketing-ai.vercel.app"
+    ]
 
     # =========================================================================
     # Database (PostgreSQL via Prisma)
