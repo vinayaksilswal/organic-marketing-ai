@@ -74,11 +74,14 @@ def resolve_prisma_engine() -> str | None:
 
     prisma_dir = os.path.dirname(prisma.__file__)
     
-    # Direct explicit file paths expected on Render
+    # Direct explicit file paths expected by Prisma v5.17 on Render
+    engine_name = "prisma-query-engine-debian-openssl-3.0.x"
     explicit_paths = [
-        "prisma-query-engine-debian-openssl-3.0.x",
+        f"/opt/render/project/src/{engine_name}",
+        f"/opt/render/.cache/prisma-python/binaries/5.17.0/393aa359c9ad4a4bb28630fb5613f9c281cde053/{engine_name}",
+        engine_name,
         "query-engine-debian-openssl-3.0.x",
-        os.path.join(prisma_dir, "prisma-query-engine-debian-openssl-3.0.x"),
+        os.path.join(prisma_dir, engine_name),
         os.path.join(prisma_dir, "bin", "query-engine"),
     ]
 

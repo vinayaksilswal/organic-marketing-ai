@@ -21,51 +21,55 @@ python -m prisma py fetch || echo "Warning: prisma py fetch warning"
 echo "Generating Prisma client..."
 python -m prisma generate --schema=schema_py.prisma
 
-# Copy engine to exact locations expected by Prisma v5.17 on Render
+# Populate exact paths expected by Prisma v5.17 on Render
 python -c "
-import os, glob, shutil, prisma
+import os, shutil, prisma
 
 prisma_dir = os.path.dirname(prisma.__file__)
+engine_name = 'prisma-query-engine-debian-openssl-3.0.x'
 
-# Find downloaded binary recursively
-found = None
-for search_base in [os.path.expanduser('~/.cache'), '/root/.cache', '/tmp', prisma_dir, '.']:
-    if os.path.exists(search_base):
-        for root, dirs, files in os.walk(search_base):
+# Recursively locate any downloaded query engine file
+found_binary = None
+for root_dir in ['/opt/render/.cache', os.path.expanduser('~/.cache'), '/tmp', prisma_dir, '.']:
+    if os.path.exists(root_dir):
+        for root, dirs, files in os.walk(root_dir):
             for file in files:
                 if 'query-engine' in file and not file.endswith(('.gz', '.py', '.pyc', '.json', '.lock')):
-                    found = os.path.join(root, file)
+                    found_binary = os.path.join(root, file)
                     break
-            if found:
+            if found_binary:
                 break
-    if found:
+    if found_binary:
         break
 
-if found:
-    os.chmod(found, 0o755)
-    print(f'Found Prisma engine binary at: {found}')
-    
-    # Target paths expected by Prisma on Render
-    targets = [
-        'prisma-query-engine-debian-openssl-3.0.x',
-        'query-engine-debian-openssl-3.0.x',
-        'prisma-query-engine-rhel-openssl-3.0.x',
-        'query-engine-rhel-openssl-3.0.x',
-        os.path.join(prisma_dir, 'prisma-query-engine-debian-openssl-3.0.x'),
-        os.path.join(prisma_dir, 'bin', 'query-engine'),
+if found_binary:
+    os.chmod(found_binary, 0o755)
+    print(f'Found Prisma engine binary at: {found_binary}')
+
+    # Exact target locations expected by Prisma v5.17 on Render
+    cache_target_dir = '/opt/render/.cache/prisma-python/binaries/5.17.0/393aa359c9ad4a4bb28630fb5613f9c281cde053'
+    os.makedirs(cache_target_dir, exist_ok=True)
+
+    exact_targets = [
+        f'/opt/render/project/src/{engine_name}',
+        os.path.join(cache_target_dir, engine_name),
+        engine_name,
+        f'query-engine-debian-openssl-3.0.x',
+        os.path.join(prisma_dir, engine_name),
     ]
-    for target in targets:
+
+    for target in exact_targets:
         try:
             parent = os.path.dirname(target)
             if parent:
                 os.makedirs(parent, exist_ok=True)
-            shutil.copy2(found, target)
+            shutil.copy2(found_binary, target)
             os.chmod(target, 0o755)
-            print(f'✓ Copied Prisma engine to: {target}')
+            print(f'✓ Placed Prisma engine at: {target}')
         except Exception as e:
-            print(f'Warning copying to {target}: {e}')
+            print(f'Warning placing {target}: {e}')
 else:
-    print('WARNING: No query engine binary found during build step!')
+    print('WARNING: Engine binary not found in search paths!')
 "
 
 # Push schema to database
