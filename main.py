@@ -62,20 +62,24 @@ else:
 
 def resolve_prisma_engine() -> str | None:
     """
-    Locates the Prisma query engine binary across explicit targets and system
-    paths, setting PRISMA_QUERY_ENGINE_BINARY.
+    Locates and verifies an executable Prisma query engine binary, setting
+    PRISMA_QUERY_ENGINE_BINARY.
     """
     existing = os.environ.get("PRISMA_QUERY_ENGINE_BINARY")
     if existing and os.path.isfile(existing):
+        try:
+            os.chmod(existing, 0o777)
+        except Exception:
+            pass
         logger.info(f"Using existing PRISMA_QUERY_ENGINE_BINARY: {existing}")
         return existing
 
+    import subprocess
     import prisma
 
     prisma_dir = os.path.dirname(prisma.__file__)
-    
-    # Direct explicit file paths expected by Prisma v5.17 on Render
     engine_name = "prisma-query-engine-debian-openssl-3.0.x"
+
     explicit_paths = [
         f"/opt/render/project/src/{engine_name}",
         f"/opt/render/.cache/prisma-python/binaries/5.17.0/393aa359c9ad4a4bb28630fb5613f9c281cde053/{engine_name}",
@@ -89,20 +93,22 @@ def resolve_prisma_engine() -> str | None:
         abs_path = os.path.abspath(path)
         if os.path.isfile(abs_path):
             try:
-                os.chmod(abs_path, 0o755)
-            except Exception:
-                pass
-            os.environ["PRISMA_QUERY_ENGINE_BINARY"] = abs_path
-            logger.info(f"Auto-resolved Prisma engine binary at explicit path: {abs_path}")
-            return abs_path
+                os.chmod(abs_path, 0o777)
+                res = subprocess.run([abs_path, "--version"], capture_output=True, timeout=5)
+                if res.returncode == 0:
+                    os.environ["PRISMA_QUERY_ENGINE_BINARY"] = abs_path
+                    logger.info(f"Verified executable Prisma engine at: {abs_path}")
+                    return abs_path
+            except Exception as e:
+                logger.warning(f"Engine candidate at {abs_path} failed execution check: {e}")
 
     # Recursive fallback search
     search_roots = [
+        "/opt/render",
         prisma_dir,
         os.path.expanduser("~/.cache"),
         "/root/.cache",
         "/tmp",
-        "/opt/render",
         ".",
     ]
 
@@ -113,14 +119,16 @@ def resolve_prisma_engine() -> str | None:
                     if "query-engine" in file and not file.endswith((".gz", ".py", ".pyc", ".json", ".lock")):
                         full_path = os.path.join(root, file)
                         try:
-                            os.chmod(full_path, 0o755)
+                            os.chmod(full_path, 0o777)
+                            res = subprocess.run([full_path, "--version"], capture_output=True, timeout=5)
+                            if res.returncode == 0:
+                                os.environ["PRISMA_QUERY_ENGINE_BINARY"] = full_path
+                                logger.info(f"Verified executable Prisma engine binary at: {full_path}")
+                                return full_path
                         except Exception:
                             pass
-                        os.environ["PRISMA_QUERY_ENGINE_BINARY"] = full_path
-                        logger.info(f"Auto-resolved Prisma engine binary at: {full_path}")
-                        return full_path
 
-    logger.warning("Could not locate Prisma query engine binary in search")
+    logger.warning("Could not locate verified executable Prisma query engine binary")
     return None
 
 
