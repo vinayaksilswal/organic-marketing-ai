@@ -26,6 +26,9 @@ class BusinessProfileUpdate(BaseModel):
     websiteUrl: Optional[str] = None
     description: Optional[str] = None
     businessModel: Optional[str] = None
+    postIntervalHours: Optional[int] = None
+    creativeGenerationIntervalHours: Optional[int] = None
+    autoGenerateCreatives: Optional[bool] = None
 
 class SocialConnectionUpdate(BaseModel):
     fbAccessToken: Optional[str] = None
@@ -67,7 +70,7 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
             stmt = select(User).where(User.id == user_id).options(
                 selectinload(User.businessProfiles),
                 selectinload(User.socialConnection),
-            )
+            ).execution_options(populate_existing=True)
             res = await session.execute(stmt)
             user = res.scalar_one_or_none()
 
@@ -128,6 +131,12 @@ async def update_business_profile_post(
                 profile.description = data.description
             if data.businessModel is not None:
                 profile.businessModel = data.businessModel
+            if data.postIntervalHours is not None:
+                profile.postIntervalHours = data.postIntervalHours
+            if data.creativeGenerationIntervalHours is not None:
+                profile.creativeGenerationIntervalHours = data.creativeGenerationIntervalHours
+            if data.autoGenerateCreatives is not None:
+                profile.autoGenerateCreatives = data.autoGenerateCreatives
         else:
             profile = BusinessProfile(
                 userId=user_id,
@@ -152,8 +161,21 @@ async def update_business_profile_post(
                 "websiteUrl": profile.websiteUrl,
                 "description": profile.description,
                 "businessModel": profile.businessModel,
+                "postIntervalHours": profile.postIntervalHours,
+                "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
+                "autoGenerateCreatives": profile.autoGenerateCreatives,
             },
         }
+
+@router.get("/onboarding-status")
+async def get_onboarding_status(request: Request, user_id: str = Depends(verify_user)):
+    async with AsyncSessionLocal() as session:
+        stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id).order_by(BusinessProfile.createdAt.desc())
+        res = await session.execute(stmt)
+        profile = res.scalars().first()
+        if not profile:
+            return {"brandAnalysisComplete": False}
+        return {"brandAnalysisComplete": profile.brandAnalysisComplete}
 
 @router.post("/subscribe")
 async def activate_subscription(request: Request, user_id: str = Depends(verify_user)):
@@ -204,6 +226,8 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
                 "description": bp.description,
                 "businessModel": bp.businessModel or "General",
                 "postIntervalHours": bp.postIntervalHours,
+                "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
+                "autoGenerateCreatives": bp.autoGenerateCreatives,
                 "createdAt": bp.createdAt.isoformat() if bp.createdAt else None,
             }
             for bp in bps

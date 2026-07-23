@@ -517,6 +517,101 @@ async def create_manual_social_post(
         return {"success": is_success, "post": post_data, "errors": errors}
 
 
+class PostFromMediaRequest(BaseModel):
+    mediaId: Optional[str] = None
+    mediaUrl: Optional[str] = None
+    customCaption: Optional[str] = None
+    platform: str = "BOTH"
+    status: str = "POSTED"
+
+
+@router.post("/posts/from-media")
+async def create_post_from_media(
+    data: PostFromMediaRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Create and publish a social post directly from a Media Library asset."""
+    workspace_id = request.headers.get("x-workspace-id")
+    
+    async with AsyncSessionLocal() as session:
+        target_url = data.mediaUrl
+        target_tags = []
+
+        if data.mediaId:
+            media_item = await session.get(Media, data.mediaId)
+            if media_item:
+                target_url = media_item.url
+                target_tags = media_item.tags or []
+
+        if not target_url:
+            raise HTTPException(status_code=400, detail="Either mediaId or mediaUrl must be provided")
+
+        # Determine caption
+        caption = data.customCaption
+        if not caption:
+            # Generate AI caption based on workspace profile
+            profile = None
+            if workspace_id:
+                profile = await session.get(BusinessProfile, workspace_id)
+            
+            biz_name = profile.name if profile else "Our Brand"
+            topic = target_tags[0] if target_tags else "Feature Highlight"
+            base_prompt = f"Automated social post for {biz_name}. Topic: {topic}. High engagement, emojis, hashtags."
+            caption = await generate_campaign_variation(base_prompt)
+
+        # Create SocialPost draft
+        post = SocialPost(
+            businessProfileId=workspace_id,
+            platform=data.platform,
+            type="MEDIA_CATALOG",
+            caption=caption,
+            mediaUrls=[target_url],
+            scheduledAt=datetime.now(),
+            status="DRAFT" if data.status == "DRAFT" else "POSTED",
+        )
+        session.add(post)
+        await session.commit()
+        await session.refresh(post)
+
+        if data.status == "DRAFT":
+            return {"success": True, "post": {"id": post.id, "caption": post.caption, "mediaUrls": post.mediaUrls, "status": "DRAFT"}}
+
+        # Post to Facebook & Instagram & Twitter & LinkedIn
+        fb_post_id, ig_post_id = None, None
+        errors = []
+
+        if data.platform in ("FACEBOOK", "BOTH"):
+            try:
+                fb_post_id = await post_to_facebook(message=caption, media_urls=[target_url])
+            except Exception as e:
+                errors.append(f"FB: {str(e)}")
+
+        if data.platform in ("INSTAGRAM", "BOTH"):
+            try:
+                ig_post_id = await post_to_instagram(message=caption, media_urls=[target_url])
+            except Exception as e:
+                errors.append(f"IG: {str(e)}")
+
+        # Update post record
+        post.status = "POSTED" if not errors or fb_post_id or ig_post_id else "FAILED"
+        post.postedAt = datetime.now()
+        post.fbPostId = fb_post_id
+        post.igPostId = ig_post_id
+        post.errorLog = " | ".join(errors) if errors else None
+        await session.commit()
+
+        return {
+            "success": True,
+            "post": {
+                "id": post.id,
+                "caption": post.caption,
+                "mediaUrls": post.mediaUrls,
+                "status": post.status,
+            },
+            "errors": errors,
+        }
+
+
 # =============================================================================
 # Email Campaign Endpoints
 # =============================================================================

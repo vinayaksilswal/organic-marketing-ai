@@ -389,3 +389,59 @@ async def get_public_recent_activity() -> dict:
             }
     except Exception:
         return {"success": True, "data": []}
+
+
+@app.get("/api/public/self-promotion", tags=["Public"])
+async def get_public_self_promotion() -> dict:
+    """Public self-promotion engine endpoint demonstrating platform self-marketing."""
+    try:
+        async with AsyncSessionLocal() as session:
+            # Find system workspace
+            sys_user = (await session.execute(select(User).where(User.email == "system@organicai.pro"))).scalar()
+            if not sys_user:
+                return {"active": False, "campaigns": [], "posts": []}
+
+            c_stmt = (
+                select(SocialCampaign)
+                .where(SocialCampaign.userId == sys_user.id)
+                .order_by(SocialCampaign.createdAt.desc())
+                .limit(6)
+            )
+            campaigns = (await session.execute(c_stmt)).scalars().all()
+
+            p_stmt = (
+                select(SocialPost)
+                .where(SocialPost.userId == sys_user.id)
+                .order_by(SocialPost.scheduledAt.desc())
+                .limit(6)
+            )
+            posts = (await session.execute(p_stmt)).scalars().all()
+
+            return {
+                "active": True,
+                "botName": "OrganicAI Self-Growth Engine",
+                "intervalHours": 2,
+                "campaigns": [
+                    {
+                        "id": c.id,
+                        "caption": c.baseCaption,
+                        "mediaUrl": c.mediaUrl or "https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop",
+                        "createdAt": c.createdAt.isoformat() if c.createdAt else None,
+                    }
+                    for c in campaigns if c.baseCaption
+                ],
+                "posts": [
+                    {
+                        "id": p.id,
+                        "platform": p.platform,
+                        "caption": p.caption,
+                        "mediaUrls": p.mediaUrls,
+                        "status": p.status,
+                        "scheduledAt": p.scheduledAt.isoformat() if p.scheduledAt else None,
+                    }
+                    for p in posts
+                ],
+            }
+    except Exception as e:
+        return {"active": False, "error": str(e), "campaigns": [], "posts": []}
+

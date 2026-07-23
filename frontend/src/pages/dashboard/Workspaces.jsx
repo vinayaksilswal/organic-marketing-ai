@@ -11,6 +11,12 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [description, setDescription] = useState('');
   const [businessModel, setBusinessModel] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState(null);
+  const [postInterval, setPostInterval] = useState(2);
+  const [creativeInterval, setCreativeInterval] = useState(12);
+  const [autoGenerate, setAutoGenerate] = useState(true);
+
   const { activeWorkspaceId, setActiveWorkspace, refreshWorkspaces, workspaces } = useWorkspace();
 
   const businessList = workspaces && workspaces.length > 0 ? workspaces : (user?.businessProfiles || []);
@@ -59,10 +65,33 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
       setDescription('');
       setBusinessModel(null);
       
-    } catch (err) {
-      showToast(err.message, true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (!editingWorkspace) return;
+    try {
+      const res = await authFetch(`${API_BASE}/users/me/business-profile`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: editingWorkspace.name,
+          postIntervalHours: postInterval,
+          creativeGenerationIntervalHours: creativeInterval,
+          autoGenerateCreatives: autoGenerate
+        })
+      }, token);
+      
+      if (res.ok) {
+        showToast('Workspace settings updated');
+        setSettingsModalOpen(false);
+        refreshWorkspaces();
+      } else {
+        throw new Error('Failed to update settings');
+      }
+    } catch (err) {
+      showToast(err.message, true);
     }
   };
 
@@ -161,6 +190,20 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     >
                       {isActive ? 'Active Workspace' : 'Switch Workspace'}
                     </button>
+                    <button 
+                      className="btn btn-secondary"
+                      style={{ padding: '0.5rem 1rem' }}
+                      onClick={() => {
+                        setEditingWorkspace(bp);
+                        setPostInterval(bp.postIntervalHours || 2);
+                        setCreativeInterval(bp.creativeGenerationIntervalHours || 12);
+                        setAutoGenerate(bp.autoGenerateCreatives !== false);
+                        setSettingsModalOpen(true);
+                      }}
+                      title="Automation Settings"
+                    >
+                      <Settings size={18} />
+                    </button>
                   </div>
                 </div>
               );
@@ -250,6 +293,61 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {settingsModalOpen && editingWorkspace && (
+          <div className="modal-overlay" style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', 
+            justifyContent: 'center', zIndex: 999
+          }}>
+            <div className="glass-panel" style={{ width: '90%', maxWidth: '500px', padding: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0 }}><Settings size={20} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} /> Automation Settings</h3>
+                <button className="btn btn-secondary" onClick={() => setSettingsModalOpen(false)}>Close</button>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: '1rem' }}>
+                <label>Posting Frequency (Hours)</label>
+                <select value={postInterval} onChange={e => setPostInterval(Number(e.target.value))} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'var(--bg-card)', color: '#fff', border: '1px solid var(--border-color)' }}>
+                  <option value={1}>Every 1 hour</option>
+                  <option value={2}>Every 2 hours</option>
+                  <option value={4}>Every 4 hours</option>
+                  <option value={8}>Every 8 hours</option>
+                  <option value={12}>Every 12 hours</option>
+                  <option value={24}>Every 24 hours</option>
+                </select>
+                <small className="text-muted">How often the AI publishes posts to your linked social accounts.</small>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: '1rem' }}>
+                <label>Auto-Generate Creatives (AI)</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input type="checkbox" checked={autoGenerate} onChange={e => setAutoGenerate(e.target.checked)} style={{ width: '20px', height: '20px' }} />
+                  <span>Enable AI continuous creative generation</span>
+                </div>
+              </div>
+
+              {autoGenerate && (
+                <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                  <label>Creative Batch Generation (Hours)</label>
+                  <select value={creativeInterval} onChange={e => setCreativeInterval(Number(e.target.value))} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'var(--bg-card)', color: '#fff', border: '1px solid var(--border-color)' }}>
+                    <option value={2}>Every 2 hours (Aggressive / Enterprise)</option>
+                    <option value={4}>Every 4 hours (High Volume)</option>
+                    <option value={6}>Every 6 hours</option>
+                    <option value={12}>Every 12 hours (Standard)</option>
+                    <option value={24}>Every 24 hours</option>
+                    <option value={48}>Every 48 hours</option>
+                  </select>
+                  <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem' }}>How often the AI restocks your media library with new batches. <strong style={{color:'var(--primary-color)'}}>Note: Faster intervals consume more AI generation capacity.</strong></small>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+                <button className="btn btn-primary" onClick={handleSaveSettings}>Save Settings</button>
+              </div>
+            </div>
           </div>
         )}
       </div>

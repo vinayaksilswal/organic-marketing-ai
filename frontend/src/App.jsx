@@ -7,7 +7,7 @@ import DashboardLayout from './pages/DashboardLayout';
 import Toast from './components/Toast';
 import { WorkspaceProvider } from './components/WorkspaceContext';
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai.onrender.com/api/v1';
+export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai1.onrender.com/api/v1';
 
 /**
  * Helper: make authenticated API requests with automatic 401 handling.

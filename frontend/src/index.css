@@ -1015,3 +1015,19 @@ input:focus, textarea:focus, select:focus {
   flex: 1;
   padding: 2rem;
 }
+
+/* Additional Utility Classes */
+.spin-slow {
+  animation: spin 8s linear infinite;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}

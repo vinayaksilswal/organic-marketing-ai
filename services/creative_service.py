@@ -42,7 +42,7 @@ async def generate_brand_context(profile: BusinessProfile) -> Dict[str, Any]:
     Analyze a business profile and generate comprehensive brand context.
     Returns: industry, targetAudience, toneOfVoice, contentPillars, suggestedHashtags
     """
-    prompt = f"""You are a marketing strategist. Analyze this business and generate a structured brand context.
+    prompt = f"""You are a top-tier Enterprise Marketing Strategist. Analyze this business and generate a highly converting, structured brand context.
 
 Business Name: {profile.name}
 Website: {profile.websiteUrl or 'Not provided'}
@@ -51,16 +51,16 @@ Business Model: {profile.businessModel or 'General'}
 
 Return a JSON object with exactly these fields (nothing else, no markdown):
 {{
-    "industry": "the primary industry this business operates in",
-    "targetAudience": "detailed description of ideal customer persona (2-3 sentences)",
-    "toneOfVoice": "one of: Professional, Casual, Bold, Playful, Authoritative, Friendly",
+    "industry": "the primary industry this business operates in (e.g. SaaS, E-Commerce, Local Services)",
+    "targetAudience": "highly detailed description of the ideal customer persona (2-3 sentences)",
+    "toneOfVoice": "one of: Professional, Casual, Bold, Playful, Authoritative, Friendly, Visionary",
     "contentPillars": ["pillar1", "pillar2", "pillar3", "pillar4"],
     "suggestedHashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
     "brandColors": ["#8B5CF6", "#3B82F6"]
 }}
 
-Ensure contentPillars are 4 specific content themes for social media.
-Ensure suggestedHashtags are 5 relevant hashtags WITH the # prefix."""
+Ensure contentPillars are 4 specific, actionable content themes for social media that drive engagement and sales.
+Ensure suggestedHashtags are 5 highly relevant, trending hashtags WITH the # prefix."""
 
     try:
         result = await _call_llm(prompt)
@@ -106,7 +106,7 @@ async def generate_starter_creatives(profile: BusinessProfile) -> List[Dict[str,
     biz_name = profile.name or "Our Business"
     desc = profile.description or "a business"
 
-    prompt = f"""You are a social media copywriter. Generate exactly 3 social media posts for this brand.
+    prompt = f"""You are an elite enterprise social media copywriter. Generate exactly 3 highly-converting social media posts for this brand.
 
 Brand: {biz_name}
 Description: {desc}
@@ -116,12 +116,12 @@ Hashtags to include: {', '.join((profile.suggestedHashtags or ['#business', '#gr
 
 Return a JSON array with exactly 3 objects, each with these fields (nothing else, no markdown):
 [
-    {{"caption": "Full post text with emojis and hashtags (2-4 sentences)", "topic": "Content pillar name", "platform": "BOTH"}},
+    {{"caption": "A compelling, hook-driven post text with emojis, clear value proposition, and hashtags (3-5 sentences). It must drive engagement.", "topic": "Content pillar name", "platform": "BOTH"}},
     {{"caption": "...", "topic": "...", "platform": "BOTH"}},
     {{"caption": "...", "topic": "...", "platform": "BOTH"}}
 ]
 
-Make each post engaging, authentic, and ready to publish. Include relevant emojis and 3-5 hashtags."""
+Make each post highly engaging, authentic, and ready to publish to a professional audience. Include relevant emojis and 3-5 hashtags. End with a clear call to action (CTA)."""
 
     try:
         result = await _call_llm(prompt)
@@ -266,3 +266,83 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
         logger.error(f"[CREATIVE] Auto-populate failed for workspace {workspace_id}: {e}")
 
     return result
+
+
+async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dict[str, Any]:
+    """
+    Generate a new batch of AI creatives for a given workspace and deposit them
+    directly into the Media catalog and SocialCampaign queue.
+    """
+    created_items = []
+    try:
+        async with AsyncSessionLocal() as session:
+            profile = await session.get(BusinessProfile, workspace_id)
+            if not profile:
+                logger.error(f"Workspace {workspace_id} not found for creative batch generation")
+                return {"success": False, "count": 0, "message": "Workspace not found"}
+
+            user_id = profile.userId
+
+            # Ensure brand context is populated
+            if not profile.brandAnalysisComplete:
+                brand_ctx = await generate_brand_context(profile)
+                profile.industry = brand_ctx["industry"]
+                profile.targetAudience = brand_ctx["targetAudience"]
+                profile.toneOfVoice = brand_ctx["toneOfVoice"]
+                profile.contentPillars = brand_ctx["contentPillars"]
+                profile.suggestedHashtags = brand_ctx["suggestedHashtags"]
+                profile.brandColors = brand_ctx["brandColors"]
+                profile.brandAnalysisComplete = True
+                await session.commit()
+                await session.refresh(profile)
+
+            creatives = await generate_starter_creatives(profile)
+
+            for creative in creatives[:count]:
+                topic = creative.get("topic", "Brand Highlight")
+                img_prompt = (
+                    f"Modern social media graphic for {profile.name}, {profile.businessModel or 'Business'}, "
+                    f"niche {profile.industry or 'Tech'}, topic: {topic}, professional design, 8k quality"
+                )
+                img_url = get_pollinations_image_url(img_prompt, 1080, 1080)
+
+                media_id = str(uuid.uuid4())
+                media = Media(
+                    id=media_id,
+                    userId=user_id,
+                    businessProfileId=workspace_id,
+                    filename=f"AI_Render_{topic.replace(' ', '_')}_{media_id[:8]}.png",
+                    mimeType="image/png",
+                    url=img_url,
+                    tags=[topic, "ai-generated", "automated-schedule"],
+                    aiGenerated=True,
+                )
+                session.add(media)
+
+                campaign = SocialCampaign(
+                    userId=user_id,
+                    businessProfileId=workspace_id,
+                    baseCaption=creative["caption"],
+                    mediaUrl=img_url,
+                    mediaType="image",
+                    isActive=True,
+                )
+                session.add(campaign)
+                await session.flush()
+
+                created_items.append({
+                    "id": campaign.id,
+                    "caption": creative["caption"],
+                    "topic": topic,
+                    "mediaUrl": img_url,
+                    "mediaId": media_id,
+                })
+
+            await session.commit()
+            logger.info(f"[CREATIVE BATCH] Successfully generated {len(created_items)} creatives for workspace {workspace_id}")
+            return {"success": True, "count": len(created_items), "items": created_items}
+
+    except Exception as e:
+        logger.error(f"[CREATIVE BATCH] Generation failed for workspace {workspace_id}: {e}")
+        return {"success": False, "count": 0, "error": str(e)}
+

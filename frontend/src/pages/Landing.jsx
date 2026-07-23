@@ -11,6 +11,43 @@ import { Helmet } from 'react-helmet-async';
 const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai.onrender.com/api/v1';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
+const premiumStyles = `
+  .hero-gradient {
+    background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.15), transparent 40%),
+                radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.15), transparent 40%);
+  }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  }
+  .premium-text-gradient {
+    background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .accent-gradient {
+    background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .interactive-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .spin-slow {
+    animation: spin 3s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
 const Landing = () => {
   const navigate = useNavigate();
   const [activeFaq, setActiveFaq] = useState(null);
@@ -21,7 +58,16 @@ const Landing = () => {
   const [hourlyRate, setHourlyRate] = useState(50);
   const [hoursPerWeek, setHoursPerWeek] = useState(10);
 
-  // Fetch live platform stats
+  // Demo Generator state
+  const [demoBizName, setDemoBizName] = useState('');
+  const [demoBizModel, setDemoBizModel] = useState('SaaS');
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoPreview, setDemoPreview] = useState(null);
+
+  // Self promotion data
+  const [selfPromoData, setSelfPromoData] = useState(null);
+
+  // Fetch live platform stats & self promotion data
   useEffect(() => {
     fetch(`${PUBLIC_API}/api/public/stats`)
       .then(r => r.json())
@@ -31,6 +77,11 @@ const Landing = () => {
     fetch(`${PUBLIC_API}/api/public/recent-activity`)
       .then(r => r.json())
       .then(data => { if (data?.data) setRecentActivity(data.data); })
+      .catch(() => {});
+
+    fetch(`${PUBLIC_API}/api/public/self-promotion`)
+      .then(r => r.json())
+      .then(data => { if (data) setSelfPromoData(data); })
       .catch(() => {});
   }, []);
 
@@ -73,10 +124,11 @@ const Landing = () => {
   ];
 
   return (
-    <div className="view">
+    <div className="view hero-gradient" style={{ minHeight: '100vh' }}>
+      <style>{premiumStyles}</style>
       <Helmet>
-        <title>OrganicAI — AI writes, designs, and posts your marketing content automatically</title>
-        <meta name="description" content="OrganicAI auto-generates brand-matched social media posts with AI images and publishes them to Facebook, Instagram, X, and LinkedIn on a schedule you control. Starting at $17/mo." />
+        <title>OrganicAI — The Autonomous Marketing Employee</title>
+        <meta name="description" content="AI auto-generates brand-matched social media posts with images and publishes them on autopilot. Starting at $17/mo." />
         <meta name="keywords" content="AI marketing, social media automation, organic growth, content generation, automated posting" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
@@ -89,42 +141,44 @@ const Landing = () => {
       </Helmet>
       
       {/* Navbar */}
-      <nav className="navbar">
-        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0' }}>
-          <div className="nav-brand">
-            <Sparkles size={24} color="var(--primary-color)" />
-            <span>OrganicAI</span>
+      <nav className="navbar" style={{ background: 'rgba(9, 9, 11, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0.5rem 0' }}>
+          <div className="nav-brand" style={{ cursor: 'pointer' }} onClick={() => window.scrollTo(0,0)}>
+            <Sparkles size={24} color="#a855f7" />
+            <span style={{ fontWeight: 700, letterSpacing: '-0.02em', fontSize: '1.25rem' }}>OrganicAI</span>
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <button className="btn btn-secondary" onClick={() => navigate('/auth')}>Log in</button>
-            <button className="btn btn-primary" onClick={() => navigate('/auth')}>Start for $17</button>
+            <button className="btn btn-secondary" style={{ border: 'none', background: 'transparent' }} onClick={() => navigate('/auth')}>Log in</button>
+            <button className="btn btn-primary" style={{ boxShadow: '0 4px 14px rgba(168, 85, 247, 0.4)' }} onClick={() => navigate('/auth')}>Start for $17</button>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <header className="hero">
+      <header className="hero" style={{ paddingTop: '8rem', paddingBottom: '4rem', textAlign: 'center' }}>
         <div className="container">
-          <div className="hero-content">
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '0.5rem 1rem', borderRadius: '999px', marginBottom: '2rem', color: 'var(--primary-color)', fontWeight: '600', fontSize: '0.875rem' }}>
-              <Cpu size={16} /> AI Brand Context Engine + Auto-Generated Creatives
+          <div className="hero-content" style={{ margin: '0 auto' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.2)', padding: '0.5rem 1rem', borderRadius: '999px', marginBottom: '2rem', color: '#c084fc', fontWeight: '600', fontSize: '0.875rem' }}>
+              <Cpu size={16} /> Fully Autonomous Marketing Engine
             </div>
-            <h1>AI writes, designs, and posts your marketing — <span className="gradient-text">every 2 hours</span>, automatically.</h1>
-            <p style={{ fontSize: '1.2rem', maxWidth: '680px', margin: '0 auto', lineHeight: 1.7 }}>
-              Describe your business once. OrganicAI analyzes your brand, generates on-brand posts with AI images, and publishes them to <strong>Facebook, Instagram, X, and LinkedIn</strong> on a schedule you control.
+            <h1 className="premium-text-gradient" style={{ fontSize: '4.5rem', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '1.5rem' }}>
+              Hire an AI Marketing Team<br />for <span className="accent-gradient">$17/month</span>.
+            </h1>
+            <p style={{ fontSize: '1.25rem', maxWidth: '700px', margin: '0 auto 2.5rem', color: '#a1a1aa', lineHeight: 1.6 }}>
+              Stop scheduling. Start automating. OrganicAI learns your brand DNA, generates stunning visuals, writes compelling copy, and publishes to <strong>Facebook, Instagram, X, and LinkedIn</strong> on autopilot.
             </p>
-            <div className="hero-cta">
-              <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')}>
-                Start Automating — $17/mo <TrendingUp size={20} style={{ marginLeft: '0.5rem' }} />
+            <div className="hero-cta" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
+              <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')} style={{ fontSize: '1.1rem', padding: '1rem 2rem', boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)' }}>
+                Start Automating Now <TrendingUp size={20} style={{ marginLeft: '0.5rem' }} />
               </button>
-              <button className="btn btn-secondary btn-large" onClick={scrollToPricing}>
-                See What's Included
+              <button className="btn btn-secondary btn-large glass-card" onClick={scrollToPricing} style={{ fontSize: '1.1rem', padding: '1rem 2rem', color: '#fff' }}>
+                View Pricing
               </button>
             </div>
-            <div style={{ marginTop: '2rem', color: 'var(--text-muted)', fontSize: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="var(--success)"/> No credit card to start</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="var(--success)"/> Cancel anytime</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="var(--success)"/> AI creatives on signup</span>
+            <div style={{ marginTop: '2rem', color: '#71717a', fontSize: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="#10b981"/> Set & Forget</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="#10b981"/> High Converting Copy</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="#10b981"/> AI Creatives Instantly</span>
             </div>
           </div>
           
@@ -198,40 +252,64 @@ const Landing = () => {
               <span className="ticker-label">Platforms Supported</span>
             </div>
             <div className="ticker-item">
-              <span className="ticker-value">&lt;2 min</span>
-              <span className="ticker-label">Setup Time</span>
-            </div>
           </div>
         </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="how-it-works-section">
+          {/* How It Works / Demo */}
+      <section style={{ padding: '6rem 0' }}>
         <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>How It Works</h4>
-            <h2>From signup to automated posts in 3 steps</h2>
-            <p style={{ maxWidth: '640px', margin: '0 auto', fontSize: '1.05rem' }}>No marketing expertise required. OrganicAI's Brand Context Engine does the heavy lifting.</p>
+          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 700 }}>Try the Context Engine</h2>
+            <p style={{ color: '#a1a1aa', marginTop: '1rem' }}>See what our AI can generate for your brand in 5 seconds.</p>
           </div>
-          
-          <div className="how-it-works-grid">
-            <div className="step-card">
-              <div className="step-number"><Bot size={32} /></div>
-              <h3>1. Describe Your Business</h3>
-              <p>Enter your business name, website, and a short description. Our AI builds a complete Brand Context Profile — tone of voice, content pillars, hashtags, and audience targeting.</p>
-            </div>
-            <div className="step-card">
-              <div className="step-number"><Layers size={32} /></div>
-              <h3>2. AI Generates Creatives</h3>
-              <p>OrganicAI auto-creates branded social posts with AI-generated images. Review them, or turn on auto-approve and let the engine handle everything.</p>
-            </div>
-            <div className="step-card">
-              <div className="step-number"><RefreshCw size={32} /></div>
-              <h3>3. Automated Publishing</h3>
-              <p>Set your interval (default: every 2 hours). OrganicAI publishes content to Facebook, Instagram, X, and LinkedIn automatically. Watch your analytics grow.</p>
-            </div>
+
+          <div className="glass-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '3rem', borderRadius: '24px' }}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!demoBizName.trim()) return;
+              setDemoLoading(true);
+              setTimeout(() => {
+                const encoded = encodeURIComponent(`Professional highly engaging social media post visual for ${demoBizName}, ${demoBizModel} industry, high quality, cinematic lighting, ultra detailed`);
+                setDemoPreview({
+                  caption: `🚀 Big things are happening at ${demoBizName}! We're leveraging cutting-edge automation to scale our ${demoBizModel} operations faster than ever. When you eliminate manual work, you make room for real innovation. What's the biggest bottleneck in your business right now? Drop a comment below! 👇\n\n#${demoBizName.replace(/\s+/g, '')} #Innovation #Scale #BusinessGrowth`,
+                  imageUrl: `https://image.pollinations.ai/prompt/${encoded}?width=1080&height=1080&nologo=true`,
+                  topic: 'Brand Growth & Spotlight'
+                });
+                setDemoLoading(false);
+              }, 1200);
+            }} style={{ display: 'grid', gridTemplateColumns: '1fr 180px 140px', gap: '1rem', marginBottom: '2rem' }}>
+              <input type="text" placeholder="Your Business Name..." value={demoBizName} onChange={e => setDemoBizName(e.target.value)} required style={{ padding: '1rem 1.25rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }} />
+              <select value={demoBizModel} onChange={e => setDemoBizModel(e.target.value)} style={{ padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <option value="SaaS">SaaS / Tech</option>
+                <option value="E-commerce">E-Commerce</option>
+                <option value="Agency">Agency</option>
+                <option value="Local Business">Local Business</option>
+              </select>
+              <button type="submit" className="btn btn-primary" disabled={demoLoading} style={{ borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {demoLoading ? <span className="spinner"></span> : <><Sparkles size={16} style={{marginRight: '0.5rem'}}/> Generate</>}
+              </button>
+            </form>
+
+            {demoPreview && (
+              <div className="fade-in glass-card" style={{ borderRadius: '16px', overflow: 'hidden', display: 'grid', gridTemplateColumns: '300px 1fr', border: '1px solid rgba(168,85,247,0.3)' }}>
+                <div style={{ width: '100%', height: '300px', background: '#000' }}>
+                  <img src={demoPreview.imageUrl} alt="AI Visual" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+                <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)' }}>
+                  <div>
+                    <span style={{ display: 'inline-block', background: 'rgba(168,85,247,0.15)', color: '#c084fc', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600, marginBottom: '1rem' }}>
+                      ⚡ Generated Topic: {demoPreview.topic}
+                    </span>
+                    <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#e4e4e7', margin: 0 }}>{demoPreview.caption}</p>
+                  </div>
+                  <button className="btn btn-primary" style={{ width: 'fit-content', marginTop: '1.5rem' }} onClick={() => navigate('/auth')}>
+                    Automate This Flow <ArrowRight size={16} style={{marginLeft: '0.5rem'}}/>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      </section> </div>
       </section>
 
       {/* What Makes This Different — Genuine Value Props */}
@@ -239,8 +317,8 @@ const Landing = () => {
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Built Different</h4>
-            <h2>Not another "schedule your posts" tool</h2>
-            <p style={{ maxWidth: '640px', margin: '0.5rem auto 0', fontSize: '1.05rem' }}>Most tools just schedule what you write. OrganicAI writes, designs, and publishes — so you never touch content creation again.</p>
+            <h2>Stop Scheduling. Start Automating.</h2>
+            <p style={{ maxWidth: '640px', margin: '0.5rem auto 0', fontSize: '1.05rem' }}>Most tools just schedule what <strong>you</strong> write. OrganicAI acts as your autonomous marketing employee—handling the ideation, creation, and distribution end-to-end.</p>
           </div>
 
           <div className="hero-stats">
@@ -260,6 +338,44 @@ const Landing = () => {
               <p>Set your schedule (2hr, 4hr, 8hr, or custom intervals) and turn on auto-approve. Content is generated and published without you lifting a finger.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Self-Promotion AI Engine Live Showcase */}
+      <section style={{ padding: '6rem 0', background: 'rgba(0,0,0,0.3)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.4rem 1rem', borderRadius: '999px', color: '#10b981', fontWeight: '600', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+              <RefreshCw size={14} className="spin-slow" /> Self-Marketing AI Engine: ACTIVE
+            </div>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 700, marginBottom: '1rem' }}>We use OrganicAI to grow OrganicAI.</h2>
+            <p style={{ maxWidth: '640px', margin: '0 auto', color: '#a1a1aa', fontSize: '1.1rem' }}>
+              Our platform operates autonomously on a 2-hour interval, generating creatives and publishing them to promote this very service. Below are its latest live creations:
+            </p>
+          </div>
+
+          {selfPromoData?.campaigns?.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2rem' }}>
+              {selfPromoData.campaigns.slice(0, 3).map((item, idx) => (
+                <div key={idx} className="glass-card interactive-hover" style={{ borderRadius: '20px', overflow: 'hidden', transition: 'all 0.3s ease' }}>
+                  <div style={{ height: '240px', background: '#000', position: 'relative' }}>
+                    <img src={item.mediaUrl} alt="AI Promo" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
+                    <div style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', fontWeight: 600, color: '#c084fc' }}>
+                      Auto-Generated
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.5rem' }}>
+                    <p style={{ fontSize: '0.95rem', lineHeight: 1.6, color: '#e4e4e7', margin: 0 }}>{item.caption}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="glass-card" style={{ textAlign: 'center', padding: '3rem', borderRadius: '20px', color: '#a1a1aa' }}>
+              <RefreshCw size={32} className="spin-slow" style={{ margin: '0 auto 1rem', color: '#c084fc' }} />
+              <p>Self-promotion engine is running its background cycle...</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -291,38 +407,38 @@ const Landing = () => {
       </section>
 
       {/* ROI Calculator */}
-      <section id="roi" style={{ padding: '5rem 0' }}>
+      <section id="roi" style={{ padding: '6rem 0', background: 'rgba(255,255,255,0.02)' }}>
         <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>ROI Calculator</h4>
-            <h2>See how much you'll save</h2>
-            <p style={{ maxWidth: '600px', margin: '0.5rem auto 0' }}>Calculate the real cost of doing marketing manually vs letting AI handle it.</p>
+          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 700 }}>Calculate Your ROI</h2>
+            <p style={{ color: '#a1a1aa', marginTop: '1rem' }}>See the true cost of manual marketing vs OrganicAI.</p>
           </div>
 
-          <div className="glass-panel" style={{ maxWidth: '700px', margin: '0 auto', padding: '3rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2.5rem' }}>
-              <div className="input-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><DollarSign size={16} /> Your Hourly Rate ($)</label>
-                <input type="number" value={hourlyRate} onChange={e => setHourlyRate(Number(e.target.value) || 0)} min="1" />
+          <div className="glass-card" style={{ maxWidth: '800px', margin: '0 auto', padding: '3rem', borderRadius: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '3rem' }}>
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#a1a1aa', marginBottom: '0.5rem', fontSize: '0.9rem' }}><DollarSign size={16} /> Your Hourly Rate ($)</label>
+                <input type="number" value={hourlyRate} onChange={e => setHourlyRate(Number(e.target.value) || 0)} min="1" style={{ width: '100%', padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.25rem', fontWeight: 600 }} />
               </div>
-              <div className="input-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Clock size={16} /> Hours/Week on Marketing</label>
-                <input type="number" value={hoursPerWeek} onChange={e => setHoursPerWeek(Number(e.target.value) || 0)} min="1" />
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#a1a1aa', marginBottom: '0.5rem', fontSize: '0.9rem' }}><Clock size={16} /> Hours/Week on Marketing</label>
+                <input type="number" value={hoursPerWeek} onChange={e => setHoursPerWeek(Number(e.target.value) || 0)} min="1" style={{ width: '100%', padding: '1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.25rem', fontWeight: 600 }} />
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem', textAlign: 'center' }}>
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '1.5rem', borderRadius: '16px' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0' }}>Manual Cost / Month</p>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: '#ef4444', margin: 0 }}>${(hoursPerWeek * 4 * hourlyRate).toLocaleString()}</p>
+              <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '2rem 1.5rem', borderRadius: '16px' }}>
+                <p style={{ fontSize: '0.85rem', color: '#a1a1aa', margin: '0 0 0.5rem 0' }}>Manual Cost / Month</p>
+                <p style={{ fontSize: '2.5rem', fontWeight: 800, color: '#ef4444', margin: 0 }}>${(hoursPerWeek * 4 * hourlyRate).toLocaleString()}</p>
               </div>
-              <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.2)', padding: '1.5rem', borderRadius: '16px' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0' }}>OrganicAI Cost</p>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>$17</p>
+              <div style={{ background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2rem 1.5rem', borderRadius: '16px', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#a855f7', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 700 }}>OUR PRICE</div>
+                <p style={{ fontSize: '0.85rem', color: '#a1a1aa', margin: '0 0 0.5rem 0' }}>OrganicAI Cost</p>
+                <p style={{ fontSize: '2.5rem', fontWeight: 800, color: '#c084fc', margin: 0 }}>$17</p>
               </div>
-              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '1.5rem', borderRadius: '16px' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.5rem 0' }}>You Save / Year</p>
-                <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--success)', margin: 0 }}>${Math.max(0, yearlySavings).toLocaleString()}</p>
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2rem 1.5rem', borderRadius: '16px' }}>
+                <p style={{ fontSize: '0.85rem', color: '#a1a1aa', margin: '0 0 0.5rem 0' }}>You Save / Year</p>
+                <p style={{ fontSize: '2.5rem', fontWeight: 800, color: '#10b981', margin: 0 }}>${Math.max(0, yearlySavings).toLocaleString()}</p>
               </div>
             </div>
           </div>
@@ -447,13 +563,13 @@ const Landing = () => {
       
       {/* Bottom CTA */}
       <section className="bottom-cta">
-        <div className="container">
-          <h2 style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>Ready to automate your organic growth?</h2>
-          <p style={{ fontSize: '1.25rem', maxWidth: '640px', margin: '0 auto 2.5rem' }}>
-            Describe your business once. OrganicAI handles everything else — AI content, AI images, automated publishing, across 4 platforms.
+        <div className="container" style={{ textAlign: 'center', padding: '4rem 0' }}>
+          <h2 style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>Ready to put your marketing on autopilot?</h2>
+          <p style={{ fontSize: '1.25rem', maxWidth: '640px', margin: '0 auto 2.5rem', color: 'var(--text-main)' }}>
+            Join the businesses saving hundreds of hours every month. Let OrganicAI handle the content, design, and scheduling so you can focus on closing deals.
           </p>
-          <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')}>
-            Start Your Free Trial <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
+          <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')} style={{ fontSize: '1.2rem', padding: '1.25rem 2.5rem' }}>
+            Start Automating for $17 <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
           </button>
         </div>
       </section>

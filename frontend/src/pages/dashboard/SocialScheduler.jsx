@@ -23,12 +23,49 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [editStatus, setEditStatus] = useState('SCHEDULED');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
+  const [autoCreativeGen, setAutoCreativeGen] = useState(true);
+  const [creativeGenIntervalHrs, setCreativeGenIntervalHrs] = useState(2);
+
   useEffect(() => {
     fetchPosts();
     fetchLogs();
     fetchCreatives();
     fetchBrandStatus();
+    fetchCreativeSettings();
   }, [activeWorkspaceId]);
+
+  const fetchCreativeSettings = async () => {
+    try {
+      const res = await authFetch(`${API_BASE}/creatives/settings`, {}, token);
+      if (res.ok) {
+        const data = await res.json();
+        setAutoCreativeGen(data.autoGenerateCreatives ?? true);
+        setCreativeGenIntervalHrs(data.creativeGenerationIntervalHours || 2);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const saveCreativeSettings = async (intervalVal, autoVal) => {
+    const updatedInterval = intervalVal !== undefined ? intervalVal : creativeGenIntervalHrs;
+    const updatedAuto = autoVal !== undefined ? autoVal : autoCreativeGen;
+
+    try {
+      const res = await authFetch(`${API_BASE}/creatives/settings`, {
+        method: 'POST',
+        body: JSON.stringify({
+          creativeGenerationIntervalHours: updatedInterval,
+          autoGenerateCreatives: updatedAuto
+        })
+      }, token);
+      if (res.ok) {
+        setCreativeGenIntervalHrs(updatedInterval);
+        setAutoCreativeGen(updatedAuto);
+        showToast('Creative generation settings updated!');
+      }
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -216,6 +253,54 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '2rem' }}>
           {/* Settings Panel */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Automated Creative Generation Scheduler */}
+            <div className="glass-panel" style={{ padding: '2rem' }}>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '1.15rem' }}>
+                <Sparkles size={20} color="var(--primary-color)" /> Creative Generator Engine
+              </h3>
+              <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                Automatically generate fresh AI creatives & images into the Media library on a recurring schedule.
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+                <span style={{ fontWeight: '600' }}>Auto-Creative Generation</span>
+                <label style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
+                  <input type="checkbox" checked={autoCreativeGen} onChange={(e) => saveCreativeSettings(undefined, e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                  <span style={{
+                    position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: autoCreativeGen ? 'var(--primary-color)' : 'rgba(255,255,255,0.2)',
+                    transition: '.4s', borderRadius: '34px'
+                  }}>
+                    <span style={{
+                      position: 'absolute', content: '""', height: '18px', width: '18px',
+                      left: autoCreativeGen ? '28px' : '4px', bottom: '4px', backgroundColor: 'white',
+                      transition: '.4s', borderRadius: '50%'
+                    }}></span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Generation Frequency</label>
+                <select 
+                  className="input" 
+                  value={creativeGenIntervalHrs}
+                  onChange={(e) => saveCreativeSettings(parseInt(e.target.value), undefined)}
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid var(--border-color)' }}
+                >
+                  <option value={2}>Every 2 Hours (Default / Enterprise)</option>
+                  <option value={4}>Every 4 Hours</option>
+                  <option value={6}>Every 6 Hours</option>
+                  <option value={12}>Every 12 Hours</option>
+                  <option value={24}>Every 24 Hours</option>
+                </select>
+              </div>
+
+              <button className="btn btn-secondary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }} onClick={generateNewCreatives} disabled={generating}>
+                {generating ? <span className="spinner"></span> : <><RefreshCw size={16} /> Trigger Creative Batch Now</>}
+              </button>
+            </div>
+
             {/* Auto-Approve Toggle */}
             <div className="glass-panel" style={{ padding: '2rem' }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '1.15rem' }}>

@@ -90,6 +90,8 @@ class BusinessProfile(Base):
     description = Column(Text, nullable=True)
     businessModel = Column(String, nullable=True)
     postIntervalHours = Column(Integer, default=2, nullable=False)
+    creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
+    autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     # AI Brand Context Fields
     brandColors = Column(JSON, default=list, nullable=False)
     brandFonts = Column(JSON, default=list, nullable=False)
@@ -193,6 +195,8 @@ class MarketingState(Base):
     lastEmailIdx = Column(Integer, default=0, nullable=False)
     autoApprove = Column(Boolean, default=False, nullable=False)
     postIntervalHours = Column(Integer, default=2, nullable=False)
+    creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
+    autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 

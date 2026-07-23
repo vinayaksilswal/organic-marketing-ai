@@ -105,6 +105,29 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   };
 
+  const handlePostFromMedia = async (mediaItem) => {
+    try {
+      showToast('Generating AI caption and posting to social channels...', false);
+      const res = await authFetch(`${API_BASE}/marketing/posts/from-media`, {
+        method: 'POST',
+        body: JSON.stringify({
+          mediaId: mediaItem.id,
+          mediaUrl: mediaItem.url,
+          platform: 'BOTH',
+          status: 'POSTED'
+        })
+      }, token);
+
+      if (res.ok) {
+        showToast('Successfully published post across social media! 🚀');
+      } else {
+        throw new Error('Failed to publish post');
+      }
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
+
   const syncCatalog = async () => {
     if (!catalogUrl.trim()) return showToast('Please enter catalog feed URL', true);
     
@@ -337,14 +360,27 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                             {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recent'}
                           </span>
                         </div>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ padding: '0.35rem', color: 'var(--error)', flexShrink: 0, marginLeft: '0.5rem' }} 
-                          onClick={(e) => handleDeleteMedia(e, item.id)} 
-                          title="Delete media asset"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', flexShrink: 0 }} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePostFromMedia(item);
+                            }}
+                            title="Post to Social Media"
+                          >
+                            Post
+                          </button>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.35rem', color: 'var(--error)', flexShrink: 0 }} 
+                            onClick={(e) => handleDeleteMedia(e, item.id)} 
+                            title="Delete media asset"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

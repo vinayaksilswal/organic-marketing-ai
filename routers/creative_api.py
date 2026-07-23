@@ -275,3 +275,88 @@ async def re_analyze_brand(
         await session.commit()
 
         return {"success": True, "brandContext": brand_ctx}
+
+
+class CreativeSettingsUpdate(BaseModel):
+    creativeGenerationIntervalHours: Optional[int] = None
+    autoGenerateCreatives: Optional[bool] = None
+
+
+@router.get("/settings")
+async def get_creative_settings(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Get creative generation scheduler settings for active workspace."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    async with AsyncSessionLocal() as session:
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+        else:
+            stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            profile = (await session.execute(stmt)).scalars().first()
+
+        if not profile:
+            return {
+                "creativeGenerationIntervalHours": 2,
+                "autoGenerateCreatives": True,
+            }
+
+        return {
+            "creativeGenerationIntervalHours": getattr(profile, "creativeGenerationIntervalHours", 2),
+            "autoGenerateCreatives": getattr(profile, "autoGenerateCreatives", True),
+        }
+
+
+@router.post("/settings")
+async def update_creative_settings(
+    data: CreativeSettingsUpdate,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Update creative generation interval and auto-generation toggle."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    async with AsyncSessionLocal() as session:
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+        else:
+            stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            profile = (await session.execute(stmt)).scalars().first()
+
+        if not profile:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        if data.creativeGenerationIntervalHours is not None:
+            profile.creativeGenerationIntervalHours = max(1, data.creativeGenerationIntervalHours)
+        if data.autoGenerateCreatives is not None:
+            profile.autoGenerateCreatives = data.autoGenerateCreatives
+
+        await session.commit()
+        return {
+            "success": True,
+            "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
+            "autoGenerateCreatives": profile.autoGenerateCreatives,
+        }
+
+
+@router.post("/auto-generate-now")
+async def trigger_auto_generation(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Manually trigger immediate batch creative generation for active workspace."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        async with AsyncSessionLocal() as session:
+            stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            profile = (await session.execute(stmt)).scalars().first()
+            if profile:
+                workspace_id = profile.id
+
+    if not workspace_id:
+        raise HTTPException(status_code=404, detail="No active workspace found")
+
+    from services.creative_service import auto_generate_creative_batch
+    res = await auto_generate_creative_batch(workspace_id, count=3)
+    return res
+

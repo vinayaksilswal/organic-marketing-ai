@@ -17,16 +17,41 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
 
   useEffect(() => {
     if (step === 3) {
-      // Simulate the AI analysis process for high perceived value
-      setTimeout(() => setAnalysisPhase(1), 2500); // 2.5s: "Analyzing tone of voice & content pillars..."
-      setTimeout(() => setAnalysisPhase(2), 5500); // 5.5s: "Generating starter creatives with AI images..."
+      // Gradually progress the UI phases for visual feedback while polling
+      const phaseInterval = setInterval(() => {
+        setAnalysisPhase(prev => Math.min(prev + 1, 2));
+      }, 3000);
       
-      // Real check logic (in production we'd poll the API)
-      setTimeout(() => {
-        setStep(4);
-      }, 9000);
+      let active = true;
+      const pollStatus = async () => {
+        if (!active || step !== 3) return;
+        
+        try {
+          const res = await authFetch(`${API_BASE}/users/me/onboarding-status`, {}, token);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.brandAnalysisComplete) {
+              clearInterval(phaseInterval);
+              setAnalysisPhase(3); // All complete
+              setTimeout(() => { if (active) setStep(4); }, 600);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Polling error', err);
+        }
+        
+        // Re-poll every 2 seconds
+        if (active) setTimeout(pollStatus, 2000);
+      };
+      
+      pollStatus();
+      return () => {
+        active = false;
+        clearInterval(phaseInterval);
+      };
     }
-  }, [step]);
+  }, [step, token]);
 
   const handleProfileSubmit = async () => {
     if (!businessModel) {
@@ -214,20 +239,35 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
           <div className="fade-in">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
               <CreditCard size={32} color="var(--primary-color)" />
-              <h2 style={{ margin: 0 }}>Analysis Complete!</h2>
+              <h2 style={{ margin: 0 }}>Brand Engine Ready!</h2>
             </div>
-            <p style={{ marginBottom: '2.5rem', fontSize: '1.125rem' }}>We've built your Brand Context Profile and generated your first set of posts. Activate Pro to unlock them and start automating.</p>
+            <p style={{ marginBottom: '1.5rem', fontSize: '1.05rem', color: 'var(--text-muted)' }}>
+              We analyzed your brand, generated custom content pillars, and created your first set of AI social posts & media. Activate Pro to unlock automated 2-hour publishing.
+            </p>
             
+            {/* Generated Brand Summary Preview */}
+            <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.25)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontWeight: '700', color: 'var(--primary-color)' }}>
+                <Sparkles size={18} /> Generated Brand Context Engine
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>Tone: Enterprise Professional</span>
+                <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>Interval: Every 2 Hours (Aggressive)</span>
+                <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc' }}>AI Auto-Pilot: Active</span>
+              </div>
+              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}><strong>Content Pillars:</strong> Growth Tips • Industry Insights • Product Showcase • Thought Leadership</p>
+            </div>
+
             <div className="payment-box">
-              <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>PRO TIER</h3>
-              <div className="price" style={{ margin: '1rem 0 2rem' }}>
+              <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>PRO UNLIMITED</h3>
+              <div className="price" style={{ margin: '1rem 0 1.5rem' }}>
                 <span className="currency">$</span>17<span className="period">/mo</span>
               </div>
               
-              <ul style={{ listStyle: 'none', textAlign: 'left', margin: '0 auto 2.5rem', maxWidth: '300px' }}>
-                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Access AI Brand Engine</li>
-                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Unlimited AI Creatives</li>
-                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Auto-Publishing (FB, IG, X, LI)</li>
+              <ul style={{ listStyle: 'none', textAlign: 'left', margin: '0 auto 2rem', maxWidth: '340px' }}>
+                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Automated AI Creative Generation (Every 2h+)</li>
+                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Auto-Populated Media Library</li>
+                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Auto-Publishing (FB, IG, X, LinkedIn)</li>
               </ul>
               
               <button className="btn btn-primary btn-large" style={{ width: '100%' }} onClick={handlePayment} disabled={loading}>
