@@ -109,6 +109,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         'ALTER TABLE "SocialCampaign" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
                         'ALTER TABLE "EmailCampaign" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
                         'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "tags" JSON NOT NULL DEFAULT \'[]\'::json;',
+                        'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "aiGenerated" BOOLEAN NOT NULL DEFAULT FALSE;',
                         'ALTER TABLE "MarketingLog" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
                     ]
                     for q in queries:
