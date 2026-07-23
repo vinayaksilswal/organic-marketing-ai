@@ -169,16 +169,42 @@ async def generate_video_prompt(data: GeneratePromptRequest, request: Request, u
 
 @router.post("/render")
 async def render_video(data: RenderVideoRequest, request: Request, user_id: str = Depends(verify_user), workspace_id: Optional[str] = Depends(get_workspace_id)):
+    import httpx
     try:
-        render_id = str(uuid.uuid4())
-        sample_videos = [
-            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
-        ]
-        import random
-        video_url = random.choice(sample_videos)
-
+        # Retrieve user's video API config
+        async with AsyncSessionLocal() as session:
+            stmt = select(VideoApiConfig).where(and_(
+                VideoApiConfig.userId == user_id,
+                VideoApiConfig.businessProfileId == workspace_id
+            ))
+            res = await session.execute(stmt)
+            config = res.scalars().first()
+            
+            if not config or not config.apiKey:
+                raise HTTPException(status_code=400, detail="Missing json2video API key. Please configure it in settings.")
+                
+            api_key = config.apiKey
+            
+        if data.provider != "json2video":
+            raise HTTPException(status_code=400, detail="Only json2video is currently supported.")
+            
+        # Post to JSON2Video API
+        headers = {
+            "x-api-key": api_key,
+            "Content-Type": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post("https://api.json2video.com/v2/movies", json=data.payload, headers=headers)
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail=f"json2video API error: {response.text}")
+                
+            resp_data = response.json()
+            project_url = resp_data.get("project", {}).get("url", "")
+            job_id = resp_data.get("project", {}).get("id", str(uuid.uuid4()))
+            
+        # Optional: Save a placeholder Media object to DB, though standard practice is polling/webhooks
         async with AsyncSessionLocal() as session:
             if not workspace_id:
                 bp_stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
@@ -187,22 +213,27 @@ async def render_video(data: RenderVideoRequest, request: Request, user_id: str 
                     workspace_id = bp.id
 
             media = Media(
-                id=render_id,
+                id=job_id,
                 userId=user_id,
                 businessProfileId=workspace_id,
-                filename=f"AI_Render_{data.provider}_{render_id[:8]}.mp4",
+                filename=f"AI_Render_{job_id}.mp4",
                 mimeType="video/mp4",
-                url=video_url
+                url=project_url, # Usually this is a dashboard URL until it's rendered, or we just store the status
+                notes="PROCESSING"
             )
             session.add(media)
             await session.commit()
 
         return {
             "success": True,
-            "message": "Video rendering complete! Asset saved to Media Repository.",
-            "mediaId": render_id,
-            "videoUrl": video_url
+            "message": "Video rendering started! It will be available shortly.",
+            "mediaId": job_id,
+            "videoUrl": project_url,
+            "status": "PROCESSING"
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Render failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Rendering failed: {str(e)}")
 
