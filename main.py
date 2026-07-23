@@ -79,6 +79,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             app.state.db_ready = True
             logger.info("SQLAlchemy ORM connected to PostgreSQL")
 
+            try:
+                from sqlalchemy import text
+                async with engine.begin() as conn:
+                    queries = [
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "creativeGenerationIntervalHours" INTEGER NOT NULL DEFAULT 2;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "autoGenerateCreatives" BOOLEAN NOT NULL DEFAULT TRUE;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandColors" JSON NOT NULL DEFAULT \'[]\'::json;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandFonts" JSON NOT NULL DEFAULT \'[]\'::json;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "industry" VARCHAR;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "targetAudience" TEXT;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "toneOfVoice" VARCHAR;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "contentPillars" JSON NOT NULL DEFAULT \'[]\'::json;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "suggestedHashtags" JSON NOT NULL DEFAULT \'[]\'::json;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandAnalysisComplete" BOOLEAN NOT NULL DEFAULT FALSE;',
+                    ]
+                    for q in queries:
+                        await conn.execute(text(q))
+                logger.info("Migrated BusinessProfile table automatically on startup")
+            except Exception as e:
+                logger.error(f"Failed to auto-migrate database: {e}")
+
+
             scheduler = create_scheduler()
             scheduler.start()
             app.state.scheduler = scheduler
