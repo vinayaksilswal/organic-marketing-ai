@@ -48,6 +48,14 @@ class GenerateRequest(BaseModel):
     count: int = 3
 
 
+class VideoCampaignRequest(BaseModel):
+    product_name: str
+    product_url: str
+    image_url: str
+    goal: str = "conversion"
+
+
+
 class ImageGenerateRequest(BaseModel):
     prompt: str
     width: int = 1080
@@ -82,6 +90,21 @@ async def get_brand_analysis_status(
             "brandColors": profile.brandColors,
         }
 
+@router.post("/generate-video-campaign")
+async def generate_video_campaign(
+    data: VideoCampaignRequest,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Generate a video campaign using the automated pipeline."""
+    from services.video_pipeline_service import execute_video_pipeline
+    
+    result = await execute_video_pipeline(
+        product_name=data.product_name,
+        product_url=data.product_url,
+        image_url=data.image_url,
+        goal=data.goal
+    )
+    return result
 
 @router.post("/generate")
 async def generate_creatives(
@@ -98,7 +121,6 @@ async def generate_creatives(
         else:
             stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
             profile = (await session.execute(stmt)).scalars().first()
-
         if not profile:
             raise HTTPException(status_code=404, detail="No workspace found")
 
