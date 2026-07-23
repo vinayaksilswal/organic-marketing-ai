@@ -7,10 +7,14 @@ import uuid
 async def main():
     await init_db()
     async with AsyncSessionLocal() as session:
-        user_id = str(uuid.uuid4())
-        u = User(id=user_id, email=f"test_{user_id}@test.com", password="pwd")
-        session.add(u)
-        await session.commit()
+        # Fetch existing user
+        stmt = select(User).where(User.email == "vinayaksilswal@gmail.com")
+        res = await session.execute(stmt)
+        u = res.scalar_one_or_none()
+        if not u:
+            print("User not found in DB!")
+            return
+        user_id = u.id
         
         stmt = (
             select(User)

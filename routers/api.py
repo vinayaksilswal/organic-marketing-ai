@@ -166,11 +166,45 @@ async def get_media(media_id: str, request: Request):
         elif req_type.endswith(".png"):
             mime_type = "image/png"
 
-    return FileResponse(
-        path=cache_path,
-        media_type=mime_type,
-        headers={"Cache-Control": "public, max-age=86400"},
-    )
+    import mimetypes
+    from fastapi import Response
+    
+    file_size = os.path.getsize(cache_path)
+    range_header = request.headers.get("range")
+    
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=86400",
+        "Content-Type": mime_type,
+    }
+    
+    if range_header:
+        # e.g. "bytes=0-" or "bytes=0-100"
+        range_str = range_header.replace("bytes=", "")
+        start_str, end_str = range_str.split("-")
+        
+        start = int(start_str) if start_str else 0
+        end = int(end_str) if end_str else file_size - 1
+        
+        # clamp the end value
+        end = min(end, file_size - 1)
+        length = end - start + 1
+        
+        headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        headers["Content-Length"] = str(length)
+        
+        with open(cache_path, "rb") as f:
+            f.seek(start)
+            data = f.read(length)
+            
+        return Response(content=data, status_code=206, headers=headers, media_type=mime_type)
+        
+    else:
+        headers["Content-Length"] = str(file_size)
+        with open(cache_path, "rb") as f:
+            data = f.read()
+        return Response(content=data, status_code=200, headers=headers, media_type=mime_type)
+
 
 
 # =============================================================================

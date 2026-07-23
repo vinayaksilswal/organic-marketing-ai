@@ -6,6 +6,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [posts, setPosts] = useState([]);
   const [logs, setLogs] = useState([]);
   const [creatives, setCreatives] = useState([]);
+  const [mediaList, setMediaList] = useState([]);
   const [intervalHrs, setIntervalHrs] = useState(2); // 2hr Default
   const [autoApprove, setAutoApprove] = useState(false);
   const [customHrs, setCustomHrs] = useState('');
@@ -17,10 +18,12 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [brandStatus, setBrandStatus] = useState(null);
 
   // Post edit modal state
+  const [editingCreative, setEditingCreative] = useState(null);
   const [editingPost, setEditingPost] = useState(null);
   const [editCaption, setEditCaption] = useState('');
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editStatus, setEditStatus] = useState('SCHEDULED');
+  const [editSelectedMedia, setEditSelectedMedia] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const [autoCreativeGen, setAutoCreativeGen] = useState(true);
@@ -32,7 +35,17 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
     fetchCreatives();
     fetchBrandStatus();
     fetchCreativeSettings();
+    fetchMedia();
   }, [activeWorkspaceId]);
+
+    const fetchMedia = async () => {
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media`, {}, token);
+      if (res.ok) {
+        setMediaList(await res.json());
+      }
+    } catch (err) { console.error(err); }
+  };
 
   const fetchCreativeSettings = async () => {
     try {
@@ -185,11 +198,47 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   };
 
+  
+  const openEditCreativeModal = (creative) => {
+    setEditingCreative(creative);
+    setEditCaption(creative.caption || '');
+    setEditSelectedMedia(creative.mediaUrl || '');
+  };
+
+  const handleUpdateCreative = async () => {
+    if (!editingCreative) return;
+    setEditSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('caption', editCaption);
+      if (editSelectedMedia) formData.append('media_url', editSelectedMedia);
+      
+      const res = await authFetch(`${API_BASE}/creatives/${editingCreative.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {})
+        },
+        body: formData
+      });
+      if (res.ok) {
+        showToast('Creative updated successfully!');
+        setEditingCreative(null);
+        fetchCreatives();
+      } else throw new Error('Failed to update creative');
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
   const openEditModal = (post) => {
     setEditingPost(post);
     setEditCaption(post.caption || '');
     setEditStatus(post.status || 'SCHEDULED');
     setEditScheduledAt(post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : '');
+    setEditSelectedMedia(post.mediaUrls && post.mediaUrls.length > 0 ? post.mediaUrls[0] : '');
   };
 
   const handleUpdatePost = async () => {
@@ -200,6 +249,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
       formData.append('caption', editCaption);
       formData.append('status', editStatus);
       if (editScheduledAt) formData.append('scheduledAt', new Date(editScheduledAt).toISOString());
+      if (editSelectedMedia) formData.append('existing_media', editSelectedMedia);
 
       const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
       const res = await fetch(`${API_BASE}/marketing/posts/${editingPost.id}`, {
@@ -426,9 +476,8 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                         <div style={{ padding: '1rem' }}>
                           <p style={{ fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem 0' }}>{creative.caption}</p>
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn btn-secondary" style={{ flex: 1, padding: '0.5rem', color: 'var(--error)', borderColor: 'rgba(239, 68, 68, 0.3)' }} onClick={() => updateCreativeStatus(creative.id, false)}>
-                              Reject
-                            </button>
+                            <button className="btn btn-secondary" style={{ flex: 1, padding: '0.5rem' }} onClick={() => openEditCreativeModal(creative)}>Edit</button>
+<button className="btn btn-secondary" style={{ flex: 1, padding: '0.5rem', color: 'var(--error)', borderColor: 'rgba(239, 68, 68, 0.3)' }} onClick={() => updateCreativeStatus(creative.id, false)}>Reject</button>
                             <button className="btn btn-primary" style={{ flex: 1, padding: '0.5rem', background: 'var(--success)' }} onClick={() => updateCreativeStatus(creative.id, true)}>
                               Approve
                             </button>
@@ -445,7 +494,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     <div key={creative.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       {creative.mediaUrl && <img src={creative.mediaUrl} style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />}
                       <p style={{ margin: 0, fontSize: '0.9rem', flex: 1 }}>{creative.caption}</p>
-                      <span className="badge active">APPROVED</span>
+                      <span className="badge active">APPROVED</span><button className="btn btn-secondary" style={{ padding: '0.35rem' }} onClick={() => openEditCreativeModal(creative)} title="Edit"><Edit3 size={14}/></button>
                     </div>
                   ))}
                   {activeCreatives.length > 5 && <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>+ {activeCreatives.length - 5} more</p>}
@@ -516,6 +565,47 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
           </div>
         </div>
 
+        
+        {/* Edit Creative Modal */}
+        {editingCreative && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div className="glass-panel" style={{ maxWidth: '560px', width: '100%', padding: '2rem', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h3 style={{ margin: 0 }}>Edit Creative</h3>
+                <button onClick={() => setEditingCreative(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
+              </div>
+              <div className="input-group">
+                <label>Caption</label>
+                <textarea rows="5" value={editCaption} onChange={(e) => setEditCaption(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label>Attach Media from Catalog</label>
+                <select value={editSelectedMedia} onChange={(e) => setEditSelectedMedia(e.target.value)}>
+                  <option value="">-- No Media Attached --</option>
+                  {mediaList.map(m => (
+                    <option key={m.id} value={m.url}>{m.filename || 'Unnamed Media'} {m.aiGenerated ? '(AI)' : ''}</option>
+                  ))}
+                </select>
+                {editSelectedMedia && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {editSelectedMedia.toLowerCase().includes('type=video') || editSelectedMedia.toLowerCase().endsWith('.mp4') ? (
+                      <video src={editSelectedMedia} controls style={{ width: '100%', maxHeight: '200px', borderRadius: '8px' }} />
+                    ) : (
+                      <img src={editSelectedMedia} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                    )}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
+                <button className="btn btn-secondary" onClick={() => setEditingCreative(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleUpdateCreative} disabled={editSubmitting}>
+                  {editSubmitting ? <span className="spinner"></span> : 'Save Creative Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Edit Post Modal */}
         {editingPost && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
@@ -539,6 +629,24 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   <option value="SCHEDULED">SCHEDULED</option>
                   <option value="POSTED">POSTED (Trigger Immediate Publish)</option>
                 </select>
+              </div>
+              <div className="input-group">
+                <label>Attach Media from Catalog</label>
+                <select value={editSelectedMedia} onChange={(e) => setEditSelectedMedia(e.target.value)}>
+                  <option value="">-- No Media Attached --</option>
+                  {mediaList.map(m => (
+                    <option key={m.id} value={m.url}>{m.filename || 'Unnamed Media'} {m.aiGenerated ? '(AI)' : ''}</option>
+                  ))}
+                </select>
+                {editSelectedMedia && (
+                  <div style={{ marginTop: '0.5rem' }}>
+                    {editSelectedMedia.toLowerCase().includes('type=video') || editSelectedMedia.toLowerCase().endsWith('.mp4') ? (
+                      <video src={editSelectedMedia} controls style={{ width: '100%', maxHeight: '200px', borderRadius: '8px' }} />
+                    ) : (
+                      <img src={editSelectedMedia} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                    )}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
                 <button className="btn btn-secondary" onClick={() => setEditingPost(null)}>Cancel</button>
