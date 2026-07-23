@@ -347,7 +347,7 @@ async def root() -> RedirectResponse:
 # =============================================================================
 # Quick Stats API
 # =============================================================================
-@app.get("/api/stats")
+@app.get("/api/v1/stats")
 async def get_stats(request: Request) -> dict:
     """Return high-level platform statistics using SQLAlchemy session."""
     try:
