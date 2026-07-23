@@ -32,7 +32,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import select, func, text
 
 from config import settings
-from database import init_db, close_db, AsyncSessionLocal, User, Audience, SocialPost, SocialCampaign
+from database import init_db, close_db, AsyncSessionLocal, User, Audience, SocialPost, SocialCampaign, BusinessProfile, MarketingLog
 
 # =============================================================================
 # Loguru Configuration
@@ -83,6 +83,56 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             scheduler.start()
             app.state.scheduler = scheduler
             logger.info("APScheduler started (marketing automation loop active)")
+
+            # Ensure System-Level Self-Promotion Workspace exists
+            try:
+                async with AsyncSessionLocal() as session:
+                    # Look for SYSTEM user
+                    system_user = (await session.execute(select(User).where(User.email == "system@organicai.pro"))).scalar()
+                    if not system_user:
+                        system_user = User(
+                            email="system@organicai.pro",
+                            password="NOPASSWORD",
+                            name="System Account",
+                            role="SYSTEM",
+                            subscriptionStatus="ACTIVE"
+                        )
+                        session.add(system_user)
+                        await session.commit()
+                        await session.refresh(system_user)
+                        logger.info("Created SYSTEM user for self-promotion")
+
+                    # Look for SYSTEM workspace
+                    system_workspace = (await session.execute(select(BusinessProfile).where(BusinessProfile.userId == system_user.id))).scalar()
+                    if not system_workspace:
+                        system_workspace = BusinessProfile(
+                            userId=system_user.id,
+                            name="Organic Marketing AI",
+                            websiteUrl="https://organicai.pro",
+                            description="An enterprise-grade SaaS platform that uses AI to automate organic marketing. It auto-generates brand-matched social media posts with AI images and publishes them to Facebook, Instagram, X, and LinkedIn on a schedule. It helps businesses save time and grow their audience without needing marketing skills.",
+                            businessModel="SaaS",
+                            postIntervalHours=4,
+                            brandAnalysisComplete=True,
+                            toneOfVoice="Professional, authoritative, yet approachable and exciting.",
+                            contentPillars=["AI Marketing Tips", "SaaS Growth", "Social Media Automation", "ROI & Cost Savings", "Platform Features"],
+                            suggestedHashtags=["#AIMarketing", "#SaaS", "#SocialMediaAutomation", "#GrowthHacking", "#OrganicAI"]
+                        )
+                        session.add(system_workspace)
+                        await session.commit()
+                        logger.info("Created SYSTEM workspace for self-promotion")
+                        
+                        # Trigger an initial creative generation in the background so it starts posting ASAP
+                        from services.creative_service import auto_populate_workspace
+                        try:
+                            # Run generation non-blocking
+                            asyncio.create_task(auto_populate_workspace(system_user.id, system_workspace.id))
+                            logger.info("Triggered initial AI creative generation for self-promotion workspace")
+                        except Exception as inner_e:
+                            logger.error(f"Failed to trigger self-promotion creatives: {inner_e}")
+                            
+            except Exception as se:
+                logger.error(f"Failed to seed self-promotion workspace: {se}")
+
         except Exception as e:
             logger.error(f"Background database/scheduler bootstrap error: {e}")
             app.state.db_ready = False
@@ -126,12 +176,23 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://organic-marketing-ai.vercel.app",
+        "https://organicai.pro",
+        "https://www.organicai.pro",
     ],
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Request ID Middleware for tracing
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # =============================================================================
@@ -205,7 +266,7 @@ templates = Jinja2Templates(directory="templates")
 # =============================================================================
 # Router Registration
 # =============================================================================
-from routers import api, auth, marketing, user_api, stripe_webhook  # noqa: E402
+from routers import api, auth, marketing, user_api, stripe_webhook, video, ecommerce, creative_api  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -219,7 +280,11 @@ app.include_router(marketing.router)
 app.include_router(api.router)
 app.include_router(api.public_router)
 app.include_router(user_api.router)
+app.include_router(user_api.businesses_router)
 app.include_router(stripe_webhook.router)
+app.include_router(video.router)
+app.include_router(ecommerce.router)
+app.include_router(creative_api.router)
 
 
 # =============================================================================
@@ -264,3 +329,63 @@ async def get_stats(request: Request) -> dict:
             "success": True,
             "data": {"users": 0, "audience": 0, "posts": 0, "campaigns": 0},
         }
+
+
+# =============================================================================
+# Public Stats API (No Auth — for Landing Page)
+# =============================================================================
+@app.get("/api/public/stats", tags=["Public"])
+async def get_public_stats() -> dict:
+    """Public stats for the landing page. Returns real platform numbers."""
+    try:
+        async with AsyncSessionLocal() as session:
+            users = (await session.execute(select(func.count(User.id)))).scalar() or 0
+            posts = (await session.execute(select(func.count(SocialPost.id)))).scalar() or 0
+            campaigns = (await session.execute(select(func.count(SocialCampaign.id)))).scalar() or 0
+            workspaces = (await session.execute(select(func.count(BusinessProfile.id)))).scalar() or 0
+
+        return {
+            "users": users,
+            "posts": posts,
+            "campaigns": campaigns,
+            "workspaces": workspaces,
+            "platforms": 4,
+            "setupMinutes": 2,
+        }
+    except Exception:
+        return {
+            "users": 0,
+            "posts": 0,
+            "campaigns": 0,
+            "workspaces": 0,
+            "platforms": 4,
+            "setupMinutes": 2,
+        }
+
+
+@app.get("/api/public/recent-activity", tags=["Public"])
+async def get_public_recent_activity() -> dict:
+    """Public recent activity feed for landing page social proof."""
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(SocialPost)
+                .where(SocialPost.status == "POSTED")
+                .order_by(SocialPost.postedAt.desc())
+                .limit(5)
+            )
+            posts = (await session.execute(stmt)).scalars().all()
+
+            return {
+                "success": True,
+                "data": [
+                    {
+                        "platform": p.platform,
+                        "caption": (p.caption or "")[:80] + ("..." if len(p.caption or "") > 80 else ""),
+                        "postedAt": p.postedAt.isoformat() if p.postedAt else None,
+                    }
+                    for p in posts
+                ],
+            }
+    except Exception:
+        return {"success": True, "data": []}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UploadCloud, CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Sparkles, BarChart3, Activity, Clock, RefreshCw, Send } from 'lucide-react';
-import { API_BASE, authFetch } from '../App';
+import { API_BASE, authFetch } from '../../App';
+
 
 const Dashboard = ({ user, token, showToast }) => {
   const [metaConnected, setMetaConnected] = useState(false);

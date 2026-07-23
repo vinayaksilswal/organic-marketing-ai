@@ -32,7 +32,9 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
-        "https://organic-marketing-ai.vercel.app"
+        "https://organic-marketing-ai.vercel.app",
+        "https://organicai.pro",
+        "https://www.organicai.pro"
     ]
 
     # =========================================================================

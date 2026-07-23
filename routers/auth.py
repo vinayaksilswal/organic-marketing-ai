@@ -95,6 +95,11 @@ def verify_user(request: Request) -> str:
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid session")
 
+def get_workspace_id(request: Request) -> Optional[str]:
+    """
+    Extracts the workspace ID from the X-Workspace-Id header.
+    """
+    return request.headers.get("X-Workspace-Id")
 
 # =============================================================================
 # User Registration & Login Models

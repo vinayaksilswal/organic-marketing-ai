@@ -3,9 +3,9 @@ import { useState, useEffect, useCallback } from 'react';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
-import Dashboard from './pages/Dashboard';
-import Navbar from './components/Navbar';
+import DashboardLayout from './pages/DashboardLayout';
 import Toast from './components/Toast';
+import { WorkspaceProvider } from './components/WorkspaceContext';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai.onrender.com/api/v1';
 
@@ -14,9 +14,11 @@ export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketi
  * Redirects to login on expired/invalid tokens instead of showing cryptic errors.
  */
 export const authFetch = async (url, options = {}, token, onLogout) => {
+  const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {}),
     ...(options.headers || {}),
   };
 
@@ -94,14 +96,15 @@ function App() {
   return (
     <>
       {toastMessage && <Toast message={toastMessage.message} isError={toastMessage.isError} />}
-      {(token && (user?.businessProfile && user?.subscriptionStatus === 'ACTIVE')) && <Navbar onLogout={handleLogout} />}
       
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/auth" element={<Auth onLogin={handleLogin} showToast={showToast} />} />
-        <Route path="/onboarding" element={requireAuth(Onboarding)} />
-        <Route path="/dashboard" element={requireAuth(Dashboard)} />
-      </Routes>
+      <WorkspaceProvider token={token} onLogout={handleLogout}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<Auth onLogin={handleLogin} showToast={showToast} />} />
+          <Route path="/onboarding" element={requireAuth(Onboarding)} />
+          <Route path="/dashboard/*" element={requireAuth(DashboardLayout)} />
+        </Routes>
+      </WorkspaceProvider>
     </>
   );
 }

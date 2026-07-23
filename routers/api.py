@@ -24,6 +24,7 @@ from sqlalchemy import select, delete
 
 from database import (
     AsyncSessionLocal,
+    BusinessProfile,
     SocialCampaign,
     SocialPost,
     MarketingState,
@@ -78,16 +79,25 @@ async def upload_media(
     file: UploadFile = File(...),
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Upload a video or image file to the database."""
+    """Upload a video or image file to the database and register in Media catalog."""
     try:
         mime_type = file.content_type or "application/octet-stream"
         file_content = await file.read()
         media_id = str(uuid.uuid4())
 
+        workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+
         async with AsyncSessionLocal() as session:
+            if not workspace_id:
+                bp_stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+                bp = (await session.execute(bp_stmt)).scalars().first()
+                if bp:
+                    workspace_id = bp.id
+
             media = Media(
                 id=media_id,
                 userId=user_id,
+                businessProfileId=workspace_id,
                 filename=file.filename or "upload",
                 mimeType=mime_type,
                 url=f"/api/v1/media/{media_id}",
@@ -172,15 +182,42 @@ async def create_campaign(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Create a new social campaign for the user."""
+    """Create a new social campaign for the user and register media in catalog if present."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
     async with AsyncSessionLocal() as session:
+        if not workspace_id:
+            bp_stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            bp = (await session.execute(bp_stmt)).scalars().first()
+            if bp:
+                workspace_id = bp.id
+
         campaign = SocialCampaign(
             userId=user_id,
+            businessProfileId=workspace_id,
             baseCaption=data.baseCaption,
             mediaUrl=data.mediaUrl,
             mediaType=data.mediaType,
         )
         session.add(campaign)
+
+        # Register campaign media in Media catalog if provided and not already present
+        if data.mediaUrl:
+            existing_media = (await session.execute(
+                select(Media).where(Media.url == data.mediaUrl)
+            )).scalars().first()
+            if not existing_media:
+                media_id = str(uuid.uuid4())
+                fname = f"Campaign_{data.mediaType}_{media_id[:8]}"
+                mtype = "video/mp4" if data.mediaType == "video" else "image/jpeg"
+                session.add(Media(
+                    id=media_id,
+                    userId=user_id,
+                    businessProfileId=workspace_id,
+                    filename=fname,
+                    mimeType=mtype,
+                    url=data.mediaUrl,
+                ))
+
         await session.commit()
         await session.refresh(campaign)
 

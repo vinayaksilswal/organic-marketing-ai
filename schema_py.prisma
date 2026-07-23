@@ -18,16 +18,19 @@ model Audience {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, email])
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model MarketingState {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastSocialIdx Int      @default(0)
-  lastEmailIdx  Int      @default(0)
-  autoApprove   Boolean  @default(false)
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSocialIdx     Int      @default(0)
+  lastEmailIdx      Int      @default(0)
+  autoApprove       Boolean  @default(false)
+  postIntervalHours Int      @default(2)
+  updatedAt         DateTime @updatedAt
 }
 
 model SocialPost {
@@ -54,6 +57,8 @@ model SocialPost {
   updatedAt      DateTime @updatedAt
 
   engagementMetrics EngagementMetrics[]
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model EmailCampaign {
@@ -77,6 +82,8 @@ model EmailCampaign {
   bounceCount    Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model Media {
@@ -88,6 +95,8 @@ model Media {
   url         String
   storageKey  String?
   createdAt   DateTime @default(now())
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model SocialCampaign {
@@ -106,6 +115,8 @@ model SocialCampaign {
   marketingLogs   MarketingLog[]
   contentCalendar ContentCalendar[]
   abTests         ABTest[]
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model MarketingLog {
@@ -120,6 +131,8 @@ model MarketingLog {
   emailCount    Int      @default(0)
   errorLog      String?  @db.Text
   createdAt     DateTime @default(now())
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 // ─── NEW: Post-Publish Engagement Tracking ──────────────────────────
@@ -138,6 +151,8 @@ model EngagementMetrics {
   clicks        Int      @default(0)
   engagementRate Float   @default(0)
   fetchedAt     DateTime @default(now())
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 // ─── NEW: Pre-Planned Content Calendar ──────────────────────────────
@@ -155,6 +170,8 @@ model ContentCalendar {
   status       String   @default("PLANNED") // PLANNED, GENERATED, PUBLISHED, SKIPPED
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 // ─── NEW: A/B Test Tracking ─────────────────────────────────────────
@@ -174,6 +191,8 @@ model ABTest {
   status       String   @default("RUNNING") // RUNNING, COMPLETE
   createdAt    DateTime @default(now())
   analyzedAt   DateTime?
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 // ─── NEW: Drip Campaign Sequences ───────────────────────────────────
@@ -186,6 +205,8 @@ model DripSequence {
   steps       DripStep[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model DripStep {
@@ -212,7 +233,9 @@ model User {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  businessProfile   BusinessProfile?
+  businessProfiles  BusinessProfile[]
+  videoApiConfigs   VideoApiConfig[]
+  products          Product[]
   socialConnection  SocialConnection?
   marketingState    MarketingState?
   
@@ -231,13 +254,56 @@ model User {
 
 model BusinessProfile {
   id            String   @id @default(cuid())
-  userId        String   @unique
+  userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String   @default("My Business")
   websiteUrl    String?
   description   String?  @db.Text
   businessModel String?  // e.g. "SaaS", "E-commerce", "AI Influencer"
+  postIntervalHours Int  @default(2) // 2, 4, 8, 12, 24
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  audiences          Audience[]
+  socialPosts        SocialPost[]
+  emailCampaigns     EmailCampaign[]
+  media              Media[]
+  socialCampaigns    SocialCampaign[]
+  marketingLogs      MarketingLog[]
+  engagementMetrics  EngagementMetrics[]
+  contentCalendars   ContentCalendar[]
+  abTests            ABTest[]
+  dripSequences      DripSequence[]
+  products           Product[]
+  videoApiConfigs    VideoApiConfig[]
+}
+
+model VideoApiConfig {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider      String   @default("json2video") // e.g. json2video, runway, pika
+  apiKey        String
+  endpoint      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?  @db.Text
+  price         Float?
+  url           String?
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  businessProfileId String?
+  businessProfile   BusinessProfile? @relation(fields: [businessProfileId], references: [id], onDelete: Cascade)
 }
 
 model SocialConnection {

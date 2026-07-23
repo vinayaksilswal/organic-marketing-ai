@@ -71,7 +71,9 @@ class User(Base):
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
-    businessProfile = relationship("BusinessProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    businessProfiles = relationship("BusinessProfile", back_populates="user", cascade="all, delete-orphan")
+    videoApiConfigs = relationship("VideoApiConfig", back_populates="user", cascade="all, delete-orphan")
+    products = relationship("Product", back_populates="user", cascade="all, delete-orphan")
     socialConnection = relationship("SocialConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     audiences = relationship("Audience", back_populates="user", cascade="all, delete-orphan")
     campaigns = relationship("SocialCampaign", back_populates="user", cascade="all, delete-orphan")
@@ -82,14 +84,67 @@ class BusinessProfile(Base):
     __tablename__ = "BusinessProfile"
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), unique=True, nullable=False)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, default="My Business", nullable=False)
     websiteUrl = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     businessModel = Column(String, nullable=True)
+    postIntervalHours = Column(Integer, default=2, nullable=False)
+    # AI Brand Context Fields
+    brandColors = Column(JSON, default=list, nullable=False)
+    brandFonts = Column(JSON, default=list, nullable=False)
+    industry = Column(String, nullable=True)
+    targetAudience = Column(Text, nullable=True)
+    toneOfVoice = Column(String, nullable=True)
+    contentPillars = Column(JSON, default=list, nullable=False)
+    suggestedHashtags = Column(JSON, default=list, nullable=False)
+    brandAnalysisComplete = Column(Boolean, default=False, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
-    user = relationship("User", back_populates="businessProfile")
+    user = relationship("User", back_populates="businessProfiles")
+    products = relationship('Product', back_populates='businessProfile', cascade='all, delete-orphan')
+    videoapiconfigs = relationship('VideoApiConfig', back_populates='businessProfile', cascade='all, delete-orphan')
+    audiences = relationship('Audience', back_populates='businessProfile', cascade='all, delete-orphan')
+    marketingstates = relationship('MarketingState', back_populates='businessProfile', cascade='all, delete-orphan')
+    socialcampaigns = relationship('SocialCampaign', back_populates='businessProfile', cascade='all, delete-orphan')
+    socialposts = relationship('SocialPost', back_populates='businessProfile', cascade='all, delete-orphan')
+    emailcampaigns = relationship('EmailCampaign', back_populates='businessProfile', cascade='all, delete-orphan')
+    medias = relationship('Media', back_populates='businessProfile', cascade='all, delete-orphan')
+    marketinglogs = relationship('MarketingLog', back_populates='businessProfile', cascade='all, delete-orphan')
+
+class VideoApiConfig(Base):
+    __tablename__ = "VideoApiConfig"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    provider = Column(String, default="json2video", nullable=False)
+    apiKey = Column(String, nullable=False)
+    endpoint = Column(String, nullable=True)
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    user = relationship("User", back_populates="videoApiConfigs")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='videoapiconfigs')
+
+
+class Product(Base):
+    __tablename__ = "Product"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    price = Column(Float, nullable=True)
+    url = Column(String, nullable=True)
+    imageUrl = Column(String, nullable=True)
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    user = relationship("User", back_populates="products")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='products')
 
 
 class SocialConnection(Base):
@@ -125,6 +180,8 @@ class Audience(Base):
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     user = relationship("User", back_populates="audiences")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='audiences')
 
 
 class MarketingState(Base):
@@ -135,10 +192,13 @@ class MarketingState(Base):
     lastSocialIdx = Column(Integer, default=0, nullable=False)
     lastEmailIdx = Column(Integer, default=0, nullable=False)
     autoApprove = Column(Boolean, default=False, nullable=False)
+    postIntervalHours = Column(Integer, default=2, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     user = relationship("User", back_populates="marketingStates")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='marketingstates')
 
 
 class SocialCampaign(Base):
@@ -156,6 +216,8 @@ class SocialCampaign(Base):
     user = relationship("User", back_populates="campaigns")
     posts = relationship("SocialPost", back_populates="campaign", cascade="all, delete-orphan")
     emails = relationship("EmailCampaign", back_populates="campaign", cascade="all, delete-orphan")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='socialcampaigns')
 
 
 class SocialPost(Base):
@@ -180,6 +242,8 @@ class SocialPost(Base):
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     campaign = relationship("SocialCampaign", back_populates="posts")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='socialposts')
 
 
 class EmailCampaign(Base):
@@ -202,6 +266,8 @@ class EmailCampaign(Base):
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     campaign = relationship("SocialCampaign", back_populates="emails")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='emailcampaigns')
 
 
 class Media(Base):
@@ -213,7 +279,27 @@ class Media(Base):
     mimeType = Column(String, nullable=False)
     url = Column(Text, nullable=False)
     data = Column(LargeBinary, nullable=True)
+    tags = Column(JSON, default=list, nullable=False)
+    aiGenerated = Column(Boolean, default=False, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='medias')
+
+
+class MarketingLog(Base):
+    __tablename__ = "MarketingLog"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, nullable=True)
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    status = Column(String, default="SUCCESS", nullable=False)
+    socialSuccess = Column(Boolean, default=False, nullable=False)
+    emailSuccess = Column(Boolean, default=False, nullable=False)
+    emailCount = Column(Integer, default=0, nullable=False)
+    errorLog = Column(Text, nullable=True)
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    businessProfile = relationship('BusinessProfile', back_populates='marketinglogs')
 
 
 # =============================================================================
