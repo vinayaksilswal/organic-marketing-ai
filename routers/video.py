@@ -180,10 +180,15 @@ async def render_video(data: RenderVideoRequest, request: Request, user_id: str 
             res = await session.execute(stmt)
             config = res.scalars().first()
             
+            from config import settings
+            
             if not config or not config.apiKey:
-                raise HTTPException(status_code=400, detail="Missing json2video API key. Please configure it in settings.")
-                
-            api_key = config.apiKey
+                if settings.json2video_api_key:
+                    api_key = settings.json2video_api_key
+                else:
+                    raise HTTPException(status_code=400, detail="Missing json2video API key. Please configure it in settings.")
+            else:
+                api_key = config.apiKey
             
         if data.provider != "json2video":
             raise HTTPException(status_code=400, detail="Only json2video is currently supported.")

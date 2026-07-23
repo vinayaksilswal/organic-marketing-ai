@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     ig_business_account_id: str | None = None
 
     # =========================================================================
+    # Json2Video API (Video Rendering)
+    # =========================================================================
+    json2video_api_key: str | None = None
+
+    # =========================================================================
     # Resend API (Transactional & Marketing Email)
     # =========================================================================
     resend_api_key: str | None = None
