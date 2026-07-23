@@ -84,6 +84,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 async with engine.begin() as conn:
                     queries = [
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "name" VARCHAR;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "websiteUrl" VARCHAR;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "description" TEXT;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "businessModel" VARCHAR;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postIntervalHours" INTEGER NOT NULL DEFAULT 24;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "creativeGenerationIntervalHours" INTEGER NOT NULL DEFAULT 2;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "autoGenerateCreatives" BOOLEAN NOT NULL DEFAULT TRUE;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandColors" JSON NOT NULL DEFAULT \'[]\'::json;',
