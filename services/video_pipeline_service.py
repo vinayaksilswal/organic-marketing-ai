@@ -20,7 +20,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from config import settings
 from services.ai_service import LLM_TIMEOUT, MARKETING_MODEL
 
-VISION_MODEL = "google/gemini-3.5-flash" # Or anthropic/claude-3.5-sonnet
+VISION_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
+TEXT_MODEL = "google/gemma-4-31b-it:free"
 
 async def scrape_product_url(url: str) -> str:
     """Smart URL Scraper using jina.ai"""
@@ -96,7 +97,7 @@ Return valid JSON with the following keys:
 """
     from services.ai_service import _call_openrouter
     
-    response = await _call_openrouter(prompt, json_response=True, model="google/gemini-3.5-flash")
+    response = await _call_openrouter(prompt, json_response=True, model=TEXT_MODEL)
     try:
         # Clean markdown if present
         if response.startswith("```"):
@@ -157,7 +158,7 @@ Create a single paragraph prompt matching the Veo 3.1 requirement:
 Output ONLY the raw prompt string, nothing else.
 """
     from services.ai_service import _call_openrouter
-    result = await _call_openrouter(prompt, model="google/gemini-3.5-flash")
+    result = await _call_openrouter(prompt, model=TEXT_MODEL)
     return result.strip()
 
 async def execute_video_pipeline(product_name: str, product_url: str, image_url: str, goal: str = "conversion") -> Dict[str, Any]:
@@ -181,10 +182,68 @@ async def execute_video_pipeline(product_name: str, product_url: str, image_url:
     
     logger.info("Video pipeline completed successfully.")
     
+    # 6. JSON2Video Payload Generation
+    colors = intelligence.get('visual_identity', {}).get('brand_colors', {})
+    primary_color = colors.get('primary_dark', '#000000')
+    accent_color = colors.get('secondary_accent', '#ffffff')
+    
+    json2video_payload = {
+        "resolution": "square",
+        "quality": "high",
+        "fps": 30,
+        "draft": False,
+        "scenes": [
+            {
+                "comment": "Hero Intro",
+                "duration": 4,
+                "elements": [
+                    {
+                        "type": "image",
+                        "src": image_url,
+                        "style": "pan_right",
+                        "zoom": 1.1
+                    },
+                    {
+                        "type": "text",
+                        "text": f"Discover {product_name}",
+                        "style": "headline",
+                        "font": "Outfit",
+                        "size": 72,
+                        "color": "#ffffff",
+                        "position": "center",
+                        "x": 0, "y": -200, "width": 800
+                    }
+                ]
+            },
+            {
+                "comment": "Creative Strategy Hook",
+                "duration": 5,
+                "elements": [
+                    {
+                        "type": "image",
+                        "src": image_url,
+                        "style": "zoom_in"
+                    },
+                    {
+                        "type": "text",
+                        "text": intelligence.get('creative_strategy', {}).get('hero_marketing_hook', 'Upgrade your lifestyle.'),
+                        "style": "normal",
+                        "font": "Outfit",
+                        "size": 48,
+                        "color": accent_color,
+                        "position": "center",
+                        "x": 0, "y": 0, "width": 800
+                    }
+                ]
+            }
+        ]
+    }
+    
     return {
         "status": "success",
         "intelligence": intelligence,
         "creative_strategy": creative_strategy,
         "veo_prompt": final_prompt,
         "image_url": image_url,
+        "json2video_payload": json2video_payload
     }
