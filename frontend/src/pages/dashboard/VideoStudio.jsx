@@ -62,8 +62,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   };
 
   const generateCampaign = async () => {
-    if (!productName || !productUrl || !imageUrl) {
-      return showToast('Please provide Product Name, URL, and Image URL', true);
+    if (!productName || !imageUrl) {
+      return showToast('Please provide Product Name and Image URL', true);
     }
     
     setLoading(true);

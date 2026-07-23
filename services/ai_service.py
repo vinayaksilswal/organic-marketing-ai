@@ -36,8 +36,8 @@ from config import settings
 # =============================================================================
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# tencent/hy3:free — Used for marketing copy generation (free tier)
-MARKETING_MODEL = "tencent/hy3:free"
+# google/gemma-2-9b-it:free — Used for marketing copy generation (free tier)
+MARKETING_MODEL = "google/gemma-2-9b-it:free"
 
 # Shared timeout for LLM API calls (LLMs can be slow)
 LLM_TIMEOUT = httpx.Timeout(60.0, connect=15.0)

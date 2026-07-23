@@ -81,11 +81,15 @@ async def image_vision_analysis(image_url: str) -> str:
         data = resp.json()
         return data["choices"][0]["message"]["content"]
 
-async def marketing_intelligence_synthesis(product_name: str, scrape_content: str, vision_yaml: str) -> Dict[str, Any]:
+async def marketing_intelligence_synthesis(product_name: str, scrape_content: str, vision_yaml: str, profile: Optional[Any] = None) -> Dict[str, Any]:
     """Synthesize data into a marketing JSON profile."""
+    brand_context = ""
+    if profile:
+        brand_context = f"\nBusiness Profile Data:\n- Industry: {profile.industry}\n- Audience: {profile.targetAudience}\n- Tone: {profile.toneOfVoice}\n- Content Pillars: {profile.contentPillars}\n"
+    
     prompt = f"""You are an elite marketing strategist. Combine the following data into a detailed JSON marketing intelligence profile.
     
-Product Name: {product_name}
+Product Name: {product_name}{brand_context}
 Scraped Content: {scrape_content}
 Vision Analysis YAML: {vision_yaml}
 
@@ -161,7 +165,7 @@ Output ONLY the raw prompt string, nothing else.
     result = await _call_openrouter(prompt, model=TEXT_MODEL)
     return result.strip()
 
-async def execute_video_pipeline(product_name: str, product_url: str, image_url: str, goal: str = "conversion") -> Dict[str, Any]:
+async def execute_video_pipeline(product_name: str, product_url: Optional[str] = None, image_url: str = "", goal: str = "conversion", profile: Optional[Any] = None) -> Dict[str, Any]:
     """Execute the full end-to-end creative video pipeline."""
     logger.info(f"Starting video pipeline for {product_name}")
     
@@ -169,10 +173,21 @@ async def execute_video_pipeline(product_name: str, product_url: str, image_url:
     scrape_content = await scrape_product_url(product_url)
     
     # 2. Vision
-    vision_yaml = await image_vision_analysis(image_url)
+    try:
+        vision_yaml = await image_vision_analysis(image_url)
+    except Exception as e:
+        logger.error(f"Vision analysis failed: {e}")
+        vision_yaml = """
+primary_color: '#000000'
+secondary_color: '#ffffff'
+typography_style: 'modern'
+visual_tone: 'clean'
+key_elements: []
+product_placement: 'center'
+"""
     
     # 3. Intelligence
-    intelligence = await marketing_intelligence_synthesis(product_name, scrape_content, vision_yaml)
+    intelligence = await marketing_intelligence_synthesis(product_name, scrape_content, vision_yaml, profile)
     
     # 4. Creative Engine
     creative_strategy = run_creative_engine(intelligence, goal)

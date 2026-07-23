@@ -50,7 +50,7 @@ class GenerateRequest(BaseModel):
 
 class VideoCampaignRequest(BaseModel):
     product_name: str
-    product_url: str
+    product_url: Optional[str] = None
     image_url: str
     goal: str = "conversion"
 
@@ -93,16 +93,29 @@ async def get_brand_analysis_status(
 @router.post("/generate-video-campaign")
 async def generate_video_campaign(
     data: VideoCampaignRequest,
+    request: Request,
     user_id: str = Depends(verify_user),
 ) -> dict[str, Any]:
     """Generate a video campaign using the automated pipeline."""
     from services.video_pipeline_service import execute_video_pipeline
     
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    async with AsyncSessionLocal() as session:
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+        else:
+            stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            profile = (await session.execute(stmt)).scalars().first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="No workspace found")
+
+    
     result = await execute_video_pipeline(
         product_name=data.product_name,
         product_url=data.product_url,
         image_url=data.image_url,
-        goal=data.goal
+        goal=data.goal,
+        profile=profile
     )
     return result
 
@@ -256,6 +269,28 @@ async def approve_creative(
 
 
 @router.post("/{creative_id}/reject")
+
+from fastapi import Form
+@router.put("/{creative_id}")
+async def edit_creative(
+    creative_id: str,
+    request: Request,
+    caption: str = Form(None),
+    media_url: str = Form(None),
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Edit a creative's caption and media."""
+    async with AsyncSessionLocal() as session:
+        campaign = await session.get(SocialCampaign, creative_id)
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        if caption is not None:
+            campaign.baseCaption = caption
+        if media_url is not None:
+            campaign.mediaUrl = media_url
+        await session.commit()
+        return {"success": True, "message": "Creative updated successfully"}
+
 async def reject_creative(
     creative_id: str,
     request: Request,
