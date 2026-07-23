@@ -4,6 +4,7 @@ import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import DashboardLayout from './pages/DashboardLayout';
+import Checkout from './pages/Checkout';
 import Toast from './components/Toast';
 import { WorkspaceProvider } from './components/WorkspaceContext';
 
@@ -87,6 +88,7 @@ function App() {
 
   const requireAuth = (Component) => {
     if (!token) return <Navigate to="/auth" />;
+    if (user && user.subscriptionStatus !== "ACTIVE") return <Navigate to="/checkout" />;
     return <Component user={user} token={token} showToast={showToast} onLogout={handleLogout} updateAuth={(data) => {
       setUser(data);
       localStorage.setItem('user', JSON.stringify(data));
@@ -101,6 +103,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth onLogin={handleLogin} showToast={showToast} />} />
+          <Route path="/checkout" element={token ? <Checkout user={user} onLogout={handleLogout} /> : <Navigate to="/auth" />} />
           <Route path="/onboarding" element={requireAuth(Onboarding)} />
           <Route path="/dashboard/*" element={requireAuth(DashboardLayout)} />
         </Routes>

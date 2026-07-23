@@ -1,0 +1,557 @@
+a{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ec2-52-9-147-147.us-west-1.compute.amazonaws.com:8002/api/swap",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "=https://i.ibb.co/GQgDBcwj/download-2.jpg"
+            },
+            {
+              "name": "video_url",
+              "value": "={{ $json.data[0].url }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "output_video.mp4"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1840,
+        1104
+      ],
+      "id": "c278edd6-45ca-4f92-82c9-5b15aecf6552",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "formTitle": "Market Creative Team",
+        "formDescription": "Get! High Quality UGC Videos for Marketing",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Product Image",
+              "fieldType": "file",
+              "acceptFileTypes": ".jpg, .png"
+            },
+            {
+              "fieldLabel": "Name Of Product"
+            },
+            {
+              "fieldLabel": "Product URL for Product detail and Marketing"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        288,
+        304
+      ],
+      "id": "670dbda1-9aef-442b-a0f8-48a746442f22",
+      "name": "Form",
+      "webhookId": "d4d43b1e-3d92-4b11-812d-434b0b2d1c41"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemma-4-31b-it",
+          "mode": "list",
+          "cachedResultName": "models/gemma-4-31b-it"
+        },
+        "text": "=You are an elite computer vision engine and brand intelligence system operating inside an enterprise video creative pipeline. Your function is to extract precise visual, typographic, material, and conceptual data from the provided product image and return it as strictly valid YAML.\nHARD CONSTRAINTS:\n\nReturn ONLY valid YAML. No markdown fences. No preamble. No explanation. First character = first character of YAML.\nZERO HALLUCINATION: If any field cannot be definitively confirmed from the image, output null. Never infer beyond what is visually certain.\nHEX PRECISION: Derive hex values from the dominant pixel cluster. Do not approximate from memory.\nPRODUCT PRIMACY: Ignore backgrounds, props, and non-integrated elements. Analyze only the primary commercial subject.\nCATEGORY INTELLIGENCE: Classify with commercial precision:\n\nSaaS dashboard / app UI → digital_interface\nPackaged supplement / food → consumable\nSneaker / clothing / accessory → apparel\nKeyboard / device / hardware → physical_goods\nFinancial / data product → data_product\nService / platform → service_platform\n\n\n\nANALYSIS ORDER:\nStep 1 — Subject ontology:\n\nproduct: Sellable item dominates (physical or digital)\ncharacter: Human or mascot dominates, no prominent product\ncomposite: Product AND human/persona both prominent\n\nStep 2 — Extract all schema fields below with maximum specificity.\nYAML SCHEMA:\npipeline_routing:\nsubject_classification: <enum: product | character | composite>\nproduct_category: <enum: physical_goods | digital_interface | apparel | consumable | data_product | service_platform | null>\nproduct_type_detail: <string: e.g. \"B2B crypto API\", \"DTC skincare serum\", \"mechanical keyboard\", \"quantum education platform\">\ncreative_complexity: <enum: minimal | moderate | rich>\nis_digital_product: <boolean>\nhas_physical_form: <boolean>\nbrand_and_typography:\nbrand_name: <string or null>\nlogo_presence: <boolean>\nlogo_style: <enum: wordmark | icon | combination | null>\ntypography:\npresence: <boolean>\nprimary_classification: <enum: serif | sans-serif | script | display | monospace | null>\nweight: <enum: light | regular | bold | black | null>\ntext_content: <exact visible text as string, or null>\nmood: <enum: premium | playful | technical | minimal | aggressive | luxury | null>\nchromatic_profile:\ndominant_colors:\n- hex: \"<#XXXXXX>\"\nname: \"<descriptive name e.g. Electric Blue, Warm Ivory, Crimson Red>\"\nelement_association: \"<exact element this color belongs to>\"\n- hex: \"<#XXXXXX>\"\nname: \"<descriptive name>\"\nelement_association: \"<exact element>\"\n- hex: \"<#XXXXXX>\"\nname: \"<descriptive name>\"\nelement_association: \"<exact element>\"\ncolor_temperature: <enum: cool | warm | neutral>\ncontrast_level: <enum: high | medium | low>\nbackground_color: <hex string or null>\nstructural_and_material_analysis:\nmaterial_composition: <string: precise texture + material description, or \"digital\" for UI products>\ngeometric_structure: <string: shape, dimensions, layout, symmetry>\nsurface_finish: <enum: matte | glossy | metallic | translucent | flat_digital | textured | null>\nproduct_complexity: <enum: single_hero | multi_component | ui_screen | lifestyle_scene>\npackaging_present: <boolean>\nemotional_and_brand_tone:\nperceived_brand_tier: <enum: luxury | premium | mid_market | mass_market | indie | enterprise>\nemotional_resonance: <enum: trust | excitement | calm | urgency | aspiration | playfulness | authority>\nindustry_vertical: <string: e.g. \"fintech\", \"edtech\", \"wellness\", \"fashion\", \"developer_tools\", \"food_beverage\", \"quantum_computing\">\ntarget_buyer_sophistication: <enum: consumer | prosumer | professional | enterprise>\ngeneration_conditioning:\nlighting_profile: <string: precise photometric description>\ncamera_perspective: <string: exact angle, distance, lens feel>\nbrand_color_hex_list: <comma-separated list of confirmed hex values for downstream use>\noptimized_diffusion_prompt: <dense comma-separated string for latent diffusion model — material, lighting, angle, finish, mood. No background. Min 30 words.>",
+        "imageUrls": "={{ $json.data.url }}",
+        "simplify": "",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        304
+      ],
+      "id": "a4d9a2b1-d7af-4616-b690-e749b318a399",
+      "name": "Analyze an image",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "5vVj8vfFaHfK3LOR",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a world-class creative director and video prompt engineer specializing in AI-generated commercial video for enterprise marketing. You have directed campaigns for Fortune 500 brands, DTC unicorns, and funded startups across every industry vertical.\nYour task: translate the provided product intelligence, brand profile, and assigned creative format into ONE unified, production-ready Veo 3.1 video prompt that covers both scenes as a single narrative arc.\n═══════════════════════════════════════════════════════════\nINPUT DATA (injected dynamically):\n═══════════════════════════════════════════════════════════\nProduct Name: {{ $('Form').item.json['Name Of Product'] }}\nProduct URL: {{ $('Form').item.json['Product URL for Product detail and Marketing'] }}\nMarketing Intelligence JSON: {{ $('URL Analyer').item.json.content.parts[0].text }}{{ $('URL Analyer').item.json.content.parts[1].text }}\n\nAssigned Creative Format: {{ $json.creative_format.name }}\nFormat Description: {{ $json.creative_format.description }}\nVisual World: {{ $json.creative_format.visual_world }}\nCamera Direction: {{ $json.creative_format.camera_direction }}\nPacing: {{ $json.creative_format.pacing }}\nText Treatment: {{ $json.creative_format.text_treatment }}\nFormat Avoid List: {{ $json.creative_format.avoid }}\nVariation Modifier: {{ $json.variation_modifier.modifier }}\nModifier Note: {{ $json.variation_modifier.note }}\n═══════════════════════════════════════════════════════════\nPRODUCT TYPE VISUAL RULEBOOK (apply based on product_type field):\n═══════════════════════════════════════════════════════════\nDIGITAL_SAAS / DATA_API:\n\nEnvironment: Dark IDE, clean modern office, Bloomberg-terminal aesthetic\nHuman archetype: Analyst, developer, founder — precise and focused\nProps: Multiple monitors, terminal windows, real UI on screen\nLighting: Cool institutional or warm confident depending on scene beat\nNEVER: Holographic dashboards, flying data particles, generic \"tech\" visuals\n\nPHYSICAL_GOODS:\n\nEnvironment: Studio with controlled lighting OR aspirational real-world context\nSubject: Product is hero — show material, finish, weight, craftsmanship\nCamera: Macro close-ups, orbital dollies, dramatic reveals\nLighting: Rim lighting for edge definition, soft boxes for texture\nNEVER: White infinity backdrop unless luxury segment, floating products\n\nCONSUMABLE (supplements, food, beverage, skincare):\n\nEnvironment: Kitchen counter, bathroom vanity, outdoor natural setting\nSubject: Product + ingredient story — show what's INSIDE\nCamera: Macro pour shots, steam, condensation, texture close-ups\nLighting: Warm naturals, soft window light, golden hour\nNEVER: Clinical/sterile environments, generic health stock\n\nAPPAREL:\n\nEnvironment: Match the brand tier — luxury = negative space editorial, streetwear = urban grit\nSubject: Fabric movement, fit on body, material texture\nCamera: Fashion film pacing — slow reveals, editorial framing\nLighting: Soft directional for premium, harsh directional for edge brands\nNEVER: Static product flat lay as primary shot, plain mannequin\n\nEDUCATION_PLATFORM:\n\nEnvironment: Real learning spaces — desk, café, library — NOT generic classroom\nSubject: Student's face showing comprehension, the moment of \"getting it\"\nCamera: Intimate close-ups of face and screen interaction\nLighting: Warm focused desk light or soft natural\nNEVER: Generic graduation imagery, stock photo students\n\nENTERPRISE_SAAS:\n\nEnvironment: Modern office — glass walls, standing desks, confident professionals\nSubject: Professional using product with visible result on screen\nCamera: Wide establishing then tight on screen reaction\nLighting: Clean office daylight, confident and clear\nNEVER: Casual hoodie-wearing devs (unless startup positioning), empty boardrooms\n\n═══════════════════════════════════════════════════════════\nMANDATORY CREATIVE RULES (ALL PRODUCT TYPES):\n═══════════════════════════════════════════════════════════\nRULE 1 — FORMAT COMPLIANCE:\nBuild the entire prompt around the assigned creative format. If format is \"ugc_testimonial\" — real human face, natural environment, zero CGI. If \"cinematic_product_hero\" — no humans, product as sole subject. Never default to holographic dashboards.\nRULE 2 — TWO-SCENE NARRATIVE ARC IN ONE PROMPT:\nThe single prompt must contain two distinct scenes separated by a natural cinematic transition phrase (\"Then, cutting to a new scene,\" or \"As the camera pulls back,\"). Each scene must have:\n\nDifferent camera distance (one wide, one close OR one establishing, one intimate)\nDifferent emotional beat (scene 1 = problem/texture/aspiration, scene 2 = resolution/transformation/identity)\nDifferent lighting condition where possible\n\nRULE 3 — BRAND COLOR ON JUSTIFIED SURFACES ONLY:\nUse exact color names (NOT hex codes) from the brand profile. Colors must appear on real surfaces:\n\nUI elements, clothing, lighting gels, signage, product itself\nNEVER floating color gradients or arbitrary atmospheric color\n\nRULE 4 — ALL PRODUCT TEXT IN DOUBLE QUOTES:\nEvery product name, tagline, CTA, and UI text visible in the video must be in exact double quotes.\nExample: \"QuantCAI\", \"Stop guessing the market. Let AI decode the alpha.\", \"Request Early Access\"\nNEVER fabricate statistics or claims not present in the source URL.\nRULE 5 — VARIATION MODIFIER INTEGRATION:\nThe modifier must visibly influence at least one scene's atmosphere. If modifier is \"golden_hour\" — actual warm late afternoon light. If \"dark_institutional\" — cold precision lighting with terminal energy.\nRULE 6 — VEO 3.1 FIVE-PART FORMULA (STRICTLY ENFORCED):\nEvery scene within the prompt must follow this structure:\n[CINEMATOGRAPHY] Shot type + lens + movement — technically specific\n[SUBJECT & ACTION] Who/what + what they are doing + force verbs (slam, grip, push, reveal, strike)\n[ENVIRONMENT] Active system description — not a static backdrop\n[BRAND TEXT] Exact quoted text appearing on screen\n[ATMOSPHERE] Light temperature + mood + sound design direction\nRULE 7 — FORBIDDEN PHRASES (automatic rewrite required):\nNever use any of these:\n\n\"futuristic holographic\" / \"holographic display\"\n\"neon-lit trading floor\"\n\"data streams surge\" / \"pulse and ripple\"\n\"180-degree arc shot\" (unless explicitly called for)\n\"dynamic and vibrant\"\n\"state of the art\"\n\"cutting-edge\"\nAny color written as a hex code (#XXXXXX)\nSD-style negative prompts (-v, --no)\n\nRULE 8 — INDUSTRY CALIBRATION (from industry_visual_language field):\nFintech/Crypto: Terminal precision, Bloomberg energy, institutional authority\nWellness/Health: Warm naturals, human skin tones, ingredient macro\nFashion/Apparel: Editorial framing, fabric physics, negative space\nDeveloper Tools: Dark IDE, precise cursor movement, terminal green\nFood/Beverage: Steam, condensation, macro texture, appetite-first\nFitness: High contrast, sweat, kinetic energy, physical exertion\nEnterprise SaaS: Clean office, confident professionals, screen clarity\nEducation: Human face of comprehension, desk warmth, screen glow\nQuantum Computing: Physics lab precision, chalkboard equations, controlled drama\n═══════════════════════════════════════════════════════════\nOUTPUT REQUIREMENTS:\n═══════════════════════════════════════════════════════════\nOutput ONLY this exact JSON. No markdown. No preamble. No array wrapper.\nFirst character = { Last character = }\n{\n\"creative_format_used\": \"<assigned format name>\",\n\"variation_modifier_applied\": \"<assigned modifier name>\",\n\"product_type\": \"<product type from marketing intel>\",\n\"prompt\": \"<single unified Veo prompt — minimum 150 words — two scenes connected by natural cinematic transition — five-part formula applied to each scene — all brand text in double quotes — no hex codes — no forbidden phrases>\"\n}\n═══════════════════════════════════════════════════════════\nINTERNAL QUALITY CHECKLIST (run before outputting):\n═══════════════════════════════════════════════════════════\n□ Does the prompt follow the assigned creative format strictly?\n□ Are both scenes present with a natural cinematic transition?\n□ Are scenes meaningfully different in camera distance and emotional beat?\n□ Are brand colors on justified real surfaces (not atmosphere gradients)?\n□ Is all product text in exact double quotes?\n□ Does the variation modifier visibly influence at least one scene?\n□ Does each scene follow the 5-part Veo 3.1 formula?\n□ Are all forbidden phrases absent?\n□ Is the industry visual language correctly calibrated for this product type?\n□ Are there zero hex codes in the output?\n□ Is the total prompt over 150 words?\n□ Does the output match the exact JSON schema above?",
+        "options": {
+          "systemMessage": "=You are an elite creative director and video prompt engineer specializing in AI-generated commercial video for enterprise marketing. Take the reference product profile and translate it into two highly optimized, production-ready prompts for Veo 3.1 (temporal video).\n\nDefault Behavior & Enterprise Commercial Requirements\n\nIf user instructions lack detail: Generate a high-end commercial studio setting matching the product's category.\n\nDefault to high-fidelity, professional cinematic scenes unless explicitly overridden.\n\nFollow explicit brand color, typography, and material requests provided in the reference JSON.\n\nThe 5-Part Veo 3.1 Formula (Strictly Enforced)\nEvery prompt must follow this exact sequential structure: [Cinematography] + + [Action] + [Context] +.  \n\nCinematography: Explicitly dictate the camera movement (e.g., \"dolly shot\", \"slow pan\") and lens choice (e.g., \"16mm to expand space\", \"85mm to compress background for intimacy\").  \n\nSubject: Front-load the subject with a clear identity anchor and stable visual traits (e.g., specific materials like cotton or brushed aluminum to stabilize light reflection across frames).  \n\nAction & Physics: Define motion using active, force-based verbs (e.g., \"push\", \"pull\", \"strike\", \"slam\", \"ripple\", \"spiral\") to prevent weightless, floaty movements.  \n\nContext (Setting): Detail the environment as an active system (e.g., \"dust suspended in harsh volumetric light\", \"blurred monitors glowing faintly\") rather than a static backdrop.  \n\nStyle & Ambiance: Specify the overall aesthetic, mood, and lighting conditions. Include surgical negative prompts to avoid \"viral\" or low-fidelity AI artifacts (e.g., -v oversaturated, plastic, artificial reflections).  \n\nText Preservation & Brand Safety\n\nAll visible product names, logos, or taglines must be enclosed in exact double quotes (e.g., \"Crypto Order Flow API\", \"Stop guessing the trend\").  \n\nNo Fabrication: Never invent extra claims, features, statistics, or numbers.\n\nOutput Requirements\n\nGenerate text prompts only.\n\nDefault to horizontal 16:9 for commercial enterprise ads. Switch to 9:16 only if the user explicitly requests a vertical format for social media.  \n\nAlways output in exact JSON object format matching this schema:\nOUTPUT REQUIREMENTS:\n- Output ONLY this exact JSON, no markdown, no wrapping:\n\n{\n  \"prompt\": \"<single unified video prompt — minimum 120 words, following 5-part formula, combining both scenes into one cohesive narrative arc>\"\n}\n\n- First character must be { and last must be }\n- No \\n, no escaped quotes, no array wrapping\n\nQuality Control Verification (Internal Checklist)\n\nVerify text accuracy is inside double quotes.\n\nVerify the Veo 3.1 prompt follows the 5-part cinematic formula.\n\nVerify the Nano Banana (Gemini 2.5 Flash Image) prompt includes specific photographic lighting and lens terminology.  \n\nVerify exact hex colors and materials from the input JSON are utilized.\n\n\nCRITICAL OUTPUT OVERRIDE:\nReturn ONLY the raw, unescaped JSON object. Do NOT wrap the JSON in an array, do NOT wrap it in an \"output\" key, and do NOT use markdown formatting or stringified escape characters (like \\n or \\\"). The very first character of your response must be { and the last character must be }"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1408,
+        304
+      ],
+      "id": "fe1efca6-9c68-496e-aafa-52e3c6da86f2",
+      "name": "Prompt Generator"
+    },
+    {
+      "parameters": {
+        "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        448
+      ],
+      "id": "ee3da3ca-6afd-4419-83f9-dc3189f919e2",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "2ttvn5CGDtNfK8Kg",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1.1,
+      "position": [
+        1552,
+        464
+      ],
+      "id": "3fc488bf-87d4-4b5c-83a4-cb678ba43926",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// NODE 3 — CREATIVE ENGINE v3 (PRODUCTION GRADE)\n// Role: n8n Code node\n// Input: Marketing Intelligence JSON from NODE 2\n// Output: Selected format + modifier + enforcement layer for NODE 4\n// ============================================================\n\nconst input = $json || {};\nconst CAMPAIGN_GOAL = input.goal || \"conversion\";\nconst FORCE_FORMAT  = input.force_format || null;\nconst PRODUCT_TYPE  = input.product_type || null; // injected from marketing intel if available\n\n// ============================================================\n// CREATIVE FORMAT LIBRARY\n// Weighted by campaign goal AND product type compatibility\n// ============================================================\nconst CREATIVE_FORMATS = [\n  {\n    id: \"ugc_testimonial\",\n    name: \"UGC Testimonial\",\n    description: \"Authentic first-person account from a real user. Handheld, natural environment, zero CGI.\",\n    weight: { awareness: 0.3, conversion: 0.9, education: 0.4, retention: 0.7 },\n    product_type_boost: { consumable: 0.4, apparel: 0.3, education_platform: 0.2 },\n    visual_world: \"Natural indoor or outdoor environment matching the user's lifestyle\",\n    camera_direction: \"Handheld selfie — slight sway, natural shake, intimate framing\",\n    pacing: \"Slow to medium — conversational rhythm\",\n    text_treatment: \"Minimal — one key callout max\",\n    scene_1_beat: \"Problem/frustration — user before the product\",\n    scene_2_beat: \"Resolution/confidence — user after the product\",\n    avoid: [\"CGI\", \"corporate settings\", \"stock-photo feel\", \"perfect lighting\", \"scripted delivery\"],\n    human_required: true,\n    product_shown: \"incidental\"\n  },\n  {\n    id: \"problem_agitation_solution\",\n    name: \"Problem-Agitation-Solution\",\n    description: \"Opens on acute pain, agitates it visually, resolves with product as the hero.\",\n    weight: { awareness: 0.8, conversion: 1.0, education: 0.5, retention: 0.4 },\n    product_type_boost: { digital_saas: 0.3, data_api: 0.4, physical_goods: 0.2 },\n    visual_world: \"Before: chaotic, cold, overwhelming. After: calm, ordered, confident.\",\n    camera_direction: \"Scene 1: shaky, fast cuts, harsh light. Scene 2: smooth dolly, warm light.\",\n    pacing: \"Fast agitation → slow resolution\",\n    text_treatment: \"Problem text on screen in scene 1. Solution text in scene 2.\",\n    scene_1_beat: \"Maximum pain — the world without this product\",\n    scene_2_beat: \"Maximum relief — the world with this product\",\n    avoid: [\"starting with the product\", \"happy people in scene 1\", \"generic office stock\"],\n    human_required: true,\n    product_shown: \"hero_in_scene_2\"\n  },\n  {\n    id: \"challenger_comparison\",\n    name: \"Challenger Comparison\",\n    description: \"Old way vs new way — positions product as a category upgrade without naming competitors.\",\n    weight: { awareness: 0.6, conversion: 0.95, education: 0.6, retention: 0.3 },\n    product_type_boost: { digital_saas: 0.4, data_api: 0.3, physical_goods: 0.3 },\n    visual_world: \"Split contrast — old world is cluttered/analog/slow. New world is clean/digital/instant.\",\n    camera_direction: \"Static wide in scene 1. Controlled dolly in scene 2.\",\n    pacing: \"Slow frustration → confident resolution\",\n    text_treatment: \"Before / After text treatment. Strong CTA at end.\",\n    scene_1_beat: \"The old, broken way — what life looks like before\",\n    scene_2_beat: \"The new way — product as the upgrade\",\n    avoid: [\"naming competitors\", \"cliche split-screen\", \"generic 'vs' graphics\"],\n    human_required: false,\n    product_shown: \"hero_throughout\"\n  },\n  {\n    id: \"cinematic_product_hero\",\n    name: \"Cinematic Product Hero\",\n    description: \"Product is the sole subject. Shot like a luxury commercial — no humans required.\",\n    weight: { awareness: 0.9, conversion: 0.5, education: 0.2, retention: 0.6 },\n    product_type_boost: { physical_goods: 0.5, apparel: 0.5, consumable: 0.4, luxury: 0.5 },\n    visual_world: \"Studio or aspirational environment — product treated as a luxury object\",\n    camera_direction: \"Macro close-ups, slow orbital dolly, dramatic lighting reveals\",\n    pacing: \"Slow and deliberate — every frame holds\",\n    text_treatment: \"Minimal — brand name and one tagline only\",\n    scene_1_beat: \"Macro texture detail — material, finish, craftsmanship\",\n    scene_2_beat: \"Product in context — the aspirational world it belongs to\",\n    avoid: [\"humans\", \"busy backgrounds\", \"fast cuts\", \"generic studio white\"],\n    human_required: false,\n    product_shown: \"hero_center\"\n  },\n  {\n    id: \"demo_walkthrough\",\n    name: \"Product Demo Walkthrough\",\n    description: \"Screen recording or hands-on demonstration — built for digital or physical products.\",\n    weight: { awareness: 0.4, conversion: 0.8, education: 1.0, retention: 0.8 },\n    product_type_boost: { digital_saas: 0.5, data_api: 0.5, education_platform: 0.5 },\n    visual_world: \"Clean screen environment or hands on product — precision framing\",\n    camera_direction: \"Top-down for physical. Direct screen capture for digital. Cursor movements matter.\",\n    pacing: \"Medium — deliberate, clear, no rushed cuts\",\n    text_treatment: \"Callout labels on key features. Clean sans-serif.\",\n    scene_1_beat: \"The problem state — what the user sees before\",\n    scene_2_beat: \"The solution in action — live product doing the work\",\n    avoid: [\"cluttered interfaces\", \"unexplained UI jumps\", \"too many features at once\"],\n    human_required: false,\n    product_shown: \"primary_focus\"\n  },\n  {\n    id: \"lifestyle_aspiration\",\n    name: \"Lifestyle Aspiration\",\n    description: \"Product embedded in a desirable lifestyle — buyer sees themselves in the scene.\",\n    weight: { awareness: 1.0, conversion: 0.6, education: 0.2, retention: 0.7 },\n    product_type_boost: { apparel: 0.5, consumable: 0.4, physical_goods: 0.3, wellness: 0.4 },\n    visual_world: \"Aspirational real-world setting — golden hour, urban cool, natural luxury\",\n    camera_direction: \"Cinematic wide establishing, then intimate medium shots\",\n    pacing: \"Slow and editorial — fashion film pacing\",\n    text_treatment: \"Minimal — let visuals carry the story\",\n    scene_1_beat: \"Aspirational establishing — the world the buyer wants to live in\",\n    scene_2_beat: \"Product as the key to that world — subtle, integrated\",\n    avoid: [\"obvious product pushing\", \"cheesy smiling models\", \"generic stock lifestyle\"],\n    human_required: true,\n    product_shown: \"lifestyle_integrated\"\n  }\n];\n\n// ============================================================\n// VARIATION MODIFIER LIBRARY\n// ============================================================\nconst VARIATION_MODIFIERS = [\n  { modifier: \"golden_hour\",      note: \"Warm late afternoon sunlight, long shadows, amber tones\",    weight: 1.2 },\n  { modifier: \"high_energy_neon\", note: \"Vibrant neon lighting, urban night, electric color palette\", weight: 0.9 },\n  { modifier: \"dark_institutional\",note: \"Bloomberg-terminal darkness, cold precision, authority\",    weight: 0.8 },\n  { modifier: \"clean_daylight\",   note: \"Soft natural diffused light, bright airy environment\",       weight: 1.0 },\n  { modifier: \"studio_dramatic\",  note: \"Controlled studio lighting with dramatic shadows and rim light\", weight: 0.9 },\n  { modifier: \"urban_gritty\",     note: \"Raw city texture, candid feel, authentic locations\",         weight: 0.7 },\n  { modifier: \"luxury_minimal\",   note: \"Negative space, precise lighting, premium material focus\",   weight: 0.8 },\n  { modifier: \"macro_precision\",  note: \"Extreme close-up detail, texture and material as hero\",      weight: 0.7 }\n];\n\n// ============================================================\n// INDUSTRY → MODIFIER AFFINITY MAP\n// ============================================================\nconst INDUSTRY_MODIFIER_AFFINITY = {\n  fintech:           [\"dark_institutional\", \"clean_daylight\", \"studio_dramatic\"],\n  developer_tools:   [\"dark_institutional\", \"clean_daylight\"],\n  wellness:          [\"golden_hour\", \"clean_daylight\", \"macro_precision\"],\n  fashion:           [\"golden_hour\", \"studio_dramatic\", \"luxury_minimal\"],\n  food_beverage:     [\"macro_precision\", \"golden_hour\", \"clean_daylight\"],\n  fitness:           [\"high_energy_neon\", \"urban_gritty\", \"golden_hour\"],\n  enterprise_saas:   [\"clean_daylight\", \"studio_dramatic\", \"dark_institutional\"],\n  quantum_computing: [\"dark_institutional\", \"studio_dramatic\", \"clean_daylight\"],\n  edtech:            [\"clean_daylight\", \"golden_hour\", \"studio_dramatic\"],\n  ecommerce:         [\"studio_dramatic\", \"clean_daylight\", \"macro_precision\"],\n  luxury:            [\"luxury_minimal\", \"studio_dramatic\", \"golden_hour\"]\n};\n\n// ============================================================\n// WEIGHTED RANDOM PICKER\n// ============================================================\nfunction weightedPick(items, goal) {\n  const scored = items.map(item => ({\n    item,\n    score: (item.weight?.[goal] || item.weight || 1)\n  }));\n  const total = scored.reduce((s, i) => s + i.score, 0);\n  let rand = Math.random() * total;\n  for (const { item, score } of scored) {\n    if (rand < score) return item;\n    rand -= score;\n  }\n  return scored[scored.length - 1].item;\n}\n\n// ============================================================\n// FORMAT SELECTION — with product type boosting\n// ============================================================\nlet selectedFormat;\n\nif (FORCE_FORMAT) {\n  selectedFormat = CREATIVE_FORMATS.find(f => f.id === FORCE_FORMAT) || CREATIVE_FORMATS[0];\n} else {\n  // Apply product type boost if available\n  const boosted = CREATIVE_FORMATS.map(f => {\n    const boost = (PRODUCT_TYPE && f.product_type_boost?.[PRODUCT_TYPE]) || 0;\n    return {\n      ...f,\n      weight: {\n        ...f.weight,\n        [CAMPAIGN_GOAL]: (f.weight?.[CAMPAIGN_GOAL] || 0) + boost\n      }\n    };\n  });\n  selectedFormat = weightedPick(boosted, CAMPAIGN_GOAL);\n}\n\n// ============================================================\n// MODIFIER SELECTION — industry-aware\n// ============================================================\nlet selectedModifier;\nconst industryAffinity = input.industry_vertical\n  ? INDUSTRY_MODIFIER_AFFINITY[input.industry_vertical] || []\n  : [];\n\nif (industryAffinity.length > 0) {\n  // Boost modifiers that match industry affinity\n  const boostedModifiers = VARIATION_MODIFIERS.map(m => ({\n    ...m,\n    weight: industryAffinity.includes(m.modifier) ? m.weight * 2.5 : m.weight\n  }));\n  selectedModifier = weightedPick(boostedModifiers, CAMPAIGN_GOAL);\n} else {\n  selectedModifier = weightedPick(VARIATION_MODIFIERS, CAMPAIGN_GOAL);\n}\n\n// ============================================================\n// OUTPUT\n// ============================================================\nreturn [{\n  json: {\n    system_version: \"creative_engine_v3_production\",\n    campaign_goal: CAMPAIGN_GOAL,\n    product_type: PRODUCT_TYPE,\n\n    creative_format: selectedFormat,\n    variation_modifier: selectedModifier,\n\n    enforcement_layer: {\n      min_words_per_scene: 100,\n      require_brand_colors_on_surfaces: true,\n      require_double_quoted_text: true,\n      require_five_part_formula: true,\n      forbid_sd_negative_prompts: true,\n      forbid_generic_phrases: [\n        \"futuristic holographic\",\n        \"neon-lit trading floor\",\n        \"data streams surge\",\n        \"pulse and ripple\",\n        \"180-degree arc shot\",\n        \"dynamic and vibrant\",\n        \"state of the art\"\n      ],\n      single_output_prompt: true,\n      aspect_ratio: \"16:9\"\n    },\n\n    intelligence: {\n      selection_reason: `Format \"${selectedFormat.name}\" selected for ${CAMPAIGN_GOAL} goal${PRODUCT_TYPE ? ` with ${PRODUCT_TYPE} product boost` : ''}`,\n      modifier_reason: industryAffinity.length > 0\n        ? `Modifier \"${selectedModifier.modifier}\" selected via industry affinity`\n        : `Modifier \"${selectedModifier.modifier}\" selected via weighted random`,\n      human_required: selectedFormat.human_required,\n      product_placement: selectedFormat.product_shown\n    },\n\n    rotation_note: `${selectedFormat.name} × ${selectedModifier.modifier} → ${CAMPAIGN_GOAL}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        304
+      ],
+      "id": "15e03d56-6647-41b7-a4e8-b5ac99a90a20",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// NODE 2a — SMART URL SCRAPER (HARDENED v2)\n// Bulletproof against bad input, slow APIs, malformed URLs\n// ============================================================\n\n// ============================================================\n// STEP 0 — SAFE INPUT ACCESS\n// ============================================================\nlet formData;\n\ntry {\n  formData = $('Form')?.first()?.json || {};\n} catch {\n  formData = $input.first()?.json || {};\n}\n\nconst productUrl =\n  formData['Product URL for Product detail and Marketing'] ||\n  formData['Product URL'] ||\n  null;\n$input.first().json['Product URL for Product detail and Marketing']\nconst productName = (formData['Name Of Product'] || '').toLowerCase();\n\n// ============================================================\n// STEP 1 — ROBUST URL NORMALIZATION (FINAL FIX)\n// ============================================================\n\nlet cleanUrl;\n\ntry {\n  let safeUrl = String(productUrl || '')\n    .trim()\n    .replace(/[\\u200B-\\u200D\\uFEFF]/g, ''); // remove invisible chars\n\n  // Remove protocol for normalization\n  safeUrl = safeUrl.replace(/^https?:\\/\\//i, '');\n\n  // Remove trailing slashes\n  safeUrl = safeUrl.replace(/\\/+$/, '');\n\n  // BASIC DOMAIN VALIDATION (critical fix)\n  const domainRegex = /^(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}$/;\n\n  if (!domainRegex.test(safeUrl)) {\n    throw new Error('Invalid domain format');\n  }\n\n  // Rebuild clean URL\n  cleanUrl = `https://${safeUrl}`;\n\n} catch (err) {\n  return [{\n    json: {\n      scraped_content: null,\n      scrape_source: 'invalid_url',\n      scrape_quality: 'none',\n      url_attempted: productUrl,\n      fallback_used: false,\n      warning: `Invalid URL after sanitization: ${productUrl}`\n    }\n  }];\n}\n// ============================================================\n// STEP 2 — SCRAPER CONFIG\n// ============================================================\nconst SCRAPERS = [\n  {\n    name: 'jina_reader',\n    buildUrl: (url) => `https://r.jina.ai/${url}`,\n    headers: { Accept: 'text/plain' }\n  },\n  {\n    name: 'jina_markdown',\n    buildUrl: (url) => `https://r.jina.ai/${url}`,\n    headers: { Accept: 'text/markdown' }\n  },\n  {\n    name: 'allorigins',\n    buildUrl: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,\n    headers: {}\n  }\n];\n\n// ============================================================\n// STEP 3 — HELPERS\n// ============================================================\n\n// Extract text safely\nfunction extractText(body) {\n  try {\n    if (!body) return '';\n\n    if (typeof body === 'string') return body;\n\n    if (body.contents) return body.contents;\n\n    return JSON.stringify(body);\n  } catch {\n    return '';\n  }\n}\n\n// Clean HTML\nfunction cleanHtml(text) {\n  return text\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s{2,}/g, ' ')\n    .trim();\n}\n\n// Quality scoring\nfunction scoreContent(text) {\n  if (!text) return 'low';\n\n  const length = text.length;\n\n  const keywords = [\n    productName,\n    'feature',\n    'price',\n    'about',\n    'api',\n    'platform',\n    'benefit'\n  ];\n\n  const hits = keywords.filter(k => k && text.toLowerCase().includes(k)).length;\n\n  if (length > 3000 && hits >= 2) return 'high';\n  if (length > 1200) return 'medium';\n  return 'low';\n}\n\n// ============================================================\n// STEP 4 — SCRAPER EXECUTION (WITH TIMEOUT + FAILSAFE)\n// ============================================================\nlet scrapedContent = null;\nlet scrapeSource = 'none';\nlet scrapeQuality = 'failed';\nlet fallbackUsed = false;\nlet attemptLog = [];\n\nfor (let i = 0; i < SCRAPERS.length; i++) {\n  const scraper = SCRAPERS[i];\n\n  try {\n    const response = await this.helpers.httpRequest({\n      method: 'GET',\n      url: scraper.buildUrl(cleanUrl),\n      headers: scraper.headers,\n      timeout: 8000,\n      json: false,\n      ignoreHttpStatusErrors: true\n    });\n\n    const text = cleanHtml(extractText(response)).slice(0, 10000);\n\n    attemptLog.push({\n      scraper: scraper.name,\n      length: text.length\n    });\n\n    if (text.length > 300) {\n      scrapedContent = text;\n      scrapeSource = scraper.name;\n      scrapeQuality = scoreContent(text);\n      fallbackUsed = i > 0;\n      break;\n    }\n\n  } catch (err) {\n    attemptLog.push({\n      scraper: scraper.name,\n      error: err.message\n    });\n  }\n}\n\n// ============================================================\n// STEP 5 — FINAL FAILSAFE CONTENT\n// ============================================================\nif (!scrapedContent) {\n  scrapedContent = `Product: ${productName || 'Unknown'}.\nThis appears to be a product or service webpage. No structured content could be extracted.`;\n}\n\n// ============================================================\n// STEP 6 — OUTPUT (NEVER FAILS)\n// ============================================================\nreturn [{\n  json: {\n    scraped_content: scrapedContent,\n    scrape_source: scrapeSource,\n    scrape_quality: scrapeQuality,\n    url_attempted: cleanUrl,\n    fallback_used: fallbackUsed,\n    attempt_log: attemptLog,\n    warning: scrapeSource === 'none'\n      ? 'All scrapers failed — fallback content generated.'\n      : null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        768,
+        304
+      ],
+      "id": "8637479d-f4f9-4e15-8b33-7c2cf670d9ff",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemma-4-31b-it",
+          "mode": "list",
+          "cachedResultName": "models/gemma-4-31b-it"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a senior product marketing strategist and brand intelligence engine. Your task is to synthesize all available product data into a comprehensive marketing intelligence profile that will drive AI video creative generation.\nYOU HAVE THREE TIERS OF INPUT — use them in this exact priority order:\nTIER 1 — USER-PROVIDED CONTEXT (highest trust — always present):\n\nProduct name from form\nProduct description override (if user provided one)\nProduct URL (for reference)\n\nTIER 2 — IMAGE ANALYSIS YAML (second highest trust — always present):\n\nBrand name, logo style, colors extracted directly from the product image\nIndustry vertical signals from visual design language\nBrand tier and emotional tone from visual identity\nThis is ground truth for brand identity — never contradict it\n\nTIER 3 — URL SCRAPED CONTENT (lowest trust — may be empty, thin, or failed):\n\nUse to fill in features, pricing, value proposition, audience details\nIf scrape_quality is \"failed\" or \"low\" — treat as unreliable, do not force it\nIf scrape_content is null — ignore entirely, build from Tier 1 + 2 only\n\nCRITICAL RESILIENCE RULES:\n\nNEVER output null for industry_vertical — infer it from the brand name, logo style, and any visual signals in the YAML even if URL content is empty.\nNEVER output generic fallbacks like \"technology\" or \"software\" — be specific. \"QuantCAI\" with quantum wave imagery = quantum_computing_education. A supplement bottle with clean labels = wellness_supplements.\nIf URL content is empty, build the marketing profile from visual identity signals. A product's visual design language reveals its industry, audience, and positioning.\nBrand colors come from Tier 2 (Vision YAML) — never guess or approximate them.\nProduct type comes from BOTH name analysis AND visual signals. \"CAI\" suffix + educational platform signals = education_platform.\n\nPRODUCT TYPE DETECTION RULES (apply even without URL content):\n\nAPI / developer product: URL contains \"api\", \"rapidapi\", \"developer\", or technical documentation signals\nEducation platform: \"learn\", \"course\", \"academy\", \"lab\", \"tutorial\" in name or URL, or classroom visual signals\nQuantum computing: \"quant\" prefix + physics/wave visual imagery = quantum_computing_education\nSaaS dashboard: UI screenshot in image, clean interface, metric cards\nPhysical product: 3D object in image, packaging visible, material texture\nConsumable: Bottle, jar, tube, ingredient imagery\nApparel: Clothing, fabric, human wearing product\n\nOUTPUT — valid JSON only. First character = { Last character = }\n{\n\"product_intelligence\": {\n\"product_name\": \"<from form — exact>\",\n\"product_category\": \"<specific: quantum education platform | B2B crypto API | DTC skincare | etc.>\",\n\"product_subcategory\": \"<more specific: live quantum computing courses | real-time order flow data | etc.>\",\n\"product_type\": \"<enum: digital_saas | physical_goods | consumable | apparel | data_api | education_platform | service>\",\n\"price_tier\": \"<from URL if available, else infer from brand tier: free | freemium | low_ticket | mid_ticket | high_ticket | enterprise>\",\n\"value_proposition\": \"<2-3 sentences from URL if available, else construct from name + visual signals>\",\n\"key_features\": [\"<feature 1 — from URL or inferred>\", \"<feature 2>\", \"<feature 3>\", \"<feature 4>\"],\n\"primary_pain_point_solved\": \"<be specific — infer from product category if URL unavailable>\",\n\"transformation_statement\": \"<Before: [state] → After: [state]>\",\n\"data_confidence\": \"<enum: high | medium | low — reflects how much URL content was available>\"\n},\n\"audience_intelligence\": {\n\"primary_audience\": \"<specific: quantum computing students | algorithmic traders | gym owners>\",\n\"secondary_audience\": \"<second segment>\",\n\"audience_sophistication\": \"<beginner | intermediate | expert | mixed>\",\n\"decision_driver\": \"<logic | emotion | social_proof | authority | scarcity | curiosity | aspiration>\",\n\"platform_affinity\": [\"<platform 1>\", \"<platform 2>\", \"<platform 3>\"],\n\"aesthetic_preference\": \"<specific visual world they respond to>\",\n\"buying_context\": \"<impulse | considered | enterprise_cycle | subscription | one_time>\",\n\"objection_to_overcome\": \"<#1 reason they hesitate>\"\n},\n\"visual_identity\": {\n\"brand_colors\": {\n\"primary\": \"<#hex — from Vision YAML>\",\n\"secondary\": \"<#hex — from Vision YAML>\",\n\"accent\": \"<#hex — from Vision YAML or null>\",\n\"background\": \"<#hex — from Vision YAML>\",\n\"text\": \"<#hex — from Vision YAML or null>\"\n},\n\"color_names\": {\n\"primary\": \"<descriptive name: Electric Blue | Crimson Red | etc.>\",\n\"secondary\": \"<descriptive name>\",\n\"accent\": \"<descriptive name or null>\"\n},\n\"typography_personality\": \"<from Vision YAML typography field>\",\n\"visual_tone\": \"<cinematic | editorial | raw_ugc | minimalist | corporate | energetic | premium_lifestyle | dark_technical>\",\n\"logo_description\": \"<exact visual description for video placement — from Vision YAML>\",\n\"competitor_visual_world\": \"<how similar product ads look — so this product can differentiate>\"\n},\n\"creative_strategy\": {\n\"hero_marketing_hook\": \"<specific and original — never generic>\",\n\"secondary_hook\": \"<different emotional register>\",\n\"tertiary_hook\": \"<social proof or curiosity angle>\",\n\"proof_point\": \"<from URL if available, else null>\",\n\"cta_recommendation\": \"<specific CTA matching product type>\",\n\"emotional_journey\": \"<exact arc: confusion → clarity → empowerment>\",\n\"content_formats_recommended\": [\"<format 1>\", \"<format 2>\", \"<format 3>\"],\n\"forbidden_cliches\": [\"<cliche 1>\", \"<cliche 2>\"]\n},\n\"industry_visual_language\": {\n\"vertical\": \"<specific: quantum_computing_education | fintech | wellness | fashion | developer_tools | food_beverage | fitness | enterprise_saas | ecommerce>\",\n\"environment_archetype\": \"<physics lab | bloomberg terminal | modern gym | minimalist kitchen | dark IDE | quantum computing lab | luxury retail>\",\n\"lighting_signature\": \"<cold institutional | warm golden hour | dark dramatic rim | soft diffused natural | clean bright studio>\",\n\"human_archetype\": \"<curious physics student | stressed analyst | confident founder | health-conscious professional | hardcore athlete>\",\n\"prop_language\": \"<objects that signal authenticity for this vertical>\"\n},\n\"video_creative_parameters\": {\n\"recommended_aspect_ratio\": \"<16:9 | 9:16 | 1:1>\",\n\"recommended_duration_seconds\": 8,\n\"pacing\": \"<slow_cinematic | medium_editorial | fast_ugc | dynamic_mixed>\",\n\"sound_design\": \"<specific direction: ambient quantum hum | crisp electronic pulse | warm acoustic | high-energy beat>\",\n\"on_screen_text_style\": \"<minimal | bold_callout | terminal_code | editorial_caption>\",\n\"product_placement_style\": \"<hero_center | lifestyle_context | ui_closeup | hands_on | environmental>\"\n},\n\"competitive_differentiation\": {\n\"unique_angle\": \"<what makes this visually distinct for advertising>\",\n\"trust_signals\": [\"<signal 1>\", \"<signal 2>\", \"<signal 3>\"],\n\"category_codes_to_break\": \"<visual cliche of this industry to deliberately avoid>\"\n},\n\"scrape_metadata\": {\n\"url_content_used\": \"<boolean — was URL content actually useful>\",\n\"scrape_quality_received\": \"<high | medium | low | failed>\",\n\"primary_data_source\": \"<url_content | vision_yaml | form_data | combined>\"\n}\n}"
+            },
+            {
+              "content": "={{ $('Form').item.json['Product URL for Product detail and Marketing'] }}  {{ $json.scraped_content }}{{ $json.scraped_content }}{{ $('Analyze an image').item.json.candidates[0].content.parts[0].text }}{{ $('Analyze an image').item.json.candidates[0].content.parts[1] }}"
+            }
+          ]
+        },
+        "simplify": "={{ true }}",
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        944,
+        304
+      ],
+      "id": "50e88f9c-4b30-481b-b164-78fe2c44b783",
+      "name": "URL Analyer",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "5vVj8vfFaHfK3LOR",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgbb.com/1/upload?key=3278485fdafd36c6a3cf2461f0606026",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "Product_Image"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        464,
+        304
+      ],
+      "id": "93f90e20-2806-45c6-9911-3106cb370a60",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        816
+      ],
+      "id": "b498794d-4b04-412d-85e5-0e805f4f5c51",
+      "name": "Telegram Trigger",
+      "webhookId": "6af1ec99-29ad-460b-8ddf-2015b259d0dd",
+      "credentials": {
+        "telegramApi": {
+          "id": "IxdWyNHAK3DK8zDZ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.telegram.org/bot{{ $json['bot id'] }}/getFile?file_id={{ $('Telegram Trigger').item.json.message.photo[2].file_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1632,
+        816
+      ],
+      "id": "8f41a62d-840c-4e71-8cd2-60b542df2463",
+      "name": "get image id"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "997fa463-bb08-4c67-9d67-8a60efe22875",
+              "name": "bot id",
+              "value": "8337351700:AAFGFYqxAsTZjCwM-nBZ6UKUCvbKHMI-BmI",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        816
+      ],
+      "id": "5ff445c5-b6bb-48f1-9b25-b31747fd7a61",
+      "name": "Bot ID"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1392,
+        1104
+      ],
+      "id": "b3c7cdd1-6605-449e-a305-e0b3a9f22bec",
+      "name": "Telegram Trigger1",
+      "webhookId": "6af1ec99-29ad-460b-8ddf-2015b259d0dd",
+      "credentials": {
+        "telegramApi": {
+          "id": "IxdWyNHAK3DK8zDZ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://apihut.in/api/download/videos",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Avatar-Key",
+              "value": "ae2d9a97-eadd-4fe6-88b0-9c5fe5811478"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "video_url",
+              "value": "https://www.instagram.com/reel/DVXoTnJE6LZ/?igsh=OTBpdGk0Zm9qOGN4"
+            },
+            {
+              "name": "type",
+              "value": "instagram"
+            },
+            {
+              "name": "user_id",
+              "value": "ae2d9a97-eadd-4fe6-88b0-9c5fe5811478"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1600,
+        1104
+      ],
+      "id": "ac17b86e-ae1f-4797-a73a-3dc377fd4e03",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cloud.comfy.org/prompt",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "api_key_comfy_org",
+              "value": "=comfyui-f78fe47935c269f696cf55353699bd3686a558b8adfe9feb29a5bedfb6168915"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "prompt",
+              "value": "={\n  \"10\": {\n    \"inputs\": {\n      \"image\": \"806e97216eee2cb21e54fae1cc5e9f96d5eff8244285cefb5775da3f5c2739ec.jpg\"\n    },\n    \"class_type\": \"LoadImage\",\n    \"_meta\": {\n      \"title\": \"Reference Image\"\n    }\n  },\n  \"19\": {\n    \"inputs\": {\n      \"filename_prefix\": \"video/ComfyUI\",\n      \"format\": \"auto\",\n      \"codec\": \"auto\",\n      \"video\": [\n        \"344:232:15\",\n        0\n      ]\n    },\n    \"class_type\": \"SaveVideo\",\n    \"_meta\": {\n      \"title\": \"Save Video\"\n    }\n  },\n  \"159\": {\n    \"inputs\": {\n      \"value\": 720\n    },\n    \"class_type\": \"PrimitiveInt\",\n    \"_meta\": {\n      \"title\": \"Width\"\n    }\n  },\n  \"160\": {\n    \"inputs\": {\n      \"value\": 720\n    },\n    \"class_type\": \"PrimitiveInt\",\n    \"_meta\": {\n      \"title\": \"Height\"\n    }\n  },\n  \"301\": {\n    \"inputs\": {\n      \"video\": \"4c4fa92f8dba895b4ad0522bd275dcf3a57921522e912a96de889626f88a7df9.mp4\",\n      \"force_rate\": 0,\n      \"custom_width\": 0,\n      \"custom_height\": 0,\n      \"frame_load_cap\": 0,\n      \"skip_first_frames\": 0,\n      \"select_every_nth\": 1,\n      \"format\": \"AnimateDiff\"\n    },\n    \"class_type\": \"VHS_LoadVideo\",\n    \"_meta\": {\n      \"title\": \"Input Video\"\n    }\n  },\n  \"314\": {\n    \"inputs\": {\n      \"video_info\": [\n        \"301\",\n        3\n      ]\n    },\n    \"class_type\": \"VHS_VideoInfo\",\n    \"_meta\": {\n      \"title\": \"Video Info 🎥🅥🅗🅢\"\n    }\n  },\n  \"344:1\": {\n    \"inputs\": {\n      \"text\": \"色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走\",\n      \"clip\": [\n        \"344:2\",\n        0\n      ]\n    },\n    \"class_type\": \"CLIPTextEncode\",\n    \"_meta\": {\n      \"title\": \"CLIP Text Encode (Negative Prompt)\"\n    }\n  },\n  \"344:99\": {\n    \"inputs\": {\n      \"lora_name\": \"WanAnimate_relight_lora_fp16.safetensors\",\n      \"strength_model\": 1,\n      \"model\": [\n        \"344:18\",\n        0\n      ]\n    },\n    \"class_type\": \"LoraLoaderModelOnly\",\n    \"_meta\": {\n      \"title\": \"Load LoRA\"\n    }\n  },\n  \"344:9\": {\n    \"inputs\": {\n      \"crop\": \"none\",\n      \"clip_vision\": [\n        \"344:4\",\n        0\n      ],\n      \"image\": [\n        \"344:342\",\n        0\n      ]\n    },\n    \"class_type\": \"CLIPVisionEncode\",\n    \"_meta\": {\n      \"title\": \"CLIP Vision Encode\"\n    }\n  },\n  \"344:340\": {\n    \"inputs\": {\n      \"fps\": [\n        \"314\",\n        0\n      ],\n      \"images\": [\n        \"344:335\",\n        0\n      ]\n    },\n    \"class_type\": \"CreateVideo\",\n    \"_meta\": {\n      \"title\": \"Create Video\"\n    }\n  },\n  \"344:330\": {\n    \"inputs\": {\n      \"filename_prefix\": \"video/ComfyUI\",\n      \"format\": \"auto\",\n      \"codec\": \"auto\",\n      \"video\": [\n        \"344:340\",\n        0\n      ]\n    },\n    \"class_type\": \"SaveVideo\",\n    \"_meta\": {\n      \"title\": \"Save Video\"\n    }\n  },\n  \"344:331\": {\n    \"inputs\": {\n      \"filename_prefix\": \"video/ComfyUI\",\n      \"format\": \"auto\",\n      \"codec\": \"auto\",\n      \"video\": [\n        \"344:339\",\n        0\n      ]\n    },\n    \"class_type\": \"SaveVideo\",\n    \"_meta\": {\n      \"title\": \"Save Video\"\n    }\n  },\n  \"344:335\": {\n    \"inputs\": {\n      \"width\": [\n        \"344:348\",\n        0\n      ],\n      \"height\": [\n        \"344:348\",\n        1\n      ],\n      \"retarget_padding\": 16,\n      \"body_stick_width\": -1,\n      \"hand_stick_width\": -1,\n      \"draw_head\": \"True\",\n      \"pose_data\": [\n        \"344:334\",\n        0\n      ]\n    },\n    \"class_type\": \"DrawViTPose\",\n    \"_meta\": {\n      \"title\": \"Draw ViT Pose\"\n    }\n  },\n  \"344:339\": {\n    \"inputs\": {\n      \"fps\": [\n        \"314\",\n        0\n      ],\n      \"images\": [\n        \"344:332\",\n        0\n      ]\n    },\n    \"class_type\": \"CreateVideo\",\n    \"_meta\": {\n      \"title\": \"Create Video\"\n    }\n  },\n  \"344:329\": {\n    \"inputs\": {\n      \"filename_prefix\": \"video/ComfyUI\",\n      \"format\": \"auto\",\n      \"codec\": \"auto\",\n      \"video\": [\n        \"344:333\",\n        0\n      ]\n    },\n    \"class_type\": \"SaveVideo\",\n    \"_meta\": {\n      \"title\": \"Save Video\"\n    }\n  },\n  \"344:334\": {\n    \"inputs\": {\n      \"width\": [\n        \"344:348\",\n        0\n      ],\n      \"height\": [\n        \"344:348\",\n        1\n      ],\n      \"model\": [\n        \"344:328\",\n        0\n      ],\n      \"images\": [\n        \"344:338\",\n        0\n      ]\n    },\n    \"class_type\": \"PoseAndFaceDetection\",\n    \"_meta\": {\n      \"title\": \"Pose and Face Detection\"\n    }\n  },\n  \"344:326\": {\n    \"inputs\": {\n      \"keep_model_loaded\": false,\n      \"individual_objects\": false,\n      \"sam2_model\": [\n        \"344:324\",\n        0\n      ],\n      \"image\": [\n        \"344:338\",\n        0\n      ],\n      \"bboxes\": [\n        \"344:334\",\n        3\n      ]\n    },\n    \"class_type\": \"Sam2Segmentation\",\n    \"_meta\": {\n      \"title\": \"Sam2Segmentation\"\n    }\n  },\n  \"344:333\": {\n    \"inputs\": {\n      \"fps\": [\n        \"314\",\n        0\n      ],\n      \"images\": [\n        \"344:334\",\n        1\n      ]\n    },\n    \"class_type\": \"CreateVideo\",\n    \"_meta\": {\n      \"title\": \"Create Video\"\n    }\n  },\n  \"344:338\": {\n    \"inputs\": {\n      \"upscale_method\": \"lanczos\",\n      \"width\": [\n        \"159\",\n        0\n      ],\n      \"height\": [\n        \"160\",\n        0\n      ],\n      \"crop\": \"center\",\n      \"image\": [\n        \"301\",\n        0\n      ]\n    },\n    \"class_type\": \"ImageScale\",\n    \"_meta\": {\n      \"title\": \"Resize Input Video\"\n    }\n  },\n  \"344:348\": {\n    \"inputs\": {\n      \"image\": [\n        \"344:338\",\n        0\n      ]\n    },\n    \"class_type\": \"GetImageSize\",\n    \"_meta\": {\n      \"title\": \"Get Image Size\"\n    }\n  },\n  \"344:328\": {\n    \"inputs\": {\n      \"vitpose_model\": \"vitpose-l-wholebody.onnx\",\n      \"yolo_model\": \"yolov10m.onnx\",\n      \"onnx_device\": \"CUDAExecutionProvider\"\n    },\n    \"class_type\": \"OnnxDetectionModelLoader\",\n    \"_meta\": {\n      \"title\": \"ONNX Detection Model Loader\"\n    }\n  },\n  \"344:324\": {\n    \"inputs\": {\n      \"model\": \"sam2.1_hiera_base_plus.safetensors\",\n      \"segmentor\": \"video\",\n      \"device\": \"cuda\",\n      \"precision\": \"fp16\"\n    },\n    \"class_type\": \"DownloadAndLoadSAM2Model\",\n    \"_meta\": {\n      \"title\": \"(Down)Load SAM2Model\"\n    }\n  },\n  \"344:325\": {\n    \"inputs\": {\n      \"block_size\": 32,\n      \"device\": \"cpu\",\n      \"masks\": [\n        \"344:327\",\n        0\n      ]\n    },\n    \"class_type\": \"BlockifyMask\",\n    \"_meta\": {\n      \"title\": \"Blockify Mask\"\n    }\n  },\n  \"344:332\": {\n    \"inputs\": {\n      \"color\": \"0, 0, 0\",\n      \"device\": \"cpu\",\n      \"image\": [\n        \"344:338\",\n        0\n      ],\n      \"mask\": [\n        \"344:325\",\n        0\n      ]\n    },\n    \"class_type\": \"DrawMaskOnImage\",\n    \"_meta\": {\n      \"title\": \"Draw Mask On Image\"\n    }\n  },\n  \"344:327\": {\n    \"inputs\": {\n      \"expand\": 10,\n      \"incremental_expandrate\": 0,\n      \"tapered_corners\": true,\n      \"flip_input\": false,\n      \"blur_radius\": 0,\n      \"lerp_alpha\": 1,\n      \"decay_factor\": 1,\n      \"fill_holes\": false,\n      \"mask\": [\n        \"344:326\",\n        0\n      ]\n    },\n    \"class_type\": \"GrowMaskWithBlur\",\n    \"_meta\": {\n      \"title\": \"Grow Mask With Blur\"\n    }\n  },\n  \"344:342\": {\n    \"inputs\": {\n      \"upscale_method\": \"lanczos\",\n      \"width\": [\n        \"159\",\n        0\n      ],\n      \"height\": [\n        \"160\",\n        0\n      ],\n      \"crop\": \"center\",\n      \"image\": [\n        \"10\",\n        0\n      ]\n    },\n    \"class_type\": \"ImageScale\",\n    \"_meta\": {\n      \"title\": \"Resize Reference Image\"\n    }\n  },\n  \"344:20\": {\n    \"inputs\": {\n      \"unet_name\": \"Wan2_2-Animate-14B_fp8_e4m3fn_scaled_KJ.safetensors\",\n      \"weight_dtype\": \"default\"\n    },\n    \"class_type\": \"UNETLoader\",\n    \"_meta\": {\n      \"title\": \"Load Diffusion Model\"\n    }\n  },\n  \"344:2\": {\n    \"inputs\": {\n      \"clip_name\": \"umt5_xxl_fp8_e4m3fn_scaled.safetensors\",\n      \"type\": \"wan\",\n      \"device\": \"default\"\n    },\n    \"class_type\": \"CLIPLoader\",\n    \"_meta\": {\n      \"title\": \"Load CLIP\"\n    }\n  },\n  \"344:3\": {\n    \"inputs\": {\n      \"vae_name\": \"wan_2.1_vae.safetensors\"\n    },\n    \"class_type\": \"VAELoader\",\n    \"_meta\": {\n      \"title\": \"Load VAE\"\n    }\n  },\n  \"344:4\": {\n    \"inputs\": {\n      \"clip_name\": \"clip_vision_h.safetensors\"\n    },\n    \"class_type\": \"CLIPVisionLoader\",\n    \"_meta\": {\n      \"title\": \"Load CLIP Vision\"\n    }\n  },\n  \"344:21\": {\n    \"inputs\": {\n      \"text\": \"the person is dancing\",\n      \"clip\": [\n        \"344:2\",\n        0\n      ]\n    },\n    \"class_type\": \"CLIPTextEncode\",\n    \"_meta\": {\n      \"title\": \"CLIP Text Encode (Positive Prompt)\"\n    }\n  },\n  \"344:60\": {\n    \"inputs\": {\n      \"shift\": 8,\n      \"model\": [\n        \"344:99\",\n        0\n      ]\n    },\n    \"class_type\": \"ModelSamplingSD3\",\n    \"_meta\": {\n      \"title\": \"ModelSamplingSD3\"\n    }\n  },\n  \"344:18\": {\n    \"inputs\": {\n      \"lora_name\": \"lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors\",\n      \"strength_model\": 1,\n      \"model\": [\n        \"344:20\",\n        0\n      ]\n    },\n    \"class_type\": \"LoraLoaderModelOnly\",\n    \"_meta\": {\n      \"title\": \"Load LoRA\"\n    }\n  },\n  \"344:279\": {\n    \"inputs\": {\n      \"value\": -391237782833352\n    },\n    \"class_type\": \"PrimitiveInt\",\n    \"_meta\": {\n      \"title\": \"Seed\"\n    }\n  },\n  \"344:232:62\": {\n    \"inputs\": {\n      \"width\": [\n        \"159\",\n        0\n      ],\n      \"height\": [\n        \"160\",\n        0\n      ],\n      \"length\": [\n        \"301\",\n        1\n      ],\n      \"batch_size\": 1,\n      \"continue_motion_max_frames\": 5,\n      \"video_frame_offset\": 0,\n      \"positive\": [\n        \"344:21\",\n        0\n      ],\n      \"negative\": [\n        \"344:1\",\n        0\n      ],\n      \"vae\": [\n        \"344:3\",\n        0\n      ],\n      \"clip_vision_output\": [\n        \"344:9\",\n        0\n      ],\n      \"reference_image\": [\n        \"344:342\",\n        0\n      ],\n      \"face_video\": [\n        \"344:334\",\n        1\n      ],\n      \"pose_video\": [\n        \"344:335\",\n        0\n      ],\n      \"background_video\": [\n        \"344:332\",\n        0\n      ],\n      \"character_mask\": [\n        \"344:325\",\n        0\n      ]\n    },\n    \"class_type\": \"WanAnimateToVideo\",\n    \"_meta\": {\n      \"title\": \"WanAnimateToVideo\"\n    }\n  },\n  \"344:232:63\": {\n    \"inputs\": {\n      \"seed\": [\n        \"344:279\",\n        0\n      ],\n      \"steps\": 6,\n      \"cfg\": 1,\n      \"sampler_name\": \"euler\",\n      \"scheduler\": \"simple\",\n      \"denoise\": 1,\n      \"model\": [\n        \"344:60\",\n        0\n      ],\n      \"positive\": [\n        \"344:232:62\",\n        0\n      ],\n      \"negative\": [\n        \"344:232:62\",\n        1\n      ],\n      \"latent_image\": [\n        \"344:232:62\",\n        2\n      ]\n    },\n    \"class_type\": \"KSampler\",\n    \"_meta\": {\n      \"title\": \"KSampler\"\n    }\n  },\n  \"344:232:58\": {\n    \"inputs\": {\n      \"samples\": [\n        \"344:232:57\",\n        0\n      ],\n      \"vae\": [\n        \"344:3\",\n        0\n      ]\n    },\n    \"class_type\": \"VAEDecode\",\n    \"_meta\": {\n      \"title\": \"VAE Decode\"\n    }\n  },\n  \"344:232:230\": {\n    \"inputs\": {\n      \"batch_index\": [\n        \"344:232:62\",\n        4\n      ],\n      \"length\": 4096,\n      \"image\": [\n        \"344:232:58\",\n        0\n      ]\n    },\n    \"class_type\": \"ImageFromBatch\",\n    \"_meta\": {\n      \"title\": \"ImageFromBatch\"\n    }\n  },\n  \"344:232:15\": {\n    \"inputs\": {\n      \"fps\": [\n        \"314\",\n        0\n      ],\n      \"images\": [\n        \"344:232:230\",\n        0\n      ]\n    },\n    \"class_type\": \"CreateVideo\",\n    \"_meta\": {\n      \"title\": \"Create Video\"\n    }\n  },\n  \"344:232:57\": {\n    \"inputs\": {\n      \"trim_amount\": [\n        \"344:232:62\",\n        3\n      ],\n      \"samples\": [\n        \"344:232:63\",\n        0\n      ]\n    },\n    \"class_type\": \"TrimVideoLatent\",\n    \"_meta\": {\n      \"title\": \"TrimVideoLatent\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1744,
+        816
+      ],
+      "id": "cbb3d78c-110b-4c8f-937f-f1778ca3ccf4",
+      "name": "HTTP Request3"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Form": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Prompt Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "Prompt Generator",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Prompt Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "URL Analyer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL Analyer": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Bot ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        []
+      ]
+    },
+    "Bot ID": {
+      "main": [
+        [
+          {
+            "node": "get image id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get image id": {
+      "main": [
+        []
+      ]
+    },
+    "Telegram Trigger1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0555e25a-6d33-4eaf-a439-b43abebe7e4f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d5da5962de64786b4cabad69a4ce9add67f73e3153c31c76b0276334f85d9319"
+  },
+  "id": "2DxNMeUmrEhynkGh",
+  "tags": []
+}   i want you to make this system in python and intigate with the platform 
