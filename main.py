@@ -98,6 +98,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "contentPillars" JSON NOT NULL DEFAULT \'[]\'::json;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "suggestedHashtags" JSON NOT NULL DEFAULT \'[]\'::json;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandAnalysisComplete" BOOLEAN NOT NULL DEFAULT FALSE;',
+                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "postIntervalHours" INTEGER NOT NULL DEFAULT 2;',
+                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "creativeGenerationIntervalHours" INTEGER NOT NULL DEFAULT 2;',
+                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "autoGenerateCreatives" BOOLEAN NOT NULL DEFAULT TRUE;',
+                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "VideoApiConfig" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "Audience" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "SocialCampaign" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "EmailCampaign" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                        'ALTER TABLE "MarketingLog" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
                     ]
                     for q in queries:
                         await conn.execute(text(q))
