@@ -115,8 +115,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         system_user = User(
                             email="system@organicai.pro",
                             password="NOPASSWORD",
-                            name="System Account",
-                            role="SYSTEM",
                             subscriptionStatus="ACTIVE"
                         )
                         session.add(system_user)
@@ -248,10 +246,18 @@ async def global_exception_handler(
     if settings.environment != "production":
         detail = str(exc)
     
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content={"success": False, "message": detail, "error_id": error_id},
     )
+    
+    # Ensure CORS headers are present even on 500 errors so the frontend can read the error message
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+    return response
 
 
 # =============================================================================
