@@ -24,11 +24,26 @@ const Auth = ({ onLogin, showToast }) => {
       const endpoint = isLoginMode ? '/auth/login' : '/auth/register';
       const payload = JSON.stringify({ email, password });
         
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload
-      });
+      let res;
+      let retries = 12; // Wait up to 60 seconds (12 * 5s) for Render server to wake up
+      while (retries > 0) {
+        try {
+          res = await fetch(`${API_BASE}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+          });
+          break; // Fetch successful (whether 200 or 401 etc), exit retry loop
+        } catch (fetchErr) {
+          if (fetchErr.name === 'TypeError' && fetchErr.message === 'Failed to fetch' && retries > 1) {
+            showToast('Waking up server instance... Please wait, retrying automatically.', true);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            retries--;
+          } else {
+            throw fetchErr;
+          }
+        }
+      }
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -42,11 +57,25 @@ const Auth = ({ onLogin, showToast }) => {
 
       const token = data.token;
       
-      const userRes = await fetch(`${API_BASE}/users/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      let userRes;
+      let userRetries = 3;
+      while (userRetries > 0) {
+        try {
+          userRes = await fetch(`${API_BASE}/users/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          break;
+        } catch (userErr) {
+          if (userErr.name === 'TypeError' && userErr.message === 'Failed to fetch' && userRetries > 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            userRetries--;
+          } else {
+            throw userErr;
+          }
+        }
+      }
 
-      if (userRes.ok) {
+      if (userRes && userRes.ok) {
         const userData = await userRes.json();
         onLogin(token, userData);
         
@@ -60,7 +89,7 @@ const Auth = ({ onLogin, showToast }) => {
       }
     } catch (err) {
       if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
-        showToast('Waking up server instance... Please try again in 5 seconds.', true);
+        showToast('Server is currently unreachable. Please check your internet connection.', true);
       } else {
         showToast(err.message || 'Authentication failed', true);
       }
