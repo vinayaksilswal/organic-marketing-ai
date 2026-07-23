@@ -242,9 +242,9 @@ async def global_exception_handler(
     error_id = str(uuid.uuid4())
     logger.exception(f"Unhandled Exception on {request.method} {request.url.path} (Error ID: {error_id})")
     
-    detail = "An internal error occurred. Please try again later."
-    if settings.environment != "production":
-        detail = str(exc)
+    detail = str(exc)
+    # if settings.environment != "production":
+    #     detail = str(exc)
     
     response = JSONResponse(
         status_code=500,
