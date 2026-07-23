@@ -76,9 +76,13 @@ const Dashboard = ({ user, token, showToast }) => {
         const formData = new FormData();
         formData.append('file', fileToUpload);
 
+        const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
         const uploadRes = await fetch(`${API_BASE}/upload-media`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {})
+          },
           body: formData
         });
 
@@ -91,18 +95,14 @@ const Dashboard = ({ user, token, showToast }) => {
       }
 
       // 1. Create Social Campaign record
-      const campaignRes = await fetch(`${API_BASE}/campaigns`, {
+      const campaignRes = await authFetch(`${API_BASE}/campaigns`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           baseCaption: baseCaption || 'Automated high-converting growth post by OrganicAI',
           mediaUrl: uploadedMediaUrl,
           mediaType: mediaType
         })
-      });
+      }, token);
 
       if (!campaignRes.ok) {
         const errJson = await campaignRes.json().catch(() => ({}));
