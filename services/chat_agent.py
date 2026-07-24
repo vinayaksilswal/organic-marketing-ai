@@ -12,9 +12,7 @@ Available Tools:
   - search_products: Search the product catalog by name or ID
   - post_social_ad: Generate AI caption and post to FB/IG
   - send_email_campaign: Generate promotional email and blast to audience
-  - bulk_import_products: Extract SPU codes from text and import from CJ
-  - trigger_fulfillment: Trigger CJ order fulfillment for a pending order
-  - get_order_status: Check CJ fulfillment status for an order
+
   - get_marketing_stats: Get platform statistics and recent marketing activity
 
 The agent supports multi-turn tool calling: if the model requests a tool,

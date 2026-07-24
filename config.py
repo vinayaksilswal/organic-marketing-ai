@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     # =========================================================================
     # Meta Graph API (Facebook + Instagram publishing)
     # =========================================================================
+    fb_app_id: str | None = None
+    fb_app_secret: str | None = None
     fb_page_access_token: str | None = None
     fb_page_id: str | None = None
     ig_business_account_id: str | None = None
