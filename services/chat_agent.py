@@ -194,14 +194,10 @@ async def execute_tool(
                 product = (await session.execute(select(Product).where(Product.id == query))).scalar_one_or_none()
                 if product:
                     return (
-                        f"Found exact product:
-"
-                        f"  ID: {product.id}
-"
-                        f"  Name: {product.title}
-"
-                        f"  Price: ${product.price}
-"
+                        f"Found exact product:\\n"
+                        f"  ID: {product.id}\\n"
+                        f"  Name: {product.title}\\n"
+                        f"  Price: ${product.price}\\n"
                         f"  Description: {product.description[:200] if product.description else ''}..."
                     )
 
@@ -216,8 +212,7 @@ async def execute_tool(
                     lines.append(
                         f"  ID: {p.id} | {p.title} | ${p.price}"
                     )
-                return "
-".join(lines)
+                return "\\n".join(lines)
 
         # --- post_social_ad ---
         elif name == "post_social_ad":
@@ -285,20 +280,15 @@ async def execute_tool(
 
                 await session.commit()
 
-            result = f"Social post created for '{product.title}' → {platform}
-"
-            result += f"Caption: {caption[:100]}...
-"
+            result = f"Social post created for '{product.title}' → {platform}\\n"
+            result += f"Caption: {caption[:100]}...\\n"
             result += f"Status: {'POSTED ✓' if is_success else 'FAILED ✗'}"
             if fb_id:
-                result += f"
-FB Post ID: {fb_id}"
+                result += f"\\nFB Post ID: {fb_id}"
             if ig_id:
-                result += f"
-IG Post ID: {ig_id}"
+                result += f"\\nIG Post ID: {ig_id}"
             if errors:
-                result += f"
-Errors: {', '.join(errors)}"
+                result += f"\\nErrors: {', '.join(errors)}"
             return result
 
         # --- send_email_campaign ---
@@ -362,10 +352,8 @@ Errors: {', '.join(errors)}"
 
             if is_success:
                 return (
-                    f"✓ Email campaign sent for '{product.title}'
-"
-                    f"Subject: {subject}
-"
+                    f"✓ Email campaign sent for '{product.title}'\\n"
+                    f"Subject: {subject}\\n"
                     f"Recipients: {recipient_count}"
                 )
             return f"✗ Email campaign failed: {error_log}"
