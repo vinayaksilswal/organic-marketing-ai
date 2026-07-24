@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from database import AsyncSessionLocal, User, BusinessProfile, SocialConnection
 from routers.auth import verify_user
 from services.creative_service import auto_populate_workspace
+from services.crypto_service import encrypt_token, decrypt_token
 
 router = APIRouter(
     prefix="/api/v1/users/me",
@@ -164,6 +165,51 @@ async def update_business_profile_post(
                 "postIntervalHours": profile.postIntervalHours,
                 "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": profile.autoGenerateCreatives,
+            },
+        }
+
+@router.post("/social-connection")
+async def update_social_connection(
+    data: SocialConnectionUpdate, request: Request, user_id: str = Depends(verify_user)
+):
+    async with AsyncSessionLocal() as session:
+        stmt = select(SocialConnection).where(SocialConnection.userId == user_id)
+        res = await session.execute(stmt)
+        conn = res.scalars().first()
+
+        if conn:
+            if data.fbAccessToken is not None:
+                conn.fbAccessToken = encrypt_token(data.fbAccessToken)
+            if data.fbPageId is not None:
+                conn.fbPageId = data.fbPageId
+            if data.fbPageName is not None:
+                conn.fbPageName = data.fbPageName
+            if data.igAccountId is not None:
+                conn.igAccountId = data.igAccountId
+            if data.igAccountName is not None:
+                conn.igAccountName = data.igAccountName
+        else:
+            conn = SocialConnection(
+                userId=user_id,
+                fbAccessToken=encrypt_token(data.fbAccessToken) if data.fbAccessToken else None,
+                fbPageId=data.fbPageId,
+                fbPageName=data.fbPageName,
+                igAccountId=data.igAccountId,
+                igAccountName=data.igAccountName,
+            )
+            session.add(conn)
+
+        await session.commit()
+        await session.refresh(conn)
+
+        return {
+            "success": True,
+            "data": {
+                "id": conn.id,
+                "fbPageId": conn.fbPageId,
+                "fbPageName": conn.fbPageName,
+                "igAccountId": conn.igAccountId,
+                "igAccountName": conn.igAccountName,
             },
         }
 

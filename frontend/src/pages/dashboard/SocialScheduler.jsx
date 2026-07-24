@@ -1,662 +1,419 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../App';
-import { Calendar, Clock, Edit3, Trash2, CheckCircle2, XCircle, Play, AlertCircle, RefreshCw, X, FileText, Send, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3 } from 'lucide-react';
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [posts, setPosts] = useState([]);
-  const [logs, setLogs] = useState([]);
-  const [creatives, setCreatives] = useState([]);
   const [mediaList, setMediaList] = useState([]);
-  const [intervalHrs, setIntervalHrs] = useState(2); // 2hr Default
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [customHrs, setCustomHrs] = useState('');
-  const [isCustom, setIsCustom] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState('social'); // 'social', 'email', 'audience'
+  
+  // Toggles
+  const [frequencyHours, setFrequencyHours] = useState(2);
+  const [autoApproveActive, setAutoApproveActive] = useState(false);
   const [runningLoop, setRunningLoop] = useState(false);
-  const [activeTab, setActiveTab] = useState('queue'); // 'queue', 'creatives', or 'logs'
-  const [brandStatus, setBrandStatus] = useState(null);
 
-  // Post edit modal state
-  const [editingCreative, setEditingCreative] = useState(null);
+  // Edit Modal State
   const [editingPost, setEditingPost] = useState(null);
   const [editCaption, setEditCaption] = useState('');
-  const [editScheduledAt, setEditScheduledAt] = useState('');
-  const [editStatus, setEditStatus] = useState('SCHEDULED');
-  const [editSelectedMedia, setEditSelectedMedia] = useState('');
-  const [editSubmitting, setEditSubmitting] = useState(false);
-
-  const [autoCreativeGen, setAutoCreativeGen] = useState(true);
-  const [creativeGenIntervalHrs, setCreativeGenIntervalHrs] = useState(2);
+  const [editMedia, setEditMedia] = useState(null);
 
   useEffect(() => {
+    fetchSettings();
     fetchPosts();
-    fetchLogs();
-    fetchCreatives();
-    fetchBrandStatus();
-    fetchCreativeSettings();
     fetchMedia();
   }, [activeWorkspaceId]);
 
-    const fetchMedia = async () => {
+  const fetchSettings = async () => {
     try {
-      const res = await authFetch(`${API_BASE}/marketing/media`, {}, token);
-      if (res.ok) {
-        setMediaList(await res.json());
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const fetchCreativeSettings = async () => {
-    try {
-      const res = await authFetch(`${API_BASE}/creatives/settings`, {}, token);
+      const res = await authFetch(`${API_BASE}/marketing/settings`, {}, token);
       if (res.ok) {
         const data = await res.json();
-        setAutoCreativeGen(data.autoGenerateCreatives ?? true);
-        setCreativeGenIntervalHrs(data.creativeGenerationIntervalHours || 2);
+        if (data.success) {
+          setAutoApproveActive(data.autoApprove);
+          setFrequencyHours(data.intervalHours);
+        }
       }
-    } catch (err) { console.error(err); }
-  };
-
-  const saveCreativeSettings = async (intervalVal, autoVal) => {
-    const updatedInterval = intervalVal !== undefined ? intervalVal : creativeGenIntervalHrs;
-    const updatedAuto = autoVal !== undefined ? autoVal : autoCreativeGen;
-
-    try {
-      const res = await authFetch(`${API_BASE}/creatives/settings`, {
-        method: 'POST',
-        body: JSON.stringify({
-          creativeGenerationIntervalHours: updatedInterval,
-          autoGenerateCreatives: updatedAuto
-        })
-      }, token);
-      if (res.ok) {
-        setCreativeGenIntervalHrs(updatedInterval);
-        setAutoCreativeGen(updatedAuto);
-        showToast('Creative generation settings updated!');
-      }
-    } catch (err) {
-      showToast(err.message, true);
-    }
+    } catch (err) { console.error('Failed to fetch settings'); }
   };
 
   const fetchPosts = async () => {
     try {
       const res = await authFetch(`${API_BASE}/marketing/posts`, {}, token);
       if (res.ok) setPosts(await res.json());
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('Failed to fetch posts'); }
+  };
+  
+  const fetchMedia = async () => {
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media`, {}, token);
+      if (res.ok) setMediaList(await res.json());
+    } catch (err) { console.error('Failed to fetch media'); }
   };
 
-  const fetchLogs = async () => {
+  const handleFrequencyChange = async (hours) => {
+    setFrequencyHours(hours);
     try {
-      const res = await authFetch(`${API_BASE}/marketing/logs`, {}, token);
-      if (res.ok) setLogs(await res.json());
-    } catch (err) { console.error(err); }
-  };
-
-  const fetchCreatives = async () => {
-    try {
-      const res = await authFetch(`${API_BASE}/creatives/queue`, {}, token);
-      if (res.ok) {
-        const data = await res.json();
-        setCreatives(data.data || []);
-      }
-    } catch (err) { console.error(err); }
-  };
-
-  const fetchBrandStatus = async () => {
-    try {
-      const res = await authFetch(`${API_BASE}/creatives/brand-status`, {}, token);
-      if (res.ok) setBrandStatus(await res.json());
-    } catch (err) { console.error(err); }
-  };
-
-  const toggleAutoApprove = async () => {
-    const newValue = !autoApprove;
-    try {
-      const res = await authFetch(`${API_BASE}/marketing/settings/auto-approve`, {
-        method: 'POST',
-        body: JSON.stringify({ autoApprove: newValue })
-      }, token);
-      if (res.ok) {
-        setAutoApprove(newValue);
-        showToast(newValue ? 'Auto-Approve Enabled' : 'Auto-Approve Disabled');
-      }
-    } catch (err) {
-      showToast(err.message, true);
-    }
-  };
-
-  const saveInterval = async (val) => {
-    const hours = val || (isCustom ? parseInt(customHrs) : intervalHrs);
-    if (!hours || hours < 1) return showToast('Please select or enter valid hours', true);
-    
-    setLoading(true);
-    try {
-      const res = await authFetch(`${API_BASE}/marketing/settings/interval`, {
+      await authFetch(`${API_BASE}/marketing/settings/interval`, {
         method: 'POST',
         body: JSON.stringify({ intervalHours: hours })
       }, token);
-      if (res.ok) {
-        setIntervalHrs(hours);
-        showToast(`Posting interval set to every ${hours} hour(s)!`);
-      }
+      showToast('Frequency updated successfully');
     } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      setLoading(false);
+      console.error('Failed to update frequency', err);
     }
   };
 
-  const runAutomationNow = async () => {
+  const handleAutoApproveChange = async (isActive) => {
+    setAutoApproveActive(isActive);
+    try {
+      await authFetch(`${API_BASE}/marketing/settings/auto-approve`, {
+        method: 'POST',
+        body: JSON.stringify({ autoApprove: isActive })
+      }, token);
+      showToast('Auto-Approve updated successfully');
+    } catch (err) {
+      console.error('Failed to update auto-approve', err);
+    }
+  };
+
+  const handleRunAutomation = async () => {
     setRunningLoop(true);
+    showToast('Running AI Automation...', false);
     try {
       const res = await authFetch(`${API_BASE}/marketing/run-automation`, { method: 'POST' }, token);
-      if (res.ok) {
-        showToast('Marketing automation loop executed successfully! 🚀');
-        fetchPosts();
-        fetchLogs();
-      } else throw new Error('Execution failed');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Automation Loop Completed! 🚀');
+        if (data.post) {
+          setPosts(prev => [data.post, ...prev]);
+        } else {
+          fetchPosts(); // fallback refresh
+        }
+      } else {
+        showToast('Automation Failed', true);
+      }
     } catch (err) {
-      showToast(err.message, true);
+      console.error(err);
+      showToast('Error running automation', true);
     } finally {
       setRunningLoop(false);
     }
   };
 
-  const generateNewCreatives = async () => {
-    setGenerating(true);
-    showToast('AI is generating new creatives and images... this may take a minute.', false);
-    try {
-      const res = await authFetch(`${API_BASE}/creatives/generate`, {
-        method: 'POST',
-        body: JSON.stringify({ count: 3 })
-      }, token);
-      if (res.ok) {
-        const data = await res.json();
-        showToast(`Successfully generated ${data.count} new creatives!`);
-        fetchCreatives();
-        setActiveTab('creatives');
-      }
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const updateCreativeStatus = async (id, isApprove) => {
-    try {
-      const endpoint = isApprove ? 'approve' : 'reject';
-      const res = await authFetch(`${API_BASE}/creatives/${id}/${endpoint}`, { method: 'POST' }, token);
-      if (res.ok) {
-        showToast(`Creative ${isApprove ? 'approved' : 'rejected'}`);
-        fetchCreatives();
-      }
-    } catch (err) {
-      showToast(err.message, true);
-    }
-  };
-
-  
-  const openEditCreativeModal = (creative) => {
-    setEditingCreative(creative);
-    setEditCaption(creative.caption || '');
-    setEditSelectedMedia(creative.mediaUrl || '');
-  };
-
-  const handleUpdateCreative = async () => {
-    if (!editingCreative) return;
-    setEditSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append('caption', editCaption);
-      if (editSelectedMedia) formData.append('media_url', editSelectedMedia);
-      
-      const res = await authFetch(`${API_BASE}/creatives/${editingCreative.id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {})
-        },
-        body: formData
-      });
-      if (res.ok) {
-        showToast('Creative updated successfully!');
-        setEditingCreative(null);
-        fetchCreatives();
-      } else throw new Error('Failed to update creative');
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      setEditSubmitting(false);
-    }
-  };
-
-  const openEditModal = (post) => {
+  const handleEditDraft = (post) => {
     setEditingPost(post);
     setEditCaption(post.caption || '');
-    setEditStatus(post.status || 'SCHEDULED');
-    setEditScheduledAt(post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : '');
-    setEditSelectedMedia(post.mediaUrls && post.mediaUrls.length > 0 ? post.mediaUrls[0] : '');
+    setEditMedia(post.mediaUrls?.[0] || null);
   };
 
-  const handleUpdatePost = async () => {
-    if (!editingPost) return;
-    setEditSubmitting(true);
+  const handleSaveDraft = async () => {
+    if (editCaption && editCaption.length > 2200) {
+      showToast('Caption exceeds Instagram limit of 2200 characters', true);
+      return;
+    }
     try {
       const formData = new FormData();
       formData.append('caption', editCaption);
-      formData.append('status', editStatus);
-      if (editScheduledAt) formData.append('scheduledAt', new Date(editScheduledAt).toISOString());
-      if (editSelectedMedia) formData.append('existing_media', editSelectedMedia);
+      formData.append('status', 'DRAFT');
+      if (editMedia) formData.append('existing_media', editMedia);
 
-      const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
-      const res = await fetch(`${API_BASE}/marketing/posts/${editingPost.id}`, {
+      const res = await authFetch(`${API_BASE}/marketing/posts/${editingPost.id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {})
-        },
-        body: formData
-      });
-
+        body: formData,
+        isFormData: true
+      }, token);
+      
       if (res.ok) {
-        showToast('Social post updated!');
+        const updatedPost = await res.json();
+        setPosts(prev => prev.map(p => p.id === editingPost.id ? updatedPost : p));
+        showToast('Draft Saved successfully!');
         setEditingPost(null);
-        fetchPosts();
-      } else throw new Error('Failed to update post');
+      } else {
+        showToast('Failed to save draft', true);
+      }
     } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      setEditSubmitting(false);
+      console.error(err);
+      showToast('Failed to save draft', true);
     }
   };
 
-  const presets = [2, 4, 8, 12, 24];
-  const pendingCreatives = creatives.filter(c => !c.isActive);
-  const activeCreatives = creatives.filter(c => c.isActive);
+  const handleUpdateLive = async () => {
+    if (editCaption && editCaption.length > 2200) {
+      showToast('Caption exceeds Instagram limit of 2200 characters', true);
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('caption', editCaption);
+      formData.append('status', 'POSTED');
+      if (editMedia) formData.append('existing_media', editMedia);
+
+      const res = await authFetch(`${API_BASE}/marketing/posts/${editingPost.id}`, {
+        method: 'PUT',
+        body: formData,
+        isFormData: true
+      }, token);
+      
+      if (res.ok) {
+        const updatedPost = await res.json();
+        setPosts(prev => prev.map(p => p.id === editingPost.id ? updatedPost : p));
+        showToast('Post successfully published! 🚀');
+        setEditingPost(null);
+      } else {
+        showToast('Failed to publish post', true);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to publish post', true);
+    }
+  };
 
   return (
     <div className="view">
       <div className="container" style={{ padding: '3rem 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        
+        {/* HEADER SECTION */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Send color="var(--primary-color)" size={32} /> Social Media Automation
-            </h1>
+            <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Social Scheduler</h1>
             <p className="text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.95rem' }}>
-              Manage your AI-generated creatives, configure publishing frequency, and monitor automated delivery.
+              Configure AI publishing frequency and monitor automated delivery logs.
             </p>
           </div>
+          
+          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Frequency */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+               <Clock size={16} className="text-muted" />
+               <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Post Every</span>
+               <select 
+                 value={frequencyHours} 
+                 onChange={(e) => handleFrequencyChange(Number(e.target.value))}
+                 style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '700' }}
+               >
+                 <option value={1}>1 Hour</option>
+                 <option value={2}>2 Hours</option>
+                 <option value={4}>4 Hours</option>
+                 <option value={6}>6 Hours</option>
+                 <option value={12}>12 Hours</option>
+                 <option value={24}>24 Hours</option>
+               </select>
+            </div>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button className="btn btn-secondary" onClick={generateNewCreatives} disabled={generating} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {generating ? <span className="spinner"></span> : <><Sparkles size={18} /> Generate AI Creatives</>}
-            </button>
-            <button className="btn btn-primary" onClick={runAutomationNow} disabled={runningLoop} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {runningLoop ? <span className="spinner"></span> : <><Play size={18} /> Run Automation Loop</>}
+            {/* Auto Approve Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px' }}>
+                 <input type="checkbox" checked={autoApproveActive} onChange={(e) => handleAutoApproveChange(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                <span style={{ position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: autoApproveActive ? 'var(--success)' : 'rgba(255,255,255,0.2)', transition: '.4s', borderRadius: '34px' }}>
+                  <span style={{ position: 'absolute', content: '""', height: '14px', width: '14px', left: autoApproveActive ? '22px' : '4px', bottom: '4px', backgroundColor: 'white', transition: '.4s', borderRadius: '50%' }}></span>
+                </span>
+              </label>
+              <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Auto-Approve</span>
+            </div>
+
+            {/* Run Automation Button */}
+            <button 
+              className="btn btn-primary" 
+              onClick={handleRunAutomation}
+              disabled={runningLoop}
+              style={{ background: '#3b82f6', color: '#fff', fontWeight: '600', padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              {runningLoop ? <span className="spinner"></span> : <>⚡ Run Automation</>}
             </button>
           </div>
         </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '2rem' }}>
-          {/* Settings Panel */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Automated Creative Generation Scheduler */}
-            <div className="glass-panel" style={{ padding: '2rem' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '1.15rem' }}>
-                <Sparkles size={20} color="var(--primary-color)" /> Creative Generator Engine
-              </h3>
-              <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                Automatically generate fresh AI creatives & images into the Media library on a recurring schedule.
-              </p>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
-                <span style={{ fontWeight: '600' }}>Auto-Creative Generation</span>
-                <label style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
-                  <input type="checkbox" checked={autoCreativeGen} onChange={(e) => saveCreativeSettings(undefined, e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
-                  <span style={{
-                    position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: autoCreativeGen ? 'var(--primary-color)' : 'rgba(255,255,255,0.2)',
-                    transition: '.4s', borderRadius: '34px'
-                  }}>
-                    <span style={{
-                      position: 'absolute', content: '""', height: '18px', width: '18px',
-                      left: autoCreativeGen ? '28px' : '4px', bottom: '4px', backgroundColor: 'white',
-                      transition: '.4s', borderRadius: '50%'
-                    }}></span>
-                  </span>
-                </label>
-              </div>
-
-              <div className="input-group" style={{ marginBottom: '1rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Generation Frequency</label>
-                <select 
-                  className="input" 
-                  value={creativeGenIntervalHrs}
-                  onChange={(e) => saveCreativeSettings(parseInt(e.target.value), undefined)}
-                  style={{ width: '100%', padding: '0.6rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid var(--border-color)' }}
-                >
-                  <option value={2}>Every 2 Hours (Default / Enterprise)</option>
-                  <option value={4}>Every 4 Hours</option>
-                  <option value={6}>Every 6 Hours</option>
-                  <option value={12}>Every 12 Hours</option>
-                  <option value={24}>Every 24 Hours</option>
-                </select>
-              </div>
-
-              <button className="btn btn-secondary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }} onClick={generateNewCreatives} disabled={generating}>
-                {generating ? <span className="spinner"></span> : <><RefreshCw size={16} /> Trigger Creative Batch Now</>}
-              </button>
-            </div>
-
-            {/* Auto-Approve Toggle */}
-            <div className="glass-panel" style={{ padding: '2rem' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '1.15rem' }}>
-                <CheckCircle2 size={20} color="var(--success)" /> Autopilot Mode
-              </h3>
-              <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                When enabled, AI-generated creatives are automatically approved and added to the publishing queue without manual review.
-              </p>
-              
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <span style={{ fontWeight: '600' }}>Auto-Approve</span>
-                <label style={{ position: 'relative', display: 'inline-block', width: '50px', height: '26px' }}>
-                  <input type="checkbox" checked={autoApprove} onChange={toggleAutoApprove} style={{ opacity: 0, width: 0, height: 0 }} />
-                  <span style={{
-                    position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: autoApprove ? 'var(--primary-color)' : 'rgba(255,255,255,0.2)',
-                    transition: '.4s', borderRadius: '34px'
-                  }}>
-                    <span style={{
-                      position: 'absolute', content: '""', height: '18px', width: '18px',
-                      left: autoApprove ? '28px' : '4px', bottom: '4px', backgroundColor: 'white',
-                      transition: '.4s', borderRadius: '50%'
-                    }}></span>
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Frequency Controls */}
-            <div className="glass-panel" style={{ padding: '2rem' }}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', fontSize: '1.15rem' }}>
-                <Clock size={20} color="var(--primary-color)" /> Frequency Controls
-              </h3>
-              <p className="text-muted" style={{ marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                Select how often the autonomous loop publishes content for this brand.
-              </p>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                {presets.map(hrs => (
-                  <button
-                    key={hrs}
-                    className={`btn ${intervalHrs === hrs && !isCustom ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ justifyContent: 'space-between', padding: '0.6rem 1rem' }}
-                    onClick={() => { setIsCustom(false); saveInterval(hrs); }}
-                  >
-                    <span>Every {hrs} Hours</span>
-                    {hrs === 2 && <span style={{ fontSize: '0.7rem', background: 'var(--primary-color)', color: '#fff', padding: '0.1rem 0.4rem', borderRadius: '4px', fontWeight: '700' }}>DEFAULT</span>}
-                  </button>
-                ))}
-
-                <button
-                  className={`btn ${isCustom ? 'btn-primary' : 'btn-secondary'}`}
-                  style={{ justifyContent: 'space-between', padding: '0.6rem 1rem' }}
-                  onClick={() => setIsCustom(true)}
-                >
-                  <span>Custom Interval...</span>
-                </button>
-              </div>
-
-              {isCustom && (
-                <div className="fade-in" style={{ marginBottom: '1.25rem' }}>
-                  <div className="input-group">
-                    <label>Custom Hours</label>
-                    <input 
-                      type="number" min="1" placeholder="e.g. 6" 
-                      value={customHrs} onChange={(e) => setCustomHrs(e.target.value)} 
-                    />
-                  </div>
-                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => saveInterval()} disabled={loading}>
-                    {loading ? <span className="spinner"></span> : 'Set Custom Interval'}
-                  </button>
-                </div>
+        {/* LOGS SECTION */}
+        <div className="glass-panel" style={{ overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+             <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Automation Logs</h2>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: '700' }}>Status</th>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: '700' }}>Platform</th>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: '700' }}>Scheduled Time</th>
+                <th style={{ padding: '1rem 1.5rem', fontWeight: '700', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {posts.length === 0 ? (
+                <tr>
+                  <td colSpan="4" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No posts currently logged. Run the automation loop.
+                  </td>
+                </tr>
+              ) : (
+                posts.map(post => (
+                  <tr key={post.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '1rem 1.5rem' }}>
+                      <span style={{ 
+                        fontSize: '0.75rem', fontWeight: '700', padding: '0.3rem 0.7rem', 
+                        borderRadius: '30px', 
+                        background: post.status === 'POSTED' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', 
+                        color: post.status === 'POSTED' ? 'var(--success)' : '#f59e0b' 
+                      }}>
+                        {post.status || 'POSTED'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem 1.5rem', fontWeight: '600', fontSize: '0.9rem' }}>
+                      {post.platform || 'INSTAGRAM'}
+                    </td>
+                    <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem' }}>
+                      {post.scheduledAt ? new Date(post.scheduledAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    </td>
+                    <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} 
+                        onClick={() => handleEditDraft(post)}
+                      >
+                        {post.status === 'POSTED' ? 'View Details' : 'Edit / Preview'}
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
-            </div>
-          </div>
-
-          {/* Queue & Logs Area */}
-          <div className="glass-panel" style={{ padding: '2rem', height: 'fit-content' }}>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-              <button 
-                className={`btn ${activeTab === 'creatives' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setActiveTab('creatives')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                <ImageIcon size={18} /> Creatives ({pendingCreatives.length})
-              </button>
-              <button 
-                className={`btn ${activeTab === 'queue' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setActiveTab('queue')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                <Calendar size={18} /> Publishing Queue ({posts.length})
-              </button>
-              <button 
-                className={`btn ${activeTab === 'logs' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setActiveTab('logs')}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-              >
-                <FileText size={18} /> Audit Logs
-              </button>
-            </div>
-
-            {/* Creatives Tab */}
-            {activeTab === 'creatives' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ margin: 0 }}>Pending Approval ({pendingCreatives.length})</h4>
-                </div>
-                
-                {pendingCreatives.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                    No pending creatives. Click "Generate AI Creatives" to create more content.
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                    {pendingCreatives.map(creative => (
-                      <div key={creative.id} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                        {creative.mediaUrl && (
-                          <div style={{ width: '100%', height: '180px', background: '#000' }}>
-                            <img src={creative.mediaUrl} alt="AI Creative" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        )}
-                        <div style={{ padding: '1rem' }}>
-                          <p style={{ fontSize: '0.9rem', lineHeight: 1.5, margin: '0 0 1rem 0' }}>{creative.caption}</p>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button className="btn btn-secondary" style={{ flex: 1, padding: '0.5rem' }} onClick={() => openEditCreativeModal(creative)}>Edit</button>
-<button className="btn btn-secondary" style={{ flex: 1, padding: '0.5rem', color: 'var(--error)', borderColor: 'rgba(239, 68, 68, 0.3)' }} onClick={() => updateCreativeStatus(creative.id, false)}>Reject</button>
-                            <button className="btn btn-primary" style={{ flex: 1, padding: '0.5rem', background: 'var(--success)' }} onClick={() => updateCreativeStatus(creative.id, true)}>
-                              Approve
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                <h4 style={{ margin: '2rem 0 0 0', borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>Approved Campaigns ({activeCreatives.length})</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {activeCreatives.slice(0, 5).map(creative => (
-                    <div key={creative.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                      {creative.mediaUrl && <img src={creative.mediaUrl} style={{ width: '60px', height: '60px', borderRadius: '8px', objectFit: 'cover' }} />}
-                      <p style={{ margin: 0, fontSize: '0.9rem', flex: 1 }}>{creative.caption}</p>
-                      <span className="badge active">APPROVED</span><button className="btn btn-secondary" style={{ padding: '0.35rem' }} onClick={() => openEditCreativeModal(creative)} title="Edit"><Edit3 size={14}/></button>
-                    </div>
-                  ))}
-                  {activeCreatives.length > 5 && <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>+ {activeCreatives.length - 5} more</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Content Queue Tab */}
-            {activeTab === 'queue' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {posts.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                    No posts currently queued. Approve creatives or run the automation loop.
-                  </div>
-                ) : (
-                  posts.map(post => (
-                    <div key={post.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', justify: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                          <span className={`badge ${post.status === 'POSTED' ? 'active' : ''}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem' }}>{post.status}</span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: '600' }}>{post.platform || 'FACEBOOK & INSTAGRAM'}</span>
-                        </div>
-                        <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', lineHeight: 1.5 }}>{post.caption}</p>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          Scheduled: {post.scheduledAt ? new Date(post.scheduledAt).toLocaleString() : 'Pending'}
-                          {post.postedAt && ` • Published: ${new Date(post.postedAt).toLocaleString()}`}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn btn-secondary" style={{ padding: '0.5rem' }} onClick={() => openEditModal(post)} title="Edit Post">
-                          <Edit3 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
-            {/* Audit Logs Tab */}
-            {activeTab === 'logs' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {logs.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
-                    No execution audit logs found. Trigger an automation loop to see real-time delivery logs.
-                  </div>
-                ) : (
-                  logs.map(log => (
-                    <div key={log.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', justify: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
-                          <span style={{ background: log.status === 'SUCCESS' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)', color: log.status === 'SUCCESS' ? 'var(--success)' : 'var(--error)', padding: '0.2rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700' }}>
-                            {log.status}
-                          </span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          Social Success: {log.socialSuccess ? 'Yes' : 'No'} | Emails Sent: {log.emailCount}
-                        </p>
-                        {log.errorLog && <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.8rem', color: 'var(--error)' }}>Log detail: {log.errorLog}</p>}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
-          </div>
+            </tbody>
+          </table>
         </div>
 
-        
-        {/* Edit Creative Modal */}
-        {editingCreative && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <div className="glass-panel" style={{ maxWidth: '560px', width: '100%', padding: '2rem', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: 0 }}>Edit Creative</h3>
-                <button onClick={() => setEditingCreative(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
-              </div>
-              <div className="input-group">
-                <label>Caption</label>
-                <textarea rows="5" value={editCaption} onChange={(e) => setEditCaption(e.target.value)} />
-              </div>
-              <div className="input-group">
-                <label>Attach Media from Catalog</label>
-                <select value={editSelectedMedia} onChange={(e) => setEditSelectedMedia(e.target.value)}>
-                  <option value="">-- No Media Attached --</option>
-                  {mediaList.map(m => (
-                    <option key={m.id} value={m.url}>{m.filename || 'Unnamed Media'} {m.aiGenerated ? '(AI)' : ''}</option>
-                  ))}
-                </select>
-                {editSelectedMedia && (
-                  <div style={{ marginTop: '0.5rem' }}>
-                    {editSelectedMedia.toLowerCase().includes('type=video') || editSelectedMedia.toLowerCase().endsWith('.mp4') ? (
-                      <video src={editSelectedMedia} controls style={{ width: '100%', maxHeight: '200px', borderRadius: '8px' }} />
-                    ) : (
-                      <img src={editSelectedMedia} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
-                    )}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
-                <button className="btn btn-secondary" onClick={() => setEditingCreative(null)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleUpdateCreative} disabled={editSubmitting}>
-                  {editSubmitting ? <span className="spinner"></span> : 'Save Creative Changes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Post Modal */}
+        {/* SIDE-BY-SIDE EDIT MODAL */}
         {editingPost && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <div className="glass-panel" style={{ maxWidth: '560px', width: '100%', padding: '2rem', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: 0 }}>Edit Scheduled Post</h3>
-                <button onClick={() => setEditingPost(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: '1000px', height: '80vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+              
+              {/* Header */}
+              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', background: 'var(--bg-card-hover)' }}>
+                <button onClick={() => setEditingPost(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '0.3rem', marginRight: '1rem' }}>
+                  <X size={16} />
+                </button>
+                <div style={{ background: 'var(--secondary-color)', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.5rem' }}>
+                  <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '12px' }}>f</span>
+                </div>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>Edit Draft / Post</h3>
               </div>
-              <div className="input-group">
-                <label>Post Caption</label>
-                <textarea rows="5" value={editCaption} onChange={(e) => setEditCaption(e.target.value)} />
-              </div>
-              <div className="input-group">
-                <label>Scheduled Date & Time</label>
-                <input type="datetime-local" value={editScheduledAt} onChange={(e) => setEditScheduledAt(e.target.value)} />
-              </div>
-              <div className="input-group">
-                <label>Post Status</label>
-                <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                  <option value="DRAFT">DRAFT</option>
-                  <option value="SCHEDULED">SCHEDULED</option>
-                  <option value="POSTED">POSTED (Trigger Immediate Publish)</option>
-                </select>
-              </div>
-              <div className="input-group">
-                <label>Attach Media from Catalog</label>
-                <select value={editSelectedMedia} onChange={(e) => setEditSelectedMedia(e.target.value)}>
-                  <option value="">-- No Media Attached --</option>
-                  {mediaList.map(m => (
-                    <option key={m.id} value={m.url}>{m.filename || 'Unnamed Media'} {m.aiGenerated ? '(AI)' : ''}</option>
-                  ))}
-                </select>
-                {editSelectedMedia && (
-                  <div style={{ marginTop: '0.5rem' }}>
-                    {editSelectedMedia.toLowerCase().includes('type=video') || editSelectedMedia.toLowerCase().endsWith('.mp4') ? (
-                      <video src={editSelectedMedia} controls style={{ width: '100%', maxHeight: '200px', borderRadius: '8px' }} />
+
+              {/* Body */}
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                
+                {/* Left Side: Editor */}
+                <div style={{ flex: 1, padding: '1.5rem', borderRight: '1px solid var(--border-color)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <textarea 
+                    rows="8" 
+                    value={editCaption} 
+                    onChange={(e) => setEditCaption(e.target.value)} 
+                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', resize: 'vertical', fontSize: '0.9rem', lineHeight: 1.5 }}
+                  />
+                  <div style={{ textAlign: 'right', fontSize: '0.8rem', color: editCaption.length > 2200 ? 'var(--danger)' : 'var(--text-muted)', marginTop: '-1rem' }}>
+                    {editCaption.length} / 2200 characters
+                  </div>
+                  
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '600' }}>Media (Image/Video)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem' }}>
+                      <input 
+                        type="file" 
+                        accept="image/*,video/*"
+                        onChange={(e) => {
+                          if (e.target.files[0]) {
+                            const file = e.target.files[0];
+                            setEditMedia(URL.createObjectURL(file));
+                            if (file.type.startsWith('video/')) {
+                              showToast('Tip: For best results on Reels/TikTok, use 9:16 aspect ratio (1080x1920)', false);
+                            } else if (file.type.startsWith('image/')) {
+                              showToast('Tip: Instagram supports 1:1, 4:5, or 1.91:1 ratios', false);
+                            }
+                          }
+                        }}
+                        style={{ fontSize: '0.85rem', width: '100%', color: 'var(--text-muted)' }} 
+                      />
+                    </div>
+                  </div>
+
+                  {editMedia && (
+                    <div style={{ width: '100px', height: '100px', borderRadius: '8px', overflow: 'hidden', background: '#000' }}>
+                       {editMedia.includes('video') || editMedia.endsWith('.mp4') ? (
+                          <video src={editMedia} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <img src={editMedia} alt="Media" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: 'auto' }}>
+                    {editingPost.status === 'DRAFT' ? (
+                      <>
+                        <button className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem' }} onClick={handleSaveDraft}>Save Draft</button>
+                        <button className="btn btn-primary" style={{ flex: 2, padding: '0.75rem', background: '#3b82f6', color: '#fff', border: 'none' }} onClick={handleUpdateLive}>Post Now 🚀</button>
+                      </>
                     ) : (
-                      <img src={editSelectedMedia} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }} />
+                      <button className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem' }} onClick={() => setEditingPost(null)}>Close View</button>
                     )}
                   </div>
-                )}
+                </div>
+
+                {/* Right Side: Preview */}
+                <div style={{ flex: 1, padding: '1.5rem', background: 'rgba(0,0,0,0.5)', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.1)', padding: '0.25rem', borderRadius: '30px' }}>
+                     <button style={{ padding: '0.4rem 1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: '600', cursor: 'pointer' }}>Reels</button>
+                     <button style={{ padding: '0.4rem 1rem', background: 'var(--secondary-color)', borderRadius: '20px', border: 'none', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>Feed</button>
+                     <button style={{ padding: '0.4rem 1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: '600', cursor: 'pointer' }}>Profile</button>
+                  </div>
+
+                  <div style={{ width: '100%', maxWidth: '350px', background: '#111', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                    {/* Fake Instagram Header */}
+                    <div style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                         <span style={{ color: 'var(--secondary-color)', fontWeight: 'bold' }}>Q</span>
+                      </div>
+                      <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>QuantCAI</span>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
+                        <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
+                        <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
+                        <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Media */}
+                    <div style={{ width: '100%', aspectRatio: '1/1', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {editMedia ? (
+                        editMedia.includes('video') || editMedia.endsWith('.mp4') ? (
+                          <video src={editMedia} style={{ width: '100%', height: '100%', objectFit: 'cover' }} controls />
+                        ) : (
+                          <img src={editMedia} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )
+                      ) : (
+                         <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+                           <Video size={32} style={{ opacity: 0.5, marginBottom: '0.5rem' }}/>
+                           <p style={{ margin: 0, fontSize: '0.8rem' }}>No media attached</p>
+                         </div>
+                      )}
+                    </div>
+
+                    {/* Fake Instagram Footer */}
+                    <div style={{ padding: '0.75rem' }}>
+                       <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
+                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                       </div>
+                       <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.4 }}>
+                         <span style={{ fontWeight: '600', marginRight: '0.5rem' }}>QuantCAI</span>
+                         {editCaption}
+                       </p>
+                    </div>
+                  </div>
+
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
-                <button className="btn btn-secondary" onClick={() => setEditingPost(null)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleUpdatePost} disabled={editSubmitting}>
-                  {editSubmitting ? <span className="spinner"></span> : 'Save Post Changes'}
-                </button>
-              </div>
+
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

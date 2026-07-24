@@ -262,3 +262,29 @@ product_placement: 'center'
         "image_url": image_url,
         "json2video_payload": json2video_payload
     }
+
+async def submit_to_json2video(payload: Dict[str, Any], webhook_url: Optional[str] = None) -> Dict[str, Any]:
+    """Submit a JSON payload to json2video API."""
+    if not settings.json2video_api_key:
+        logger.warning("JSON2VIDEO_API_KEY not configured. Mocking video submission.")
+        return {"success": True, "project": "mock_project_id", "status": "queued"}
+        
+    url = "https://api.json2video.com/v2/movies"
+    headers = {
+        "x-api-key": settings.json2video_api_key,
+        "Content-Type": "application/json"
+    }
+    
+    if webhook_url:
+        payload["webhook_url"] = webhook_url
+        
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            return {"success": True, "project": data.get("project"), "status": "queued"}
+    except Exception as e:
+        logger.error(f"Failed to submit to json2video: {e}")
+        return {"success": False, "error": str(e)}
+

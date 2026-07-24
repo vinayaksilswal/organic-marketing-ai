@@ -4,9 +4,11 @@ import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import DashboardLayout from './pages/DashboardLayout';
+import Legal from './pages/Legal';
 import Checkout from './pages/Checkout';
 import Toast from './components/Toast';
 import { WorkspaceProvider } from './components/WorkspaceContext';
+import CookieBanner from './components/CookieBanner';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai1.onrender.com/api/v1';
 
@@ -100,8 +102,13 @@ function App() {
       {toastMessage && <Toast message={toastMessage.message} isError={toastMessage.isError} />}
       
       <WorkspaceProvider token={token} onLogout={handleLogout}>
+        <CookieBanner />
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/privacy" element={<Legal title="Privacy Policy" />} />
+          <Route path="/terms" element={<Legal title="Terms of Service" />} />
+          <Route path="/dpa" element={<Legal title="Data Processing Agreement" />} />
           <Route path="/auth" element={<Auth onLogin={handleLogin} showToast={showToast} />} />
           <Route path="/checkout" element={token ? <Checkout user={user} onLogout={handleLogout} /> : <Navigate to="/auth" />} />
           <Route path="/onboarding" element={requireAuth(Onboarding)} />

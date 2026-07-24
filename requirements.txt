@@ -29,6 +29,13 @@ tenacity
 
 # --- Task Scheduling ---
 apscheduler
+arq
+redis
+temporalio==1.30.0
+
+# --- Cryptography & Storage ---
+cryptography
+boto3
 
 # --- Email (Resend SDK) ---
 resend

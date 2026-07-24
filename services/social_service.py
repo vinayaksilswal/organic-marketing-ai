@@ -36,6 +36,7 @@ from tenacity import (
 )
 
 from config import settings
+from services.lock_service import distributed_lock
 
 # =============================================================================
 # Constants
@@ -150,101 +151,108 @@ async def post_to_facebook(
     if not media_urls:
         media_urls = []
 
-    # Ensure absolute URLs for Facebook API
-    media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
+    # Acquire distributed lock to prevent concurrent posts to the same page
+    lock_key = f"fb_post_{page_id}"
+    async with distributed_lock(lock_key, timeout_seconds=120) as acquired:
+        if not acquired:
+            logger.error(f"Could not acquire lock for Facebook Page {page_id}")
+            return None
 
-    video_urls = [url for url in media_urls if _is_video(url)]
-    image_urls = [url for url in media_urls if not _is_video(url)]
+        # Ensure absolute URLs for Facebook API
+        media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
 
-    post_ids = []
+        video_urls = [url for url in media_urls if _is_video(url)]
+        image_urls = [url for url in media_urls if not _is_video(url)]
 
-    # --- 1. Post Each Video Separately ---
-    for vid_url in video_urls:
-        url = f"{GRAPH_BASE_URL}/{page_id}/videos"
-        payload = {
-            "access_token": access_token,
-            "description": message,
-            "file_url": vid_url,
-        }
-        try:
-            result = await _graph_post(url, payload)
-            post_id = result.get("id")
-            if post_id:
-                logger.info(f"✓ Facebook video posted: {post_id}")
-                post_ids.append(post_id)
-        except Exception as e:
-            logger.error(f"Facebook video post failed: {e}")
+        post_ids = []
 
-    # --- 2. Post Images ---
-    if len(image_urls) > 1:
-        # Multi-image carousel-style post (upload unpublished, then combine)
-        attached_media: list[dict[str, str]] = []
-        for img_url in image_urls[:10]:
-            photo_payload = {
+        # --- 1. Post Each Video Separately ---
+        for vid_url in video_urls:
+            url = f"{GRAPH_BASE_URL}/{page_id}/videos"
+            payload = {
                 "access_token": access_token,
-                "url": img_url,
-                "published": "false",
+                "description": message,
+                "file_url": vid_url,
             }
             try:
-                res = await _graph_post(f"{GRAPH_BASE_URL}/{page_id}/photos", photo_payload)
-                media_id = res.get("id")
-                if media_id:
-                    attached_media.append({"media_fbid": media_id})
-            except Exception as e:
-                logger.warning(f"Failed to upload unpublished FB photo: {e}")
-
-        if attached_media:
-            import json as json_lib
-            feed_payload = {
-                "access_token": access_token,
-                "message": message,
-                "attached_media": json_lib.dumps(attached_media),
-            }
-            try:
-                result = await _graph_post(f"{GRAPH_BASE_URL}/{page_id}/feed", feed_payload)
+                result = await _graph_post(url, payload)
                 post_id = result.get("id")
                 if post_id:
-                    logger.info(f"✓ Facebook multi-photo post created: {post_id}")
+                    logger.info(f"✓ Facebook video posted: {post_id}")
                     post_ids.append(post_id)
             except Exception as e:
-                logger.error(f"Facebook multi-photo post failed: {e}")
+                logger.error(f"Facebook video post failed: {e}")
 
-    elif len(image_urls) == 1:
-        # Single image
-        url = f"{GRAPH_BASE_URL}/{page_id}/photos"
-        payload = {
-            "access_token": access_token,
-            "message": message,
-            "url": image_urls[0],
-        }
-        try:
-            result = await _graph_post(url, payload)
-            post_id = result.get("post_id") or result.get("id")
-            if post_id:
-                logger.info(f"✓ Facebook single image posted: {post_id}")
-                post_ids.append(post_id)
-        except Exception as e:
-            logger.error(f"Facebook image post failed: {e}")
+        # --- 2. Post Images ---
+        if len(image_urls) > 1:
+            # Multi-image carousel-style post (upload unpublished, then combine)
+            attached_media: list[dict[str, str]] = []
+            for img_url in image_urls[:10]:
+                photo_payload = {
+                    "access_token": access_token,
+                    "url": img_url,
+                    "published": "false",
+                }
+                try:
+                    res = await _graph_post(f"{GRAPH_BASE_URL}/{page_id}/photos", photo_payload)
+                    media_id = res.get("id")
+                    if media_id:
+                        attached_media.append({"media_fbid": media_id})
+                except Exception as e:
+                    logger.warning(f"Failed to upload unpublished FB photo: {e}")
 
-    # --- 3. Text only (if no media was provided) ---
-    if not video_urls and not image_urls:
-        url = f"{GRAPH_BASE_URL}/{page_id}/feed"
-        payload = {
-            "access_token": access_token,
-            "message": message,
-        }
-        try:
-            result = await _graph_post(url, payload)
-            post_id = result.get("id")
-            if post_id:
-                logger.info(f"✓ Facebook text posted: {post_id}")
-                post_ids.append(post_id)
-        except Exception as e:
-            logger.error(f"Facebook text post failed: {e}")
+            if attached_media:
+                import json as json_lib
+                feed_payload = {
+                    "access_token": access_token,
+                    "message": message,
+                    "attached_media": json_lib.dumps(attached_media),
+                }
+                try:
+                    result = await _graph_post(f"{GRAPH_BASE_URL}/{page_id}/feed", feed_payload)
+                    post_id = result.get("id")
+                    if post_id:
+                        logger.info(f"✓ Facebook multi-photo post created: {post_id}")
+                        post_ids.append(post_id)
+                except Exception as e:
+                    logger.error(f"Facebook multi-photo post failed: {e}")
 
-    if not post_ids:
-        return None
-    return ",".join(post_ids)
+        elif len(image_urls) == 1:
+            # Single image
+            url = f"{GRAPH_BASE_URL}/{page_id}/photos"
+            payload = {
+                "access_token": access_token,
+                "message": message,
+                "url": image_urls[0],
+            }
+            try:
+                result = await _graph_post(url, payload)
+                post_id = result.get("post_id") or result.get("id")
+                if post_id:
+                    logger.info(f"✓ Facebook single image posted: {post_id}")
+                    post_ids.append(post_id)
+            except Exception as e:
+                logger.error(f"Facebook image post failed: {e}")
+
+        # --- 3. Text only (if no media was provided) ---
+        if not video_urls and not image_urls:
+            url = f"{GRAPH_BASE_URL}/{page_id}/feed"
+            payload = {
+                "access_token": access_token,
+                "message": message,
+            }
+            try:
+                result = await _graph_post(url, payload)
+                post_id = result.get("id")
+                if post_id:
+                    logger.info(f"✓ Facebook text posted: {post_id}")
+                    post_ids.append(post_id)
+            except Exception as e:
+                logger.error(f"Facebook text post failed: {e}")
+
+        if not post_ids:
+            return None
+        return ",".join(post_ids)
 
 
 # =============================================================================
@@ -346,36 +354,43 @@ async def post_to_instagram(
         logger.warning("Instagram requires at least one media URL")
         return None
 
-    # Ensure absolute URLs for Instagram API
-    media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
+    # Acquire distributed lock to prevent concurrent posts to the same IG account
+    lock_key = f"ig_post_{ig_user_id}"
+    async with distributed_lock(lock_key, timeout_seconds=300) as acquired:
+        if not acquired:
+            logger.error(f"Could not acquire lock for Instagram Account {ig_user_id}")
+            return None
 
-    # Separate videos and images
-    video_urls = [url for url in media_urls if _is_video(url)]
-    image_urls = [url for url in media_urls if not _is_video(url)]
+        # Ensure absolute URLs for Instagram API
+        media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
 
-    post_ids = []
+        # Separate videos and images
+        video_urls = [url for url in media_urls if _is_video(url)]
+        image_urls = [url for url in media_urls if not _is_video(url)]
 
-    # --- Post each video as a separate REEL ---
-    for vid_url in video_urls:
-        vid_id = await _ig_post_video(ig_user_id, access_token, message, vid_url)
-        if vid_id:
-            post_ids.append(vid_id)
+        post_ids = []
 
-    # --- Post images as Carousel or Single Image ---
-    if len(image_urls) > 1:
-        img_id = await _ig_post_carousel(ig_user_id, access_token, message, image_urls)
-        if img_id:
-            post_ids.append(img_id)
-    elif len(image_urls) == 1:
-        img_id = await _ig_post_single_image(ig_user_id, access_token, message, image_urls[0])
-        if img_id:
-            post_ids.append(img_id)
+        # --- Post each video as a separate REEL ---
+        for vid_url in video_urls:
+            vid_id = await _ig_post_video(ig_user_id, access_token, message, vid_url)
+            if vid_id:
+                post_ids.append(vid_id)
 
-    if not post_ids:
-        logger.warning("No successful Instagram posts created")
-        return None
+        # --- Post images as Carousel or Single Image ---
+        if len(image_urls) > 1:
+            img_id = await _ig_post_carousel(ig_user_id, access_token, message, image_urls)
+            if img_id:
+                post_ids.append(img_id)
+        elif len(image_urls) == 1:
+            img_id = await _ig_post_single_image(ig_user_id, access_token, message, image_urls[0])
+            if img_id:
+                post_ids.append(img_id)
 
-    return ",".join(post_ids)
+        if not post_ids:
+            logger.warning("No successful Instagram posts created")
+            return None
+
+        return ",".join(post_ids)
 
 
 async def _ig_post_video(

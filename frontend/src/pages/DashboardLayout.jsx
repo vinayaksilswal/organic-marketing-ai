@@ -7,7 +7,9 @@ import MediaCatalog from './dashboard/MediaCatalog';
 import SocialScheduler from './dashboard/SocialScheduler';
 import EmailSuite from './dashboard/EmailSuite';
 import Workspaces from './dashboard/Workspaces';
+import TeamManagement from './dashboard/TeamManagement';
 import { useWorkspace } from '../components/WorkspaceContext';
+import HelpWidget from '../components/HelpWidget';
 
 const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
   const { activeWorkspaceId, setActiveWorkspace, workspaces } = useWorkspace();
@@ -33,8 +35,10 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
           <Route path="/social-scheduler" element={<SocialScheduler user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/email-suite" element={<EmailSuite user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/workspaces" element={<Workspaces user={user} token={token} showToast={showToast} updateAuth={updateAuth} />} />
+          <Route path="/team" element={<TeamManagement />} />
         </Routes>
       </div>
+      <HelpWidget />
     </div>
   );
 };

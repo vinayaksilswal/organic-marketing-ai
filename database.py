@@ -114,6 +114,7 @@ class BusinessProfile(Base):
     emailcampaigns = relationship('EmailCampaign', back_populates='businessProfile', cascade='all, delete-orphan')
     medias = relationship('Media', back_populates='businessProfile', cascade='all, delete-orphan')
     marketinglogs = relationship('MarketingLog', back_populates='businessProfile', cascade='all, delete-orphan')
+    socialconnections = relationship('SocialConnection', back_populates='businessProfile', cascade='all, delete-orphan')
 
 class VideoApiConfig(Base):
     __tablename__ = "VideoApiConfig"
@@ -163,6 +164,8 @@ class SocialConnection(Base):
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     user = relationship("User", back_populates="socialConnection")
+    businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
+    businessProfile = relationship('BusinessProfile', back_populates='socialconnections')
 
 
 class Audience(Base):
@@ -391,4 +394,19 @@ async def get_db_session() -> AsyncSession:
     if not _sessionmaker:
         await init_db()
     async with AsyncSessionLocal() as session:
+        yield session
+
+
+from contextlib import asynccontextmanager
+from sqlalchemy import text
+
+@asynccontextmanager
+async def get_tenant_session(workspace_id: str) -> AsyncSession:
+    """Provide an async database session context configured with RLS for the given workspace."""
+    if not _sessionmaker:
+        await init_db()
+    async with AsyncSessionLocal() as session:
+        if workspace_id:
+            # Set the local variable for PostgreSQL RLS policies to use
+            await session.execute(text("SET LOCAL app.current_workspace = :ws"), {"ws": workspace_id})
         yield session

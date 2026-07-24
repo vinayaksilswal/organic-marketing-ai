@@ -17,6 +17,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from services.storage_service import upload_media_to_s3
 from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -94,24 +95,44 @@ async def upload_media(
                 if bp:
                     workspace_id = bp.id
 
+            # Attempt to upload to S3
+            s3_url = await upload_media_to_s3(
+                workspace_id=workspace_id or "default",
+                media_id=media_id,
+                filename=file.filename or "upload",
+                content=file_content,
+                mime_type=mime_type
+            )
+
+            # Fallback to local API URL if S3 is not configured
+            final_url = s3_url if s3_url else f"/api/v1/media/{media_id}"
+            
+            # If uploaded to S3, we don't necessarily need to save data bytes in DB, 
+            # but we keep it for fallback/local parity.
             media = Media(
                 id=media_id,
                 userId=user_id,
                 businessProfileId=workspace_id,
                 filename=file.filename or "upload",
                 mimeType=mime_type,
-                url=f"/api/v1/media/{media_id}",
-                data=file_content,
+                url=final_url,
+                data=file_content if not s3_url else None,
             )
             session.add(media)
             await session.commit()
 
         url_suffix = "?type=video" if mime_type.startswith("video/") else ""
         base_url = str(request.base_url).rstrip("/")
+        
+        # Format the URL appropriately based on if it's external (S3) or internal
+        if final_url.startswith("http"):
+            full_url = final_url
+        else:
+            full_url = f"{base_url}{final_url}{url_suffix}"
 
         return StandardResponse(
             success=True,
-            data={"url": f"{base_url}/api/v1/media/{media_id}{url_suffix}"},
+            data={"url": full_url},
         )
     except Exception as e:
         logger.error(f"Failed to upload media: {e}")

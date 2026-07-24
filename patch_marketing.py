@@ -1,80 +1,58 @@
 import re
 
-with open('routers/marketing.py', 'r') as f:
-    content = f.read()
+def refactor():
+    with open('routers/marketing.py', 'r') as f:
+        content = f.read()
 
-# Add workspace_id check to get_social_posts
-post_func_pattern = r'(async def get_social_posts\(request: Request\) -> Any:.*?prisma = request\.app\.state\.prisma)'
-def post_repl(m):
-    return m.group(1) + """
-    workspace_id = request.headers.get("x-workspace-id")
-    if not workspace_id:
-        return []
-"""
-content = re.sub(post_func_pattern, post_repl, content, flags=re.DOTALL)
+    # Update import
+    content = content.replace("AsyncSessionLocal,", "get_tenant_session,")
 
-post_find_pattern = r'(posts = await prisma\.socialpost\.find_many\(\n\s*)(order=)'
-content = re.sub(post_find_pattern, r'\1where={"businessProfileId": workspace_id},\n        \2', content)
+    def replacer(match):
+        indent = match.group(1)
+        body = match.group(2)
+        # Check if workspace_id is in the body of the async with block
+        # We need to extract it to BEFORE the async with block
+        
+        # Is workspace_id defined inside?
+        ws_match = re.search(r'([ \t]*)workspace_id = request\.headers\.get\(([^)]+)\)\n', body)
+        if ws_match:
+            # Remove it from the body
+            body = body.replace(ws_match.group(0), "")
+            return f"{indent}workspace_id = request.headers.get({ws_match.group(2)})\n{indent}async with get_tenant_session(workspace_id) as session:\n{body}"
+        else:
+            # If not defined inside, it might be defined before, or not at all.
+            # If not at all, we can fallback to extracting from request if request is available,
+            # or just rely on it being defined before.
+            # Let's just define it if it's not present before
+            return f"{indent}workspace_id = request.headers.get('x-workspace-id') if 'request' in locals() else None\n{indent}async with get_tenant_session(workspace_id) as session:\n{body}"
 
-# Add workspace_id check to get_email_campaigns
-email_func_pattern = r'(async def get_email_campaigns\(request: Request\) -> Any:.*?prisma = request\.app\.state\.prisma)'
-def email_repl(m):
-    return m.group(1) + """
-    workspace_id = request.headers.get("x-workspace-id")
-    if not workspace_id:
-        return []
-"""
-content = re.sub(email_func_pattern, email_repl, content, flags=re.DOTALL)
+    # We can match `async with AsyncSessionLocal() as session:` and everything inside it up to the next unindented line
+    # Actually, a simpler regex just matching the line itself:
+    
+    # Just do a manual pass line by line
+    lines = content.split('\n')
+    for i, line in enumerate(lines):
+        if 'async with AsyncSessionLocal() as session:' in line:
+            indent = line[:line.find('async with')]
+            # Check lines before and after
+            has_ws_before = any('workspace_id =' in lines[j] for j in range(max(0, i-5), i))
+            if has_ws_before:
+                lines[i] = f"{indent}async with get_tenant_session(workspace_id) as session:"
+            else:
+                # find it after
+                found_after = False
+                for j in range(i+1, min(len(lines), i+6)):
+                    if 'workspace_id = ' in lines[j]:
+                        ws_line = lines[j].strip()
+                        lines[i] = f"{indent}{ws_line}\n{indent}async with get_tenant_session(workspace_id) as session:"
+                        lines[j] = ""  # remove the line from inside
+                        found_after = True
+                        break
+                if not found_after:
+                    lines[i] = f"{indent}workspace_id = request.headers.get('x-workspace-id')\n{indent}async with get_tenant_session(workspace_id) as session:"
+                    
+    with open('routers/marketing.py', 'w') as f:
+        f.write("\n".join(lines).replace("\n\n\n", "\n\n"))
 
-email_find_pattern = r'(emails = await prisma\.emailcampaign\.find_many\(\n\s*)(order=)'
-content = re.sub(email_find_pattern, r'\1where={"businessProfileId": workspace_id},\n        \2', content)
-
-# When creating posts or emails, we should attach businessProfileId, but wait, those endpoints might also need workspace_id!
-manual_post_pattern = r'(post = await prisma\.socialpost\.create\(\n\s*data=\{)'
-def mp_repl(m):
-    return """
-    workspace_id = request.headers.get("x-workspace-id")
-""" + m.group(1) + """
-            "businessProfileId": workspace_id,
-"""
-content = re.sub(manual_post_pattern, mp_repl, content)
-
-manual_email_pattern = r'(campaign = await prisma\.emailcampaign\.create\(\n\s*data=\{)'
-def me_repl(m):
-    return """
-    workspace_id = request.headers.get("x-workspace-id")
-""" + m.group(1) + """
-            "businessProfileId": workspace_id,
-"""
-content = re.sub(manual_email_pattern, me_repl, content)
-
-# For dashboard stats (using SQLAlchemy)
-dash_pattern = r'(async def marketing_dashboard\(request: Request\) -> Any:.*?async with AsyncSessionLocal\(\) as session:)'
-def dash_repl(m):
-    return m.group(1) + """
-        workspace_id = request.headers.get("x-workspace-id")
-"""
-content = re.sub(dash_pattern, dash_repl, content, flags=re.DOTALL)
-
-astmt_pattern = r'(a_stmt = select\(Audience\))'
-content = re.sub(astmt_pattern, r'\1.where(Audience.businessProfileId == workspace_id)', content)
-
-mstmt_pattern = r'(m_stmt = select\(MarketingState\))'
-content = re.sub(mstmt_pattern, r'\1.where(MarketingState.businessProfileId == workspace_id)', content)
-
-# Create marketing state if not exists, attach businessProfileId
-state_create_pattern = r'(state = MarketingState\(userId=first_user\.id)(, autoApprove=data\.autoApprove\))'
-def sc_repl(m):
-    return """workspace_id = request.headers.get("x-workspace-id")
-                    """ + m.group(1) + """, businessProfileId=workspace_id""" + m.group(2)
-content = re.sub(state_create_pattern, sc_repl, content)
-
-# auto-approve setting filter
-aa_pattern = r'(stmt = select\(MarketingState\))'
-content = re.sub(aa_pattern, r'\1.where(MarketingState.businessProfileId == request.headers.get("x-workspace-id"))', content)
-
-
-with open('routers/marketing.py', 'w') as f:
-    f.write(content)
-
-print("Updated routers/marketing.py")
+if __name__ == '__main__':
+    refactor()
