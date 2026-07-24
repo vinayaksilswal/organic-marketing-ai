@@ -29,6 +29,7 @@ class BusinessProfileUpdate(BaseModel):
     description: Optional[str] = None
     businessModel: Optional[str] = None
     productCatalogUrl: Optional[str] = None
+    influencerReferenceUrl: Optional[str] = None
     niche: Optional[str] = None
     postIntervalHours: Optional[int] = None
     creativeGenerationIntervalHours: Optional[int] = None
@@ -145,6 +146,8 @@ async def update_business_profile_post(
                 profile.autoGenerateCreatives = data.autoGenerateCreatives
             if hasattr(data, 'productCatalogUrl') and data.productCatalogUrl is not None:
                 profile.productCatalogUrl = data.productCatalogUrl
+            if hasattr(data, 'influencerReferenceUrl') and data.influencerReferenceUrl is not None:
+                profile.influencerReferenceUrl = data.influencerReferenceUrl
         else:
             profile = BusinessProfile(
                 userId=user_id,
@@ -153,6 +156,7 @@ async def update_business_profile_post(
                 description=data.description,
                 businessModel=data.businessModel,
                 productCatalogUrl=data.productCatalogUrl,
+                influencerReferenceUrl=data.influencerReferenceUrl,
                 niche=data.niche,
             )
             session.add(profile)
@@ -325,10 +329,10 @@ async def create_user_business(data: BusinessProfileUpdate, request: Request, us
                     "websiteUrl": profile.websiteUrl,
                     "description": profile.description,
                     "businessModel": profile.businessModel,
-                    "productCatalogUrl": profile.productCatalogUrl,
+                    "productCatalogUrl": getattr(profile, "productCatalogUrl", None),
+                    "influencerReferenceUrl": getattr(profile, "influencerReferenceUrl", None),
                     "brandAnalysisComplete": False,
                 },
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {str(e)}")
-

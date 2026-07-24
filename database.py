@@ -92,6 +92,7 @@ class BusinessProfile(Base):
     businessModel = Column(String, nullable=True)
     niche = Column(String, nullable=True)  # Predefined niche from NICHE_OPTIONS
     productCatalogUrl = Column(String, nullable=True) # E-commerce catalog URL (XML, CSV, etc.)
+    influencerReferenceUrl = Column(String, nullable=True) # Reference image for AI Influencers
     postIntervalHours = Column(Integer, default=2, nullable=False)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)

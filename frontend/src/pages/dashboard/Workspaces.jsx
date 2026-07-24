@@ -11,6 +11,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [description, setDescription] = useState('');
   const [businessModel, setBusinessModel] = useState(null);
   const [productCatalogUrl, setProductCatalogUrl] = useState('');
+  const [influencerReferenceUrl, setInfluencerReferenceUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState(null);
@@ -37,7 +38,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
           websiteUrl: website,
           description: description,
           businessModel: businessModel,
-          productCatalogUrl: productCatalogUrl
+          productCatalogUrl: productCatalogUrl,
+          influencerReferenceUrl: influencerReferenceUrl
         })
       }, token);
 
@@ -67,6 +69,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
       setDescription('');
       setBusinessModel(null);
       setProductCatalogUrl('');
+      setInfluencerReferenceUrl('');
       
     } finally {
       setLoading(false);
@@ -301,6 +304,24 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       />
                       <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.8rem' }}>
                         Provide a production catalog link to automatically generate creatives for your products.
+                      </small>
+                    </div>
+                  </div>
+                )}
+
+                {businessModel === 'AI Influencer' && (
+                  <div className="fade-in" style={{ padding: '1rem', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid var(--primary-color)' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label style={{ color: 'var(--primary-color)' }}><Target size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} /> Influencer Character Image / Reference URL</label>
+                      <input 
+                        type="url" 
+                        placeholder="https://example.com/character-sheet.jpg" 
+                        value={influencerReferenceUrl} 
+                        onChange={e => setInfluencerReferenceUrl(e.target.value)} 
+                        style={{ borderColor: 'rgba(59, 130, 246, 0.3)' }}
+                      />
+                      <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                        Provide an image URL of the AI Influencer persona to maintain visual consistency in generated media.
                       </small>
                     </div>
                   </div>
