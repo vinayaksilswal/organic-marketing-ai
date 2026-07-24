@@ -33,6 +33,7 @@ from sqlalchemy import select, func, text
 
 from config import settings
 from database import init_db, close_db, AsyncSessionLocal, User, Audience, SocialPost, SocialCampaign, BusinessProfile, MarketingLog
+from exceptions import OrganicMarketingException
 
 # =============================================================================
 # Loguru Configuration
@@ -88,6 +89,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     migrations = [
                         'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT FALSE;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "niche" VARCHAR;',
+                        'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessToken" TEXT;',
+                        'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessSecret" TEXT;',
+                        'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinAccessToken" TEXT;',
                     ]
                     for q in migrations:
                         await conn.execute(text(q))
@@ -193,9 +197,10 @@ async def global_exception_handler(
     error_id = str(uuid.uuid4())
     logger.exception(f"Unhandled Exception on {request.method} {request.url.path} (Error ID: {error_id})")
     
-    detail = str(exc)
-    # if settings.environment != "production":
-    #     detail = str(exc)
+    if settings.environment == "production":
+        detail = "An internal server error occurred."
+    else:
+        detail = str(exc)
     
     response = JSONResponse(
         status_code=500,
@@ -203,6 +208,26 @@ async def global_exception_handler(
     )
     
     # Ensure CORS headers are present even on 500 errors so the frontend can read the error message
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+    return response
+
+
+@app.exception_handler(OrganicMarketingException)
+async def organic_marketing_exception_handler(
+    request: Request, exc: OrganicMarketingException
+) -> JSONResponse:
+    error_id = str(uuid.uuid4())
+    logger.error(f"Domain Exception [{exc.error_code}] on {request.method} {request.url.path} (Error ID: {error_id}): {exc.message}")
+    
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"success": False, "message": exc.message, "error_code": exc.error_code, "error_id": error_id},
+    )
+    
     origin = request.headers.get("origin")
     if origin:
         response.headers["Access-Control-Allow-Origin"] = origin

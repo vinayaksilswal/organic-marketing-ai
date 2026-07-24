@@ -20,6 +20,9 @@ from __future__ import annotations
 import os
 import logging
 from typing import Optional
+from database import AsyncSessionLocal, SocialConnection
+from sqlalchemy import select
+from services.crypto_service import decrypt_token
 
 logger = logging.getLogger("organicai.twitter")
 
@@ -33,49 +36,40 @@ class TwitterService:
     def __init__(self):
         self.api_key = os.getenv("TWITTER_API_KEY", "")
         self.api_secret = os.getenv("TWITTER_API_SECRET", "")
-        self.access_token = os.getenv("TWITTER_ACCESS_TOKEN", "")
-        self.access_token_secret = os.getenv("TWITTER_ACCESS_TOKEN_SECRET", "")
-        self._client = None
-        self._available = False
 
-    def _ensure_client(self):
-        """Lazy-initialize the tweepy Client. Returns True if available."""
-        if self._client is not None:
-            return self._available
+    async def _get_client(self, workspace_id: str):
+        """Initialize the tweepy Client for a specific tenant."""
+        if not self.api_key or not self.api_secret:
+            logger.warning("Twitter API platform credentials not configured.")
+            return None
 
-        if not all([self.api_key, self.api_secret, self.access_token, self.access_token_secret]):
-            logger.warning("Twitter API credentials not configured — skipping Twitter integration.")
-            self._available = False
-            return False
+        async with AsyncSessionLocal() as session:
+            stmt = select(SocialConnection).where(SocialConnection.businessProfileId == workspace_id)
+            conn = (await session.execute(stmt)).scalars().first()
+            if not conn or not conn.twitterAccessToken or not conn.twitterAccessSecret:
+                logger.warning(f"No Twitter credentials for workspace {workspace_id}")
+                return None
+            
+            access_token = decrypt_token(conn.twitterAccessToken) or conn.twitterAccessToken
+            access_token_secret = decrypt_token(conn.twitterAccessSecret) or conn.twitterAccessSecret
 
         try:
             import tweepy  # noqa: F811
-
-            self._client = tweepy.Client(
+            client = tweepy.Client(
                 consumer_key=self.api_key,
                 consumer_secret=self.api_secret,
-                access_token=self.access_token,
-                access_token_secret=self.access_token_secret,
+                access_token=access_token,
+                access_token_secret=access_token_secret,
             )
-            self._available = True
-            logger.info("Twitter/X API client initialized successfully.")
-            return True
+            return client
         except ImportError:
             logger.warning("tweepy package not installed — Twitter integration disabled.")
-            self._available = False
-            return False
+            return None
         except Exception as e:
             logger.error(f"Failed to initialize Twitter client: {e}")
-            self._available = False
-            return False
+            return None
 
-    @property
-    def is_available(self) -> bool:
-        """Check if the Twitter service is configured and ready."""
-        self._ensure_client()
-        return self._available
-
-    async def post_tweet(self, text: str) -> Optional[str]:
+    async def post_tweet(self, workspace_id: str, text: str) -> Optional[str]:
         """
         Post a single tweet. Returns the tweet ID on success.
         
@@ -85,11 +79,12 @@ class TwitterService:
         Returns:
             Tweet ID string, or None on failure.
         """
-        if not self._ensure_client():
+        client = await self._get_client(workspace_id)
+        if not client:
             return None
 
         try:
-            response = self._client.create_tweet(text=text)
+            response = client.create_tweet(text=text)
             tweet_id = response.data["id"]
             logger.info(f"Tweet posted successfully: {tweet_id}")
             return str(tweet_id)
@@ -97,7 +92,7 @@ class TwitterService:
             logger.error(f"Failed to post tweet: {e}")
             return None
 
-    async def post_thread(self, tweets: list[str]) -> list[str]:
+    async def post_thread(self, workspace_id: str, tweets: list[str]) -> list[str]:
         """
         Post a multi-tweet thread. Each tweet is chained via in_reply_to_tweet_id.
         
@@ -107,7 +102,8 @@ class TwitterService:
         Returns:
             List of tweet IDs posted, or empty list on failure.
         """
-        if not self._ensure_client() or not tweets:
+        client = await self._get_client(workspace_id)
+        if not client or not tweets:
             return []
 
         posted_ids: list[str] = []
@@ -119,7 +115,7 @@ class TwitterService:
                 if reply_to:
                     kwargs["in_reply_to_tweet_id"] = reply_to
 
-                response = self._client.create_tweet(**kwargs)
+                response = client.create_tweet(**kwargs)
                 tweet_id = str(response.data["id"])
                 posted_ids.append(tweet_id)
                 reply_to = tweet_id

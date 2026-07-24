@@ -37,6 +37,9 @@ from tenacity import (
 
 from config import settings
 from services.lock_service import distributed_lock
+from database import AsyncSessionLocal, SocialConnection
+from sqlalchemy import select
+from services.crypto_service import decrypt_token
 
 # =============================================================================
 # Constants
@@ -112,24 +115,34 @@ async def _graph_get(url: str, params: dict[str, str]) -> dict:
         return response.json()
 
 
-def _get_fb_credentials() -> tuple[str | None, str | None]:
-    """Get Facebook Page credentials from settings."""
-    return settings.fb_page_access_token, settings.fb_page_id
+async def _get_fb_credentials(workspace_id: str) -> tuple[str | None, str | None]:
+    """Get Facebook Page credentials from DB for the specific workspace."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(SocialConnection).where(SocialConnection.businessProfileId == workspace_id)
+        conn = (await session.execute(stmt)).scalars().first()
+        if conn and conn.fbAccessToken and conn.fbPageId:
+            return decrypt_token(conn.fbAccessToken) or conn.fbAccessToken, conn.fbPageId
+    return None, None
 
 
-def _get_ig_credentials() -> tuple[str | None, str | None]:
-    """Get Instagram Business Account credentials from settings."""
-    return settings.fb_page_access_token, settings.ig_business_account_id
+async def _get_ig_credentials(workspace_id: str) -> tuple[str | None, str | None]:
+    """Get Instagram Business Account credentials from DB for the specific workspace."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(SocialConnection).where(SocialConnection.businessProfileId == workspace_id)
+        conn = (await session.execute(stmt)).scalars().first()
+        if conn and conn.fbAccessToken and conn.igAccountId:
+            return decrypt_token(conn.fbAccessToken) or conn.fbAccessToken, conn.igAccountId
+    return None, None
 
 
 # =============================================================================
 # Facebook Publishing
 # =============================================================================
 async def post_to_facebook(
-    message: str, media_urls: list[str] | None = None
+    workspace_id: str, message: str, media_urls: list[str] | None = None
 ) -> str | None:
     """
-    Post content to the Facebook Page.
+    Post content to the Facebook Page for a specific workspace.
 
     Enterprise Logic:
     - Videos: Posted individually to /{page-id}/videos (Native Video/Reels).
@@ -137,13 +150,14 @@ async def post_to_facebook(
     - Returns a comma-separated list of all successful post IDs.
 
     Args:
+        workspace_id: The tenant's workspace ID
         message: The post caption/message text
         media_urls: Optional list of media URLs (images and/or videos)
 
     Returns:
         The Facebook post ID string (comma-separated if multiple), or None on failure
     """
-    access_token, page_id = _get_fb_credentials()
+    access_token, page_id = await _get_fb_credentials(workspace_id)
     if not access_token or not page_id:
         logger.warning("Facebook credentials missing — skipping post")
         return None
@@ -323,7 +337,7 @@ async def _poll_container_status(
 # Instagram Publishing
 # =============================================================================
 async def post_to_instagram(
-    message: str, media_urls: list[str] | None = None
+    workspace_id: str, message: str, media_urls: list[str] | None = None
 ) -> str | None:
     """
     Post content to Instagram using the container-based publishing flow.
@@ -339,13 +353,14 @@ async def post_to_instagram(
     - Single image → Standard image post
 
     Args:
+        workspace_id: The tenant's workspace ID
         message: The post caption
         media_urls: List of media URLs (required — IG needs at least one)
 
     Returns:
         The Instagram post ID string, or None on failure
     """
-    access_token, ig_user_id = _get_ig_credentials()
+    access_token, ig_user_id = await _get_ig_credentials(workspace_id)
     if not access_token or not ig_user_id:
         logger.warning("Instagram credentials missing — skipping post")
         return None
@@ -554,9 +569,9 @@ def _handle_ig_error(post_type: str, error: Exception) -> None:
 # =============================================================================
 # Post Update Functions (for editing existing posts)
 # =============================================================================
-async def update_facebook_post(post_id: str, new_message: str) -> bool:
+async def update_facebook_post(workspace_id: str, post_id: str, new_message: str) -> bool:
     """Update the text/message of an existing Facebook post."""
-    access_token, _ = _get_fb_credentials()
+    access_token, _ = await _get_fb_credentials(workspace_id)
     if not access_token:
         logger.warning("Facebook credentials missing — cannot update post")
         return False
@@ -575,9 +590,9 @@ async def update_facebook_post(post_id: str, new_message: str) -> bool:
         return False
 
 
-async def update_instagram_post(media_id: str, new_caption: str) -> bool:
+async def update_instagram_post(workspace_id: str, media_id: str, new_caption: str) -> bool:
     """Update the caption of an existing Instagram post."""
-    access_token, _ = _get_ig_credentials()
+    access_token, _ = await _get_ig_credentials(workspace_id)
     if not access_token:
         logger.warning("Instagram credentials missing — cannot update post")
         return False

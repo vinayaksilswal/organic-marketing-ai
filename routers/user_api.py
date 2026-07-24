@@ -7,8 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from database import AsyncSessionLocal, User, BusinessProfile, SocialConnection
 from routers.auth import verify_user
-from services.creative_service import auto_populate_workspace
-from services.catalog_service import sync_workspace_catalog
+from services.onboarding_service import OnboardingService
 from services.crypto_service import encrypt_token, decrypt_token
 
 router = APIRouter(
@@ -41,6 +40,9 @@ class SocialConnectionUpdate(BaseModel):
     fbPageName: Optional[str] = None
     igAccountId: Optional[str] = None
     igAccountName: Optional[str] = None
+    twitterAccessToken: Optional[str] = None
+    twitterAccessSecret: Optional[str] = None
+    linkedinAccessToken: Optional[str] = None
 
 @router.get("")
 async def get_current_user(request: Request, user_id: str = Depends(verify_user)):
@@ -106,6 +108,8 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
                 "fbPageName": user.socialConnection.fbPageName,
                 "igAccountId": user.socialConnection.igAccountId,
                 "igAccountName": user.socialConnection.igAccountName,
+                "hasTwitter": bool(user.socialConnection.twitterAccessToken),
+                "hasLinkedin": bool(user.socialConnection.linkedinAccessToken),
             }
 
         return {
@@ -122,68 +126,22 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
 async def update_business_profile_post(
     data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)
 ):
-    async with AsyncSessionLocal() as session:
-        stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id)
-        res = await session.execute(stmt)
-        profile = res.scalars().first()
+    profile = await OnboardingService.update_business_profile(user_id, data.model_dump(exclude_unset=True))
 
-        if profile:
-            if data.name is not None:
-                profile.name = data.name
-            if data.websiteUrl is not None:
-                profile.websiteUrl = data.websiteUrl
-            if data.description is not None:
-                profile.description = data.description
-            if data.businessModel is not None:
-                profile.businessModel = data.businessModel
-            if data.niche is not None:
-                profile.niche = data.niche
-            if data.postIntervalHours is not None:
-                profile.postIntervalHours = data.postIntervalHours
-            if data.creativeGenerationIntervalHours is not None:
-                profile.creativeGenerationIntervalHours = data.creativeGenerationIntervalHours
-            if data.autoGenerateCreatives is not None:
-                profile.autoGenerateCreatives = data.autoGenerateCreatives
-            if hasattr(data, 'productCatalogUrl') and data.productCatalogUrl is not None:
-                profile.productCatalogUrl = data.productCatalogUrl
-            if hasattr(data, 'influencerReferenceUrl') and data.influencerReferenceUrl is not None:
-                profile.influencerReferenceUrl = data.influencerReferenceUrl
-        else:
-            profile = BusinessProfile(
-                userId=user_id,
-                name=data.name or "My Business",
-                websiteUrl=data.websiteUrl,
-                description=data.description,
-                businessModel=data.businessModel,
-                productCatalogUrl=data.productCatalogUrl,
-                influencerReferenceUrl=data.influencerReferenceUrl,
-                niche=data.niche,
-            )
-            session.add(profile)
-
-        await session.commit()
-        await session.refresh(profile)
-
-        # Trigger AI brand analysis in the background
-        asyncio.create_task(auto_populate_workspace(user_id, profile.id))
-        
-        if profile.productCatalogUrl:
-            asyncio.create_task(sync_workspace_catalog(profile.id))
-
-        return {
-            "success": True,
-            "data": {
-                "id": profile.id,
-                "name": profile.name,
-                "websiteUrl": profile.websiteUrl,
-                "description": profile.description,
-                "businessModel": profile.businessModel,
-                "productCatalogUrl": profile.productCatalogUrl,
-                "postIntervalHours": profile.postIntervalHours,
-                "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
-                "autoGenerateCreatives": profile.autoGenerateCreatives,
-            },
-        }
+    return {
+        "success": True,
+        "data": {
+            "id": profile.id,
+            "name": profile.name,
+            "websiteUrl": profile.websiteUrl,
+            "description": profile.description,
+            "businessModel": profile.businessModel,
+            "productCatalogUrl": profile.productCatalogUrl,
+            "postIntervalHours": profile.postIntervalHours,
+            "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
+            "autoGenerateCreatives": profile.autoGenerateCreatives,
+        },
+    }
 
 @router.post("/social-connection")
 async def update_social_connection(
@@ -205,6 +163,12 @@ async def update_social_connection(
                 conn.igAccountId = data.igAccountId
             if data.igAccountName is not None:
                 conn.igAccountName = data.igAccountName
+            if data.twitterAccessToken is not None:
+                conn.twitterAccessToken = encrypt_token(data.twitterAccessToken) if data.twitterAccessToken else None
+            if data.twitterAccessSecret is not None:
+                conn.twitterAccessSecret = encrypt_token(data.twitterAccessSecret) if data.twitterAccessSecret else None
+            if data.linkedinAccessToken is not None:
+                conn.linkedinAccessToken = encrypt_token(data.linkedinAccessToken) if data.linkedinAccessToken else None
         else:
             conn = SocialConnection(
                 userId=user_id,
@@ -213,6 +177,9 @@ async def update_social_connection(
                 fbPageName=data.fbPageName,
                 igAccountId=data.igAccountId,
                 igAccountName=data.igAccountName,
+                twitterAccessToken=encrypt_token(data.twitterAccessToken) if data.twitterAccessToken else None,
+                twitterAccessSecret=encrypt_token(data.twitterAccessSecret) if data.twitterAccessSecret else None,
+                linkedinAccessToken=encrypt_token(data.linkedinAccessToken) if data.linkedinAccessToken else None,
             )
             session.add(conn)
 
@@ -227,6 +194,8 @@ async def update_social_connection(
                 "fbPageName": conn.fbPageName,
                 "igAccountId": conn.igAccountId,
                 "igAccountName": conn.igAccountName,
+                "hasTwitter": bool(conn.twitterAccessToken),
+                "hasLinkedin": bool(conn.linkedinAccessToken),
             },
         }
 
@@ -302,37 +271,20 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
 async def create_user_business(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
     """Create a new business workspace entity."""
     try:
-        async with AsyncSessionLocal() as session:
-            profile = BusinessProfile(
-                userId=user_id,
-                name=data.name or "New Workspace",
-                websiteUrl=data.websiteUrl,
-                description=data.description,
-                businessModel=data.businessModel or "General",
-                productCatalogUrl=data.productCatalogUrl,
-            )
-            session.add(profile)
-            await session.commit()
-            await session.refresh(profile)
+        profile = await OnboardingService.create_business_profile(user_id, data.model_dump(exclude_unset=True))
 
-            # Trigger AI brand analysis + starter creative generation in background
-            asyncio.create_task(auto_populate_workspace(user_id, profile.id))
-            
-            if profile.productCatalogUrl:
-                asyncio.create_task(sync_workspace_catalog(profile.id))
-
-            return {
-                "success": True,
-                "data": {
-                    "id": profile.id,
-                    "name": profile.name,
-                    "websiteUrl": profile.websiteUrl,
-                    "description": profile.description,
-                    "businessModel": profile.businessModel,
-                    "productCatalogUrl": getattr(profile, "productCatalogUrl", None),
-                    "influencerReferenceUrl": getattr(profile, "influencerReferenceUrl", None),
-                    "brandAnalysisComplete": False,
-                },
-            }
+        return {
+            "success": True,
+            "data": {
+                "id": profile.id,
+                "name": profile.name,
+                "websiteUrl": profile.websiteUrl,
+                "description": profile.description,
+                "businessModel": profile.businessModel,
+                "productCatalogUrl": getattr(profile, "productCatalogUrl", None),
+                "influencerReferenceUrl": getattr(profile, "influencerReferenceUrl", None),
+                "brandAnalysisComplete": False,
+            },
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {str(e)}")

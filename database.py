@@ -165,6 +165,9 @@ class SocialConnection(Base):
     fbPageName = Column(String, nullable=True)
     igAccountId = Column(String, nullable=True)
     igAccountName = Column(String, nullable=True)
+    twitterAccessToken = Column(Text, nullable=True)
+    twitterAccessSecret = Column(Text, nullable=True)
+    linkedinAccessToken = Column(Text, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 

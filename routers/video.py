@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from database import AsyncSessionLocal, VideoApiConfig, Media, BusinessProfile
 from routers.auth import verify_user, get_workspace_id
 from sqlalchemy import select, and_
+from services.crypto_service import encrypt_token, decrypt_token
 
 router = APIRouter(
     prefix="/api/v1/video",
@@ -53,10 +54,10 @@ async def save_video_config(data: VideoConfigUpdate, request: Request, user_id: 
         config = res.scalars().first()
         if config:
             config.provider = data.provider
-            config.apiKey = data.apiKey
+            config.apiKey = encrypt_token(data.apiKey) if data.apiKey else ""
             config.endpoint = data.endpoint
         else:
-            config = VideoApiConfig(userId=user_id, businessProfileId=workspace_id, provider=data.provider, apiKey=data.apiKey, endpoint=data.endpoint)
+            config = VideoApiConfig(userId=user_id, businessProfileId=workspace_id, provider=data.provider, apiKey=encrypt_token(data.apiKey) if data.apiKey else "", endpoint=data.endpoint)
             session.add(config)
         await session.commit()
         return {"success": True, "message": "Video API configuration saved successfully"}
@@ -188,7 +189,7 @@ async def render_video(data: RenderVideoRequest, request: Request, user_id: str 
                 else:
                     raise HTTPException(status_code=400, detail="Missing json2video API key. Please configure it in settings.")
             else:
-                api_key = config.apiKey
+                api_key = decrypt_token(config.apiKey) or config.apiKey
             
         if data.provider != "json2video":
             raise HTTPException(status_code=400, detail="Only json2video is currently supported.")
