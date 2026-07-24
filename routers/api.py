@@ -17,7 +17,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
-from services.storage_service import upload_media_to_s3
+from services.storage_service import upload_media_to_cloudinary
 from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -95,19 +95,19 @@ async def upload_media(
                 if bp:
                     workspace_id = bp.id
 
-            # Attempt to upload to S3
-            s3_url = await upload_media_to_s3(
+            # Attempt to upload to Cloudinary
+            cloudinary_res = await upload_media_to_cloudinary(
                 workspace_id=workspace_id or "default",
                 media_id=media_id,
                 filename=file.filename or "upload",
-                content=file_content,
-                mime_type=mime_type
+                source=file_content,
+                resource_type="auto"
             )
 
-            # Fallback to local API URL if S3 is not configured
-            final_url = s3_url if s3_url else f"/api/v1/media/{media_id}"
+            # Fallback to local API URL if Cloudinary is not configured
+            final_url = cloudinary_res["secure_url"] if cloudinary_res else f"/api/v1/media/{media_id}"
             
-            # If uploaded to S3, we don't necessarily need to save data bytes in DB, 
+            # If uploaded to Cloudinary, we don't necessarily need to save data bytes in DB, 
             # but we keep it for fallback/local parity.
             media = Media(
                 id=media_id,
@@ -116,7 +116,7 @@ async def upload_media(
                 filename=file.filename or "upload",
                 mimeType=mime_type,
                 url=final_url,
-                data=file_content if not s3_url else None,
+                data=file_content if not cloudinary_res else None,
             )
             session.add(media)
             await session.commit()

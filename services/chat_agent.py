@@ -32,7 +32,7 @@ from typing import Any
 import httpx
 from loguru import logger
 from sqlalchemy import select, func
-from database import AsyncSessionLocal, SocialCampaign, SocialPost, EmailCampaign, Audience
+from database import AsyncSessionLocal, SocialCampaign, SocialPost, EmailCampaign, Audience, Product
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -181,7 +181,6 @@ async def execute_tool(
     Args:
         name: The tool function name requested by the LLM
         args: The arguments dict parsed from the LLM's function call
-        prisma: The Prisma client instance (from app.state)
 
     Returns:
         A string result to feed back to the LLM
@@ -191,165 +190,182 @@ async def execute_tool(
         if name == "search_products":
             query = args.get("query", "")
 
-            # Try exact ID match first
-            product = await prisma.product.find_first(where={"id": query})
-            if product:
-                return (
-                    f"Found exact product:\n"
-                    f"  ID: {product.id}\n"
-                    f"  Name: {product.productName}\n"
-                    f"  Price: ${product.sellPrice}\n"
-                    f"  Cost: ${product.costPrice}\n"
-                    f"  Category: {product.categoryName}\n"
-                    f"  Description: {product.description[:200]}..."
-                )
+            async with AsyncSessionLocal() as session:
+                product = (await session.execute(select(Product).where(Product.id == query))).scalar_one_or_none()
+                if product:
+                    return (
+                        f"Found exact product:
+"
+                        f"  ID: {product.id}
+"
+                        f"  Name: {product.title}
+"
+                        f"  Price: ${product.price}
+"
+                        f"  Description: {product.description[:200] if product.description else ''}..."
+                    )
 
-            # Search by name (case-insensitive contains)
-            products = await prisma.product.find_many(
-                where={"productName": {"contains": query, "mode": "insensitive"}},
-                take=5,
-            )
-            if not products:
-                return f"No products found matching '{query}'"
+                products = (await session.execute(
+                    select(Product).where(Product.title.ilike(f"%{query}%")).limit(5)
+                )).scalars().all()
+                if not products:
+                    return f"No products found matching '{query}'"
 
-            lines = [f"Found {len(products)} product(s):"]
-            for p in products:
-                lines.append(
-                    f"  ID: {p.id} | {p.productName} | ${p.sellPrice} | {p.categoryName}"
-                )
-            return "\n".join(lines)
+                lines = [f"Found {len(products)} product(s):"]
+                for p in products:
+                    lines.append(
+                        f"  ID: {p.id} | {p.title} | ${p.price}"
+                    )
+                return "
+".join(lines)
 
         # --- post_social_ad ---
         elif name == "post_social_ad":
             product_id = args.get("product_id", "")
             platform = args.get("platform", "BOTH")
 
-            product = await prisma.product.find_unique(where={"id": product_id})
-            if not product:
-                return f"Error: Product with ID '{product_id}' not found."
+            async with AsyncSessionLocal() as session:
+                product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+                if not product:
+                    return f"Error: Product with ID '{product_id}' not found."
 
-            # Generate AI caption
-            caption = await generate_social_caption(product)
+                caption = await generate_social_caption(product)
 
-            # Gather media (video-first priority)
-            media_urls: list[str] = []
-            if product.productVideo:
-                media_urls.append(product.productVideo)
-            if product.productImages:
-                media_urls.extend(product.productImages)
-            elif product.productImage:
-                media_urls.append(product.productImage)
+                media_urls = []
+                if product.imageUrl:
+                    media_urls.append(product.imageUrl)
 
-            # Create draft record
-            post = await prisma.socialpost.create(
-                data={
-                    "productId": product.id,
-                    "platform": platform,
-                    "type": "CHAT_BOT",
-                    "caption": caption,
-                    "mediaUrls": media_urls,
-                    "scheduledAt": datetime.now(),
-                    "status": "DRAFT",
-                }
-            )
+                campaign = SocialCampaign(
+                    userId=product.userId,
+                    baseCaption=caption,
+                    mediaUrl=media_urls[0] if media_urls else "",
+                    mediaType="image",
+                    isActive=True
+                )
+                session.add(campaign)
+                await session.flush()
 
-            # Post to platforms
-            fb_id, ig_id = None, None
-            errors: list[str] = []
+                post = SocialPost(
+                    userId=product.userId,
+                    campaignId=campaign.id,
+                    platform=platform,
+                    type="CHAT_BOT",
+                    caption=caption,
+                    mediaUrls=media_urls,
+                    scheduledAt=datetime.now(),
+                    status="DRAFT",
+                )
+                session.add(post)
+                await session.flush()
 
-            if platform in ("FACEBOOK", "BOTH"):
-                try:
-                    fb_id = await post_to_facebook(message=caption, media_urls=media_urls)
-                except Exception as e:
-                    errors.append(f"FB: {e}")
+                fb_id, ig_id = None, None
+                errors = []
 
-            if platform in ("INSTAGRAM", "BOTH"):
-                try:
-                    ig_id = await post_to_instagram(message=caption, media_urls=media_urls)
-                except Exception as e:
-                    errors.append(f"IG: {e}")
+                if platform in ("FACEBOOK", "BOTH"):
+                    try:
+                        fb_id = await post_to_facebook(message=caption, media_urls=media_urls)
+                    except Exception as e:
+                        errors.append(f"FB: {e}")
 
-            is_success = fb_id is not None or ig_id is not None
+                if platform in ("INSTAGRAM", "BOTH"):
+                    try:
+                        ig_id = await post_to_instagram(message=caption, media_urls=media_urls)
+                    except Exception as e:
+                        errors.append(f"IG: {e}")
 
-            # Update record
-            await prisma.socialpost.update(
-                where={"id": post.id},
-                data={
-                    "status": "POSTED" if is_success else "FAILED",
-                    "postedAt": datetime.now() if is_success else None,
-                    "fbPostId": fb_id,
-                    "igPostId": ig_id,
-                    "errorLog": " | ".join(errors) if errors else None,
-                },
-            )
+                is_success = fb_id is not None or ig_id is not None
 
-            result = f"Social post created for '{product.productName}' → {platform}\n"
-            result += f"Caption: {caption[:100]}...\n"
+                post.status = "POSTED" if is_success else "FAILED"
+                if is_success:
+                    post.postedAt = datetime.now()
+                post.fbPostId = fb_id
+                post.igPostId = ig_id
+                if errors:
+                    post.errorLog = " | ".join(errors)
+
+                await session.commit()
+
+            result = f"Social post created for '{product.title}' → {platform}
+"
+            result += f"Caption: {caption[:100]}...
+"
             result += f"Status: {'POSTED ✓' if is_success else 'FAILED ✗'}"
             if fb_id:
-                result += f"\nFB Post ID: {fb_id}"
+                result += f"
+FB Post ID: {fb_id}"
             if ig_id:
-                result += f"\nIG Post ID: {ig_id}"
+                result += f"
+IG Post ID: {ig_id}"
             if errors:
-                result += f"\nErrors: {', '.join(errors)}"
+                result += f"
+Errors: {', '.join(errors)}"
             return result
 
         # --- send_email_campaign ---
         elif name == "send_email_campaign":
             product_id = args.get("product_id", "")
-            product = await prisma.product.find_unique(where={"id": product_id})
-            if not product:
-                return f"Error: Product with ID '{product_id}' not found."
+            
+            async with AsyncSessionLocal() as session:
+                product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+                if not product:
+                    return f"Error: Product with ID '{product_id}' not found."
 
-            # Generate email content
-            email_content = await generate_promotional_email(product)
-            subject = email_content.get("subject", "Special Offer")
-            body_text = email_content.get("bodyText", "")
-            body_html = email_content.get("bodyHtml", "")
+                email_content = await generate_promotional_email(product)
+                subject = email_content.get("subject", "Special Offer")
+                body_text = email_content.get("bodyText", "")
+                body_html = email_content.get("bodyHtml", "")
 
-            # Create campaign record
-            campaign = await prisma.emailcampaign.create(
-                data={
-                    "productId": product.id,
-                    "type": "CHAT_BOT",
-                    "subject": subject,
-                    "bodyText": body_text,
-                    "bodyHtml": body_html,
-                    "scheduledAt": datetime.now(),
-                    "status": "DRAFT",
-                }
-            )
-
-            # Send via Resend
-            try:
-                result_data = await send_email_blast(
-                    subject=subject,
-                    html_body=body_html,
-                    text_body=body_text,
-                    prisma=prisma,
+                campaign_parent = SocialCampaign(
+                    userId=product.userId,
+                    baseCaption=subject,
+                    mediaUrl="",
+                    mediaType="image",
+                    isActive=True
                 )
-                is_success = result_data.get("success", False)
-                recipient_count = result_data.get("count", 0)
-                error_log = result_data.get("error")
-            except Exception as e:
-                is_success = False
-                recipient_count = 0
-                error_log = str(e)
+                session.add(campaign_parent)
+                await session.flush()
 
-            await prisma.emailcampaign.update(
-                where={"id": campaign.id},
-                data={
-                    "status": "SENT" if is_success else "FAILED",
-                    "sentAt": datetime.now() if is_success else None,
-                    "recipientCount": recipient_count,
-                    "errorLog": error_log,
-                },
-            )
+                campaign = EmailCampaign(
+                    userId=product.userId,
+                    campaignId=campaign_parent.id,
+                    status="DRAFT",
+                    subject=subject,
+                    bodyText=body_text,
+                    bodyHtml=body_html,
+                    scheduledAt=datetime.now()
+                )
+                session.add(campaign)
+                await session.flush()
+
+                try:
+                    result_data = await send_email_blast(
+                        subject=subject,
+                        body_html=body_html,
+                        body_text=body_text
+                    )
+                    is_success = result_data.get("success", False)
+                    recipient_count = result_data.get("sent_count", 0)
+                    error_log = result_data.get("error")
+                except Exception as e:
+                    is_success = False
+                    recipient_count = 0
+                    error_log = str(e)
+
+                campaign.status = "SENT" if is_success else "FAILED"
+                if is_success:
+                    campaign.sentAt = datetime.now()
+                campaign.recipientCount = recipient_count
+                if error_log:
+                    campaign.errorLog = str(error_log)
+                
+                await session.commit()
 
             if is_success:
                 return (
-                    f"✓ Email campaign sent for '{product.productName}'\n"
-                    f"Subject: {subject}\n"
+                    f"✓ Email campaign sent for '{product.title}'
+"
+                    f"Subject: {subject}
+"
                     f"Recipients: {recipient_count}"
                 )
             return f"✗ Email campaign failed: {error_log}"
@@ -425,7 +441,6 @@ async def chat_with_agent(
 
     Args:
         messages: List of conversation messages [{"role": "user", "content": "..."}]
-        prisma: The Prisma client instance (from app.state)
 
     Returns:
         Dict with 'role' and 'content' keys (the assistant's final response)
