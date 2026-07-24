@@ -22,6 +22,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   const [rendering, setRendering] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   useEffect(() => {
     fetchConfig();
@@ -141,6 +143,36 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     { label: 'Shoes Promo', name: 'Nike Air Max', url: 'https://nike.com', img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80' },
     { label: 'Tech Gadget', name: 'Smart Watch', url: 'https://apple.com', img: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80' },
   ];
+
+  const handleManualUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`${API_BASE}/upload-media`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Workspace-Id': activeWorkspaceId || ''
+        }
+      });
+      if (res.ok) {
+        showToast('Video uploaded to Media Catalog successfully!');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } else {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Upload failed');
+      }
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="view">
@@ -298,21 +330,49 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     )}
 
                   <div style={{ marginBottom: '2rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
-                      Generated Veo 3.1 Prompt
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
+                      <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
+                        Generated AI Video Prompt
+                      </label>
+                    </div>
                     <textarea 
                       className="glass-panel"
                       value={veoPrompt}
                       readOnly
-                      style={{ width: '100%', minHeight: '120px', padding: '1rem', fontSize: '0.95rem', lineHeight: '1.6', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)' }}
+                      style={{ width: '100%', minHeight: '120px', padding: '1rem', fontSize: '0.95rem', lineHeight: '1.6', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1rem' }}
                     />
+                    
+                    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px' }}>
+                      <h5 style={{ margin: '0 0 0.5rem 0', color: '#e5e7eb', fontSize: '0.95rem' }}>Manual Generation</h5>
+                      <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
+                        Use the prompt above in tools like Google Veo, Runway, or Midjourney. Then upload the resulting video here.
+                      </p>
+                      <input 
+                        type="file" 
+                        accept="video/*" 
+                        ref={fileInputRef} 
+                        onChange={handleManualUpload} 
+                        style={{ display: 'none' }} 
+                      />
+                      <button 
+                        className="btn" 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.1)', border: 'none', padding: '0.5rem 1rem' }}
+                      >
+                        {uploading ? (
+                          <><span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Uploading...</>
+                        ) : (
+                          <><Check size={16} /> Upload Generated Video to Media</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                   
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
                       <label style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
-                        Generated <code style={{ color: 'var(--primary-color)' }}>json2video</code> API Payload
+                        Automated Rendering Payload (<code style={{ color: 'var(--primary-color)' }}>json2video</code>)
                       </label>
                       <button className="btn" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }} onClick={copyPayload}>
                         {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />} {copied ? 'Copied' : 'Copy JSON'}

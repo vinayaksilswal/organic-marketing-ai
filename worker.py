@@ -28,6 +28,7 @@ from database import (
     MarketingLog,
     MarketingState,
     Media,
+    Product,
     SocialCampaign,
     SocialPost,
     init_db,
@@ -86,6 +87,49 @@ async def _get_next_campaign_for_workspace(
     state.lastSocialIdx = next_idx
     return campaigns[next_idx]
 
+
+async def _get_next_product_for_workspace(
+    session: Any, profile: BusinessProfile
+) -> Product | None:
+    """Get the next product for a specific workspace using round-robin."""
+    query = (
+        select(Product)
+        .where(Product.businessProfileId == profile.id)
+        .order_by(Product.createdAt.asc())
+    )
+
+    res = await session.execute(query)
+    products = res.scalars().all()
+
+    if not products:
+        return None
+
+    state_query = select(MarketingState).where(
+        MarketingState.businessProfileId == profile.id
+    )
+    state_res = await session.execute(state_query)
+    state = state_res.scalars().first()
+
+    if not state:
+        state = MarketingState(
+            userId=profile.userId,
+            businessProfileId=profile.id,
+            lastSocialIdx=0,
+            lastEmailIdx=0,
+            lastProductIdx=0,
+            autoApprove=getattr(profile, "autoGenerateCreatives", True),
+        )
+        session.add(state)
+        await session.flush()
+
+    # Need to check if lastProductIdx is present on MarketingState, else default to 0
+    current_idx = getattr(state, "lastProductIdx", 0)
+    next_idx = current_idx + 1
+    if next_idx >= len(products):
+        next_idx = 0
+
+    state.lastProductIdx = next_idx
+    return products[next_idx]
 
 async def _select_media_for_post(
     session: Any, profile: BusinessProfile
@@ -168,30 +212,95 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 logger.error(f"Workspace {workspace_id} not found.")
                 return "error_workspace_not_found"
 
-            # 1. Get next campaign
-            campaign = await _get_next_campaign_for_workspace(session, profile)
-            if not campaign:
-                logger.info(f"No active campaigns found for workspace {workspace_id}.")
-                return "no_campaigns"
+            if profile.businessModel == "E-commerce" and getattr(profile, "productCatalogUrl", None):
+                # E-commerce Flow: Pick a product and generate a post
+                product = await _get_next_product_for_workspace(session, profile)
+                if not product:
+                    logger.info(f"No products found for E-commerce workspace {workspace_id}. Falling back to standard campaign.")
+                    campaign = await _get_next_campaign_for_workspace(session, profile)
+                    if not campaign:
+                        return "no_campaigns"
+                    media_url = await _select_media_for_post(session, profile)
+                    if not media_url and campaign.mediaUrl:
+                        media_url = campaign.mediaUrl
+                    media_urls = [media_url] if media_url else []
+                    
+                    prompt = (
+                        f"Write a highly engaging social media post for {profile.name} "
+                        f"(Industry: {profile.industry or 'General'}, "
+                        f"Tone: {profile.toneOfVoice or 'Professional'}). "
+                        f"Base content: {campaign.baseCaption}. "
+                        f"Include 3-5 relevant hashtags from: "
+                        f"{', '.join(profile.suggestedHashtags or ['#business', '#growth'])}. "
+                        f"Make it compelling with emojis and a clear CTA."
+                    )
+                    fallback_caption = campaign.baseCaption
+                    campaign_id = campaign.id
+                else:
+                    logger.info(f"Selected product {product.id} ({product.title}) for workspace {workspace_id}")
+                    media_urls = []
+                    if getattr(product, "videoUrl", None):
+                        media_urls.append(product.videoUrl)
+                    elif product.imageUrl:
+                        media_urls.append(product.imageUrl)
+                        
+                    price_info = f" Price: ${product.price}." if getattr(product, "price", None) else ""
+                    prompt = (
+                        f"Write a highly engaging product highlight social media post for {profile.name} "
+                        f"(Industry: {profile.industry or 'E-commerce'}, "
+                        f"Tone: {profile.toneOfVoice or 'Persuasive & Excited'}). "
+                        f"Product Name: {product.title}. "
+                        f"Description: {product.description or 'A high quality product.'}{price_info} "
+                        f"Include 3-5 relevant hashtags from: "
+                        f"{', '.join(profile.suggestedHashtags or ['#ecommerce', '#musthave'])}. "
+                        f"Make it compelling with emojis and end with a clear Call-To-Action. "
+                        f"Include this purchase link at the end: {product.url or profile.websiteUrl or ''}"
+                    )
+                    fallback_caption = f"Check out our amazing {product.title}! Get it here: {product.url or profile.websiteUrl or ''}"
+                    # Use a dummy campaign ID or the first active one if required by DB schema
+                    dummy_campaign = await _get_next_campaign_for_workspace(session, profile)
+                    if dummy_campaign:
+                        campaign_id = dummy_campaign.id
+                    else:
+                        dummy_campaign = SocialCampaign(
+                            userId=profile.userId,
+                            businessProfileId=profile.id,
+                            baseCaption="[Automated Product Highlight]",
+                            mediaUrl="",
+                            isActive=True
+                        )
+                        session.add(dummy_campaign)
+                        await session.flush()
+                        campaign_id = dummy_campaign.id
 
-            logger.info(f"Selected campaign {campaign.id} for workspace {workspace_id}")
+            else:
+                # Standard Flow: Pick a campaign
+                campaign = await _get_next_campaign_for_workspace(session, profile)
+                if not campaign:
+                    logger.info(f"No active campaigns found for workspace {workspace_id}.")
+                    return "no_campaigns"
 
-            # 2. Select media from catalog (prefer unused AI-generated)
-            media_url = await _select_media_for_post(session, profile)
-            if not media_url and campaign.mediaUrl:
-                media_url = campaign.mediaUrl
-            media_urls = [media_url] if media_url else []
+                logger.info(f"Selected campaign {campaign.id} for workspace {workspace_id}")
 
-            # 3. Generate fresh AI caption
-            prompt = (
-                f"Write a highly engaging social media post for {profile.name} "
-                f"(Industry: {profile.industry or 'General'}, "
-                f"Tone: {profile.toneOfVoice or 'Professional'}). "
-                f"Base content: {campaign.baseCaption}. "
-                f"Include 3-5 relevant hashtags from: "
-                f"{', '.join(profile.suggestedHashtags or ['#business', '#growth'])}. "
-                f"Make it compelling with emojis and a clear CTA."
-            )
+                # 2. Select media from catalog (prefer unused AI-generated)
+                media_url = await _select_media_for_post(session, profile)
+                if not media_url and campaign.mediaUrl:
+                    media_url = campaign.mediaUrl
+                media_urls = [media_url] if media_url else []
+
+                # 3. Generate fresh AI caption
+                prompt = (
+                    f"Write a highly engaging social media post for {profile.name} "
+                    f"(Industry: {profile.industry or 'General'}, "
+                    f"Tone: {profile.toneOfVoice or 'Professional'}). "
+                    f"Base content: {campaign.baseCaption}. "
+                    f"Include 3-5 relevant hashtags from: "
+                    f"{', '.join(profile.suggestedHashtags or ['#business', '#growth'])}. "
+                    f"Make it compelling with emojis and a clear CTA."
+                )
+                fallback_caption = campaign.baseCaption
+                campaign_id = campaign.id
+
             try:
                 final_caption = await generate_campaign_variation(prompt)
             except Exception as e:
@@ -199,7 +308,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 final_caption = None
 
             if not final_caption or len(final_caption) < 10:
-                final_caption = campaign.baseCaption
+                final_caption = fallback_caption
 
             # 4. Post to all platforms
             fb_post_id = None

@@ -153,29 +153,37 @@ async def generate_omnichannel_content(business_context: str, campaign_context: 
     Enterprise-grade multimodal generation using strict Pydantic validation.
     """
     system_prompt = (
-        "You are an elite enterprise marketing AI. "
-        "Your goal is to drive high-value organic conversions, highlighting ROI, scalability, and seamless integration. "
+        "You are an elite enterprise marketing copywriter and brand strategist. "
+        "Your goal is to drive high-value organic conversions through psychological hooks, clear ROI, and precise audience targeting. "
+        "MANDATORY RULES:\n"
+        "1. NO CLICHES: Never use words like 'cutting-edge', 'state of the art', 'dynamic', 'revolutionary', 'unlock', or 'synergy'.\n"
+        "2. SPECIFICITY: Speak directly to the pain point. Use concrete outcomes over vague promises.\n"
+        "3. HOOK-FIRST: Every caption and email must start with a pattern-interrupting hook.\n"
+        "4. NO EMOJI SPAM: Use emojis surgically, maximum 2 per post.\n"
         "Your output MUST be a valid JSON object matching the requested schema exactly. "
-        "No markdown fences. Return ONLY the JSON."
+        "No markdown fences. Return ONLY the raw JSON."
     )
 
-    prompt = f"""Generate omnichannel marketing content based on the following:
-
+    prompt = f"""Generate enterprise-grade omnichannel marketing content based on the following context.
+    
 Business Context:
 {business_context}
 
 Campaign Context:
 {campaign_context}
 
+FRAMEWORK REQUIREMENT:
+Use the PAS (Problem-Agitation-Solution) or AIDA (Attention-Interest-Desire-Action) framework for the social caption and email body. 
+
 Return a JSON object with:
-1. "caption": A highly engaging social media caption (under 2200 characters).
-2. "hashtags": An array of 3-7 relevant hashtags.
-3. "email_subject": A high-converting, curiosity-driven email subject line.
-4. "email_headline": A strong 2-5 word email headline focusing on business value.
-5. "email_subheadline": A short sentence elaborating on the headline and urgency.
-6. "email_body_copy": 2-3 sentences of persuasive body copy selling the service. DO NOT include HTML.
-7. "email_cta_text": Action-oriented text for an email button.
-8. "video_hook": A punchy 3-5 word text overlay for the start of a vertical video."""
+1. "caption": A highly engaging social media caption (under 2200 characters). Must start with a hook.
+2. "hashtags": An array of 3-5 hyper-relevant niche hashtags (no generic tags like #business).
+3. "email_subject": A high-converting, curiosity-driven email subject line (under 50 chars).
+4. "email_headline": A strong 2-5 word email headline focusing on concrete business value.
+5. "email_subheadline": A short sentence elaborating on the headline with urgency.
+6. "email_body_copy": 2-3 sentences of persuasive body copy selling the service. Focus on the transformation. DO NOT include HTML.
+7. "email_cta_text": Action-oriented text for an email button (e.g. "Get Your Audit", not "Click Here").
+8. "video_hook": A punchy 3-5 word text overlay for the first 3 seconds of a vertical video."""
 
     for attempt in range(3):
         try:
@@ -218,23 +226,30 @@ async def generate_campaign_email(campaign: Any) -> dict[str, str]:
     for a social campaign.
     """
     system_prompt = (
-        "You are an elite marketing copywriter for Organic Marketing AI. "
-        "Your goal is to drive high-value organic conversions, highlighting ROI, scalability, and seamless integration. "
+        "You are a master direct-response copywriter for B2B and B2C enterprise brands. "
+        "Your goal is to maximize email open rates and click-through rates. "
+        "MANDATORY RULES:\n"
+        "1. NO CLICHES: Never use 'cutting-edge', 'revolutionize', 'unlock', 'transform your business', or 'supercharge'.\n"
+        "2. CURIOSITY + BENEFIT: The subject line must combine a specific benefit with a curiosity gap.\n"
+        "3. CONVERSATIONAL TONE: Write like a human expert talking to a peer, not a corporate robot.\n"
         "Your output MUST be a valid JSON object with EXACTLY 5 keys: "
         "subject, headline, subheadline, body_copy, cta_text. "
-        "No markdown fences. Return ONLY the JSON."
+        "No markdown fences. Return ONLY the raw JSON."
     )
 
-    prompt = f"""Write a promotional email based on this campaign context:
+    prompt = f"""Write a high-converting promotional email based on this campaign context:
 
 Campaign Base Content: {campaign.baseCaption}
 
+COPYWRITING FRAMEWORK:
+Use a direct, pain-point-focused approach. Agitate a specific problem they have, then introduce our solution as the inevitable answer.
+
 Return a JSON object with:
-1. "subject": A high-converting, curiosity-driven email subject line
-2. "headline": A strong 2-5 word headline focusing on business value
-3. "subheadline": A short sentence elaborating on the headline and urgency
-4. "body_copy": 2-3 sentences of persuasive body copy selling the service. Focus on pain points and solutions. DO NOT include HTML.
-5. "cta_text": Action-oriented text for a button (e.g. "Scale Your Business", "Start Free Trial")"""
+1. "subject": A high-converting, curiosity-driven email subject line (e.g., "The real reason your ads are failing (and the fix)")
+2. "headline": A strong 2-5 word headline focusing on concrete business value
+3. "subheadline": A short sentence elaborating on the headline and adding urgency or proof
+4. "body_copy": 2-3 sentences of persuasive body copy. Focus on the 'Before -> After' transformation. DO NOT include HTML.
+5. "cta_text": Action-oriented text for a button (e.g., "See how it works", "Get the playbook")"""
 
     text = await _call_openrouter(
         prompt,
