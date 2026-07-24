@@ -273,6 +273,39 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                         await session.flush()
                         campaign_id = dummy_campaign.id
 
+            elif profile.businessModel == "AI Influencer":
+                # AI Influencer Flow: Use character chart/reference
+                campaign = await _get_next_campaign_for_workspace(session, profile)
+                if not campaign:
+                    logger.info(f"No active campaigns found for workspace {workspace_id}.")
+                    return "no_campaigns"
+                
+                logger.info(f"Selected campaign {campaign.id} for AI Influencer workspace {workspace_id}")
+                
+                media_url = await _select_media_for_post(session, profile)
+                if getattr(profile, "influencerReferenceUrl", None):
+                    # If they have a reference URL, prioritize it if we don't have fresh media
+                    if not media_url:
+                        media_url = profile.influencerReferenceUrl
+                elif not media_url and campaign.mediaUrl:
+                    media_url = campaign.mediaUrl
+                    
+                media_urls = [media_url] if media_url else []
+
+                char_reference = f"\nCHARACTER VISUAL REFERENCE URL: {profile.influencerReferenceUrl}" if getattr(profile, "influencerReferenceUrl", None) else ""
+                
+                prompt = (
+                    f"Write a highly engaging social media post from the first-person perspective of an AI Influencer "
+                    f"named {profile.name} (Tone: {profile.toneOfVoice or 'Authentic & Playful'}). "
+                    f"Base content: {campaign.baseCaption}. "
+                    f"Include 3-5 relevant hashtags from: "
+                    f"{', '.join(profile.suggestedHashtags or ['#aiinfluencer', '#lifestyle'])}."
+                    f"{char_reference} "
+                    f"Make it sound like a real person sharing their life or thoughts. Use emojis naturally."
+                )
+                fallback_caption = campaign.baseCaption
+                campaign_id = campaign.id
+
             else:
                 # Standard Flow: Pick a campaign
                 campaign = await _get_next_campaign_for_workspace(session, profile)
