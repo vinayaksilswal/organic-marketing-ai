@@ -92,8 +92,8 @@ def verify_user(request: Request) -> str:
         return user_id
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Session expired. Please log in again.")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid session")
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid session: {str(e)}")
 
 def get_workspace_id(request: Request) -> Optional[str]:
     """
