@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     ]
 
     # =========================================================================
-    # Database (PostgreSQL via Prisma) & Redis (ARQ)
+    # Database (PostgreSQL) & Redis (ARQ)
     # =========================================================================
     database_url: str = "postgresql://postgres:password@localhost:5432/quantcai"
     redis_url: str = "redis://localhost:6379/0"

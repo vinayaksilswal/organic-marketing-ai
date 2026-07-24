@@ -7,8 +7,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    libssl-dev \
-    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file first (for Docker layer caching)
@@ -20,13 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Force Prisma binary engine type
-ENV PRISMA_CLIENT_ENGINE_TYPE=binary
-ENV PRISMA_CLI_QUERY_ENGINE_TYPE=binary
 
-# Fetch the Prisma engine binary and generate client AS ROOT (needs write access)
-RUN python -m prisma py fetch && \
-    python -m prisma generate --schema=schema_py.prisma
 
 # Create a non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
@@ -51,4 +43,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 # Run with Gunicorn + Uvicorn workers
 # IMPORTANT: -w 1 (single worker) is REQUIRED because APScheduler runs
 # the marketing loop. Multiple workers would cause duplicate posts.
-CMD ["sh", "-c", "python -m prisma db push --schema=schema_py.prisma --accept-data-loss 2>/dev/null; gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-8000} --timeout 120 --graceful-timeout 30"]
+CMD ["sh", "-c", "gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:${PORT:-8000} --timeout 120 --graceful-timeout 30"]
