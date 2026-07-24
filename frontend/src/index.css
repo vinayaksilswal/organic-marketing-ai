@@ -1041,3 +1041,56 @@ input:focus, textarea:focus, select:focus {
   font-weight: 600;
   letter-spacing: 0.02em;
 }
+
+/* Logo Marquee */
+.logo-marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  padding: 3rem 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.logo-marquee {
+  display: inline-flex;
+  gap: 6rem;
+  animation: logo-scroll 40s linear infinite;
+  align-items: center;
+  padding-left: 6rem;
+  opacity: 0.6;
+}
+
+@keyframes logo-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-50% - 3rem)); }
+}
+
+.logo-marquee img {
+  height: 35px;
+  filter: grayscale(100%) brightness(200%); /* Make them white/grayish */
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.logo-marquee img:hover {
+  opacity: 1;
+}
+
+/* PAS Section */
+.pas-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 2.5rem;
+  border-radius: 20px;
+  transition: all 0.3s ease;
+}
+
+.pas-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-5px);
+}
+

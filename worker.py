@@ -349,7 +349,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
 
             # Facebook
             try:
-                fb_post_id = await post_to_facebook(final_caption, media_urls=media_urls)
+                fb_post_id = await post_to_facebook(workspace_id, final_caption, media_urls=media_urls)
                 if fb_post_id:
                     logger.info(f"✓ Posted to Facebook: {fb_post_id}")
                 else:
@@ -362,7 +362,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             ig_post_id = None
             if media_urls:
                 try:
-                    ig_post_id = await post_to_instagram(final_caption, media_urls=media_urls)
+                    ig_post_id = await post_to_instagram(workspace_id, final_caption, media_urls=media_urls)
                     if ig_post_id:
                         logger.info(f"✓ Posted to Instagram: {ig_post_id}")
                     else:
@@ -376,7 +376,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 tweet_text = final_caption
                 if len(tweet_text) > 280:
                     tweet_text = tweet_text[:277] + "..."
-                await twitter_service.post_tweet(tweet_text)
+                await twitter_service.post_tweet(workspace_id, tweet_text)
                 logger.info("✓ Posted to Twitter")
             except Exception as e:
                 errors.append(f"Twitter: {str(e)}")
@@ -384,7 +384,8 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
 
             # LinkedIn
             try:
-                await linkedin_service.post_share(final_caption)
+                # Assuming linkedin_service uses post_text
+                await linkedin_service.post_text(workspace_id, final_caption)
                 logger.info("✓ Posted to LinkedIn")
             except Exception as e:
                 errors.append(f"LinkedIn: {str(e)}")
@@ -429,15 +430,17 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 )
             else:
                 logger.warning(
-                    f"[ARQ Worker] Partially failed for workspace {workspace_id}: "
+                    f"[ARQ Worker] Failed for workspace {workspace_id}: "
                     f"{', '.join(errors)}"
                 )
+                from exceptions import IntegrationError
+                raise IntegrationError(f"Social post failed: {', '.join(errors)}")
 
-            return "success" if is_success else "partial"
+            return "success"
 
     except Exception as e:
-        logger.error(f"[ARQ Worker] Critical error in context_aggregation_task: {e}")
-
+        logger.error(f"[ARQ Worker] Task failed with unhandled exception: {e}")
+        
         # Try to log the failure
         try:
             async with AsyncSessionLocal() as session:
@@ -452,7 +455,28 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
         except Exception:
             pass
 
-        return "error"
+        raise e
+
+
+async def auto_populate_workspace_task(ctx: dict, user_id: str, workspace_id: str) -> None:
+    """ARQ background task to execute AI onboarding."""
+    try:
+        from services.creative_service import auto_populate_workspace
+        logger.info(f"[ARQ Worker] Executing auto_populate_workspace for {workspace_id}")
+        await auto_populate_workspace(user_id, workspace_id)
+    except Exception as e:
+        logger.error(f"[ARQ Worker] auto_populate_workspace failed: {e}")
+        raise e
+
+async def sync_workspace_catalog_task(ctx: dict, workspace_id: str) -> None:
+    """ARQ background task to sync product catalog."""
+    try:
+        from services.catalog_service import sync_workspace_catalog
+        logger.info(f"[ARQ Worker] Executing sync_workspace_catalog for {workspace_id}")
+        await sync_workspace_catalog(workspace_id)
+    except Exception as e:
+        logger.error(f"[ARQ Worker] sync_workspace_catalog failed: {e}")
+        raise e
 
 
 async def startup(ctx: dict) -> None:
@@ -466,7 +490,11 @@ async def shutdown(ctx: dict) -> None:
 
 
 class WorkerSettings:
-    functions = [context_aggregation_task]
+    functions = [
+        context_aggregation_task,
+        auto_populate_workspace_task,
+        sync_workspace_catalog_task,
+    ]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     on_startup = startup
     on_shutdown = shutdown

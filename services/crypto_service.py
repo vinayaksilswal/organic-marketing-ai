@@ -40,16 +40,21 @@ def encrypt_token(token: str | None) -> str | None:
         return f.encrypt(token.encode('utf-8')).decode('utf-8')
     except Exception as e:
         logger.error(f"Failed to encrypt token: {e}")
-        return None
+        from exceptions import OrganicMarketingException
+        raise OrganicMarketingException("Encryption failed", status_code=500, error_code="CRYPTO_ERROR")
 
 def decrypt_token(encrypted_token: str | None) -> str | None:
-    """Decrypts an AES-256 (Fernet) encrypted token string back to plaintext."""
+    """
+    Decrypts an AES-256 (Fernet) encrypted token string back to plaintext.
+    If decryption fails (e.g. legacy plaintext tokens during migration), logs a warning
+    and returns the original string to ensure system stability.
+    """
     if not encrypted_token:
         return None
     try:
         f = _get_fernet()
         return f.decrypt(encrypted_token.encode('utf-8')).decode('utf-8')
     except Exception as e:
-        # If decryption fails, it might be an unencrypted token (legacy)
-        logger.warning(f"Failed to decrypt token (might be plaintext): {e}")
+        logger.warning(f"Failed to decrypt token (may be plaintext legacy token): {e}")
         return encrypted_token
+

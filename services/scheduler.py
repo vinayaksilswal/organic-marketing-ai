@@ -89,6 +89,18 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
     The unified autonomous marketing loop.
     Tries to enqueue tasks via ARQ/Redis. Falls back to inline execution.
     """
+    try:
+        from arq import create_pool
+        from arq.connections import RedisSettings
+        redis_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        lock = await redis_pool.set("lock:marketing_loop", "1", nx=True, ex=300)
+        await redis_pool.close()
+        if not lock:
+            logger.info("[MARKETING LOOP] Another instance is already running")
+            return
+    except Exception as e:
+        logger.warning(f"[MARKETING LOOP] Redis lock check failed: {e}")
+
     logger.info("=" * 60)
     logger.info("[MARKETING LOOP] Starting autonomous marketing cycle")
     logger.info("=" * 60)
@@ -177,6 +189,18 @@ async def _execute_inline(workspace_id: str) -> None:
 # =============================================================================
 async def execute_creative_generation_loop() -> None:
     """The autonomous creative generation loop running frequently to populate media assets."""
+    try:
+        from arq import create_pool
+        from arq.connections import RedisSettings
+        redis_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        lock = await redis_pool.set("lock:creative_loop", "1", nx=True, ex=600)
+        await redis_pool.close()
+        if not lock:
+            logger.info("[CREATIVE GENERATOR] Another instance is already running")
+            return
+    except Exception as e:
+        logger.warning(f"[CREATIVE GENERATOR] Redis lock check failed: {e}")
+
     logger.info("=" * 60)
     logger.info("[CREATIVE GENERATOR] Starting automated creative generation cycle")
     logger.info("=" * 60)

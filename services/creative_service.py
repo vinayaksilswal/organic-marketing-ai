@@ -322,6 +322,17 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
             await session.commit()
             logger.info(f"[CREATIVE] ✓ Auto-populate complete for workspace {workspace_id}: {result}")
 
+            # Step 5: Immediately trigger automated publishing so the user gets an instant result
+            try:
+                from services.scheduler import _try_enqueue_arq, _execute_inline
+                logger.info(f"[CREATIVE] Triggering immediate automated publishing for workspace {workspace_id}")
+                enqueued = await _try_enqueue_arq(workspace_id)
+                if not enqueued:
+                    logger.info(f"[CREATIVE] ARQ not available, running inline for {workspace_id}")
+                    await _execute_inline(workspace_id)
+            except Exception as trigger_err:
+                logger.error(f"[CREATIVE] Failed to trigger immediate publishing: {trigger_err}")
+
     except Exception as e:
         logger.error(f"[CREATIVE] Auto-populate failed for workspace {workspace_id}: {e}")
 

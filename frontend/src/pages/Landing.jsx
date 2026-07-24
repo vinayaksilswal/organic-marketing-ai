@@ -4,7 +4,7 @@ import {
   CheckCircle2, TrendingUp, Sparkles, Zap, PlayCircle, Users, 
   ShieldCheck, ChevronDown, ArrowRight, Star,
   BarChart3, Link, Target, Clock, Bot, Eye, DollarSign,
-  Layers, Cpu, Globe, Lock, RefreshCw
+  Layers, Cpu, Globe, Lock, RefreshCw, Frown, AlertCircle, ThumbsUp, XCircle, LayoutDashboard
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -162,18 +162,23 @@ const Landing = () => {
               <Cpu size={16} /> Fully Autonomous Marketing Engine
             </div>
             <h1 className="premium-text-gradient" style={{ fontSize: '4.5rem', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '1.5rem' }}>
-              Hire an AI Marketing Team<br />for <span className="accent-gradient">$17/month</span>.
+              Scale Your Audience<br />on <span className="accent-gradient">Autopilot</span>.
             </h1>
             <p style={{ fontSize: '1.25rem', maxWidth: '700px', margin: '0 auto 2.5rem', color: '#a1a1aa', lineHeight: 1.6 }}>
-              Stop scheduling. Start automating. OrganicAI learns your brand DNA, generates stunning visuals, writes compelling copy, and publishes to <strong>Facebook, Instagram, X, and LinkedIn</strong> on autopilot.
+              The first AI employee that learns your brand DNA, designs stunning visuals, writes high-converting copy, and publishes daily to <strong>Facebook, Instagram, X, and LinkedIn</strong>.
             </p>
-            <div className="hero-cta" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem' }}>
-              <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')} style={{ fontSize: '1.1rem', padding: '1rem 2rem', boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)' }}>
-                Start Automating Now <TrendingUp size={20} style={{ marginLeft: '0.5rem' }} />
-              </button>
-              <button className="btn btn-secondary btn-large glass-card" onClick={scrollToPricing} style={{ fontSize: '1.1rem', padding: '1rem 2rem', color: '#fff' }}>
-                View Pricing
-              </button>
+            <div className="hero-cta" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', margin: '2rem auto 1rem', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button className="btn btn-primary btn-large pulse" onClick={() => navigate('/auth')} style={{ fontSize: '1.1rem', padding: '1rem 2rem', boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)' }}>
+                  Get Started for $17 <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
+                </button>
+                <button className="btn btn-secondary btn-large glass-card" onClick={scrollToPricing} style={{ fontSize: '1.1rem', padding: '1rem 2rem', color: '#fff' }}>
+                  See How It Works
+                </button>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: '#71717a', marginTop: '0.5rem' }}>
+                <ShieldCheck size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem', color: '#10b981' }} /> 14-Day Money-Back Guarantee. Cancel Anytime.
+              </p>
             </div>
             <div style={{ marginTop: '2rem', color: '#71717a', fontSize: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><CheckCircle2 size={16} color="#10b981"/> Set & Forget</span>
@@ -196,27 +201,102 @@ const Landing = () => {
                 <div style={{ width: '90%', height: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '1rem' }}></div>
                 <div style={{ width: '70%', height: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '1rem' }}></div>
               </div>
-              <div className="mockup-content">
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-                  <div style={{ flex: 1, height: '100px', background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Posts Generated</span>
-                    <span style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary-color)' }}>{liveStats?.posts || 0}</span>
+              <div className="mockup-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <LayoutDashboard size={20} color="var(--primary-color)" />
+                    <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>Active Campaign: Social Growth</span>
                   </div>
-                  <div style={{ flex: 1, height: '100px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Campaigns Active</span>
-                    <span style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--secondary-color)' }}>{liveStats?.campaigns || 0}</span>
+                  <span className="badge active"><RefreshCw size={12} className="spin-slow" style={{ marginRight: '0.25rem' }} /> Auto-Publishing ON</span>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '1rem', flex: 1 }}>
+                  {/* Simulated Image Gen */}
+                  <div style={{ flex: 1, background: 'rgba(0,0,0,0.4)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(45deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1))', animation: 'pulseGlow 4s infinite alternate' }}></div>
+                    <div style={{ textAlign: 'center', zIndex: 1 }}>
+                       <Sparkles size={32} color="var(--primary-color)" style={{ marginBottom: '1rem', animation: 'float 3s infinite' }} />
+                       <p style={{ fontSize: '0.85rem', color: 'var(--primary-color)', fontWeight: 600 }}>Generating Visuals...</p>
+                    </div>
                   </div>
-                  <div style={{ flex: 1, height: '100px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>Businesses</span>
-                    <span style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--success)' }}>{liveStats?.workspaces || 0}</span>
+                  {/* Simulated Copy Gen */}
+                  <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}><Bot size={14} color="#a1a1aa" /> <span style={{ fontSize: '0.75rem', color: '#a1a1aa' }}>Analyzing brand voice...</span></div>
+                       <div className="skeleton-card" style={{ height: '8px', width: '80%', borderRadius: '4px', marginBottom: '0.5rem' }}></div>
+                       <div className="skeleton-card" style={{ height: '8px', width: '100%', borderRadius: '4px', marginBottom: '0.5rem' }}></div>
+                       <div className="skeleton-card" style={{ height: '8px', width: '60%', borderRadius: '4px' }}></div>
+                    </div>
+                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#a1a1aa', marginBottom: '0.5rem' }}>
+                        <span>Target Platforms</span>
+                        <span style={{ color: 'var(--success)' }}>Ready</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                         <div style={{ padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '0.7rem' }}>Instagram</div>
+                         <div style={{ padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '0.7rem' }}>LinkedIn</div>
+                         <div style={{ padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '0.7rem' }}>X (Twitter)</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div style={{ width: '100%', height: '200px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}></div>
               </div>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Trust Logo Marquee */}
+      <div className="logo-marquee-container">
+        <div className="logo-marquee">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg" alt="Microsoft" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix" />
+          {/* Duplicates for infinite scroll */}
+          <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg" alt="Microsoft" />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix" />
+        </div>
+      </div>
+
+      {/* Problem - Agitation - Solution (PAS) */}
+      <section style={{ padding: '6rem 0', background: 'rgba(255,255,255,0.01)' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+            <h4 style={{ color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.1em' }}>The Old Way</h4>
+            <h2 style={{ fontSize: '2.5rem', maxWidth: '700px', margin: '0.5rem auto' }}>Manual marketing is draining your resources.</h2>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', marginBottom: '4rem' }}>
+            <div className="pas-card">
+              <Frown size={40} color="#ef4444" style={{ marginBottom: '1.5rem' }} />
+              <h3 style={{ fontSize: '1.25rem' }}>Creative Burnout</h3>
+              <p style={{ fontSize: '1rem' }}>Staring at a blank screen trying to figure out what to post today. Wasting hours in Canva designing basic templates.</p>
+            </div>
+            <div className="pas-card">
+              <XCircle size={40} color="#ef4444" style={{ marginBottom: '1.5rem' }} />
+              <h3 style={{ fontSize: '1.25rem' }}>Inconsistent Posting</h3>
+              <p style={{ fontSize: '1rem' }}>You get busy closing deals and forget to post for a week. The algorithm punishes you, and your reach drops to zero.</p>
+            </div>
+            <div className="pas-card">
+              <AlertCircle size={40} color="#ef4444" style={{ marginBottom: '1.5rem' }} />
+              <h3 style={{ fontSize: '1.25rem' }}>Expensive Agencies</h3>
+              <p style={{ fontSize: '1rem' }}>Paying a freelancer or agency $2,000+/month just to schedule generic posts that don't sound like your brand.</p>
+            </div>
+          </div>
+
+          <div className="glass-card" style={{ padding: '3rem', borderRadius: '24px', textAlign: 'center', background: 'linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1))', border: '1px solid rgba(168,85,247,0.3)' }}>
+             <h4 style={{ color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '1rem' }}>The New Way</h4>
+             <h2 style={{ fontSize: '2.5rem', marginBottom: '1.5rem' }}>Meet your autonomous AI Marketing Team.</h2>
+             <p style={{ fontSize: '1.1rem', maxWidth: '600px', margin: '0 auto 2rem' }}>OrganicAI doesn't just schedule. It <strong>generates, designs, and publishes</strong> contextually relevant content 24/7. Never miss a post again.</p>
+             <button className="btn btn-primary" onClick={() => navigate('/auth')} style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}>Experience the Solution <ArrowRight size={18} style={{ marginLeft: '0.5rem' }} /></button>
+          </div>
+        </div>
+      </section>
 
       {/* Live Stats Ticker — Real Data */}
       <section className="social-proof-section">
@@ -499,6 +579,61 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Wall of Love (Testimonials) */}
+      <section className="testimonials-section">
+        <div className="container">
+          <div style={{ textAlign: 'center' }}>
+            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Wall of Love</h4>
+            <h2>Loved by founders and marketers</h2>
+            <p style={{ maxWidth: '600px', margin: '0 auto' }}>Don't just take our word for it. See what our early adopters are saying about reclaiming their time.</p>
+          </div>
+          
+          <div className="testimonial-grid">
+            <div className="testimonial-card">
+              <div className="stars">
+                <Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" />
+              </div>
+              <p className="testimonial-text">"I run a small SaaS and simply didn't have time for social media. OrganicAI literally took over my entire Twitter and LinkedIn presence overnight. The generated images are incredibly high quality."</p>
+              <div className="testimonial-author">
+                <div className="author-avatar">JD</div>
+                <div className="author-info">
+                  <h4>James D.</h4>
+                  <p>SaaS Founder</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="testimonial-card">
+              <div className="stars">
+                <Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" />
+              </div>
+              <p className="testimonial-text">"We were paying an agency $1,500/mo for 12 posts. Now I pay $17 and OrganicAI posts highly engaging content every 4 hours. It's an absolute no-brainer for any e-commerce store."</p>
+              <div className="testimonial-author">
+                <div className="author-avatar">ST</div>
+                <div className="author-info">
+                  <h4>Sarah T.</h4>
+                  <p>E-commerce Owner</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card">
+              <div className="stars">
+                <Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" />
+              </div>
+              <p className="testimonial-text">"The Brand Context Engine is what sold me. It actually sounds like us. I put it on auto-approve 3 weeks ago and haven't logged in since, but our engagement is up 300%."</p>
+              <div className="testimonial-author">
+                <div className="author-avatar">MK</div>
+                <div className="author-info">
+                  <h4>Marcus K.</h4>
+                  <p>Marketing Agency Director</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing" className="pricing-section">
         <div className="container">
@@ -527,11 +662,14 @@ const Landing = () => {
               <li><CheckCircle2 size={20} /> <span><strong>AI Video Studio</strong> — promotional video generation</span></li>
             </ul>
             
-            <button className="btn btn-primary" style={{ width: '100%', padding: '1.25rem', fontSize: '1.125rem' }} onClick={() => navigate('/auth')}>
-              Get Started — $17/mo <Sparkles size={20} style={{ marginLeft: '0.5rem' }} />
+            <button className="btn btn-primary pulse" style={{ width: '100%', padding: '1.25rem', fontSize: '1.125rem', fontWeight: 700 }} onClick={() => navigate('/auth')}>
+              Start Your Automation Engine <Sparkles size={20} style={{ marginLeft: '0.5rem' }} />
             </button>
-            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              <ShieldCheck size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} /> Secure payment · Cancel anytime · No setup fees
+            <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
+                <ShieldCheck size={16} /> 14-Day Money-Back Guarantee
+              </span>
+              <span>Cancel anytime. No lock-in. No setup fees.</span>
             </p>
           </div>
         </div>
