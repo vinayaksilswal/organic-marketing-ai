@@ -22,6 +22,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import httpx
 from loguru import logger
+from pydantic import BaseModel, Field, ValidationError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -132,7 +133,84 @@ def _parse_json_response(text: str) -> dict | None:
 
 
 # =============================================================================
-# generate_campaign_email() — Full Email Content Generation
+# Schema Validation & Guardrails
+# =============================================================================
+class OmnichannelContentSchema(BaseModel):
+    caption: str = Field(..., max_length=2200, description="Main social media caption (strict <2200 chars for TikTok).")
+    hashtags: list[str] = Field(default_factory=list, max_items=15, description="Relevant hashtags.")
+    email_subject: str = Field(..., max_length=100, description="Promotional email subject line.")
+    email_headline: str = Field(..., max_length=100, description="Email headline (2-5 words).")
+    email_subheadline: str = Field(..., max_length=200, description="Email subheadline.")
+    email_body_copy: str = Field(..., description="Persuasive body copy for the email.")
+    email_cta_text: str = Field(..., max_length=30, description="Call to action button text.")
+    video_hook: str = Field(..., max_length=100, description="Short text hook for the video overlay.")
+
+# =============================================================================
+# Omnichannel Generation (Enterprise)
+# =============================================================================
+async def generate_omnichannel_content(business_context: str, campaign_context: str) -> dict:
+    """
+    Enterprise-grade multimodal generation using strict Pydantic validation.
+    """
+    system_prompt = (
+        "You are an elite enterprise marketing AI. "
+        "Your goal is to drive high-value organic conversions, highlighting ROI, scalability, and seamless integration. "
+        "Your output MUST be a valid JSON object matching the requested schema exactly. "
+        "No markdown fences. Return ONLY the JSON."
+    )
+
+    prompt = f"""Generate omnichannel marketing content based on the following:
+
+Business Context:
+{business_context}
+
+Campaign Context:
+{campaign_context}
+
+Return a JSON object with:
+1. "caption": A highly engaging social media caption (under 2200 characters).
+2. "hashtags": An array of 3-7 relevant hashtags.
+3. "email_subject": A high-converting, curiosity-driven email subject line.
+4. "email_headline": A strong 2-5 word email headline focusing on business value.
+5. "email_subheadline": A short sentence elaborating on the headline and urgency.
+6. "email_body_copy": 2-3 sentences of persuasive body copy selling the service. DO NOT include HTML.
+7. "email_cta_text": Action-oriented text for an email button.
+8. "video_hook": A punchy 3-5 word text overlay for the start of a vertical video."""
+
+    for attempt in range(3):
+        try:
+            text = await _call_openrouter(prompt, system_prompt=system_prompt, json_response=True)
+            parsed = _parse_json_response(text)
+            
+            if not parsed:
+                continue
+
+            # Strict Pydantic Validation
+            validated_data = OmnichannelContentSchema(**parsed)
+            return validated_data.model_dump()
+            
+        except ValidationError as e:
+            logger.warning(f"LLM output failed Pydantic validation: {e}. Retrying...")
+            # We could append the validation error to the prompt for the next attempt
+            prompt += f"\n\nERROR in previous attempt: Please fix these validation errors:\n{e}"
+        except Exception as e:
+            logger.error(f"Error during omnichannel generation: {e}")
+            
+    # Fallback if all attempts fail
+    return {
+        "caption": "Check out our latest updates to scale your business! 🚀",
+        "hashtags": ["#BusinessGrowth", "#Automation"],
+        "email_subject": "Transform your business with Organic Marketing AI",
+        "email_headline": "Unlock Enterprise AI",
+        "email_subheadline": "Automate your workflows today.",
+        "email_body_copy": "Check out our latest automation tools to help you scale.",
+        "email_cta_text": "Learn More",
+        "video_hook": "Scale Your Business"
+    }
+
+
+# =============================================================================
+# generate_campaign_email() — Legacy Fallback
 # =============================================================================
 async def generate_campaign_email(campaign: Any) -> dict[str, str]:
     """

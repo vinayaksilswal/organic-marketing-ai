@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "websiteUrl" VARCHAR;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "description" TEXT;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "businessModel" VARCHAR;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postIntervalHours" INTEGER NOT NULL DEFAULT 24;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postIntervalHours" INTEGER NOT NULL DEFAULT 2;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "creativeGenerationIntervalHours" INTEGER NOT NULL DEFAULT 2;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "autoGenerateCreatives" BOOLEAN NOT NULL DEFAULT TRUE;',
                         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandColors" JSON NOT NULL DEFAULT \'[]\'::json;',
@@ -150,7 +150,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                             websiteUrl="https://organicai.pro",
                             description="An enterprise-grade SaaS platform that uses AI to automate organic marketing. It auto-generates brand-matched social media posts with AI images and publishes them to Facebook, Instagram, X, and LinkedIn on a schedule. It helps businesses save time and grow their audience without needing marketing skills.",
                             businessModel="SaaS",
-                            postIntervalHours=4,
+                            postIntervalHours=2,
                             brandAnalysisComplete=True,
                             toneOfVoice="Professional, authoritative, yet approachable and exciting.",
                             contentPillars=["AI Marketing Tips", "SaaS Growth", "Social Media Automation", "ROI & Cost Savings", "Platform Features"],
@@ -293,6 +293,14 @@ async def health_check(request: Request) -> JSONResponse:
             "status": "healthy",
             "database": "connected" if db_ready else "connecting",
         },
+    )
+
+@app.get("/healthz", tags=["System"])
+async def healthz_check() -> JSONResponse:
+    """Standard Kubernetes liveness probe endpoint."""
+    return JSONResponse(
+        status_code=200,
+        content={"status": "ok"}
     )
 
 

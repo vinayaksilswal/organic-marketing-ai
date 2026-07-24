@@ -269,28 +269,6 @@ async def approve_creative(
 
 
 @router.post("/{creative_id}/reject")
-
-from fastapi import Form
-@router.put("/{creative_id}")
-async def edit_creative(
-    creative_id: str,
-    request: Request,
-    caption: str = Form(None),
-    media_url: str = Form(None),
-    user_id: str = Depends(verify_user),
-) -> dict[str, Any]:
-    """Edit a creative's caption and media."""
-    async with AsyncSessionLocal() as session:
-        campaign = await session.get(SocialCampaign, creative_id)
-        if not campaign:
-            raise HTTPException(status_code=404, detail="Creative not found")
-        if caption is not None:
-            campaign.baseCaption = caption
-        if media_url is not None:
-            campaign.mediaUrl = media_url
-        await session.commit()
-        return {"success": True, "message": "Creative updated successfully"}
-
 async def reject_creative(
     creative_id: str,
     request: Request,
@@ -417,3 +395,23 @@ async def trigger_auto_generation(
     res = await auto_generate_creative_batch(workspace_id, count=3)
     return res
 
+from fastapi import Form
+@router.put("/{creative_id}")
+async def edit_creative(
+    creative_id: str,
+    request: Request,
+    caption: str = Form(None),
+    media_url: str = Form(None),
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Edit a creative's caption and media."""
+    async with AsyncSessionLocal() as session:
+        campaign = await session.get(SocialCampaign, creative_id)
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Creative not found")
+        if caption is not None:
+            campaign.baseCaption = caption
+        if media_url is not None:
+            campaign.mediaUrl = media_url
+        await session.commit()
+        return {"success": True, "message": "Creative updated successfully"}

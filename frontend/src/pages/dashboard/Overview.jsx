@@ -43,7 +43,7 @@ const Dashboard = ({ user, token, showToast }) => {
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      // Optional: showToast(err.message, true);
+      showToast(`Dashboard sync failed: ${err.message}`, true);
     } finally {
       setRefreshing(false);
     }
@@ -65,6 +65,17 @@ const Dashboard = ({ user, token, showToast }) => {
   };
 
   const startAutomation = async () => {
+    if (files.length === 0 && !baseCaption.trim()) {
+      return showToast('Please provide a campaign angle or upload media.', true);
+    }
+    
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    for (const f of files) {
+      if (f.size > MAX_FILE_SIZE) {
+        return showToast(`File ${f.name} exceeds the 50MB limit.`, true);
+      }
+    }
+
     setLoading(true);
     try {
       let uploadedMediaUrl = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800';
@@ -154,7 +165,7 @@ const Dashboard = ({ user, token, showToast }) => {
             </div>
             <div>
               <h4 style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Posts Generated</h4>
-              <h2 style={{ margin: 0 }}>{stats ? stats.posts : (recentPosts.length || 0)}</h2>
+              {refreshing && !stats ? <div className="skeleton-card" style={{ width: '60px', height: '36px', borderRadius: '6px' }}></div> : <h2 style={{ margin: 0 }}>{stats ? stats.posts : (recentPosts.length || 0)}</h2>}
             </div>
           </div>
           <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -163,7 +174,7 @@ const Dashboard = ({ user, token, showToast }) => {
             </div>
             <div>
               <h4 style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Total Campaigns</h4>
-              <h2 style={{ margin: 0 }}>{stats ? stats.campaigns : 0}</h2>
+              {refreshing && !stats ? <div className="skeleton-card" style={{ width: '60px', height: '36px', borderRadius: '6px' }}></div> : <h2 style={{ margin: 0 }}>{stats ? stats.campaigns : 0}</h2>}
             </div>
           </div>
           <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
@@ -172,7 +183,7 @@ const Dashboard = ({ user, token, showToast }) => {
             </div>
             <div>
               <h4 style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Active Users</h4>
-              <h2 style={{ margin: 0 }}>{stats ? stats.users : 1}</h2>
+              {refreshing && !stats ? <div className="skeleton-card" style={{ width: '60px', height: '36px', borderRadius: '6px' }}></div> : <h2 style={{ margin: 0 }}>{stats ? stats.users : 1}</h2>}
             </div>
           </div>
         </div>
@@ -330,7 +341,15 @@ const Dashboard = ({ user, token, showToast }) => {
             </div>
 
             {/* Live Social Posts Activity Feed */}
-            {recentPosts.length > 0 && (
+            {/* Live Social Posts Activity Feed */}
+            {refreshing && recentPosts.length === 0 ? (
+              <div className="glass-panel" style={{ padding: '2rem' }}>
+                <h3 style={{ marginBottom: '1.5rem' }}>Recent Automated Posts</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {Array(3).fill(0).map((_, i) => <div key={i} className="skeleton-card" style={{ height: '90px', borderRadius: '12px' }}></div>)}
+                </div>
+              </div>
+            ) : recentPosts.length > 0 && (
               <div className="glass-panel" style={{ padding: '2rem' }}>
                 <h3 style={{ marginBottom: '1.5rem' }}>Recent Automated Posts</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

@@ -24,6 +24,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
 from sqlalchemy import select, text
+from arq import create_pool
+from arq.connections import RedisSettings
+from config import settings
 
 from database import (
     AsyncSessionLocal,
@@ -101,150 +104,52 @@ async def _get_next_campaign_for_workspace(session, profile: BusinessProfile) ->
 async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
     """The unified autonomous marketing loop executing via SQLAlchemy."""
     logger.info("=" * 60)
-    logger.info("[MARKETING LOOP] Starting autonomous marketing cycle")
+    logger.info("[MARKETING LOOP] Starting autonomous marketing cycle (ARQ Enqueue)")
     logger.info("=" * 60)
 
     try:
+        redis_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        
         async with AsyncSessionLocal() as session:
             stmt = select(BusinessProfile).where(BusinessProfile.brandAnalysisComplete == True)
             profiles = (await session.execute(stmt)).scalars().all()
 
             for profile in profiles:
-                # Check when this profile last posted
-                last_post_stmt = select(SocialPost).where(
-                    SocialPost.userId == profile.userId
-                ).order_by(SocialPost.scheduledAt.desc()).limit(1)
-                
-                last_post = (await session.execute(last_post_stmt)).scalars().first()
-                
-                now = utc_now()
-                interval_hours = profile.postIntervalHours or 2
-                
-                if last_post and last_post.scheduledAt:
-                    last_at = last_post.scheduledAt
-                    if last_at.tzinfo is None:
-                        last_at = last_at.replace(tzinfo=timezone.utc)
-                    hours_since_last_post = (now - last_at).total_seconds() / 3600.0
-                    if hours_since_last_post < interval_hours:
-                        continue # Not due yet
+                try:
+                    # Check when this profile last posted
+                    last_post_stmt = select(SocialPost).where(
+                        SocialPost.userId == profile.userId
+                    ).order_by(SocialPost.scheduledAt.desc()).limit(1)
+                    
+                    last_post = (await session.execute(last_post_stmt)).scalars().first()
+                    
+                    now = utc_now()
+                    interval_hours = profile.postIntervalHours or 2
+                    
+                    if last_post and last_post.scheduledAt:
+                        last_at = last_post.scheduledAt
+                        if last_at.tzinfo is None:
+                            last_at = last_at.replace(tzinfo=timezone.utc)
+                        hours_since_last_post = (now - last_at).total_seconds() / 3600.0
+                        if hours_since_last_post < interval_hours:
+                            continue # Not due yet
 
-                logger.info(f"[MARKETING LOOP] Processing workspace {profile.id} ({profile.name})")
-                
-                campaign = await _get_next_campaign_for_workspace(session, profile)
-                if not campaign:
-                    logger.info(f"[MARKETING LOOP] No active campaigns for workspace {profile.id}")
+                    logger.info(f"[MARKETING LOOP] Enqueueing aggregation task for workspace {profile.id} ({profile.name})")
+                    
+                    # Enqueue ARQ task instead of blocking
+                    await redis_pool.enqueue_job('context_aggregation_task', profile.id)
+                    
+                except Exception as workspace_err:
+                    logger.error(f"[MARKETING LOOP] Critical error enqueueing workspace {profile.id}: {workspace_err}")
                     continue
-
-                auto_approve = getattr(profile, 'autoGenerateCreatives', True)
-                
-                caption: str = ""
-                email_subject: str = ""
-                email_text: str = ""
-                email_html: str = ""
-                social_errors: list[str] = []
-                email_errors: list[str] = []
-
-                try:
-                    caption = await generate_campaign_variation(campaign.baseCaption)
-                    email_content = await generate_campaign_email(campaign)
-                    email_subject = email_content.get("subject", "Organic Marketing AI Update")
-                    email_text = email_content.get("bodyText", "")
-                    email_html = email_content.get("bodyHtml", "")
-                except Exception as e:
-                    logger.error(f"[MARKETING LOOP] AI generation failed: {e}")
-                    caption = campaign.baseCaption
-                    email_subject = "Organic Marketing AI Update"
-                    email_text = campaign.baseCaption
-                    email_html = f"<p>{campaign.baseCaption}</p>"
-
-                vid_url = campaign.mediaUrl
-                if vid_url.startswith("/"):
-                    vid_url = f"https://organicmarketing.ai{vid_url}"
-
-                post_obj = SocialPost(
-                    userId=campaign.userId,
-                    campaignId=campaign.id,
-                    platform="BOTH",
-                    type="AUTO",
-                    caption=caption,
-                    mediaUrls=[vid_url],
-                    status="POSTED" if auto_approve else "PENDING_APPROVAL",
-                    scheduledAt=utc_now(),
-                )
-                session.add(post_obj)
-                await session.flush()
-                
-                if auto_approve:
-                    # FB
-                    try:
-                        fb_res = await post_to_facebook(caption, vid_url, campaign.mediaType)
-                        if fb_res.get("success"):
-                            post_obj.fbPostId = fb_res.get("post_id")
-                        else:
-                            social_errors.append(f"FB: {fb_res.get('error')}")
-                    except Exception as e:
-                        social_errors.append(f"FB exception: {e}")
-
-                    # IG
-                    try:
-                        ig_res = await post_to_instagram(caption, vid_url, campaign.mediaType)
-                        if ig_res.get("success"):
-                            post_obj.igPostId = ig_res.get("post_id")
-                        else:
-                            social_errors.append(f"IG: {ig_res.get('error')}")
-                    except Exception as e:
-                        social_errors.append(f"IG exception: {e}")
-
-                    # Twitter
-                    try:
-                        tw_res = await twitter_service.post_tweet(caption, [vid_url] if vid_url else None)
-                        if tw_res.get("success"):
-                            post_obj.twitterPostId = tw_res.get("tweet_id")
-                    except Exception as e:
-                        social_errors.append(f"Twitter: {e}")
-
-                    # LinkedIn
-                    try:
-                        li_res = await linkedin_service.post_share(caption, vid_url if vid_url else None)
-                        if li_res.get("success"):
-                            post_obj.linkedinPostId = li_res.get("post_id")
-                    except Exception as e:
-                        social_errors.append(f"LinkedIn: {e}")
-
-                    post_obj.postedAt = utc_now()
-                    if social_errors:
-                        post_obj.errorLog = "; ".join(social_errors)
-
-                email_count = 0
-                try:
-                    email_res = await send_email_blast(subject=email_subject, body_html=email_html, body_text=email_text, user_id=campaign.userId)
-                    if email_res.get("success"):
-                        email_count = email_res.get("sent_count", 0)
-                    else:
-                        email_errors.append(f"Email: {email_res.get('error')}")
-                except Exception as e:
-                    email_errors.append(f"Email exception: {e}")
-
-                email_obj = EmailCampaign(
-                    userId=campaign.userId,
-                    campaignId=campaign.id,
-                    status="SENT" if email_count > 0 else "FAILED",
-                    subject=email_subject,
-                    bodyText=email_text,
-                    bodyHtml=email_html,
-                    scheduledAt=utc_now(),
-                    sentAt=utc_now() if email_count > 0 else None,
-                    recipientCount=email_count,
-                    errorLog="; ".join(email_errors) if email_errors else None,
-                )
-                session.add(email_obj)
-            
-            await session.commit()
     except Exception as e:
         logger.error(f"[MARKETING LOOP] Loop exception: {e}")
+    finally:
+        if 'redis_pool' in locals():
+            await redis_pool.close()
 
     logger.info("=" * 60)
-    logger.info("[MARKETING LOOP] Cycle complete")
+    logger.info("[MARKETING LOOP] Cycle enqueue complete")
     logger.info("=" * 60)
 
 
@@ -367,17 +272,17 @@ def create_scheduler() -> AsyncIOScheduler:
 
     scheduler.add_job(
         execute_marketing_loop,
-        trigger=IntervalTrigger(hours=1),
+        trigger=IntervalTrigger(hours=2),
         id="marketing_loop",
-        name="Autonomous 1-Hour Marketing Loop",
+        name="Autonomous 2-Hour Marketing Loop",
         replace_existing=True,
     )
 
     scheduler.add_job(
         execute_creative_generation_loop,
-        trigger=IntervalTrigger(hours=1),
+        trigger=IntervalTrigger(hours=2),
         id="creative_generation_loop",
-        name="Autonomous 1-Hour Creative Generation Loop",
+        name="Autonomous 2-Hour Creative Generation Loop",
         replace_existing=True,
     )
 
@@ -389,7 +294,7 @@ def create_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    logger.info("APScheduler initialized (Marketing Loop: 1h, Creative Loop: 1h, Arxiv Loop: 2h)")
+    logger.info("APScheduler initialized (Marketing Loop: 2h, Creative Loop: 2h, Arxiv Loop: 2h)")
     return scheduler
 
 

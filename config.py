@@ -38,13 +38,15 @@ class Settings(BaseSettings):
     ]
 
     # =========================================================================
-    # Database (PostgreSQL via Prisma)
+    # Database (PostgreSQL via Prisma) & Redis (ARQ)
     # =========================================================================
     database_url: str = "postgresql://postgres:password@localhost:5432/quantcai"
+    redis_url: str = "redis://localhost:6379/0"
 
     # =========================================================================
-    # Admin Authentication (JWT-based cookie auth)
+    # Security (Encryption & Authentication)
     # =========================================================================
+    encryption_key: str | None = None  # Base64 encoded 32-byte key for AES-256
     admin_username: str = "admin"
     admin_password: str = "admin"
     jwt_secret: str | None = None
@@ -62,6 +64,21 @@ class Settings(BaseSettings):
     fb_page_access_token: str | None = None
     fb_page_id: str | None = None
     ig_business_account_id: str | None = None
+
+    # =========================================================================
+    # TikTok Content Posting API
+    # =========================================================================
+    tiktok_client_key: str | None = None
+    tiktok_client_secret: str | None = None
+
+    # =========================================================================
+    # Cloud Storage (AWS S3 / Cloudflare R2)
+    # =========================================================================
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_region_name: str | None = None
+    aws_endpoint_url: str | None = None
+    aws_bucket_name: str | None = None
 
     # =========================================================================
     # Json2Video API (Video Rendering)
@@ -100,6 +117,8 @@ class Settings(BaseSettings):
         if self.environment == "production":
             if not self.jwt_secret or self.jwt_secret == "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7":
                 raise ValueError("CRITICAL: JWT_SECRET must be securely set in production environment variables.")
+            if not self.encryption_key:
+                raise ValueError("CRITICAL: ENCRYPTION_KEY must be securely set in production environment variables.")
             if self.database_url == "postgresql://postgres:password@localhost:5432/quantcai":
                 raise ValueError("CRITICAL: DATABASE_URL must be set to a real production database URL.")
             if self.admin_username == "admin" or self.admin_password == "admin":
@@ -107,6 +126,11 @@ class Settings(BaseSettings):
         elif not self.jwt_secret:
             self.jwt_secret = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
             warnings.warn("Using default JWT_SECRET for development. Do NOT use in production.")
+        
+        if not self.encryption_key:
+            self.encryption_key = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            warnings.warn("Using default ENCRYPTION_KEY for development. Do NOT use in production.")
+            
         return self
 
 

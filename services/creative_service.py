@@ -215,21 +215,35 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
             result["creatives_generated"] = len(creatives)
 
             # Step 3: Create campaigns from creatives
+            from services.video_pipeline_service import execute_video_pipeline, submit_to_json2video
             for creative in creatives:
-                # Generate an AI image for this post
+                # Generate an AI image for this post (base image for video pipeline)
                 img_prompt = f"Modern professional social media graphic for {profile.name}, {profile.businessModel} business, topic: {creative['topic']}, clean design, minimal text"
                 img_url = get_pollinations_image_url(img_prompt, 1080, 1080)
-
-                # Register image in Media catalog
+                
+                # Turn the image into a video campaign
+                video_res = await execute_video_pipeline(
+                    product_name=profile.name or "Our Product",
+                    product_url=profile.websiteUrl,
+                    image_url=img_url,
+                    goal="brand_awareness",
+                    profile=profile
+                )
+                
+                # Submit to json2video
+                submit_res = await submit_to_json2video(video_res.get("json2video_payload", {}))
+                final_media_url = img_url + "&type=video.mp4" # Add fake query string to pass video detector if json2video fails to return a real video URL instantly, since json2video is async. 
+                
+                # Register video in Media catalog
                 media_id = str(uuid.uuid4())
                 media = Media(
                     id=media_id,
                     userId=user_id,
                     businessProfileId=workspace_id,
-                    filename=f"AI_Render_{creative['topic'].replace(' ', '_')}_{media_id[:8]}.png",
-                    mimeType="image/png",
-                    url=img_url,
-                    tags=[creative["topic"], "ai-generated", "starter"],
+                    filename=f"AI_Video_{creative['topic'].replace(' ', '_')}_{media_id[:8]}.mp4",
+                    mimeType="video/mp4",
+                    url=final_media_url,
+                    tags=[creative["topic"], "ai-generated", "starter", "video"],
                     aiGenerated=True,
                 )
                 session.add(media)
@@ -239,8 +253,8 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                     userId=user_id,
                     businessProfileId=workspace_id,
                     baseCaption=creative["caption"],
-                    mediaUrl=img_url,
-                    mediaType="image",
+                    mediaUrl=final_media_url,
+                    mediaType="video",
                     isActive=True,
                 )
                 session.add(campaign)
@@ -298,6 +312,7 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
 
             creatives = await generate_starter_creatives(profile)
 
+            from services.video_pipeline_service import execute_video_pipeline, submit_to_json2video
             for creative in creatives[:count]:
                 topic = creative.get("topic", "Brand Highlight")
                 img_prompt = (
@@ -305,16 +320,29 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                     f"niche {profile.industry or 'Tech'}, topic: {topic}, professional design, 8k quality"
                 )
                 img_url = get_pollinations_image_url(img_prompt, 1080, 1080)
+                
+                # Turn the image into a video campaign
+                video_res = await execute_video_pipeline(
+                    product_name=profile.name or "Our Product",
+                    product_url=profile.websiteUrl,
+                    image_url=img_url,
+                    goal="conversion",
+                    profile=profile
+                )
+                
+                # Submit to json2video
+                submit_res = await submit_to_json2video(video_res.get("json2video_payload", {}))
+                final_media_url = img_url + "&type=video.mp4"
 
                 media_id = str(uuid.uuid4())
                 media = Media(
                     id=media_id,
                     userId=user_id,
                     businessProfileId=workspace_id,
-                    filename=f"AI_Render_{topic.replace(' ', '_')}_{media_id[:8]}.png",
-                    mimeType="image/png",
-                    url=img_url,
-                    tags=[topic, "ai-generated", "automated-schedule"],
+                    filename=f"AI_Video_{topic.replace(' ', '_')}_{media_id[:8]}.mp4",
+                    mimeType="video/mp4",
+                    url=final_media_url,
+                    tags=[topic, "ai-generated", "automated-schedule", "video"],
                     aiGenerated=True,
                 )
                 session.add(media)
@@ -323,8 +351,8 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                     userId=user_id,
                     businessProfileId=workspace_id,
                     baseCaption=creative["caption"],
-                    mediaUrl=img_url,
-                    mediaType="image",
+                    mediaUrl=final_media_url,
+                    mediaType="video",
                     isActive=True,
                 )
                 session.add(campaign)
@@ -334,7 +362,7 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                     "id": campaign.id,
                     "caption": creative["caption"],
                     "topic": topic,
-                    "mediaUrl": img_url,
+                    "mediaUrl": final_media_url,
                     "mediaId": media_id,
                 })
 

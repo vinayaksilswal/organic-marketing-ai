@@ -19,3 +19,37 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: organic_marketing_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  arq-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: organic-marketing-ai:latest
+    container_name: organic_marketing_worker
+    restart: always
+    command: arq worker.WorkerSettings
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+    depends_on:
+      - redis
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  redis_data:

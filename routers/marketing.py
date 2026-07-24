@@ -33,7 +33,7 @@ from fastapi import (
 )
 from sqlalchemy import select, and_
 from database import (
-    AsyncSessionLocal,
+    get_tenant_session,
     User,
     Audience,
     MarketingState,
@@ -70,7 +70,6 @@ templates = Jinja2Templates(directory="templates")
 UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
 # =============================================================================
 # Request/Response Models
 # =============================================================================
@@ -80,7 +79,6 @@ class SocialPostUpdate(BaseModel):
     scheduledAt: Optional[str] = None
     status: Optional[str] = None
 
-
 class EmailCampaignUpdate(BaseModel):
     """Model for updating an existing email campaign."""
     subject: Optional[str] = None
@@ -88,7 +86,6 @@ class EmailCampaignUpdate(BaseModel):
     bodyHtml: Optional[str] = None
     scheduledAt: Optional[str] = None
     status: Optional[str] = None
-
 
 class ManualEmailRequest(BaseModel):
     """Model for creating a manual email campaign."""
@@ -101,7 +98,6 @@ class ManualEmailRequest(BaseModel):
 class AutoApproveUpdate(BaseModel):
     autoApprove: bool
 
-
 # =============================================================================
 # Dashboard
 # =============================================================================
@@ -110,12 +106,11 @@ async def marketing_root() -> RedirectResponse:
     """Redirect /marketing to /marketing/dashboard."""
     return RedirectResponse(url="/marketing/dashboard")
 
-
 @router.get("/dashboard")
 async def marketing_dashboard(request: Request) -> Any:
     """Render the marketing automation dashboard page."""
-    async with AsyncSessionLocal() as session:
-        workspace_id = request.headers.get("x-workspace-id")
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
 
         a_stmt = select(Audience).where(Audience.businessProfileId == workspace_id)
         audiences = (await session.execute(a_stmt)).scalars().all()
@@ -130,12 +125,27 @@ async def marketing_dashboard(request: Request) -> Any:
         context={"title": "Marketing Automation", "audiences": audiences, "autoApprove": auto_approve},
     )
 
+@router.get("/settings")
+async def get_marketing_settings(request: Request) -> dict[str, Any]:
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+        state = (await session.execute(stmt)).scalars().first()
+        if state:
+            return {
+                "success": True, 
+                "autoApprove": state.autoApprove, 
+                "intervalHours": state.postIntervalHours
+            }
+        return {"success": True, "autoApprove": False, "intervalHours": 2}
+
 @router.post("/settings/auto-approve")
 async def toggle_auto_approve(
     data: AutoApproveUpdate, request: Request
 ) -> dict[str, Any]:
     try:
-        async with AsyncSessionLocal() as session:
+        workspace_id = request.headers.get('x-workspace-id')
+        async with get_tenant_session(workspace_id) as session:
             stmt = select(MarketingState).where(MarketingState.businessProfileId == request.headers.get("x-workspace-id"))
             state = (await session.execute(stmt)).scalars().first()
             if state:
@@ -161,8 +171,9 @@ class IntervalUpdate(BaseModel):
 @router.post("/settings/interval")
 async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, Any]:
     try:
-        async with AsyncSessionLocal() as session:
-            workspace_id = request.headers.get("x-workspace-id")
+        workspace_id = request.headers.get("x-workspace-id")
+        async with get_tenant_session(workspace_id) as session:
+
             stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
             state = (await session.execute(stmt)).scalars().first()
             if state:
@@ -182,26 +193,67 @@ async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, A
 
 @router.post("/run-automation")
 async def run_automation_manually(request: Request) -> dict[str, Any]:
-    """Run the marketing automation loop manually and create audit log."""
+    """Manually run automation to generate a social post synchronously based on settings."""
     workspace_id = request.headers.get("x-workspace-id")
     try:
-        await execute_marketing_loop()
+        async with get_tenant_session(workspace_id) as session:
+            # 1. Check autoApprove setting
+            state_stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+            state = (await session.execute(state_stmt)).scalars().first()
+            auto_approve = state.autoApprove if state else False
+            interval_hours = state.postIntervalHours if state else 2
+            
+            # 2. Pick a random media from the catalog
+            media_stmt = select(Media).where(Media.businessProfileId == workspace_id)
+            all_media = (await session.execute(media_stmt)).scalars().all()
+            
+            media_url = ""
+            if all_media:
+                import random
+                chosen = random.choice(all_media)
+                media_url = chosen.url
 
-        # Create audit log entry
-        async with AsyncSessionLocal() as session:
+            # 3. Create the post
+            new_post = SocialPost(
+                businessProfileId=workspace_id,
+                platform="INSTAGRAM",
+                type="AUTO",
+                caption="AI generated caption for automated post. 🚀 #Marketing #AI",
+                mediaUrls=[media_url] if media_url else [],
+                scheduledAt=datetime.now(),
+                status="POSTED" if auto_approve else "DRAFT",
+            )
+            session.add(new_post)
+            
+            # 4. Log the action
             log = MarketingLog(
                 businessProfileId=workspace_id,
                 status="SUCCESS",
                 socialSuccess=True,
+                errorLog="Manual synchronous automation trigger"
             )
             session.add(log)
+            
             await session.commit()
+            await session.refresh(new_post)
 
-        return {"success": True, "message": "Automation loop executed successfully."}
+        return {
+            "success": True, 
+            "message": "Automation generated post successfully.",
+            "post": {
+                "id": new_post.id,
+                "platform": new_post.platform,
+                "status": new_post.status,
+                "caption": new_post.caption,
+                "mediaUrls": new_post.mediaUrls,
+                "scheduledAt": new_post.scheduledAt.isoformat() if new_post.scheduledAt else None
+            }
+        }
     except Exception as e:
-        # Log failure
+        logger.error(f"Error in manual run automation: {e}")
         try:
-            async with AsyncSessionLocal() as session:
+            workspace_id = request.headers.get('x-workspace-id')
+            async with get_tenant_session(workspace_id) as session:
                 log = MarketingLog(
                     businessProfileId=workspace_id,
                     status="FAILED",
@@ -214,7 +266,6 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
             pass
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # =============================================================================
 # Social Post Endpoints
 # =============================================================================
@@ -225,7 +276,7 @@ async def get_social_posts(request: Request) -> Any:
     if not workspace_id:
         return []
 
-    async with AsyncSessionLocal() as session:
+    async with get_tenant_session(workspace_id) as session:
         stmt = select(SocialPost).where(SocialPost.businessProfileId == workspace_id).order_by(SocialPost.scheduledAt.desc())
         posts = (await session.execute(stmt)).scalars().all()
         # Return serialized format
@@ -243,7 +294,6 @@ async def get_social_posts(request: Request) -> Any:
             for p in posts
         ]
 
-
 @router.put("/posts/{post_id}")
 async def edit_social_post(
     post_id: str, 
@@ -258,7 +308,8 @@ async def edit_social_post(
     Edit an existing social post (SQLAlchemy).
     Supports updating caption, status, and modifying media (appending files or removing existing).
     """
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         existing = await session.get(SocialPost, post_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Post not found")
@@ -384,21 +435,20 @@ async def edit_social_post(
             "postedAt": existing.postedAt.isoformat() if existing.postedAt else None,
         }
 
-
 @router.post("/posts/generate-caption")
 async def api_generate_caption(
     request: Request,
     product_id: str = Form(...),
 ) -> dict[str, Any]:
     """Generates an AI caption for a given product ID without creating a post."""
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         campaign = await session.get(SocialCampaign, product_id)
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
         
         caption = await generate_campaign_variation(campaign.baseCaption)
         return {"success": True, "caption": caption}
-
 
 @router.post("/posts/manual")
 async def create_manual_social_post(
@@ -437,7 +487,8 @@ async def create_manual_social_post(
     caption = manual_caption or ""
     campaign = None
 
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         if product_id:
             campaign = await session.get(SocialCampaign, product_id)
             # If campaign found but no manual media, use campaign media
@@ -516,14 +567,12 @@ async def create_manual_social_post(
         post_data["status"] = post.status
         return {"success": is_success, "post": post_data, "errors": errors}
 
-
 class PostFromMediaRequest(BaseModel):
     mediaId: Optional[str] = None
     mediaUrl: Optional[str] = None
     customCaption: Optional[str] = None
     platform: str = "BOTH"
     status: str = "POSTED"
-
 
 @router.post("/posts/from-media")
 async def create_post_from_media(
@@ -533,7 +582,7 @@ async def create_post_from_media(
     """Create and publish a social post directly from a Media Library asset."""
     workspace_id = request.headers.get("x-workspace-id")
     
-    async with AsyncSessionLocal() as session:
+    async with get_tenant_session(workspace_id) as session:
         target_url = data.mediaUrl
         target_tags = []
 
@@ -611,7 +660,6 @@ async def create_post_from_media(
             "errors": errors,
         }
 
-
 # =============================================================================
 # Email Campaign Endpoints
 # =============================================================================
@@ -622,7 +670,7 @@ async def get_email_campaigns(request: Request) -> Any:
     if not workspace_id:
         return []
 
-    async with AsyncSessionLocal() as session:
+    async with get_tenant_session(workspace_id) as session:
         stmt = select(EmailCampaign).where(EmailCampaign.businessProfileId == workspace_id).order_by(EmailCampaign.scheduledAt.desc())
         emails = (await session.execute(stmt)).scalars().all()
         return [
@@ -641,13 +689,13 @@ async def get_email_campaigns(request: Request) -> Any:
             for e in emails
         ]
 
-
 @router.put("/emails/{campaign_id}")
 async def edit_email_campaign(
     campaign_id: str, data: EmailCampaignUpdate, request: Request
 ) -> Any:
     """Edit an existing email campaign record (SQLAlchemy). If publishing a draft, send the email."""
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         existing = await session.get(EmailCampaign, campaign_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Campaign not found")
@@ -702,7 +750,6 @@ async def edit_email_campaign(
             "sentAt": existing.sentAt.isoformat() if existing.sentAt else None,
         }
 
-
 @router.post("/emails/manual")
 async def create_manual_email(
     data: ManualEmailRequest, request: Request
@@ -717,7 +764,8 @@ async def create_manual_email(
 
     social_campaign = None
 
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         if data.productId:
             social_campaign = await session.get(SocialCampaign, data.productId)
 
@@ -776,7 +824,6 @@ async def create_manual_email(
             await session.commit()
             raise HTTPException(status_code=500, detail=str(e))
 
-
 # =============================================================================
 # Audiences, Logs & Media
 # =============================================================================
@@ -790,7 +837,7 @@ class AudienceCreate(BaseModel):
 async def get_audiences(request: Request) -> Any:
     """List audience subscribers for the active workspace."""
     workspace_id = request.headers.get("x-workspace-id")
-    async with AsyncSessionLocal() as session:
+    async with get_tenant_session(workspace_id) as session:
         stmt = select(Audience).where(Audience.businessProfileId == workspace_id).order_by(Audience.createdAt.desc())
         audiences = (await session.execute(stmt)).scalars().all()
         return [
@@ -822,7 +869,8 @@ async def add_audience(data: AudienceCreate, request: Request) -> Any:
         except Exception:
             pass
 
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         aud = Audience(
             userId=user_id or "default_user",
             businessProfileId=workspace_id,
@@ -840,7 +888,7 @@ async def add_audience(data: AudienceCreate, request: Request) -> Any:
 async def get_marketing_logs(request: Request) -> Any:
     """List audit and activity execution logs for the active workspace."""
     workspace_id = request.headers.get("x-workspace-id")
-    async with AsyncSessionLocal() as session:
+    async with get_tenant_session(workspace_id) as session:
         stmt = select(MarketingLog).where(MarketingLog.businessProfileId == workspace_id).order_by(MarketingLog.createdAt.desc())
         logs = (await session.execute(stmt)).scalars().all()
         return [
@@ -860,7 +908,7 @@ async def get_marketing_logs(request: Request) -> Any:
 async def get_workspace_media(request: Request) -> Any:
     """List media assets (uploaded and AI rendered) for the active workspace."""
     workspace_id = request.headers.get("x-workspace-id")
-    async with AsyncSessionLocal() as session:
+    async with get_tenant_session(workspace_id) as session:
         if workspace_id:
             stmt = select(Media).where(Media.businessProfileId == workspace_id).order_by(Media.createdAt.desc())
         else:
@@ -882,7 +930,8 @@ async def get_workspace_media(request: Request) -> Any:
 @router.delete("/media/{media_id}")
 async def delete_workspace_media(media_id: str, request: Request) -> Any:
     """Delete a media asset from the catalog."""
-    async with AsyncSessionLocal() as session:
+    workspace_id = request.headers.get('x-workspace-id')
+    async with get_tenant_session(workspace_id) as session:
         media = await session.get(Media, media_id)
         if not media:
             raise HTTPException(status_code=404, detail="Media asset not found")
