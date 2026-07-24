@@ -188,9 +188,24 @@ async def api_login(data: UserLogin, request: Request):
             return {
                 "success": True,
                 "token": token,
-                "user": {"id": user.id, "email": user.email},
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "isSuperAdmin": getattr(user, "isSuperAdmin", False),
+                },
             }
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+
+
+# =============================================================================
+# Niche / Industry Options API
+# =============================================================================
+@router.get("/api/v1/niches")
+async def get_niche_options():
+    """Return the predefined list of business niches for onboarding."""
+    from services.seed_service import NICHE_OPTIONS
+    return {"success": True, "niches": NICHE_OPTIONS}
+

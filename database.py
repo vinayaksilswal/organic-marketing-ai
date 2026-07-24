@@ -68,6 +68,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     password = Column(String, nullable=False)
     subscriptionStatus = Column(String, default="INACTIVE", nullable=False)
+    isSuperAdmin = Column(Boolean, default=False, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -89,6 +90,7 @@ class BusinessProfile(Base):
     websiteUrl = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     businessModel = Column(String, nullable=True)
+    niche = Column(String, nullable=True)  # Predefined niche from NICHE_OPTIONS
     postIntervalHours = Column(Integer, default=2, nullable=False)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)

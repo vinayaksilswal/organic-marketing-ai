@@ -1,56 +1,40 @@
 """
 =============================================================================
-Organic Marketing AI — Marketing Automation Scheduler (6-Hour Autonomous Loop)
+Organic Marketing AI — Marketing Automation Scheduler
 =============================================================================
-Implements the autonomous marketing loop using SQLAlchemy 2.0 Async Session:
+Implements the autonomous marketing loop using APScheduler:
 
-  1. Query database for NEXT campaign (sequential round-robin)
-  2. Generate marketing copy via OpenRouter (AI)
-  3. Push to Meta APIs (Facebook + Instagram), Twitter, LinkedIn
-  4. Send email blast to Audience
-  5. Log posts to SocialPost / EmailCampaign tables
+  Every 2 hours (configurable per workspace):
+  1. Query all active workspaces with completed brand analysis
+  2. Check if each workspace is due for a post (based on interval)
+  3. Enqueue to ARQ worker (or execute inline if Redis unavailable)
+
+  Creative Generation Loop (every 2 hours):
+  1. Check each workspace's creative generation interval
+  2. Generate new AI creatives and upload to Cloudinary
 
 Uses APScheduler's AsyncIOScheduler for non-blocking task execution.
-Zero binary dependencies.
+Falls back to inline execution if Redis/ARQ is unavailable.
 =============================================================================
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
-from sqlalchemy import select, text
-from arq import create_pool
-from arq.connections import RedisSettings
-from config import settings
+from sqlalchemy import select
 
+from config import settings
 from database import (
     AsyncSessionLocal,
-    User,
+    BusinessProfile,
+    MarketingState,
     SocialCampaign,
     SocialPost,
-    EmailCampaign,
-    MarketingState,
-    BusinessProfile,
-)
-from services.ai_service import (
-    generate_campaign_variation,
-    generate_campaign_email,
-    generate_arxiv_content,
-    _classify_paper_category,
-    _build_arxiv_cta_link,
-)
-from services.email_service import send_email_blast
-from services.social_service import post_to_facebook, post_to_instagram
-from services.twitter_service import twitter_service
-from services.linkedin_service import linkedin_service
-from services.arxiv_newsroom import (
-    ArxivRegistry,
-    fetch_and_filter_new_papers,
 )
 
 
@@ -59,16 +43,15 @@ def utc_now() -> datetime:
 
 
 # =============================================================================
-# =============================================================================
 # Campaign Rotation (Workspace-Scoped)
 # =============================================================================
 async def _get_next_campaign_for_workspace(session, profile: BusinessProfile) -> SocialCampaign | None:
     """Get the next active campaign for a specific workspace."""
     query = select(SocialCampaign).where(
         SocialCampaign.businessProfileId == profile.id,
-        SocialCampaign.isActive == True
+        SocialCampaign.isActive == True,
     ).order_by(SocialCampaign.createdAt.asc())
-    
+
     res = await session.execute(query)
     campaigns = res.scalars().all()
 
@@ -85,7 +68,7 @@ async def _get_next_campaign_for_workspace(session, profile: BusinessProfile) ->
             businessProfileId=profile.id,
             lastSocialIdx=0,
             lastEmailIdx=0,
-            autoApprove=getattr(profile, 'autoGenerateCreatives', True)
+            autoApprove=getattr(profile, "autoGenerateCreatives", True),
         )
         session.add(state)
         await session.flush()
@@ -99,109 +82,96 @@ async def _get_next_campaign_for_workspace(session, profile: BusinessProfile) ->
 
 
 # =============================================================================
-# The Autonomous Marketing Loop — Runs Frequently
+# The Autonomous Marketing Loop
 # =============================================================================
 async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
-    """The unified autonomous marketing loop executing via SQLAlchemy."""
+    """
+    The unified autonomous marketing loop.
+    Tries to enqueue tasks via ARQ/Redis. Falls back to inline execution.
+    """
     logger.info("=" * 60)
-    logger.info("[MARKETING LOOP] Starting autonomous marketing cycle (ARQ Enqueue)")
+    logger.info("[MARKETING LOOP] Starting autonomous marketing cycle")
     logger.info("=" * 60)
 
     try:
-        redis_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-        
         async with AsyncSessionLocal() as session:
             stmt = select(BusinessProfile).where(BusinessProfile.brandAnalysisComplete == True)
             profiles = (await session.execute(stmt)).scalars().all()
 
+            if not profiles:
+                logger.info("[MARKETING LOOP] No active workspaces found")
+                return
+
             for profile in profiles:
                 try:
                     # Check when this profile last posted
-                    last_post_stmt = select(SocialPost).where(
-                        SocialPost.userId == profile.userId
-                    ).order_by(SocialPost.scheduledAt.desc()).limit(1)
-                    
+                    last_post_stmt = (
+                        select(SocialPost)
+                        .where(SocialPost.businessProfileId == profile.id)
+                        .order_by(SocialPost.scheduledAt.desc())
+                        .limit(1)
+                    )
                     last_post = (await session.execute(last_post_stmt)).scalars().first()
-                    
+
                     now = utc_now()
                     interval_hours = profile.postIntervalHours or 2
-                    
+
                     if last_post and last_post.scheduledAt:
                         last_at = last_post.scheduledAt
                         if last_at.tzinfo is None:
                             last_at = last_at.replace(tzinfo=timezone.utc)
                         hours_since_last_post = (now - last_at).total_seconds() / 3600.0
                         if hours_since_last_post < interval_hours:
-                            continue # Not due yet
+                            logger.debug(
+                                f"[MARKETING LOOP] Skipping {profile.name} — "
+                                f"posted {hours_since_last_post:.1f}h ago (interval: {interval_hours}h)"
+                            )
+                            continue
 
-                    logger.info(f"[MARKETING LOOP] Enqueueing aggregation task for workspace {profile.id} ({profile.name})")
-                    
-                    # Enqueue ARQ task instead of blocking
-                    await redis_pool.enqueue_job('context_aggregation_task', profile.id)
-                    
+                    logger.info(f"[MARKETING LOOP] Processing workspace: {profile.name} ({profile.id})")
+
+                    # Try ARQ (Redis) first, fall back to inline
+                    enqueued = await _try_enqueue_arq(profile.id)
+                    if not enqueued:
+                        logger.info(f"[MARKETING LOOP] Running inline for {profile.name}")
+                        await _execute_inline(profile.id)
+
                 except Exception as workspace_err:
-                    logger.error(f"[MARKETING LOOP] Critical error enqueueing workspace {profile.id}: {workspace_err}")
+                    logger.error(f"[MARKETING LOOP] Error processing {profile.id}: {workspace_err}")
                     continue
+
     except Exception as e:
         logger.error(f"[MARKETING LOOP] Loop exception: {e}")
-    finally:
-        if 'redis_pool' in locals():
-            await redis_pool.close()
 
-    logger.info("=" * 60)
-    logger.info("[MARKETING LOOP] Cycle enqueue complete")
-    logger.info("=" * 60)
+    logger.info("[MARKETING LOOP] Cycle complete")
 
 
-# =============================================================================
-# ArXiv Autonomous Newsroom Loop — Runs Every 2 Hours
-# =============================================================================
-async def execute_arxiv_newsroom_loop() -> None:
-    """The autonomous arXiv Newsroom loop that runs every 2 hours."""
-    logger.info("=" * 60)
-    logger.info("[ARXIV NEWSROOM] Starting 2-hour paper ingestion cycle")
-    logger.info("=" * 60)
-
+async def _try_enqueue_arq(workspace_id: str) -> bool:
+    """Try to enqueue a task via ARQ/Redis. Returns False if Redis is unavailable."""
     try:
-        new_papers = await fetch_and_filter_new_papers()
-        if not new_papers:
-            logger.info("[ARXIV NEWSROOM] No new arXiv papers found in registry search")
-            return
+        from arq import create_pool
+        from arq.connections import RedisSettings
 
-        for paper in new_papers:
-            arxiv_id = paper.get("arxiv_id", "")
-            title = paper.get("title", "")
-            abstract = paper.get("abstract", "")
-            category = _classify_paper_category(paper)
-            cta_link = _build_arxiv_cta_link(arxiv_id, category)
-
-            copy_res = await generate_arxiv_content(
-                arxiv_id=arxiv_id,
-                title=title,
-                abstract=abstract,
-                cta_link=cta_link,
-            )
-
-            social_caption = copy_res.get("socialCaption", f"New arXiv paper: {title}\n{cta_link}")
-
-            # Post directly to Twitter & LinkedIn
-            try:
-                await twitter_service.post_tweet(social_caption)
-                await linkedin_service.post_share(social_caption)
-                ArxivRegistry.mark_as_processed(arxiv_id)
-                logger.info(f"[ARXIV NEWSROOM] Published paper {arxiv_id} to Twitter & LinkedIn")
-            except Exception as pub_err:
-                logger.error(f"[ARXIV NEWSROOM] Failed publishing paper {arxiv_id}: {pub_err}")
-
+        redis_pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+        await redis_pool.enqueue_job("context_aggregation_task", workspace_id)
+        await redis_pool.close()
+        logger.info(f"[MARKETING LOOP] Enqueued ARQ task for workspace {workspace_id}")
+        return True
     except Exception as e:
-        logger.error(f"[ARXIV NEWSROOM] Ingestion loop exception: {e}")
-
-    logger.info("=" * 60)
-    logger.info("[ARXIV NEWSROOM] 2-hour cycle complete")
-    logger.info("=" * 60)
+        logger.debug(f"[MARKETING LOOP] ARQ unavailable ({e}), will use inline execution")
+        return False
 
 
-# =============================================================================
+async def _execute_inline(workspace_id: str) -> None:
+    """Execute the marketing task inline (without ARQ worker)."""
+    try:
+        from worker import context_aggregation_task
+        result = await context_aggregation_task({}, workspace_id)
+        logger.info(f"[MARKETING LOOP] Inline execution result for {workspace_id}: {result}")
+    except Exception as e:
+        logger.error(f"[MARKETING LOOP] Inline execution failed for {workspace_id}: {e}")
+
+
 # =============================================================================
 # Autonomous AI Creative Generation Loop
 # =============================================================================
@@ -212,7 +182,6 @@ async def execute_creative_generation_loop() -> None:
     logger.info("=" * 60)
 
     try:
-        from database import BusinessProfile
         from services.creative_service import auto_generate_creative_batch
 
         async with AsyncSessionLocal() as session:
@@ -220,47 +189,50 @@ async def execute_creative_generation_loop() -> None:
             profiles = (await session.execute(stmt)).scalars().all()
 
         if not profiles:
-            logger.info("[CREATIVE GENERATOR] No active workspaces found for creative generation")
+            logger.info("[CREATIVE GENERATOR] No active workspaces found")
             return
 
         for profile in profiles:
-            # Check when creatives were last generated. We check SocialCampaigns
-            async with AsyncSessionLocal() as session:
-                last_campaign_stmt = select(SocialCampaign).where(
-                    SocialCampaign.businessProfileId == profile.id
-                ).order_by(SocialCampaign.createdAt.desc()).limit(1)
-                
-                last_campaign = (await session.execute(last_campaign_stmt)).scalars().first()
-                
-            now = utc_now()
-            auto_gen = getattr(profile, 'autoGenerateCreatives', True)
+            auto_gen = getattr(profile, "autoGenerateCreatives", True)
             if not auto_gen:
-                logger.debug(f"[CREATIVE GENERATOR] Auto-generation disabled for workspace {profile.id}")
+                logger.debug(f"[CREATIVE GENERATOR] Auto-generation disabled for {profile.name}")
                 continue
 
-            interval_hours = getattr(profile, 'creativeGenerationIntervalHours', 12) or 12
-            
+            # Check when creatives were last generated
+            async with AsyncSessionLocal() as session:
+                last_campaign_stmt = (
+                    select(SocialCampaign)
+                    .where(SocialCampaign.businessProfileId == profile.id)
+                    .order_by(SocialCampaign.createdAt.desc())
+                    .limit(1)
+                )
+                last_campaign = (await session.execute(last_campaign_stmt)).scalars().first()
+
+            now = utc_now()
+            interval_hours = getattr(profile, "creativeGenerationIntervalHours", 12) or 12
+
             if last_campaign and last_campaign.createdAt:
                 last_at = last_campaign.createdAt
                 if last_at.tzinfo is None:
                     last_at = last_at.replace(tzinfo=timezone.utc)
                 hours_since_last = (now - last_at).total_seconds() / 3600.0
                 if hours_since_last < interval_hours:
-                    continue # Not due yet
+                    continue
 
-            logger.info(f"[CREATIVE GENERATOR] Generating creatives for workspace {profile.id} (Interval: {interval_hours}h)")
+            logger.info(f"[CREATIVE GENERATOR] Generating creatives for {profile.name} ({profile.id})")
             try:
                 res = await auto_generate_creative_batch(profile.id, count=3)
-                logger.info(f"[CREATIVE GENERATOR] Generated {res.get('count', 0)} creatives for business: {profile.name} ({profile.id})")
+                logger.info(
+                    f"[CREATIVE GENERATOR] ✓ Generated {res.get('count', 0)} creatives "
+                    f"for {profile.name}"
+                )
             except Exception as e:
-                logger.error(f"[CREATIVE GENERATOR] Failed generating for workspace {profile.id}: {e}")
+                logger.error(f"[CREATIVE GENERATOR] Failed for {profile.id}: {e}")
 
     except Exception as e:
-        logger.error(f"[CREATIVE GENERATOR] Loop execution exception: {e}")
+        logger.error(f"[CREATIVE GENERATOR] Loop exception: {e}")
 
-    logger.info("=" * 60)
     logger.info("[CREATIVE GENERATOR] Cycle complete")
-    logger.info("=" * 60)
 
 
 # =============================================================================
@@ -286,15 +258,7 @@ def create_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    scheduler.add_job(
-        execute_arxiv_newsroom_loop,
-        trigger=IntervalTrigger(hours=2),
-        id="arxiv_newsroom_loop",
-        name="Autonomous 2-Hour arXiv Newsroom Loop",
-        replace_existing=True,
-    )
-
-    logger.info("APScheduler initialized (Marketing Loop: 2h, Creative Loop: 2h, Arxiv Loop: 2h)")
+    logger.info("APScheduler initialized (Marketing Loop: 2h, Creative Loop: 2h)")
     return scheduler
 
 
@@ -303,4 +267,3 @@ def shutdown_scheduler(scheduler: AsyncIOScheduler) -> None:
     if scheduler and scheduler.running:
         scheduler.shutdown(wait=False)
         logger.info("APScheduler shut down successfully")
-

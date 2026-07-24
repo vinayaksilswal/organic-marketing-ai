@@ -27,6 +27,7 @@ class BusinessProfileUpdate(BaseModel):
     websiteUrl: Optional[str] = None
     description: Optional[str] = None
     businessModel: Optional[str] = None
+    niche: Optional[str] = None
     postIntervalHours: Optional[int] = None
     creativeGenerationIntervalHours: Optional[int] = None
     autoGenerateCreatives: Optional[bool] = None
@@ -132,6 +133,8 @@ async def update_business_profile_post(
                 profile.description = data.description
             if data.businessModel is not None:
                 profile.businessModel = data.businessModel
+            if data.niche is not None:
+                profile.niche = data.niche
             if data.postIntervalHours is not None:
                 profile.postIntervalHours = data.postIntervalHours
             if data.creativeGenerationIntervalHours is not None:
@@ -141,10 +144,11 @@ async def update_business_profile_post(
         else:
             profile = BusinessProfile(
                 userId=user_id,
-                name=data.name or "Default Workspace",
+                name=data.name or "My Business",
                 websiteUrl=data.websiteUrl,
                 description=data.description,
                 businessModel=data.businessModel,
+                niche=data.niche,
             )
             session.add(profile)
 
