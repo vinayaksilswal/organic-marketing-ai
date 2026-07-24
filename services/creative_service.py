@@ -1,10 +1,18 @@
 """
 =============================================================================
-Organic Marketing AI — AI Creative Service
+Organic Marketing AI — AI Creative Service (Enterprise)
 =============================================================================
 Handles automated brand analysis and creative generation during business
-onboarding. Generates brand context, starter content, and AI images using
-Pollinations.ai (free, no API key required).
+onboarding. Generates brand context, starter content, and AI images/videos.
+
+Content Pipeline:
+  1. Brand Analysis → LLM generates industry, audience, tone, pillars
+  2. Starter Creatives → LLM generates 3 social post templates
+  3. AI Image Generation → Pollinations.ai (free, no key)
+  4. Media Storage → Cloudinary (tenant-partitioned)
+  5. Campaign Creation → SocialCampaign + Media records in DB
+
+All media is uploaded to Cloudinary under tenants/{workspace_id}/media/
 =============================================================================
 """
 
@@ -42,12 +50,14 @@ async def generate_brand_context(profile: BusinessProfile) -> Dict[str, Any]:
     Analyze a business profile and generate comprehensive brand context.
     Returns: industry, targetAudience, toneOfVoice, contentPillars, suggestedHashtags
     """
+    niche_hint = f"\nBusiness Niche/Category: {profile.niche}" if getattr(profile, 'niche', None) else ""
+
     prompt = f"""You are a top-tier Enterprise Marketing Strategist. Analyze this business and generate a highly converting, structured brand context.
 
 Business Name: {profile.name}
 Website: {profile.websiteUrl or 'Not provided'}
 Description: {profile.description or 'Not provided'}
-Business Model: {profile.businessModel or 'General'}
+Business Model: {profile.businessModel or 'General'}{niche_hint}
 
 Return a JSON object with exactly these fields (nothing else, no markdown):
 {{
@@ -64,8 +74,6 @@ Ensure suggestedHashtags are 5 highly relevant, trending hashtags WITH the # pre
 
     try:
         result = await _call_llm(prompt)
-        # Try to extract JSON from the response
-        # Handle case where LLM wraps in markdown code block
         cleaned = result.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -176,9 +184,38 @@ def get_pollinations_image_url(prompt: str, width: int = 1024, height: int = 102
     return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={width}&height={height}&nologo=true"
 
 
+async def _upload_image_to_cloudinary(
+    image_url: str,
+    workspace_id: str,
+    topic: str,
+    media_id: str,
+) -> str:
+    """
+    Upload an AI-generated image to Cloudinary and return the secure URL.
+    Falls back to the original URL if Cloudinary is not configured.
+    """
+    try:
+        from services.storage_service import upload_image_from_url
+        result = await upload_image_from_url(
+            workspace_id=workspace_id,
+            media_id=media_id,
+            image_url=image_url,
+            filename=f"AI_{topic.replace(' ', '_')}_{media_id[:8]}",
+            tags=[topic, "ai-generated"],
+        )
+        if result and result.get("secure_url"):
+            logger.info(f"✓ Uploaded to Cloudinary: {result['secure_url']}")
+            return result["secure_url"]
+    except Exception as e:
+        logger.warning(f"Cloudinary upload failed, using direct URL: {e}")
+
+    return image_url
+
+
 async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, Any]:
     """
-    Full onboarding pipeline: analyze brand → generate creatives → populate media & campaigns.
+    Full onboarding pipeline: analyze brand → generate creatives → upload to
+    Cloudinary → populate media & campaigns.
     Called as a background task after business profile creation.
     """
     result = {
@@ -194,7 +231,7 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                 logger.error(f"Workspace {workspace_id} not found for auto-populate")
                 return result
 
-            # Step 1: Generate brand context
+            # Step 1: Generate brand context via LLM
             logger.info(f"[CREATIVE] Generating brand context for workspace {workspace_id}")
             brand_ctx = await generate_brand_context(profile)
 
@@ -209,41 +246,44 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
             await session.refresh(profile)
             result["brand_analysis"] = True
 
-            # Step 2: Generate starter creatives
+            # Step 2: Generate starter creatives via LLM
             logger.info(f"[CREATIVE] Generating starter creatives for workspace {workspace_id}")
             creatives = await generate_starter_creatives(profile)
             result["creatives_generated"] = len(creatives)
 
-            # Step 3: Create campaigns from creatives
-            from services.video_pipeline_service import execute_video_pipeline, submit_to_json2video
+            # Step 3: For each creative — generate AI image → upload to Cloudinary → create campaign
             for creative in creatives:
-                # Generate an AI image for this post (base image for video pipeline)
-                img_prompt = f"Modern professional social media graphic for {profile.name}, {profile.businessModel} business, topic: {creative['topic']}, clean design, minimal text"
-                img_url = get_pollinations_image_url(img_prompt, 1080, 1080)
-                
-                # Turn the image into a video campaign
-                video_res = await execute_video_pipeline(
-                    product_name=profile.name or "Our Product",
-                    product_url=profile.websiteUrl,
-                    image_url=img_url,
-                    goal="brand_awareness",
-                    profile=profile
-                )
-                
-                # Submit to json2video
-                submit_res = await submit_to_json2video(video_res.get("json2video_payload", {}))
-                final_media_url = img_url + "&type=video.mp4" # Add fake query string to pass video detector if json2video fails to return a real video URL instantly, since json2video is async. 
-                
-                # Register video in Media catalog
                 media_id = str(uuid.uuid4())
+
+                # Generate AI image prompt
+                img_prompt = (
+                    f"Modern professional social media graphic for {profile.name}, "
+                    f"{profile.businessModel or 'business'}, "
+                    f"topic: {creative['topic']}, clean design, minimal text, "
+                    f"brand colors {', '.join(profile.brandColors or ['#8B5CF6'])}"
+                )
+                pollinations_url = get_pollinations_image_url(img_prompt, 1080, 1080)
+
+                # Upload to Cloudinary (returns secure URL, falls back to direct URL)
+                final_media_url = await _upload_image_to_cloudinary(
+                    image_url=pollinations_url,
+                    workspace_id=workspace_id,
+                    topic=creative["topic"],
+                    media_id=media_id,
+                )
+
+                # Determine mime type based on URL
+                mime_type = "image/png"
+
+                # Register in Media catalog
                 media = Media(
                     id=media_id,
                     userId=user_id,
                     businessProfileId=workspace_id,
-                    filename=f"AI_Video_{creative['topic'].replace(' ', '_')}_{media_id[:8]}.mp4",
-                    mimeType="video/mp4",
+                    filename=f"AI_{creative['topic'].replace(' ', '_')}_{media_id[:8]}.png",
+                    mimeType=mime_type,
                     url=final_media_url,
-                    tags=[creative["topic"], "ai-generated", "starter", "video"],
+                    tags=[creative["topic"], "ai-generated", "starter"],
                     aiGenerated=True,
                 )
                 session.add(media)
@@ -254,13 +294,13 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                     businessProfileId=workspace_id,
                     baseCaption=creative["caption"],
                     mediaUrl=final_media_url,
-                    mediaType="video",
+                    mediaType="image",
                     isActive=True,
                 )
                 session.add(campaign)
                 result["campaigns_created"] += 1
 
-            # Step 4: Ensure MarketingState exists with 2hr default
+            # Step 4: Ensure MarketingState exists with auto-approve
             from sqlalchemy import select
             ms_stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
             ms = (await session.execute(ms_stmt)).scalars().first()
@@ -274,7 +314,7 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                 session.add(ms)
 
             await session.commit()
-            logger.info(f"[CREATIVE] Auto-populate complete for workspace {workspace_id}: {result}")
+            logger.info(f"[CREATIVE] ✓ Auto-populate complete for workspace {workspace_id}: {result}")
 
     except Exception as e:
         logger.error(f"[CREATIVE] Auto-populate failed for workspace {workspace_id}: {e}")
@@ -286,6 +326,7 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
     """
     Generate a new batch of AI creatives for a given workspace and deposit them
     directly into the Media catalog and SocialCampaign queue.
+    Uploads all images to Cloudinary.
     """
     created_items = []
     try:
@@ -312,37 +353,34 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
 
             creatives = await generate_starter_creatives(profile)
 
-            from services.video_pipeline_service import execute_video_pipeline, submit_to_json2video
             for creative in creatives[:count]:
-                topic = creative.get("topic", "Brand Highlight")
-                img_prompt = (
-                    f"Modern social media graphic for {profile.name}, {profile.businessModel or 'Business'}, "
-                    f"niche {profile.industry or 'Tech'}, topic: {topic}, professional design, 8k quality"
-                )
-                img_url = get_pollinations_image_url(img_prompt, 1080, 1080)
-                
-                # Turn the image into a video campaign
-                video_res = await execute_video_pipeline(
-                    product_name=profile.name or "Our Product",
-                    product_url=profile.websiteUrl,
-                    image_url=img_url,
-                    goal="conversion",
-                    profile=profile
-                )
-                
-                # Submit to json2video
-                submit_res = await submit_to_json2video(video_res.get("json2video_payload", {}))
-                final_media_url = img_url + "&type=video.mp4"
-
                 media_id = str(uuid.uuid4())
+                topic = creative.get("topic", "Brand Highlight")
+
+                img_prompt = (
+                    f"Modern social media graphic for {profile.name}, "
+                    f"{profile.businessModel or 'Business'}, "
+                    f"niche {profile.industry or 'Tech'}, "
+                    f"topic: {topic}, professional design, 8k quality"
+                )
+                pollinations_url = get_pollinations_image_url(img_prompt, 1080, 1080)
+
+                # Upload to Cloudinary
+                final_media_url = await _upload_image_to_cloudinary(
+                    image_url=pollinations_url,
+                    workspace_id=workspace_id,
+                    topic=topic,
+                    media_id=media_id,
+                )
+
                 media = Media(
                     id=media_id,
                     userId=user_id,
                     businessProfileId=workspace_id,
-                    filename=f"AI_Video_{topic.replace(' ', '_')}_{media_id[:8]}.mp4",
-                    mimeType="video/mp4",
+                    filename=f"AI_{topic.replace(' ', '_')}_{media_id[:8]}.png",
+                    mimeType="image/png",
                     url=final_media_url,
-                    tags=[topic, "ai-generated", "automated-schedule", "video"],
+                    tags=[topic, "ai-generated", "automated-schedule"],
                     aiGenerated=True,
                 )
                 session.add(media)
@@ -352,7 +390,7 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                     businessProfileId=workspace_id,
                     baseCaption=creative["caption"],
                     mediaUrl=final_media_url,
-                    mediaType="video",
+                    mediaType="image",
                     isActive=True,
                 )
                 session.add(campaign)
@@ -367,10 +405,9 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                 })
 
             await session.commit()
-            logger.info(f"[CREATIVE BATCH] Successfully generated {len(created_items)} creatives for workspace {workspace_id}")
+            logger.info(f"[CREATIVE BATCH] ✓ Generated {len(created_items)} creatives for workspace {workspace_id}")
             return {"success": True, "count": len(created_items), "items": created_items}
 
     except Exception as e:
         logger.error(f"[CREATIVE BATCH] Generation failed for workspace {workspace_id}: {e}")
         return {"success": False, "count": 0, "error": str(e)}
-

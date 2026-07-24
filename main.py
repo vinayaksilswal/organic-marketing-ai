@@ -63,117 +63,49 @@ else:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Manages application startup non-blockingly so Render web server boots in < 1 second.
+    Database initialization, schema migration, seeding, and scheduler start happen
+    in a background task so the HTTP server is available immediately.
     """
     from services.scheduler import create_scheduler, shutdown_scheduler
+    from services.seed_service import run_all_seeds
 
     logger.info("=" * 60)
     logger.info("Organic Marketing AI Platform — Starting Up")
     logger.info(f"Environment: {settings.environment}")
     logger.info("=" * 60)
 
-    # Initialize DB & Scheduler asynchronously in the background
     async def bg_bootstrap():
         try:
+            # 1. Initialize database engine and create tables
             engine = await init_db()
             app.state.db_engine = engine
             app.state.db_ready = True
             logger.info("SQLAlchemy ORM connected to PostgreSQL")
 
+            # 2. Minimal schema migrations for new columns (idempotent)
             try:
-                from sqlalchemy import text
                 async with engine.begin() as conn:
-                    queries = [
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "name" VARCHAR;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "websiteUrl" VARCHAR;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "description" TEXT;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "businessModel" VARCHAR;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postIntervalHours" INTEGER NOT NULL DEFAULT 2;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "creativeGenerationIntervalHours" INTEGER NOT NULL DEFAULT 2;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "autoGenerateCreatives" BOOLEAN NOT NULL DEFAULT TRUE;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandColors" JSON NOT NULL DEFAULT \'[]\'::json;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandFonts" JSON NOT NULL DEFAULT \'[]\'::json;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "industry" VARCHAR;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "targetAudience" TEXT;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "toneOfVoice" VARCHAR;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "contentPillars" JSON NOT NULL DEFAULT \'[]\'::json;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "suggestedHashtags" JSON NOT NULL DEFAULT \'[]\'::json;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandAnalysisComplete" BOOLEAN NOT NULL DEFAULT FALSE;',
-                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "postIntervalHours" INTEGER NOT NULL DEFAULT 2;',
-                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "creativeGenerationIntervalHours" INTEGER NOT NULL DEFAULT 2;',
-                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "autoGenerateCreatives" BOOLEAN NOT NULL DEFAULT TRUE;',
-                        'ALTER TABLE "MarketingState" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "VideoApiConfig" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "Audience" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "SocialCampaign" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "EmailCampaign" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
-                        'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "tags" JSON NOT NULL DEFAULT \'[]\'::json;',
-                        'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "aiGenerated" BOOLEAN NOT NULL DEFAULT FALSE;',
-                        'ALTER TABLE "MarketingLog" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR;',
+                    migrations = [
+                        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT FALSE;',
+                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "niche" VARCHAR;',
                     ]
-                    for q in queries:
+                    for q in migrations:
                         await conn.execute(text(q))
-                logger.info("Migrated BusinessProfile table automatically on startup")
+                logger.info("Schema migrations applied successfully")
             except Exception as e:
-                logger.error(f"Failed to auto-migrate database: {e}")
+                logger.warning(f"Schema migration warning (may be first run): {e}")
 
+            # 3. Run all database seeds (system user, superadmin, etc.)
+            await run_all_seeds()
 
+            # 4. Start the APScheduler for marketing automation
             scheduler = create_scheduler()
             scheduler.start()
             app.state.scheduler = scheduler
             logger.info("APScheduler started (marketing automation loop active)")
 
-            # Ensure System-Level Self-Promotion Workspace exists
-            try:
-                async with AsyncSessionLocal() as session:
-                    # Look for SYSTEM user
-                    system_user = (await session.execute(select(User).where(User.email == "system@organicai.pro"))).scalar()
-                    if not system_user:
-                        system_user = User(
-                            email="system@organicai.pro",
-                            password="NOPASSWORD",
-                            subscriptionStatus="ACTIVE"
-                        )
-                        session.add(system_user)
-                        await session.commit()
-                        await session.refresh(system_user)
-                        logger.info("Created SYSTEM user for self-promotion")
-
-                    # Look for SYSTEM workspace
-                    system_workspace = (await session.execute(select(BusinessProfile).where(BusinessProfile.userId == system_user.id))).scalar()
-                    if not system_workspace:
-                        system_workspace = BusinessProfile(
-                            userId=system_user.id,
-                            name="Organic Marketing AI",
-                            websiteUrl="https://organicai.pro",
-                            description="An enterprise-grade SaaS platform that uses AI to automate organic marketing. It auto-generates brand-matched social media posts with AI images and publishes them to Facebook, Instagram, X, and LinkedIn on a schedule. It helps businesses save time and grow their audience without needing marketing skills.",
-                            businessModel="SaaS",
-                            postIntervalHours=2,
-                            brandAnalysisComplete=True,
-                            toneOfVoice="Professional, authoritative, yet approachable and exciting.",
-                            contentPillars=["AI Marketing Tips", "SaaS Growth", "Social Media Automation", "ROI & Cost Savings", "Platform Features"],
-                            suggestedHashtags=["#AIMarketing", "#SaaS", "#SocialMediaAutomation", "#GrowthHacking", "#OrganicAI"]
-                        )
-                        session.add(system_workspace)
-                        await session.commit()
-                        logger.info("Created SYSTEM workspace for self-promotion")
-                        
-                        # Trigger an initial creative generation in the background so it starts posting ASAP
-                        from services.creative_service import auto_populate_workspace
-                        try:
-                            # Run generation non-blocking
-                            asyncio.create_task(auto_populate_workspace(system_user.id, system_workspace.id))
-                            logger.info("Triggered initial AI creative generation for self-promotion workspace")
-                        except Exception as inner_e:
-                            logger.error(f"Failed to trigger self-promotion creatives: {inner_e}")
-                            
-            except Exception as se:
-                logger.error(f"Failed to seed self-promotion workspace: {se}")
-
         except Exception as e:
-            logger.error(f"Background database/scheduler bootstrap error: {e}")
+            logger.error(f"Background bootstrap error: {e}")
             app.state.db_ready = False
             app.state.db_error = str(e)
 

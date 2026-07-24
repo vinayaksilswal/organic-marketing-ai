@@ -1,58 +1,55 @@
 # =============================================================================
-# QuantCAI — Python Backend Dependencies
+# Organic Marketing AI — Python Backend Dependencies (Production-Ready)
 # =============================================================================
 
 # --- Web Framework ---
-fastapi
-uvicorn[standard]
-gunicorn
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+gunicorn==23.0.0
 
 # --- Templating & Static Files ---
-jinja2
-python-multipart
+jinja2==3.1.6
+python-multipart==0.0.20
 
 # --- Database ORM ---
 sqlalchemy[asyncio]>=2.0.0
-asyncpg
-prisma
+asyncpg==0.30.0
 
 # --- Configuration ---
-pydantic
-pydantic-settings
-python-dotenv
+pydantic==2.11.5
+pydantic-settings==2.9.1
+python-dotenv==1.1.0
 
 # --- HTTP Client (async) ---
-httpx
+httpx==0.28.1
 
 # --- Retry & Resilience ---
-tenacity
+tenacity==9.1.2
 
 # --- Task Scheduling ---
-apscheduler
-arq
-redis
-temporalio==1.30.0
+apscheduler==3.11.0
+arq==0.26.1
+redis==5.3.0
 
-# --- Cryptography & Storage ---
-cryptography
-boto3
+# --- Cloud Media Storage (Cloudinary) ---
+cloudinary==1.43.0
 
 # --- Email (Resend SDK) ---
-resend
+resend==2.7.0
 
 # --- Twitter/X API ---
-tweepy
+tweepy==4.15.0
 
 # --- Authentication ---
-pyjwt
-bcrypt
+pyjwt==2.10.1
+bcrypt==4.3.0
 
 # --- Logging ---
-loguru
+loguru==0.7.3
 
 # --- Monitoring ---
-prometheus-fastapi-instrumentator
+prometheus-fastapi-instrumentator==7.0.2
 
 # --- Monetization & Security ---
-stripe
-slowapi
+stripe==12.2.0
+slowapi==0.1.9

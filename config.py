@@ -72,13 +72,11 @@ class Settings(BaseSettings):
     tiktok_client_secret: str | None = None
 
     # =========================================================================
-    # Cloud Storage (AWS S3 / Cloudflare R2)
+    # Cloud Storage (Cloudinary)
     # =========================================================================
-    aws_access_key_id: str | None = None
-    aws_secret_access_key: str | None = None
-    aws_region_name: str | None = None
-    aws_endpoint_url: str | None = None
-    aws_bucket_name: str | None = None
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
 
     # =========================================================================
     # Json2Video API (Video Rendering)
@@ -98,9 +96,15 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str | None = None
 
     # =========================================================================
-    # Gemini API Key (legacy — kept for backward compat if needed)
+    # YouTube API (Optional — for auto-posting Shorts)
     # =========================================================================
-    gemini_api_key: str | None = None
+    youtube_client_id: str | None = None
+    youtube_client_secret: str | None = None
+
+    # =========================================================================
+    # Admin Seeding
+    # =========================================================================
+    admin_email: str = "vinayaksilswal@gmail.com"
 
     # =========================================================================
     # Pydantic Settings Configuration

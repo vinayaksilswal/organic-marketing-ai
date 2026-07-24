@@ -8,6 +8,8 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
   const [website, setWebsite] = useState('');
   const [description, setDescription] = useState('');
   const [businessModel, setBusinessModel] = useState(null);
+  const [niche, setNiche] = useState('');
+  const [nicheOptions, setNicheOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   
   // AI Analysis states
@@ -16,6 +18,20 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Fetch niche options
+    const fetchNiches = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/niches`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) setNicheOptions(data.niches);
+        }
+      } catch (err) {
+        console.error('Failed to fetch niches', err);
+      }
+    };
+    fetchNiches();
+
     if (step === 3) {
       // Gradually progress the UI phases for visual feedback while polling
       const phaseInterval = setInterval(() => {
@@ -58,6 +74,10 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
       showToast('Please select a business model', true);
       return;
     }
+    if (!niche) {
+      showToast('Please select a niche', true);
+      return;
+    }
     
     setLoading(true);
     try {
@@ -70,7 +90,8 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
         body: JSON.stringify({
           websiteUrl: website,
           description: description,
-          businessModel: businessModel
+          businessModel: businessModel,
+          niche: niche
         })
       });
 
@@ -175,6 +196,16 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
                   {model.name}
                 </div>
               ))}
+            </div>
+
+            <div className="input-group" style={{ marginTop: '2rem' }}>
+              <label>Business Niche</label>
+              <select value={niche} onChange={e => setNiche(e.target.value)} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white', marginTop: '0.5rem' }}>
+                <option value="">Select your niche...</option>
+                {nicheOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
+                ))}
+              </select>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3rem' }}>
