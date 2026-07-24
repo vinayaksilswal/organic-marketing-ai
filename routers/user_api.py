@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from database import AsyncSessionLocal, User, BusinessProfile, SocialConnection
 from routers.auth import verify_user
 from services.creative_service import auto_populate_workspace
+from services.catalog_service import sync_workspace_catalog
 from services.crypto_service import encrypt_token, decrypt_token
 
 router = APIRouter(
@@ -27,6 +28,7 @@ class BusinessProfileUpdate(BaseModel):
     websiteUrl: Optional[str] = None
     description: Optional[str] = None
     businessModel: Optional[str] = None
+    productCatalogUrl: Optional[str] = None
     niche: Optional[str] = None
     postIntervalHours: Optional[int] = None
     creativeGenerationIntervalHours: Optional[int] = None
@@ -141,6 +143,8 @@ async def update_business_profile_post(
                 profile.creativeGenerationIntervalHours = data.creativeGenerationIntervalHours
             if data.autoGenerateCreatives is not None:
                 profile.autoGenerateCreatives = data.autoGenerateCreatives
+            if hasattr(data, 'productCatalogUrl') and data.productCatalogUrl is not None:
+                profile.productCatalogUrl = data.productCatalogUrl
         else:
             profile = BusinessProfile(
                 userId=user_id,
@@ -148,6 +152,7 @@ async def update_business_profile_post(
                 websiteUrl=data.websiteUrl,
                 description=data.description,
                 businessModel=data.businessModel,
+                productCatalogUrl=data.productCatalogUrl,
                 niche=data.niche,
             )
             session.add(profile)
@@ -157,6 +162,9 @@ async def update_business_profile_post(
 
         # Trigger AI brand analysis in the background
         asyncio.create_task(auto_populate_workspace(user_id, profile.id))
+        
+        if profile.productCatalogUrl:
+            asyncio.create_task(sync_workspace_catalog(profile.id))
 
         return {
             "success": True,
@@ -166,6 +174,7 @@ async def update_business_profile_post(
                 "websiteUrl": profile.websiteUrl,
                 "description": profile.description,
                 "businessModel": profile.businessModel,
+                "productCatalogUrl": profile.productCatalogUrl,
                 "postIntervalHours": profile.postIntervalHours,
                 "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": profile.autoGenerateCreatives,
@@ -275,6 +284,7 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
                 "websiteUrl": bp.websiteUrl,
                 "description": bp.description,
                 "businessModel": bp.businessModel or "General",
+                "productCatalogUrl": bp.productCatalogUrl,
                 "postIntervalHours": bp.postIntervalHours,
                 "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": bp.autoGenerateCreatives,
@@ -295,6 +305,7 @@ async def create_user_business(data: BusinessProfileUpdate, request: Request, us
                 websiteUrl=data.websiteUrl,
                 description=data.description,
                 businessModel=data.businessModel or "General",
+                productCatalogUrl=data.productCatalogUrl,
             )
             session.add(profile)
             await session.commit()
@@ -302,6 +313,9 @@ async def create_user_business(data: BusinessProfileUpdate, request: Request, us
 
             # Trigger AI brand analysis + starter creative generation in background
             asyncio.create_task(auto_populate_workspace(user_id, profile.id))
+            
+            if profile.productCatalogUrl:
+                asyncio.create_task(sync_workspace_catalog(profile.id))
 
             return {
                 "success": True,
@@ -311,6 +325,7 @@ async def create_user_business(data: BusinessProfileUpdate, request: Request, us
                     "websiteUrl": profile.websiteUrl,
                     "description": profile.description,
                     "businessModel": profile.businessModel,
+                    "productCatalogUrl": profile.productCatalogUrl,
                     "brandAnalysisComplete": False,
                 },
             }

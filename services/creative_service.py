@@ -114,7 +114,7 @@ async def generate_starter_creatives(profile: BusinessProfile) -> List[Dict[str,
     biz_name = profile.name or "Our Business"
     desc = profile.description or "a business"
 
-    prompt = f"""You are an elite enterprise social media copywriter. Generate exactly 3 highly-converting social media posts for this brand.
+    prompt = f"""You are an elite enterprise social media copywriter and brand strategist. Generate exactly 3 highly-converting social media posts for this brand.
 
 Brand: {biz_name}
 Description: {desc}
@@ -122,14 +122,20 @@ Tone: {tone}
 Content Pillars: {', '.join(pillars[:4])}
 Hashtags to include: {', '.join((profile.suggestedHashtags or ['#business', '#growth'])[:3])}
 
+COPYWRITING RULES:
+1. NO CLICHES: Do not use words like 'cutting-edge', 'revolutionary', 'unlock your potential', or 'supercharge'.
+2. HOOK-FIRST: The first sentence must be a pattern-interrupting hook (a bold claim, a contrarian opinion, or a highly specific question).
+3. FRAMEWORK: Use the PAS (Problem-Agitation-Solution) framework. Agitate the pain before introducing the brand.
+4. FORMATTING: Use emojis surgically (max 3). Keep paragraphs short (1-2 sentences).
+
 Return a JSON array with exactly 3 objects, each with these fields (nothing else, no markdown):
 [
-    {{"caption": "A compelling, hook-driven post text with emojis, clear value proposition, and hashtags (3-5 sentences). It must drive engagement.", "topic": "Content pillar name", "platform": "BOTH"}},
+    {{"caption": "A compelling, hook-driven post text applying the PAS framework...", "topic": "Content pillar name", "platform": "BOTH"}},
     {{"caption": "...", "topic": "...", "platform": "BOTH"}},
     {{"caption": "...", "topic": "...", "platform": "BOTH"}}
 ]
 
-Make each post highly engaging, authentic, and ready to publish to a professional audience. Include relevant emojis and 3-5 hashtags. End with a clear call to action (CTA)."""
+Make each post highly engaging, authentic, and ready to publish to a professional audience. End with a clear, specific call to action (CTA)."""
 
     try:
         result = await _call_llm(prompt)

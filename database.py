@@ -91,6 +91,7 @@ class BusinessProfile(Base):
     description = Column(Text, nullable=True)
     businessModel = Column(String, nullable=True)
     niche = Column(String, nullable=True)  # Predefined niche from NICHE_OPTIONS
+    productCatalogUrl = Column(String, nullable=True) # E-commerce catalog URL (XML, CSV, etc.)
     postIntervalHours = Column(Integer, default=2, nullable=False)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
@@ -144,6 +145,7 @@ class Product(Base):
     price = Column(Float, nullable=True)
     url = Column(String, nullable=True)
     imageUrl = Column(String, nullable=True)
+    videoUrl = Column(String, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -198,6 +200,7 @@ class MarketingState(Base):
     userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
     lastSocialIdx = Column(Integer, default=0, nullable=False)
     lastEmailIdx = Column(Integer, default=0, nullable=False)
+    lastProductIdx = Column(Integer, default=0, nullable=False)
     autoApprove = Column(Boolean, default=False, nullable=False)
     postIntervalHours = Column(Integer, default=2, nullable=False)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)

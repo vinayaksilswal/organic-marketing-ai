@@ -10,6 +10,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [website, setWebsite] = useState('');
   const [description, setDescription] = useState('');
   const [businessModel, setBusinessModel] = useState(null);
+  const [productCatalogUrl, setProductCatalogUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState(null);
@@ -35,7 +36,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
           name: name || 'New Workspace',
           websiteUrl: website,
           description: description,
-          businessModel: businessModel
+          businessModel: businessModel,
+          productCatalogUrl: productCatalogUrl
         })
       }, token);
 
@@ -64,6 +66,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
       setWebsite('');
       setDescription('');
       setBusinessModel(null);
+      setProductCatalogUrl('');
       
     } finally {
       setLoading(false);
@@ -264,7 +267,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                   This choice tunes the AI automation prompts, marketing schedules, and video generation layouts.
                 </p>
                 
-                <div className="selection-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+                <div className="selection-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                   {[
                     { name: 'AI Influencer', icon: '🤖' },
                     { name: 'SaaS', icon: '💻' },
@@ -284,6 +287,24 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </div>
                   ))}
                 </div>
+
+                {businessModel === 'E-commerce' && (
+                  <div className="fade-in" style={{ padding: '1rem', background: 'rgba(168, 85, 247, 0.05)', borderRadius: '12px', border: '1px solid var(--primary-color)' }}>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label style={{ color: 'var(--primary-color)' }}><Sparkles size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} /> E-commerce Catalog Link (CSV/XML)</label>
+                      <input 
+                        type="url" 
+                        placeholder="https://yourstore.com/products.csv" 
+                        value={productCatalogUrl} 
+                        onChange={e => setProductCatalogUrl(e.target.value)} 
+                        style={{ borderColor: 'rgba(168, 85, 247, 0.3)' }}
+                      />
+                      <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                        Provide a production catalog link to automatically generate creatives for your products.
+                      </small>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2.5rem' }}>
                   <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
