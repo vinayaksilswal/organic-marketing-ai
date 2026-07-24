@@ -40,9 +40,10 @@ resend==2.7.0
 # --- Twitter/X API ---
 tweepy==4.15.0
 
-# --- Authentication ---
+# --- Authentication & Encryption ---
 pyjwt==2.9.0
 bcrypt==4.3.0
+cryptography>=41.0.0
 
 # --- Logging ---
 loguru==0.7.3
