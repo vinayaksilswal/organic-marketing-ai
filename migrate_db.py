@@ -26,6 +26,8 @@ async def migrate():
         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "contentPillars" JSON NOT NULL DEFAULT \'[]\'::json;',
         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "suggestedHashtags" JSON NOT NULL DEFAULT \'[]\'::json;',
         'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandAnalysisComplete" BOOLEAN NOT NULL DEFAULT FALSE;',
+        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "productCatalogUrl" VARCHAR;',
+        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "influencerReferenceUrl" VARCHAR;',
     ]
     
     for q in queries:

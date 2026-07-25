@@ -286,7 +286,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               
               {/* Header */}
               <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', background: 'var(--bg-card-hover)' }}>
-                <button onClick={() => setEditingPost(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '0.3rem', marginRight: '1rem' }}>
+                <button onClick={() => setEditingPost(null)} style={{ border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '0.3rem', marginRight: '1rem' }}>
                   <X size={16} />
                 </button>
                 <div style={{ background: 'var(--secondary-color)', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.5rem' }}>

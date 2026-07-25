@@ -475,94 +475,13 @@ product_placement: 'center'
     
     logger.info("Video pipeline completed successfully.")
     
-    # 6. JSON2Video Payload Generation
-    colors = intelligence.get('visual_identity', {}).get('brand_colors', {})
-    primary_color = colors.get('primary_dark', '#000000')
-    accent_color = colors.get('secondary_accent', '#ffffff')
-    
-    json2video_payload = {
-        "resolution": "square",
-        "quality": "high",
-        "fps": 30,
-        "draft": False,
-        "scenes": [
-            {
-                "comment": "Hero Intro",
-                "duration": 4,
-                "elements": [
-                    {
-                        "type": "image",
-                        "src": image_url,
-                        "style": "pan_right",
-                        "zoom": 1.1
-                    },
-                    {
-                        "type": "text",
-                        "text": f"Discover {product_name}",
-                        "style": "headline",
-                        "font": "Outfit",
-                        "size": 72,
-                        "color": "#ffffff",
-                        "position": "center",
-                        "x": 0, "y": -200, "width": 800
-                    }
-                ]
-            },
-            {
-                "comment": "Creative Strategy Hook",
-                "duration": 5,
-                "elements": [
-                    {
-                        "type": "image",
-                        "src": image_url,
-                        "style": "zoom_in"
-                    },
-                    {
-                        "type": "text",
-                        "text": intelligence.get('creative_strategy', {}).get('hero_marketing_hook', 'Upgrade your lifestyle.'),
-                        "style": "normal",
-                        "font": "Outfit",
-                        "size": 48,
-                        "color": accent_color,
-                        "position": "center",
-                        "x": 0, "y": 0, "width": 800
-                    }
-                ]
-            }
-        ]
-    }
-    
     return {
         "status": "success",
         "intelligence": intelligence,
         "creative_strategy": creative_strategy,
         "veo_prompt": final_prompt,
-        "image_url": image_url,
-        "json2video_payload": json2video_payload
+        "image_url": image_url
     }
 
-async def submit_to_json2video(payload: Dict[str, Any], webhook_url: Optional[str] = None) -> Dict[str, Any]:
-    """Submit a JSON payload to json2video API."""
-    if not settings.json2video_api_key:
-        logger.warning("JSON2VIDEO_API_KEY not configured. Mocking video submission.")
-        return {"success": True, "project": "mock_project_id", "status": "queued"}
-        
-    url = "https://api.json2video.com/v2/movies"
-    headers = {
-        "x-api-key": settings.json2video_api_key,
-        "Content-Type": "application/json"
-    }
-    
-    if webhook_url:
-        payload["webhook_url"] = webhook_url
-        
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            return {"success": True, "project": data.get("project"), "status": "queued"}
-    except Exception as e:
-        logger.error(f"Failed to submit to json2video: {e}")
-        return {"success": False, "error": str(e)}
+
 

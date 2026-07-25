@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-import { Sparkles, CheckCircle2, ShieldCheck, LogOut, CreditCard, Building2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, ShieldCheck, LogOut, Building2 } from 'lucide-react';
+import { API_BASE } from '../App';
 
 export default function Checkout({ user, onLogout }) {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('stripe'); // 'paypal' or 'stripe'
 
   if (user?.subscriptionStatus === 'ACTIVE') {
     navigate('/dashboard');
@@ -22,8 +22,7 @@ export default function Checkout({ user, onLogout }) {
 
   const initialOptions = {
     "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID || "test",
-    "vault": "true",
-    "intent": "subscription",
+    "currency": "USD",
     "components": "buttons",
     "disable-funding": "card"
   };
@@ -67,57 +66,48 @@ export default function Checkout({ user, onLogout }) {
               <li><CheckCircle2 size={20} /> <span>Social & Email Automation</span></li>
             </ul>
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-              <button 
-                className={`btn ${paymentMethod === 'stripe' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                onClick={() => setPaymentMethod('stripe')}
-              >
-                <CreditCard size={18} /> Card
-              </button>
-              <button 
-                className={`btn ${paymentMethod === 'paypal' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ flex: 1, padding: '0.75rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                onClick={() => setPaymentMethod('paypal')}
-              >
-                PayPal
-              </button>
-            </div>
-
             <div className="payment-container" style={{ minHeight: '150px', display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center' }}>
-              {paymentMethod === 'stripe' && (
-                <button 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', padding: '1rem', fontSize: '1.125rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
-                  onClick={() => alert("Stripe checkout integration pending.")}
-                >
-                  <CreditCard size={20} /> Pay with Stripe
-                </button>
-              )}
-              {paymentMethod === 'paypal' && (
-                import.meta.env.VITE_PAYPAL_CLIENT_ID ? (
-                  <PayPalScriptProvider options={initialOptions}>
-                    <PayPalButtons
-                      style={{ layout: "vertical", shape: "rect", color: "gold" }}
-                      createSubscription={(data, actions) => {
-                        return actions.subscription.create({
-                          'plan_id': import.meta.env.VITE_PAYPAL_PLAN_ID || "P-YOUR_PLAN_ID",
-                          'custom_id': user?.id
+              <PayPalScriptProvider options={initialOptions}>
+                <PayPalButtons
+                  style={{ layout: "vertical", shape: "rect", color: "gold" }}
+                  createOrder={(data, actions) => {
+                    return actions.order.create({
+                      purchase_units: [
+                        {
+                          amount: {
+                            value: "17.00",
+                          },
+                          description: "Organic Marketing AI - Pro Plan"
+                        },
+                      ],
+                    });
+                  }}
+                  onApprove={async (data, actions) => {
+                    const order = await actions.order.capture();
+                    console.log("Order approved:", order);
+                    
+                    try {
+                      const token = localStorage.getItem('token');
+                      if (token) {
+                        await fetch(`${API_BASE}/users/me/subscribe`, {
+                          method: 'POST',
+                          headers: { 'Authorization': `Bearer ${token}` }
                         });
-                      }}
-                      onApprove={handleApprove}
-                      onError={(err) => {
-                        console.error("PayPal Error:", err);
-                        setError("Payment could not be processed. Please try again.");
-                      }}
-                    />
-                  </PayPalScriptProvider>
-                ) : (
-                  <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', textAlign: 'center' }}>
-                    PayPal Client ID not configured. Please use Card payment.
-                  </div>
-                )
-              )}
+                      }
+                    } catch (e) {
+                      console.error("Failed to update subscription status", e);
+                    }
+
+                    setTimeout(() => {
+                      window.location.href = '/dashboard';
+                    }, 2000);
+                  }}
+                  onError={(err) => {
+                    console.error("PayPal Error:", err);
+                    setError("Payment could not be processed. Please try again.");
+                  }}
+                />
+              </PayPalScriptProvider>
             </div>
             
             <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
