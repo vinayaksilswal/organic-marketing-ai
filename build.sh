@@ -9,8 +9,8 @@ echo "=== Organic Marketing AI Build ==="
 # Install Python dependencies
 pip install --no-cache-dir -r requirements.txt
 
-# Run Database Migrations
-echo "=== Running Database Migrations ==="
-python migrate_db.py
+# Run Alembic Migrations
+echo "=== Running Alembic Migrations ==="
+alembic upgrade head
 
 echo "=== Build Complete ==="

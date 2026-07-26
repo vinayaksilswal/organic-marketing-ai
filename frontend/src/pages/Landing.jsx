@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai.onrender.com/api/v1';
+import { API_BASE } from '../App';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
 const premiumStyles = `

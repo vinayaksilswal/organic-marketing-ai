@@ -84,14 +84,17 @@ export default function Checkout({ user, onLogout }) {
                   }}
                   onApprove={async (data, actions) => {
                     const order = await actions.order.capture();
-                    console.log("Order approved:", order);
-                    
+
                     try {
                       const token = localStorage.getItem('token');
                       if (token) {
                         await fetch(`${API_BASE}/users/me/subscribe`, {
                           method: 'POST',
-                          headers: { 'Authorization': `Bearer ${token}` }
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({ order_id: order.id })
                         });
                       }
                     } catch (e) {

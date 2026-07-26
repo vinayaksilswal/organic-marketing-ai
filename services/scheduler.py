@@ -32,7 +32,6 @@ from config import settings
 from database import (
     AsyncSessionLocal,
     BusinessProfile,
-    MarketingState,
     SocialCampaign,
     SocialPost,
 )
@@ -40,45 +39,6 @@ from database import (
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-# =============================================================================
-# Campaign Rotation (Workspace-Scoped)
-# =============================================================================
-async def _get_next_campaign_for_workspace(session, profile: BusinessProfile) -> SocialCampaign | None:
-    """Get the next active campaign for a specific workspace."""
-    query = select(SocialCampaign).where(
-        SocialCampaign.businessProfileId == profile.id,
-        SocialCampaign.isActive == True,
-    ).order_by(SocialCampaign.createdAt.asc())
-
-    res = await session.execute(query)
-    campaigns = res.scalars().all()
-
-    if not campaigns:
-        return None
-
-    state_query = select(MarketingState).where(MarketingState.businessProfileId == profile.id)
-    state_res = await session.execute(state_query)
-    state = state_res.scalars().first()
-
-    if not state:
-        state = MarketingState(
-            userId=profile.userId,
-            businessProfileId=profile.id,
-            lastSocialIdx=0,
-            lastEmailIdx=0,
-            autoApprove=getattr(profile, "autoGenerateCreatives", True),
-        )
-        session.add(state)
-        await session.flush()
-
-    next_idx = state.lastSocialIdx + 1
-    if next_idx >= len(campaigns):
-        next_idx = 0
-
-    state.lastSocialIdx = next_idx
-    return campaigns[next_idx]
 
 
 # =============================================================================

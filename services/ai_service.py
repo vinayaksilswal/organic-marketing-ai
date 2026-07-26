@@ -491,14 +491,14 @@ Return a JSON object with:
 # social media content for the autonomous arXiv newsroom pipeline.
 # =============================================================================
 
-ARXIV_X_SYSTEM_PROMPT = """You are a senior quantum computing developer advocate writing for X (Twitter).
-Your audience is Python developers, quantum researchers, and Qiskit users.
+ARXIV_X_SYSTEM_PROMPT = """You are a senior technology advocate writing for X (Twitter).
+Your audience is developers, researchers, and technical professionals.
 
 RULES:
 - Write exactly 3 posts for an X thread. Each post MUST be under 280 characters.
 - Post 1: Hook — summarize what the paper discovered in a punchy, engaging way. Use an emoji opener.
-- Post 2: Technical implications — what this means for Python/Qiskit developers. Include a hypothetical code snippet or library reference if relevant.
-- Post 3: Call-to-action — direct readers to explore this concept on Organic Marketing AI. Use the CTA link provided.
+- Post 2: Technical implications — what this means for practitioners. Include relevant context.
+- Post 3: Call-to-action — direct readers to learn more. Use the CTA link provided.
 - Be technically accurate but accessible. No hype or buzzwords.
 - Include 3-5 relevant hashtags separately.
 
@@ -507,50 +507,47 @@ OUTPUT FORMAT (strict JSON, no markdown fences):
   "post_1": "...",
   "post_2": "...",
   "post_3": "...",
-  "hashtags": ["#Quantum", "#Qiskit", ...]
+  "hashtags": ["#Research", "#Tech", ...]
 }"""
 
-ARXIV_LINKEDIN_SYSTEM_PROMPT = """You are a cybersecurity thought leader writing for LinkedIn.
-Your audience is CISOs, VP of Engineering, compliance officers, and DevSecOps leaders.
+ARXIV_LINKEDIN_SYSTEM_PROMPT = """You are a technology thought leader writing for LinkedIn.
+Your audience is technical leaders, engineering managers, and industry professionals.
 
 RULES:
-- Write a professional, risk-focused executive summary (max 3000 characters).
-- Frame the research around the NSA CNSA 2.0 mandate (PQC in all new software by 2030, full replacement by 2033).
-- Emphasize the shrinking timeline for Post-Quantum Cryptography (PQC) migration.
-- Reference the average data breach cost ($4.44M) and the regulatory implications.
-- End with a clear call-to-action to assess cryptographic posture using Organic Marketing AI's PQC scanner at https://organicmarketing.ai/pqc-scanner
+- Write a professional executive summary (max 3000 characters).
+- Frame the research around its practical industry implications.
+- Emphasize actionable insights and future impact.
+- End with a clear call-to-action using the CTA link provided.
 - Include 3-5 professional hashtags separately.
 - Do NOT use emojis. Use professional tone throughout.
 
 OUTPUT FORMAT (strict JSON, no markdown fences):
 {
   "body": "...",
-  "hashtags": ["#PostQuantumCryptography", "#CyberSecurity", ...]
+  "hashtags": ["#Research", "#Technology", ...]
 }"""
 
 
 def _classify_paper_category(title: str, abstract: str) -> str:
-    """Classify a paper as 'quantum' or 'cybersecurity' based on keywords."""
+    """Classify an arXiv paper into a broad category based on keywords."""
     text = (title + " " + abstract).lower()
-    crypto_keywords = {
-        "cryptograph", "post-quantum", "pqc", "lattice-based", "ml-kem", "ml-dsa",
-        "slh-dsa", "nist", "rsa", "ecc", "key exchange", "digital signature",
-        "encryption", "tls", "certificate", "vulnerability", "cybersecurity",
-        "shor's algorithm", "factoring", "key encapsulation", "hash-based",
+    category_keywords = {
+        "cybersecurity": ["cryptograph", "vulnerability", "cybersecurity", "encryption", "tls", "certificate", "malware", "intrusion"],
+        "ai_ml": ["machine learning", "deep learning", "neural network", "transformer", "llm", "reinforcement learning", "diffusion model"],
+        "quantum": ["quantum", "qubit", "entanglement", "superposition"],
     }
-    for kw in crypto_keywords:
-        if kw in text:
-            return "cybersecurity"
-    return "quantum"
+    for category, keywords in category_keywords.items():
+        for kw in keywords:
+            if kw in text:
+                return category
+    return "general"
 
 
 def _build_arxiv_cta_link(category: str, arxiv_id: str) -> str:
-    """Build a trackable CTA link based on the paper's category."""
+    """Build a trackable CTA link for the paper."""
     base = "https://organicmarketing.ai"
     utm = f"utm_source=arxiv_newsroom&utm_medium=social&utm_campaign={arxiv_id}"
-    if category == "cybersecurity":
-        return f"{base}/pqc-scanner?{utm}"
-    return f"{base}/circuit-builder?{utm}"
+    return f"{base}/research?{utm}"
 
 
 async def generate_arxiv_x_thread(
@@ -579,15 +576,15 @@ CTA Link to include in post 3: {cta_link}"""
             "post_1": str(parsed.get("post_1", ""))[:280],
             "post_2": str(parsed.get("post_2", ""))[:280],
             "post_3": str(parsed.get("post_3", ""))[:280],
-            "hashtags": parsed.get("hashtags", ["#Quantum", "#OrganicAI"]),
+            "hashtags": parsed.get("hashtags", ["#Research", "#OrganicAI"]),
         }
 
     # Fallback if LLM fails
     return {
         "post_1": f"🔬 New research: {title[:200]}",
         "post_2": f"Read the full paper: https://arxiv.org/abs/{arxiv_id}",
-        "post_3": f"Explore quantum concepts interactively → {cta_link}",
-        "hashtags": ["#Quantum", "#Research", "#OrganicMarketingAI"],
+        "post_3": f"Explore more → {cta_link}",
+        "hashtags": ["#Research", "#Tech", "#OrganicMarketingAI"],
     }
 
 
@@ -615,20 +612,17 @@ CTA Link: {cta_link}"""
     if parsed and isinstance(parsed, dict):
         return {
             "body": str(parsed.get("body", ""))[:3000],
-            "hashtags": parsed.get("hashtags", ["#PostQuantumCryptography", "#CyberSecurity"]),
+            "hashtags": parsed.get("hashtags", ["#Research", "#Technology"]),
         }
 
     # Fallback if LLM fails
-    category = _classify_paper_category(title, abstract)
     return {
         "body": (
-            f"New research published on arXiv highlights critical developments "
-            f"in {'post-quantum cryptography' if category == 'cybersecurity' else 'quantum computing'}.\n\n"
+            f"New research published on arXiv highlights important developments.\n\n"
             f'"{title}"\n\n'
-            f"Organizations preparing for the NSA CNSA 2.0 mandate should take note. "
-            f"Assess your cryptographic posture at {cta_link}"
+            f"Read the full paper and explore more at {cta_link}"
         ),
-        "hashtags": ["#PostQuantumCryptography", "#CyberSecurity", "#CNSA2"],
+        "hashtags": ["#Research", "#Technology", "#Innovation"],
     }
 
 

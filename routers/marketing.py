@@ -36,6 +36,7 @@ from database import (
     get_tenant_session,
     User,
     Audience,
+    BusinessProfile,
     MarketingState,
     SocialCampaign,
     SocialPost,
@@ -368,7 +369,7 @@ async def edit_social_post(
 
             if platform in ("FACEBOOK", "BOTH"):
                 try:
-                    fb_post_id = await post_to_facebook(message=caption_to_post, media_urls=media_urls)
+                    fb_post_id = await post_to_facebook(workspace_id, message=caption_to_post, media_urls=media_urls)
                     if not fb_post_id:
                         errors.append("FB: Post returned None")
                 except Exception as e:
@@ -376,7 +377,7 @@ async def edit_social_post(
 
             if platform in ("INSTAGRAM", "BOTH"):
                 try:
-                    ig_post_id = await post_to_instagram(message=caption_to_post, media_urls=media_urls)
+                    ig_post_id = await post_to_instagram(workspace_id, message=caption_to_post, media_urls=media_urls)
                     if not ig_post_id:
                         errors.append("IG: Post returned None")
                 except Exception as e:
@@ -533,7 +534,7 @@ async def create_manual_social_post(
 
         if platform in ("FACEBOOK", "BOTH"):
             try:
-                fb_post_id = await post_to_facebook(message=caption, media_urls=media_urls)
+                fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=media_urls)
                 if not fb_post_id:
                     errors.append("FB: Post returned None")
             except Exception as e:
@@ -541,7 +542,7 @@ async def create_manual_social_post(
 
         if platform in ("INSTAGRAM", "BOTH"):
             try:
-                ig_post_id = await post_to_instagram(message=caption, media_urls=media_urls)
+                ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=media_urls)
                 if not ig_post_id:
                     errors.append("IG: Post returned None")
             except Exception as e:
@@ -631,13 +632,13 @@ async def create_post_from_media(
 
         if data.platform in ("FACEBOOK", "BOTH"):
             try:
-                fb_post_id = await post_to_facebook(message=caption, media_urls=[target_url])
+                fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=[target_url])
             except Exception as e:
                 errors.append(f"FB: {str(e)}")
 
         if data.platform in ("INSTAGRAM", "BOTH"):
             try:
-                ig_post_id = await post_to_instagram(message=caption, media_urls=[target_url])
+                ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=[target_url])
             except Exception as e:
                 errors.append(f"IG: {str(e)}")
 

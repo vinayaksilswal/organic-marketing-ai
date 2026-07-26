@@ -48,9 +48,20 @@ cryptography>=41.0.0
 # --- Logging ---
 loguru==0.7.3
 
+# --- Database Migrations ---
+alembic==1.15.2
+
 # --- Monitoring ---
 prometheus-fastapi-instrumentator==7.0.2
 
 # --- Monetization & Security ---
 stripe==12.2.0
 slowapi==0.1.9
+
+# --- Error Tracking ---
+sentry-sdk[fastapi]==2.22.0
+
+# --- Testing (dev) ---
+# pytest==8.3.5
+# pytest-asyncio==0.25.3
+# httpx  # already installed

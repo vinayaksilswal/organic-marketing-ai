@@ -1,18 +1,15 @@
 """
 =============================================================================
-QuantCAI — Autonomous arXiv Research Newsroom
+Organic Marketing AI — Autonomous arXiv Research Newsroom
 =============================================================================
-Scrapes the arXiv Atom API for the latest papers in quantum physics (quant-ph)
-and computer security (cs.CR), deduplicates against a local SQLite registry,
-and feeds abstracts into the AI content generation pipeline for autonomous
-social media publishing.
+Scrapes the arXiv Atom API for the latest papers across research categories,
+deduplicates against a local SQLite registry, and feeds abstracts into the
+AI content generation pipeline for autonomous social media publishing.
 
 arXiv API Terms:
   - Max 30,000 records per query
   - Polite inter-request delay (3 seconds minimum)
   - Rate-limiting aware with exponential backoff
-
-Copyright (c) 2026 QuantCAI — All rights reserved.
 =============================================================================
 """
 

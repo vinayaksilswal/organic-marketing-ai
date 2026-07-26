@@ -190,9 +190,7 @@ class LinkedInService:
 
 {caption}
 
-🔗 Learn more: {cta_url}
-
-#PostQuantumCryptography #QuantumComputing #Cybersecurity #NIST #PQC #QuantumSafe #TechSecurity"""
+🔗 Learn more: {cta_url}"""
 
         return formatted
 

@@ -26,8 +26,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     }
     
     setLoading(true);
-    setJobId(null);
-    setProjectUrl(null);
+    setIntelligence(null);
+    setVeoPrompt('');
     try {
       const res = await authFetch(`${API_BASE}/creatives/generate-video-campaign`, {
         method: 'POST',
@@ -194,7 +194,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
             </div>
             
             {/* Results Section */}
-            {(veoPrompt || jsonPayload || intelligence) && (
+            {(veoPrompt || intelligence) && (
               <div className="glass-panel" style={{ padding: '0', overflow: 'hidden' }}>
                 <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.2)' }}>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

@@ -162,9 +162,7 @@ async def seed_superadmin() -> None:
                     logger.info(f"✓ Granted superadmin role to {admin_email}")
                 return
 
-            # Create the superadmin account with a default password
-            # User should change this on first login
-            default_password = "OrganicAI@2024!"
+            default_password = settings.superadmin_default_password
             hashed = bcrypt.hashpw(
                 default_password.encode("utf-8"), bcrypt.gensalt()
             ).decode("utf-8")
@@ -179,9 +177,7 @@ async def seed_superadmin() -> None:
             await session.commit()
             await session.refresh(admin_user)
 
-            logger.info(f"✓ Created superadmin account: {admin_email}")
-            logger.info(f"  Default password: {default_password}")
-            logger.info(f"  ⚠️  CHANGE THIS PASSWORD IMMEDIATELY IN PRODUCTION")
+            logger.info(f"Created superadmin account: {admin_email}")
 
     except Exception as e:
         logger.error(f"Failed to seed superadmin: {e}")

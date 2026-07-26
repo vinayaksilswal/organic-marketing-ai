@@ -71,7 +71,7 @@ YAML SCHEMA:
 pipeline_routing:
   subject_classification: <enum: product | character | composite>
   product_category: <enum: physical_goods | digital_interface | apparel | consumable | data_product | service_platform | null>
-  product_type_detail: <string: e.g. "B2B crypto API", "DTC skincare serum", "mechanical keyboard", "quantum education platform">
+  product_type_detail: <string: e.g. "B2B crypto API", "DTC skincare serum", "mechanical keyboard", "online education platform">
   creative_complexity: <enum: minimal | moderate | rich>
   is_digital_product: <boolean>
   has_physical_form: <boolean>
@@ -102,7 +102,7 @@ structural_and_material_analysis:
 emotional_and_brand_tone:
   perceived_brand_tier: <enum: luxury | premium | mid_market | mass_market | indie | enterprise>
   emotional_resonance: <enum: trust | excitement | calm | urgency | aspiration | playfulness | authority>
-  industry_vertical: <string: e.g. "fintech", "edtech", "wellness", "fashion", "developer_tools", "food_beverage", "quantum_computing">
+  industry_vertical: <string: e.g. "fintech", "edtech", "wellness", "fashion", "developer_tools", "food_beverage", "ecommerce">
   target_buyer_sophistication: <enum: consumer | prosumer | professional | enterprise>
 generation_conditioning:
   lighting_profile: <string: precise photometric description>
@@ -157,7 +157,7 @@ TIER 3 — URL SCRAPED CONTENT (lowest trust):
 
 CRITICAL RESILIENCE RULES:
 NEVER output null for industry_vertical — infer it from the brand name, logo style, and any visual signals in the YAML even if URL content is empty.
-NEVER output generic fallbacks like "technology" or "software" — be specific. "QuantCAI" with quantum wave imagery = quantum_computing_education. A supplement bottle with clean labels = wellness_supplements.
+NEVER output generic fallbacks like "technology" or "software" — be specific. A supplement bottle with clean labels = wellness_supplements. A dashboard screenshot with charts = analytics_saas.
 If URL content is empty, build the marketing profile from visual identity signals. A product's visual design language reveals its industry, audience, and positioning.
 Brand colors come from Tier 2 (Vision YAML) — never guess or approximate them.
 Product type comes from BOTH name analysis AND visual signals. "CAI" suffix + educational platform signals = education_platform.
@@ -165,7 +165,6 @@ Product type comes from BOTH name analysis AND visual signals. "CAI" suffix + ed
 PRODUCT TYPE DETECTION RULES (apply even without URL content):
 API / developer product: URL contains "api", "rapidapi", "developer", or technical documentation signals
 Education platform: "learn", "course", "academy", "lab", "tutorial" in name or URL, or classroom visual signals
-Quantum computing: "quant" prefix + physics/wave visual imagery = quantum_computing_education
 SaaS dashboard: UI screenshot in image, clean interface, metric cards
 Physical product: 3D object in image, packaging visible, material texture
 Consumable: Bottle, jar, tube, ingredient imagery
@@ -175,8 +174,8 @@ OUTPUT — valid JSON only. First character = {{ Last character = }}
 {{
 "product_intelligence": {{
 "product_name": "<from form — exact>",
-"product_category": "<specific: quantum education platform | B2B crypto API | DTC skincare | etc.>",
-"product_subcategory": "<more specific: live quantum computing courses | real-time order flow data | etc.>",
+"product_category": "<specific: online education platform | B2B crypto API | DTC skincare | etc.>",
+"product_subcategory": "<more specific: live coding courses | real-time order flow data | etc.>",
 "product_type": "<enum: digital_saas | physical_goods | consumable | apparel | data_api | education_platform | service>",
 "price_tier": "<from URL if available, else infer from brand tier: free | freemium | low_ticket | mid_ticket | high_ticket | enterprise>",
 "value_proposition": "<2-3 sentences from URL if available, else construct from name + visual signals>",
@@ -186,7 +185,7 @@ OUTPUT — valid JSON only. First character = {{ Last character = }}
 "data_confidence": "<enum: high | medium | low — reflects how much URL content was available>"
 }},
 "audience_intelligence": {{
-"primary_audience": "<specific: quantum computing students | algorithmic traders | gym owners>",
+"primary_audience": "<specific: online learners | algorithmic traders | gym owners>",
 "secondary_audience": "<second segment>",
 "audience_sophistication": "<beginner | intermediate | expert | mixed>",
 "decision_driver": "<logic | emotion | social_proof | authority | scarcity | curiosity | aspiration>",
@@ -224,17 +223,17 @@ OUTPUT — valid JSON only. First character = {{ Last character = }}
 "forbidden_cliches": ["<cliche 1>", "<cliche 2>"]
 }},
 "industry_visual_language": {{
-"vertical": "<specific: quantum_computing_education | fintech | wellness | fashion | developer_tools | food_beverage | fitness | enterprise_saas | ecommerce>",
-"environment_archetype": "<physics lab | bloomberg terminal | modern gym | minimalist kitchen | dark IDE | quantum computing lab | luxury retail>",
+"vertical": "<specific: edtech | fintech | wellness | fashion | developer_tools | food_beverage | fitness | enterprise_saas | ecommerce>",
+"environment_archetype": "<co-working space | bloomberg terminal | modern gym | minimalist kitchen | dark IDE | university classroom | luxury retail>",
 "lighting_signature": "<cold institutional | warm golden hour | dark dramatic rim | soft diffused natural | clean bright studio>",
-"human_archetype": "<curious physics student | stressed analyst | confident founder | health-conscious professional | hardcore athlete>",
+"human_archetype": "<eager online learner | stressed analyst | confident founder | health-conscious professional | hardcore athlete>",
 "prop_language": "<objects that signal authenticity for this vertical>"
 }},
 "video_creative_parameters": {{
 "recommended_aspect_ratio": "<16:9 | 9:16 | 1:1>",
 "recommended_duration_seconds": 8,
 "pacing": "<slow_cinematic | medium_editorial | fast_ugc | dynamic_mixed>",
-"sound_design": "<specific direction: ambient quantum hum | crisp electronic pulse | warm acoustic | high-energy beat>",
+"sound_design": "<specific direction: ambient electronic drone | crisp electronic pulse | warm acoustic | high-energy beat>",
 "on_screen_text_style": "<minimal | bold_callout | terminal_code | editorial_caption>",
 "product_placement_style": "<hero_center | lifestyle_context | ui_closeup | hands_on | environmental>"
 }},

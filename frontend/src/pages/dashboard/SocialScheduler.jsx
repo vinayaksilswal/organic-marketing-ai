@@ -367,9 +367,9 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     {/* Fake Instagram Header */}
                     <div style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                         <span style={{ color: 'var(--secondary-color)', fontWeight: 'bold' }}>Q</span>
+                         <span style={{ color: 'var(--secondary-color)', fontWeight: 'bold' }}>O</span>
                       </div>
-                      <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>QuantCAI</span>
+                      <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>OrganicAI</span>
                       <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
                         <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
                         <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
@@ -401,7 +401,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                        </div>
                        <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.4 }}>
-                         <span style={{ fontWeight: '600', marginRight: '0.5rem' }}>QuantCAI</span>
+                         <span style={{ fontWeight: '600', marginRight: '0.5rem' }}>OrganicAI</span>
                          {editCaption}
                        </p>
                     </div>

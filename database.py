@@ -75,7 +75,7 @@ class User(Base):
     businessProfiles = relationship("BusinessProfile", back_populates="user", cascade="all, delete-orphan")
     videoApiConfigs = relationship("VideoApiConfig", back_populates="user", cascade="all, delete-orphan")
     products = relationship("Product", back_populates="user", cascade="all, delete-orphan")
-    socialConnection = relationship("SocialConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    socialConnections = relationship("SocialConnection", back_populates="user", cascade="all, delete-orphan")
     audiences = relationship("Audience", back_populates="user", cascade="all, delete-orphan")
     campaigns = relationship("SocialCampaign", back_populates="user", cascade="all, delete-orphan")
     marketingStates = relationship("MarketingState", back_populates="user", cascade="all, delete-orphan")
@@ -157,9 +157,10 @@ class Product(Base):
 
 class SocialConnection(Base):
     __tablename__ = "SocialConnection"
+    __table_args__ = (UniqueConstraint("userId", "businessProfileId", name="uniq_user_workspace_social"),)
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), unique=True, nullable=False)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
     fbAccessToken = Column(Text, nullable=True)
     fbPageId = Column(String, nullable=True)
     fbPageName = Column(String, nullable=True)
@@ -171,7 +172,7 @@ class SocialConnection(Base):
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
-    user = relationship("User", back_populates="socialConnection")
+    user = relationship("User", back_populates="socialConnections")
     businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
     businessProfile = relationship('BusinessProfile', back_populates='socialconnections')
 

@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from loguru import logger
 
+from config import settings
 from database import AsyncSessionLocal, User, BusinessProfile, SocialConnection
 from routers.auth import verify_user
 from services.onboarding_service import OnboardingService
@@ -47,12 +50,14 @@ class SocialConnectionUpdate(BaseModel):
 @router.get("")
 async def get_current_user(request: Request, user_id: str = Depends(verify_user)):
     async with AsyncSessionLocal() as session:
+        workspace_id = request.headers.get("x-workspace-id")
+
         stmt = (
             select(User)
             .where(User.id == user_id)
             .options(
                 selectinload(User.businessProfiles),
-                selectinload(User.socialConnection),
+                selectinload(User.socialConnections),
             )
         )
         res = await session.execute(stmt)
@@ -61,7 +66,6 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Auto-create Default Workspace if user has no business profiles
         if not user.businessProfiles or len(user.businessProfiles) == 0:
             default_profile = BusinessProfile(
                 userId=user.id,
@@ -72,11 +76,10 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
             )
             session.add(default_profile)
             await session.commit()
-            
-            # Re-fetch user with newly created profile
+
             stmt = select(User).where(User.id == user_id).options(
                 selectinload(User.businessProfiles),
-                selectinload(User.socialConnection),
+                selectinload(User.socialConnections),
             ).execution_options(populate_existing=True)
             res = await session.execute(stmt)
             user = res.scalar_one_or_none()
@@ -101,15 +104,19 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
         ]
 
         social_data = None
-        if user.socialConnection:
+        active_conn = next(
+            (c for c in user.socialConnections if c.businessProfileId == workspace_id),
+            user.socialConnections[0] if user.socialConnections else None,
+        )
+        if active_conn:
             social_data = {
-                "id": user.socialConnection.id,
-                "fbPageId": user.socialConnection.fbPageId,
-                "fbPageName": user.socialConnection.fbPageName,
-                "igAccountId": user.socialConnection.igAccountId,
-                "igAccountName": user.socialConnection.igAccountName,
-                "hasTwitter": bool(user.socialConnection.twitterAccessToken),
-                "hasLinkedin": bool(user.socialConnection.linkedinAccessToken),
+                "id": active_conn.id,
+                "fbPageId": active_conn.fbPageId,
+                "fbPageName": active_conn.fbPageName,
+                "igAccountId": active_conn.igAccountId,
+                "igAccountName": active_conn.igAccountName,
+                "hasTwitter": bool(active_conn.twitterAccessToken),
+                "hasLinkedin": bool(active_conn.linkedinAccessToken),
             }
 
         return {
@@ -147,8 +154,12 @@ async def update_business_profile_post(
 async def update_social_connection(
     data: SocialConnectionUpdate, request: Request, user_id: str = Depends(verify_user)
 ):
+    workspace_id = request.headers.get("x-workspace-id")
     async with AsyncSessionLocal() as session:
-        stmt = select(SocialConnection).where(SocialConnection.userId == user_id)
+        stmt = select(SocialConnection).where(
+            SocialConnection.userId == user_id,
+            SocialConnection.businessProfileId == workspace_id,
+        )
         res = await session.execute(stmt)
         conn = res.scalars().first()
 
@@ -172,6 +183,7 @@ async def update_social_connection(
         else:
             conn = SocialConnection(
                 userId=user_id,
+                businessProfileId=workspace_id,
                 fbAccessToken=encrypt_token(data.fbAccessToken) if data.fbAccessToken else None,
                 fbPageId=data.fbPageId,
                 fbPageName=data.fbPageName,
@@ -209,9 +221,40 @@ async def get_onboarding_status(request: Request, user_id: str = Depends(verify_
             return {"brandAnalysisComplete": False}
         return {"brandAnalysisComplete": profile.brandAnalysisComplete}
 
+class SubscribeRequest(BaseModel):
+    order_id: str
+
 @router.post("/subscribe")
-async def activate_subscription(request: Request, user_id: str = Depends(verify_user)):
-    """Activate subscription status for the current user."""
+async def activate_subscription(data: SubscribeRequest, request: Request, user_id: str = Depends(verify_user)):
+    """Activate subscription after verifying PayPal payment."""
+    if not settings.paypal_client_id or not settings.paypal_client_secret:
+        raise HTTPException(status_code=503, detail="Payment verification not configured")
+
+    paypal_base = "https://api-m.paypal.com" if settings.environment == "production" else "https://api-m.sandbox.paypal.com"
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        auth_resp = await client.post(
+            f"{paypal_base}/v1/oauth2/token",
+            data={"grant_type": "client_credentials"},
+            auth=(settings.paypal_client_id, settings.paypal_client_secret),
+        )
+        if auth_resp.status_code != 200:
+            logger.error(f"PayPal auth failed: {auth_resp.text}")
+            raise HTTPException(status_code=502, detail="Payment verification failed")
+
+        access_token = auth_resp.json().get("access_token")
+
+        order_resp = await client.get(
+            f"{paypal_base}/v2/checkout/orders/{data.order_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if order_resp.status_code != 200:
+            raise HTTPException(status_code=402, detail="Payment order not found")
+
+        order = order_resp.json()
+        if order.get("status") != "COMPLETED":
+            raise HTTPException(status_code=402, detail="Payment not completed")
+
     async with AsyncSessionLocal() as session:
         stmt = select(User).where(User.id == user_id)
         res = await session.execute(stmt)
@@ -222,6 +265,7 @@ async def activate_subscription(request: Request, user_id: str = Depends(verify_
 
         user.subscriptionStatus = "ACTIVE"
         await session.commit()
+        logger.info(f"Subscription activated for user {user_id} via PayPal order {data.order_id}")
         return {"success": True, "message": "Subscription activated successfully"}
 
 

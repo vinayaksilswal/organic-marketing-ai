@@ -83,23 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             app.state.db_ready = True
             logger.info("SQLAlchemy ORM connected to PostgreSQL")
 
-            # 2. Minimal schema migrations for new columns (idempotent)
-            try:
-                async with engine.begin() as conn:
-                    migrations = [
-                        'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT FALSE;',
-                        'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "niche" VARCHAR;',
-                        'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessToken" TEXT;',
-                        'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessSecret" TEXT;',
-                        'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinAccessToken" TEXT;',
-                    ]
-                    for q in migrations:
-                        await conn.execute(text(q))
-                logger.info("Schema migrations applied successfully")
-            except Exception as e:
-                logger.warning(f"Schema migration warning (may be first run): {e}")
-
-            # 3. Run all database seeds (system user, superadmin, etc.)
+            # 2. Run all database seeds (system user, superadmin, etc.)
             await run_all_seeds()
 
             # 4. Start the APScheduler for marketing automation
@@ -147,13 +131,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://organic-marketing-ai.vercel.app",
-        "https://organicai.pro",
-        "https://www.organicai.pro",
-    ],
+    allow_origins=settings.allowed_origins,
     allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],

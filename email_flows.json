@@ -1,0 +1,50 @@
+{
+  "sequences": {
+    "welcome": {
+      "trigger": "user_registered",
+      "steps": [
+        {
+          "delay_hours": 0,
+          "subject": "Welcome to OrganicAI - Your Marketing Autopilot is Ready",
+          "template": "brand_highlight",
+          "headline": "Your Marketing Autopilot is Ready",
+          "body": "Thanks for joining OrganicAI! Set up your first workspace, connect your social accounts, and let our AI start generating and publishing content for you automatically.",
+          "cta_text": "Set Up My Workspace",
+          "cta_link": "https://organic-marketing-ai.vercel.app/onboarding"
+        },
+        {
+          "delay_hours": 24,
+          "subject": "Quick tip: How to get the most from your Brand Context Engine",
+          "template": "brand_highlight",
+          "headline": "Maximize Your Brand Context",
+          "body": "Our AI analyzes your website and business description to build a Brand Context Profile. The more detail you provide during onboarding, the better your auto-generated posts will match your voice and audience.",
+          "cta_text": "Update My Brand Profile",
+          "cta_link": "https://organic-marketing-ai.vercel.app/dashboard"
+        },
+        {
+          "delay_hours": 72,
+          "subject": "Your first week with OrganicAI - Here's what happened",
+          "template": "brand_highlight",
+          "headline": "Your First Week in Review",
+          "body": "You've been on OrganicAI for a few days now. Check your dashboard to see how many posts were auto-generated, which platforms they were published to, and how your content pipeline is performing.",
+          "cta_text": "View My Dashboard",
+          "cta_link": "https://organic-marketing-ai.vercel.app/dashboard"
+        }
+      ]
+    },
+    "reengagement": {
+      "trigger": "inactive_7_days",
+      "steps": [
+        {
+          "delay_hours": 0,
+          "subject": "Your marketing autopilot is waiting for you",
+          "template": "brand_highlight",
+          "headline": "We Noticed You've Been Away",
+          "body": "Your OrganicAI workspace is still set up and ready to go. Connect your social accounts or add a new campaign to get your automated posting back on track.",
+          "cta_text": "Reactivate My Autopilot",
+          "cta_link": "https://organic-marketing-ai.vercel.app/dashboard"
+        }
+      ]
+    }
+  }
+}

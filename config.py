@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # =========================================================================
     # Database (PostgreSQL) & Redis (ARQ)
     # =========================================================================
-    database_url: str = "postgresql://postgres:password@localhost:5432/quantcai"
+    database_url: str = "postgresql://postgres:password@localhost:5432/organicai"
     redis_url: str = "redis://localhost:6379/0"
 
     # =========================================================================
@@ -92,6 +92,13 @@ class Settings(BaseSettings):
     resend_from_email: str = "Organic Marketing AI <support@organicmarketing.ai>"
 
     # =========================================================================
+    # PayPal (Subscription Payments)
+    # =========================================================================
+    paypal_client_id: str | None = None
+    paypal_client_secret: str | None = None
+    paypal_webhook_id: str | None = None
+
+    # =========================================================================
     # Stripe (Monetization & Webhooks)
     # =========================================================================
     stripe_secret_key: str | None = None
@@ -107,6 +114,20 @@ class Settings(BaseSettings):
     # Admin Seeding
     # =========================================================================
     admin_email: str = "vinayaksilswal@gmail.com"
+    superadmin_default_password: str = "ChangeMe!2024"
+
+    # =========================================================================
+    # Error Tracking
+    # =========================================================================
+    sentry_dsn: str | None = None
+
+    # =========================================================================
+    # OAuth SSO
+    # =========================================================================
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    microsoft_client_id: str | None = None
+    microsoft_client_secret: str | None = None
 
     # =========================================================================
     # Pydantic Settings Configuration
@@ -125,7 +146,7 @@ class Settings(BaseSettings):
                 raise ValueError("CRITICAL: JWT_SECRET must be securely set in production environment variables.")
             if not self.encryption_key:
                 raise ValueError("CRITICAL: ENCRYPTION_KEY must be securely set in production environment variables.")
-            if self.database_url == "postgresql://postgres:password@localhost:5432/quantcai":
+            if self.database_url == "postgresql://postgres:password@localhost:5432/organicai":
                 raise ValueError("CRITICAL: DATABASE_URL must be set to a real production database URL.")
             if self.admin_username == "admin" or self.admin_password == "admin":
                 raise ValueError("CRITICAL: ADMIN_USERNAME and ADMIN_PASSWORD must be changed in production.")
