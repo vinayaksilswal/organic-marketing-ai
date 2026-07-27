@@ -26,7 +26,7 @@ const Auth = ({ onLogin, showToast }) => {
       } else {
         showToast('Something went wrong. Please try again.', true);
       }
-    } catch {
+    } catch (err) {
       showToast('Network error. Please try again.', true);
     } finally {
       setLoading(false);

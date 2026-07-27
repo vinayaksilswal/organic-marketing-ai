@@ -35,7 +35,7 @@ export default function ResetPassword() {
       } else {
         setStatus({ type: 'error', message: data.detail || 'Reset failed' });
       }
-    } catch {
+    } catch (err) {
       setStatus({ type: 'error', message: 'Network error' });
     } finally {
       setLoading(false);
