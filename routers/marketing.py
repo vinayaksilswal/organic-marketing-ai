@@ -923,6 +923,8 @@ async def get_workspace_media(request: Request) -> Any:
                 "url": m.url,
                 "tags": m.tags,
                 "aiGenerated": m.aiGenerated,
+                "prompt": m.prompt,
+                "promptType": m.promptType,
                 "createdAt": m.createdAt.isoformat() if m.createdAt else None,
             }
             for m in media_list

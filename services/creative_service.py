@@ -291,6 +291,8 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                     url=final_media_url,
                     tags=[creative["topic"], "ai-generated", "starter"],
                     aiGenerated=True,
+                    prompt=img_prompt,
+                    promptType="image",
                 )
                 session.add(media)
 
@@ -399,6 +401,8 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                     url=final_media_url,
                     tags=[topic, "ai-generated", "automated-schedule"],
                     aiGenerated=True,
+                    prompt=img_prompt,
+                    promptType="image",
                 )
                 session.add(media)
 

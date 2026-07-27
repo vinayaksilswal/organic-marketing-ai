@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Sparkles, Check, Film, LayoutTemplate } from 'lucide-react';
+import { Sparkles, Check, Film, LayoutTemplate, Copy } from 'lucide-react';
 
 const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   // Pipeline inputs
@@ -224,7 +224,17 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.5rem' }}>
                       <label style={{ display: 'block', color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem' }}>
                         Generated AI Video Prompt
+                        <span style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.15rem' }}>
+                          Saved to this workspace's media library
+                        </span>
                       </label>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => { navigator.clipboard.writeText(veoPrompt); showToast('Prompt copied to clipboard'); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                      >
+                        <Copy size={14} /> Copy
+                      </button>
                     </div>
                     <textarea 
                       className="glass-panel"

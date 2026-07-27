@@ -17,6 +17,7 @@ import asyncio
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import select, and_
 
@@ -117,6 +118,28 @@ async def generate_video_campaign(
         goal=data.goal,
         profile=profile
     )
+
+    # Persist the generated prompt into the workspace media library so the user
+    # can find it later next to the asset it describes.
+    veo_prompt = result.get("veo_prompt")
+    if veo_prompt:
+        try:
+            async with AsyncSessionLocal() as session:
+                session.add(Media(
+                    userId=user_id,
+                    businessProfileId=profile.id,
+                    filename=f"Video prompt — {data.product_name}",
+                    mimeType="text/plain",
+                    url=data.image_url or "",
+                    tags=[data.product_name, "video-prompt", "ai-generated"],
+                    aiGenerated=True,
+                    prompt=veo_prompt,
+                    promptType="video",
+                ))
+                await session.commit()
+        except Exception:
+            logger.exception("Failed to save video prompt to media library")
+
     return result
 
 @router.post("/generate")

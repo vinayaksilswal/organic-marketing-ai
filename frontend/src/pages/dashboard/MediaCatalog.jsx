@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Upload, Trash2, Edit, Play, Eye, X } from 'lucide-react';
+import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaList, setMediaList] = useState([]);
@@ -189,10 +189,32 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem 1.5rem', maxWidth: '300px' }}>
+                        <td style={{ padding: '1rem 1.5rem', maxWidth: '340px' }}>
                           <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                             {captionPreview}
                           </p>
+                          {item.prompt && (
+                            <details style={{ marginTop: '0.5rem' }}>
+                              <summary style={{ cursor: 'pointer', fontSize: '0.72rem', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.3rem', listStyle: 'none' }}>
+                                <Sparkles size={11} />
+                                {item.promptType === 'video' ? 'Video prompt' : 'AI prompt'}
+                              </summary>
+                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                                  {item.prompt}
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(item.prompt);
+                                    showToast('Prompt copied to clipboard');
+                                  }}
+                                  style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.72rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                                >
+                                  <Copy size={11} /> Copy prompt
+                                </button>
+                              </div>
+                            </details>
+                          )}
                         </td>
                         <td style={{ padding: '1rem 1.5rem' }}>
                           <span style={{ 
