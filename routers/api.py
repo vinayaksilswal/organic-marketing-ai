@@ -400,11 +400,14 @@ async def trigger_social_post(
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
     """Manually trigger one marketing loop iteration."""
-    import asyncio
+    from services.task_utils import spawn_background
     from services.scheduler import execute_marketing_loop
 
     logger.info(f"[MANUAL TRIGGER] User {user_id} triggered marketing loop")
-    asyncio.create_task(execute_marketing_loop(user_id=user_id))
+    spawn_background(
+        execute_marketing_loop(user_id=user_id),
+        f"manual_marketing_loop(user={user_id})",
+    )
     return StandardResponse(
         success=True,
         message="Marketing loop triggered. Check recent posts for results.",

@@ -110,7 +110,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             app.state.db_ready = False
             app.state.db_error = str(e)
 
-    asyncio.create_task(bg_bootstrap())
+    # Held on app.state: asyncio keeps only a weak reference to tasks, so a
+    # bare create_task() can be garbage collected before the DB and scheduler
+    # finish initialising.
+    app.state.bootstrap_task = asyncio.create_task(bg_bootstrap())
 
     logger.info("Organic Marketing AI fast startup complete — listening on port")
     yield

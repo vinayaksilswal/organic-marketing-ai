@@ -68,6 +68,9 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     password = Column(String, nullable=False)
     subscriptionStatus = Column(String, default="INACTIVE", nullable=False)
+    # The PayPal order that paid for this subscription. Unique so a single
+    # completed order can never activate more than one account.
+    paypalOrderId = Column(String, unique=True, nullable=True)
     isSuperAdmin = Column(Boolean, default=False, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

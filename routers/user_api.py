@@ -4,8 +4,14 @@ from typing import Optional
 import asyncio
 import httpx
 from sqlalchemy import select, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from loguru import logger
+
+# Pricing for the single paid plan. The PayPal order is built client-side, so
+# the server must independently enforce what a valid payment looks like.
+PLAN_PRICE = 17.00
+PLAN_CURRENCY = "USD"
 
 from config import settings
 from database import (
@@ -260,7 +266,36 @@ async def activate_subscription(data: SubscribeRequest, request: Request, user_i
         if order.get("status") != "COMPLETED":
             raise HTTPException(status_code=402, detail="Payment not completed")
 
+        # The PayPal order is created client-side, so the amount it carries is
+        # attacker-controlled. Verify the captured total actually covers the plan.
+        captured = 0.0
+        currency = None
+        for unit in order.get("purchase_units", []):
+            for capture in (unit.get("payments", {}) or {}).get("captures", []):
+                if capture.get("status") == "COMPLETED":
+                    amount = capture.get("amount", {})
+                    captured += float(amount.get("value", 0))
+                    currency = currency or amount.get("currency_code")
+
+        if currency != PLAN_CURRENCY or captured + 0.01 < PLAN_PRICE:
+            logger.warning(
+                f"Underpaid subscription attempt by user {user_id}: "
+                f"order {data.order_id} captured {captured} {currency}, expected {PLAN_PRICE} {PLAN_CURRENCY}"
+            )
+            raise HTTPException(
+                status_code=402,
+                detail=f"Payment of {PLAN_PRICE:.2f} {PLAN_CURRENCY} is required to activate this plan.",
+            )
+
     async with AsyncSessionLocal() as session:
+        # A completed order may only ever activate one account.
+        claimed = (await session.execute(
+            select(User).where(User.paypalOrderId == data.order_id)
+        )).scalar_one_or_none()
+        if claimed and claimed.id != user_id:
+            logger.warning(f"Replayed PayPal order {data.order_id} by user {user_id}")
+            raise HTTPException(status_code=409, detail="This payment has already been used to activate an account.")
+
         stmt = select(User).where(User.id == user_id)
         res = await session.execute(stmt)
         user = res.scalar_one_or_none()
@@ -269,7 +304,14 @@ async def activate_subscription(data: SubscribeRequest, request: Request, user_i
             raise HTTPException(status_code=404, detail="User not found")
 
         user.subscriptionStatus = "ACTIVE"
-        await session.commit()
+        user.paypalOrderId = data.order_id
+        try:
+            await session.commit()
+        except IntegrityError:
+            # Lost a race against a concurrent claim of the same order
+            await session.rollback()
+            raise HTTPException(status_code=409, detail="This payment has already been used to activate an account.")
+
         logger.info(f"Subscription activated for user {user_id} via PayPal order {data.order_id}")
         return {"success": True, "message": "Subscription activated successfully"}
 

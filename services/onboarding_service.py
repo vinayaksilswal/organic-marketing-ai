@@ -17,6 +17,8 @@ from loguru import logger
 from database import AsyncSessionLocal, BusinessProfile, User
 from config import settings
 from exceptions import OrganicMarketingException
+from services.task_utils import spawn_background
+
 
 class OnboardingService:
     @staticmethod
@@ -122,10 +124,15 @@ class OnboardingService:
             await redis_pool.close()
         except Exception as e:
             logger.warning(f"ARQ queue unavailable. Falling back to inline asyncio execution: {e}")
-            import asyncio
             from services.creative_service import auto_populate_workspace
             from services.catalog_service import sync_workspace_catalog
-            
-            asyncio.create_task(auto_populate_workspace(user_id, workspace_id))
+
+            spawn_background(
+                auto_populate_workspace(user_id, workspace_id),
+                f"auto_populate_workspace({workspace_id})",
+            )
             if product_catalog_url:
-                asyncio.create_task(sync_workspace_catalog(workspace_id))
+                spawn_background(
+                    sync_workspace_catalog(workspace_id),
+                    f"sync_workspace_catalog({workspace_id})",
+                )
