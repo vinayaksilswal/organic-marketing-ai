@@ -36,6 +36,10 @@ class Settings(BaseSettings):
         "https://organicai.pro",
         "https://www.organicai.pro"
     ]
+    # Public origin of this API — used to build OAuth redirect URIs
+    backend_public_url: str = "https://organic-marketing-ai1.onrender.com"
+    # Where OAuth flows send the browser back to
+    frontend_url: str = "https://organic-marketing-ai.vercel.app"
 
     # =========================================================================
     # Database (PostgreSQL) & Redis (ARQ)
@@ -98,13 +102,6 @@ class Settings(BaseSettings):
     paypal_client_id: str | None = None
     paypal_client_secret: str | None = None
     paypal_webhook_id: str | None = None
-
-    # =========================================================================
-    # Stripe (Monetization & Webhooks)
-    # =========================================================================
-    stripe_secret_key: str | None = None
-    stripe_webhook_secret: str | None = None
-    stripe_price_id: str | None = None
 
     # =========================================================================
     # YouTube API (Optional — for auto-posting Shorts)

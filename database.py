@@ -299,6 +299,8 @@ class Media(Base):
     data = Column(LargeBinary, nullable=True)
     tags = Column(JSON, default=list, nullable=False)
     aiGenerated = Column(Boolean, default=False, nullable=False)
+    prompt = Column(Text, nullable=True)  # The AI prompt that produced this asset
+    promptType = Column(String, nullable=True)  # 'image' | 'video'
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
     businessProfile = relationship('BusinessProfile', back_populates='medias')

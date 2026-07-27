@@ -3,12 +3,16 @@ from pydantic import BaseModel
 from typing import Optional
 import asyncio
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from loguru import logger
 
 from config import settings
-from database import AsyncSessionLocal, User, BusinessProfile, SocialConnection
+from database import (
+    AsyncSessionLocal, User, BusinessProfile, SocialConnection,
+    Media, SocialPost, SocialCampaign, EmailCampaign, MarketingLog,
+    MarketingState, Product, Audience, VideoApiConfig, TeamMember,
+)
 from routers.auth import verify_user
 from services.onboarding_service import OnboardingService
 from services.crypto_service import encrypt_token, decrypt_token
@@ -287,19 +291,8 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
         res = await session.execute(stmt)
         bps = res.scalars().all()
 
-        if not bps:
-            default_profile = BusinessProfile(
-                userId=user_id,
-                name="Default Workspace",
-                websiteUrl="https://organicmarketing.ai",
-                description="Default automated growth & marketing workspace",
-                businessModel="SaaS",
-            )
-            session.add(default_profile)
-            await session.commit()
-            await session.refresh(default_profile)
-            bps = [default_profile]
-
+        # New users start with zero businesses — the UI shows an empty state
+        # prompting them to create their first one. Never auto-create.
         result = []
         for bp in bps:
             sc = bp.socialconnections[0] if bp.socialconnections else None
@@ -355,6 +348,37 @@ async def create_user_business(data: BusinessProfileUpdate, request: Request, us
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {str(e)}")
+
+
+@businesses_router.delete("/{workspace_id}")
+async def delete_business(workspace_id: str, request: Request, user_id: str = Depends(verify_user)):
+    """Delete a workspace and every record belonging to it.
+
+    Children are removed explicitly rather than relying on ORM cascade: an async
+    session.delete() would lazy-load each relationship and raise MissingGreenlet,
+    and older rows may predate the ondelete='CASCADE' constraints.
+    """
+    async with AsyncSessionLocal() as session:
+        bp = await session.get(BusinessProfile, workspace_id)
+        if not bp or bp.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        name = bp.name
+        for model in (
+            Media, SocialPost, SocialCampaign, EmailCampaign, MarketingLog,
+            MarketingState, Product, Audience, SocialConnection, VideoApiConfig,
+            TeamMember,
+        ):
+            await session.execute(
+                delete(model).where(model.businessProfileId == workspace_id)
+            )
+        await session.execute(
+            delete(BusinessProfile).where(BusinessProfile.id == workspace_id)
+        )
+        await session.commit()
+        logger.info(f"Deleted workspace {workspace_id} ({name}) for user {user_id}")
+
+        return {"success": True, "message": f"'{name}' and all its data were deleted."}
 
 
 @businesses_router.patch("/{workspace_id}")
