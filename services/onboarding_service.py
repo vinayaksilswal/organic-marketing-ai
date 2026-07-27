@@ -83,6 +83,8 @@ class OnboardingService:
                         profile.creativeGenerationIntervalHours = data["creativeGenerationIntervalHours"]
                     if "autoGenerateCreatives" in data and data["autoGenerateCreatives"] is not None:
                         profile.autoGenerateCreatives = data["autoGenerateCreatives"]
+                    if "logoUrl" in data and data["logoUrl"] is not None:
+                        profile.logoUrl = data["logoUrl"]
                     if "productCatalogUrl" in data and data["productCatalogUrl"] is not None:
                         profile.productCatalogUrl = data["productCatalogUrl"]
                     if "influencerReferenceUrl" in data and data["influencerReferenceUrl"] is not None:

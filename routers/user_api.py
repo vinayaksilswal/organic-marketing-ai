@@ -30,6 +30,7 @@ class BusinessProfileUpdate(BaseModel):
     websiteUrl: Optional[str] = None
     description: Optional[str] = None
     businessModel: Optional[str] = None
+    logoUrl: Optional[str] = None
     productCatalogUrl: Optional[str] = None
     influencerReferenceUrl: Optional[str] = None
     niche: Optional[str] = None
@@ -275,9 +276,14 @@ async def activate_subscription(data: SubscribeRequest, request: Request, user_i
 @businesses_router.get("")
 @businesses_router.get("/")
 async def get_user_businesses(request: Request, user_id: str = Depends(verify_user)):
-    """List all business profiles (workspaces) for the user."""
+    """List all business profiles (workspaces) with their social connections."""
     async with AsyncSessionLocal() as session:
-        stmt = select(BusinessProfile).where(BusinessProfile.userId == user_id).order_by(BusinessProfile.createdAt.asc())
+        stmt = (
+            select(BusinessProfile)
+            .options(selectinload(BusinessProfile.socialconnections))
+            .where(BusinessProfile.userId == user_id)
+            .order_by(BusinessProfile.createdAt.asc())
+        )
         res = await session.execute(stmt)
         bps = res.scalars().all()
 
@@ -294,21 +300,38 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
             await session.refresh(default_profile)
             bps = [default_profile]
 
-        return [
-            {
+        result = []
+        for bp in bps:
+            sc = bp.socialconnections[0] if bp.socialconnections else None
+            result.append({
                 "id": bp.id,
                 "name": bp.name or "Default Workspace",
                 "websiteUrl": bp.websiteUrl,
                 "description": bp.description,
                 "businessModel": bp.businessModel or "General",
+                "logoUrl": bp.logoUrl,
                 "productCatalogUrl": bp.productCatalogUrl,
+                "influencerReferenceUrl": bp.influencerReferenceUrl,
+                "niche": bp.niche,
                 "postIntervalHours": bp.postIntervalHours,
                 "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": bp.autoGenerateCreatives,
+                "brandAnalysisComplete": bp.brandAnalysisComplete,
+                "industry": bp.industry,
+                "targetAudience": bp.targetAudience,
+                "toneOfVoice": bp.toneOfVoice,
                 "createdAt": bp.createdAt.isoformat() if bp.createdAt else None,
-            }
-            for bp in bps
-        ]
+                "socialConnection": {
+                    "fbPageId": sc.fbPageId,
+                    "fbPageName": sc.fbPageName,
+                    "igAccountId": sc.igAccountId,
+                    "igAccountName": sc.igAccountName,
+                    "hasTwitter": bool(sc.twitterAccessToken),
+                    "hasLinkedin": bool(sc.linkedinAccessToken),
+                    "hasFacebook": bool(sc.fbAccessToken),
+                } if sc else None,
+            })
+        return result
 
 @businesses_router.post("")
 @businesses_router.post("/")
@@ -332,3 +355,37 @@ async def create_user_business(data: BusinessProfileUpdate, request: Request, us
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {str(e)}")
+
+
+@businesses_router.patch("/{workspace_id}")
+async def update_business(workspace_id: str, data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
+    """Update any fields on a workspace the user owns."""
+    async with AsyncSessionLocal() as session:
+        bp = await session.get(BusinessProfile, workspace_id)
+        if not bp or bp.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            if hasattr(bp, field):
+                setattr(bp, field, value)
+
+        await session.commit()
+        await session.refresh(bp)
+
+        return {
+            "success": True,
+            "data": {
+                "id": bp.id,
+                "name": bp.name,
+                "websiteUrl": bp.websiteUrl,
+                "description": bp.description,
+                "businessModel": bp.businessModel,
+                "logoUrl": bp.logoUrl,
+                "productCatalogUrl": bp.productCatalogUrl,
+                "influencerReferenceUrl": bp.influencerReferenceUrl,
+                "postIntervalHours": bp.postIntervalHours,
+                "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
+                "autoGenerateCreatives": bp.autoGenerateCreatives,
+            },
+        }
