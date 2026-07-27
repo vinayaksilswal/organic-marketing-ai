@@ -1042,42 +1042,177 @@ input:focus, textarea:focus, select:focus {
   letter-spacing: 0.02em;
 }
 
-/* Logo Marquee */
-.logo-marquee-container {
-  overflow: hidden;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  padding: 3rem 0;
-  background: rgba(0, 0, 0, 0.3);
+/* Integration Bar — real platform integrations */
+.integration-bar {
+  padding: 2.5rem 0;
+  background: rgba(0, 0, 0, 0.25);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.logo-marquee {
-  display: inline-flex;
-  gap: 6rem;
-  animation: logo-scroll 40s linear infinite;
+.integration-bar-label {
+  text-align: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 1.5rem 0;
+}
+
+.integration-logos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.integration-chip {
+  display: flex;
   align-items: center;
-  padding-left: 6rem;
-  opacity: 0.6;
+  gap: 0.55rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  transition: border-color 0.2s ease, transform 0.2s ease;
 }
 
-@keyframes logo-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(calc(-50% - 3rem)); }
+.integration-chip:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-2px);
 }
 
-.logo-marquee img {
-  height: 35px;
-  filter: grayscale(100%) brightness(200%); /* Make them white/grayish */
-  opacity: 0.7;
-  transition: opacity 0.3s ease;
+/* How It Works */
+.how-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
 }
 
-.logo-marquee img:hover {
-  opacity: 1;
+.how-step {
+  padding: 1.75rem;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s ease, border-color 0.25s ease;
 }
+
+.how-step:hover {
+  transform: translateY(-4px);
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+.how-step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.how-step-num {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.how-step-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  color: var(--primary-color);
+}
+
+/* Mini product visuals inside each step */
+.hiw-visual {
+  margin-top: auto;
+  padding: 0.9rem;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 104px;
+  justify-content: center;
+}
+
+.hiw-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.hiw-label { color: rgba(255, 255, 255, 0.4); }
+.hiw-value { color: #e4e4e7; font-family: ui-monospace, monospace; }
+
+.hiw-chip {
+  padding: 0.1rem 0.5rem;
+  border-radius: 5px;
+  background: rgba(139, 92, 246, 0.15);
+  color: #c084fc;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.hiw-analysing {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--primary-color);
+  padding-top: 0.4rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.07);
+}
+
+.hiw-prompt {
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: #d4d4d8;
+  font-style: italic;
+  border-left: 2px solid var(--primary-color);
+  padding-left: 0.6rem;
+}
+
+.hiw-thumbs { display: flex; gap: 0.4rem; }
+.hiw-thumbs span {
+  flex: 1;
+  height: 26px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(59, 130, 246, 0.25));
+}
+
+.hiw-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+.hiw-grid span {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(59, 130, 246, 0.22));
+}
+.hiw-grid span:nth-child(2) { background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(16, 185, 129, 0.22)); }
+.hiw-grid span:nth-child(5) { background: linear-gradient(135deg, rgba(236, 72, 153, 0.22), rgba(168, 85, 247, 0.22)); }
+
+.hiw-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: #d4d4d8;
+}
+.hiw-row-pending { color: rgba(255, 255, 255, 0.5); }
+.hiw-time { margin-left: auto; color: rgba(255, 255, 255, 0.3); font-size: 0.68rem; }
 
 /* PAS Section */
 .pas-card {

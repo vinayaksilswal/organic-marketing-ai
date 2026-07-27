@@ -4,7 +4,8 @@ import {
   CheckCircle2, TrendingUp, Sparkles, Zap, PlayCircle, Users, 
   ShieldCheck, ChevronDown, ArrowRight, Star,
   BarChart3, Link, Target, Clock, Bot, Eye, DollarSign,
-  Layers, Cpu, Globe, Lock, RefreshCw, Frown, AlertCircle, ThumbsUp, XCircle, LayoutDashboard
+  Layers, Cpu, Globe, Lock, RefreshCw, Frown, AlertCircle, ThumbsUp, XCircle, LayoutDashboard,
+  Instagram, Facebook, Linkedin, Twitter, Film, Image as ImageIcon, Send, CheckCheck, Building2
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -246,22 +247,103 @@ const Landing = () => {
         </div>
       </header>
 
-      {/* Trust Logo Marquee */}
-      <div className="logo-marquee-container">
-        <div className="logo-marquee">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg" alt="Microsoft" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix" />
-          {/* Duplicates for infinite scroll */}
-          <img src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg" alt="Amazon" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/5/51/IBM_logo.svg" alt="IBM" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/9/96/Microsoft_logo_%282012%29.svg" alt="Microsoft" />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix" />
+      {/* Real integrations — the platforms we actually publish to */}
+      <div className="integration-bar">
+        <div className="container">
+          <p className="integration-bar-label">Publishes directly to the platforms you already use</p>
+          <div className="integration-logos">
+            {[
+              { name: 'Instagram', icon: <Instagram size={22} />, color: '#e1306c' },
+              { name: 'Facebook', icon: <Facebook size={22} />, color: '#1877f2' },
+              { name: 'LinkedIn', icon: <Linkedin size={22} />, color: '#0a66c2' },
+              { name: 'X (Twitter)', icon: <Twitter size={22} />, color: '#e5e7eb' },
+            ].map(p => (
+              <div key={p.name} className="integration-chip">
+                <span style={{ color: p.color, display: 'flex' }}>{p.icon}</span>
+                <span>{p.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* How It Works — the real product flow */}
+      <section style={{ padding: '6rem 0' }}>
+        <div className="container">
+          <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.85rem', margin: 0 }}>How it works</h4>
+            <h2 style={{ fontSize: '2.5rem', margin: '0.75rem auto 1rem', maxWidth: '720px' }}>Add your business once. It markets itself from then on.</h2>
+            <p style={{ color: '#a1a1aa', maxWidth: '580px', margin: '0 auto', fontSize: '1.05rem' }}>
+              Four steps. No calendars to fill, no briefs to write, no designer to brief.
+            </p>
+          </div>
+
+          <div className="how-steps">
+            {[
+              {
+                n: '01', icon: <Building2 size={20} />, title: 'Add your business',
+                body: 'Drop in your website and a short description. The AI reads your site and builds a brand profile — tone, audience, content pillars, colours.',
+                visual: (
+                  <div className="hiw-visual">
+                    <div className="hiw-field"><span className="hiw-label">Website</span><span className="hiw-value">yourbrand.com</span></div>
+                    <div className="hiw-field"><span className="hiw-label">Model</span><span className="hiw-chip">E-commerce</span></div>
+                    <div className="hiw-analysing"><Bot size={13} /> Analysing brand voice…</div>
+                  </div>
+                )
+              },
+              {
+                n: '02', icon: <Film size={20} />, title: 'AI writes the prompt & creative',
+                body: 'It generates a full cinematic video prompt and on-brand visuals — and shows you the exact prompt it used, so nothing is a black box.',
+                visual: (
+                  <div className="hiw-visual">
+                    <div className="hiw-prompt">“Slow orbital dolly on the product, warm golden-hour rim light, matte ceramic finish…”</div>
+                    <div className="hiw-thumbs">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                )
+              },
+              {
+                n: '03', icon: <ImageIcon size={20} />, title: 'Lands in your media library',
+                body: 'Every generated asset and its prompt is saved to that business’s own catalog. Reuse it, edit it, or let the scheduler pick it up.',
+                visual: (
+                  <div className="hiw-visual">
+                    <div className="hiw-grid"><span /><span /><span /><span /><span /><span /></div>
+                  </div>
+                )
+              },
+              {
+                n: '04', icon: <Send size={20} />, title: 'Review, then it publishes',
+                body: 'Posts queue up in a review log. Approve them yourself, or switch on auto-approve and it publishes on your schedule — every 2 hours by default.',
+                visual: (
+                  <div className="hiw-visual">
+                    <div className="hiw-row"><CheckCheck size={13} color="#10b981" /> Posted to Instagram <span className="hiw-time">2h ago</span></div>
+                    <div className="hiw-row"><CheckCheck size={13} color="#10b981" /> Posted to LinkedIn <span className="hiw-time">4h ago</span></div>
+                    <div className="hiw-row hiw-row-pending"><Clock size={13} color="#f59e0b" /> Queued — Facebook <span className="hiw-time">in 1h</span></div>
+                  </div>
+                )
+              },
+            ].map(s => (
+              <div key={s.n} className="how-step glass-card">
+                <div className="how-step-head">
+                  <span className="how-step-num">{s.n}</span>
+                  <span className="how-step-icon">{s.icon}</span>
+                </div>
+                <h3 style={{ fontSize: '1.15rem', margin: '0 0 0.5rem' }}>{s.title}</h3>
+                <p style={{ fontSize: '0.92rem', color: '#a1a1aa', lineHeight: 1.6, margin: '0 0 1.25rem' }}>{s.body}</p>
+                {s.visual}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '3rem' }}>
+            <button className="btn btn-primary" onClick={() => navigate('/auth')} style={{ fontSize: '1.05rem', padding: '0.9rem 2rem' }}>
+              Start for $17/mo <ArrowRight size={17} style={{ marginLeft: '0.5rem' }} />
+            </button>
+            <p style={{ fontSize: '0.85rem', color: '#71717a', marginTop: '0.85rem' }}>Cancel anytime · No contract · Secure PayPal checkout</p>
+          </div>
+        </div>
+      </section>
 
       {/* Problem - Agitation - Solution (PAS) */}
       <section style={{ padding: '6rem 0', background: 'rgba(255,255,255,0.01)' }}>
@@ -332,9 +414,14 @@ const Landing = () => {
               <span className="ticker-label">Platforms Supported</span>
             </div>
             <div className="ticker-item">
+              <span className="ticker-value">&lt;2 min</span>
+              <span className="ticker-label">Setup Time</span>
+            </div>
           </div>
         </div>
-          {/* How It Works / Demo */}
+      </section>
+
+      {/* How It Works / Demo */}
       <section style={{ padding: '6rem 0' }}>
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
@@ -389,7 +476,6 @@ const Landing = () => {
             )}
           </div>
         </div>
-      </section> </div>
       </section>
 
       {/* What Makes This Different — Genuine Value Props */}
