@@ -1,119 +1,218 @@
-import React, { useState } from 'react';
-import { Users, Shield, UserPlus, MoreVertical, Check, Mail } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE, authFetch } from '../../config';
+import { Users, Shield, UserPlus, Trash2, Check, Clock, Mail } from 'lucide-react';
 
-export default function TeamManagement() {
-  const [teamMembers, setTeamMembers] = useState([
-    { id: 1, name: 'Alex Director', email: 'alex@organicai.com', role: 'Owner', status: 'Active' },
-    { id: 2, name: 'Sarah Marketing', email: 'sarah@organicai.com', role: 'Editor', status: 'Active' },
-    { id: 3, name: 'John Intern', email: 'john@organicai.com', role: 'Viewer', status: 'Pending' }
-  ]);
+const ROLES = [
+  { value: 'viewer', label: 'Viewer', hint: 'Read-only access' },
+  { value: 'editor', label: 'Editor', hint: 'Create and edit content' },
+  { value: 'admin', label: 'Admin', hint: 'Full access except billing' },
+];
+
+export default function TeamManagement({ token, showToast, activeWorkspaceId }) {
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('editor');
+  const [inviting, setInviting] = useState(false);
 
-  const handleInvite = (e) => {
+  const inputStyle = {
+    width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px',
+    background: 'rgba(255,255,255,0.04)', color: '#fff',
+    border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.9rem', outline: 'none',
+  };
+
+  const loadMembers = useCallback(async () => {
+    if (!activeWorkspaceId) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      const res = await authFetch(`${API_BASE}/team`, {
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      }, token);
+      if (!res.ok) throw new Error('Could not load team members');
+      setMembers(await res.json());
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeWorkspaceId, token, showToast]);
+
+  useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  const handleInvite = async (e) => {
     e.preventDefault();
-    if (!inviteEmail) return;
-    setTeamMembers([...teamMembers, { id: Date.now(), name: 'Pending User', email: inviteEmail, role: 'Viewer', status: 'Pending' }]);
-    setInviteEmail('');
-    alert(`Invitation sent to ${inviteEmail}`);
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      const res = await authFetch(`${API_BASE}/team`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Failed to send invite');
+      showToast(`Invited ${inviteEmail.trim()}`);
+      setInviteEmail('');
+      loadMembers();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRoleChange = async (memberId, role) => {
+    try {
+      const res = await authFetch(`${API_BASE}/team/${memberId}`, {
+        method: 'PATCH',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({ role }),
+      }, token);
+      if (!res.ok) throw new Error('Failed to update role');
+      setMembers(ms => ms.map(m => (m.id === memberId ? { ...m, role } : m)));
+      showToast('Role updated');
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
+
+  const handleRemove = async (member) => {
+    try {
+      const res = await authFetch(`${API_BASE}/team/${member.id}`, {
+        method: 'DELETE',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      }, token);
+      if (!res.ok) throw new Error('Failed to remove member');
+      setMembers(ms => ms.filter(m => m.id !== member.id));
+      showToast(`Removed ${member.email}`);
+    } catch (err) {
+      showToast(err.message, true);
+    }
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="mb-8 flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-            <Users size={24} className="text-purple-500" />
-            Team Management
+    <div className="view">
+      <div className="container" style={{ padding: '3rem 0', maxWidth: 900 }}>
+        <div style={{ marginBottom: '2.5rem' }}>
+          <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <Users size={28} color="var(--primary-color)" /> Team &amp; Roles
           </h1>
-          <p className="text-gray-400">Manage your workspace members and access roles.</p>
+          <p className="text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.95rem' }}>
+            Invite people to collaborate on this workspace and control what they can do.
+          </p>
         </div>
-      </div>
 
-      {/* Invite Section */}
-      <div className="bg-[#1e1e1e] border border-white/10 rounded-lg p-6 mb-8 shadow-lg">
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <UserPlus size={18} /> Invite new members
-        </h2>
-        <form onSubmit={handleInvite} className="flex gap-4 flex-wrap">
-          <div className="flex-1 min-w-[250px] relative">
-            <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-            <input 
-              type="email" 
-              placeholder="colleague@company.com" 
-              className="w-full bg-[#2a2a2a] border border-white/10 rounded p-2.5 pl-10 text-white focus:outline-none focus:border-purple-500 transition-colors"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              required
-            />
+        {!activeWorkspaceId ? (
+          <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)' }}>
+              Select a business from the sidebar to manage its team.
+            </p>
           </div>
-          <select className="bg-[#2a2a2a] border border-white/10 rounded p-2.5 text-white focus:outline-none focus:border-purple-500 min-w-[150px]">
-            <option value="Viewer">Viewer</option>
-            <option value="Editor">Editor</option>
-            <option value="Admin">Admin</option>
-          </select>
-          <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-medium rounded px-6 py-2.5 transition-colors">
-            Send Invite
-          </button>
-        </form>
-      </div>
+        ) : (
+          <>
+            {/* Invite */}
+            <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: '0 0 1.15rem 0', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <UserPlus size={17} color="var(--primary-color)" /> Invite a teammate
+              </h2>
+              <form onSubmit={handleInvite} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ flex: '1 1 260px', position: 'relative' }}>
+                  <Mail size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.35)' }} />
+                  <input
+                    type="email" required placeholder="colleague@company.com"
+                    value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                    style={{ ...inputStyle, paddingLeft: '2.35rem' }}
+                  />
+                </div>
+                <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+                  style={{ ...inputStyle, width: 'auto', minWidth: 150, appearance: 'auto' }}>
+                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+                <button type="submit" className="btn btn-primary" disabled={inviting}
+                  style={{ padding: '0.7rem 1.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {inviting ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <UserPlus size={15} />}
+                  {inviting ? 'Sending…' : 'Send Invite'}
+                </button>
+              </form>
+              <p style={{ margin: '0.85rem 0 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)' }}>
+                {ROLES.find(r => r.value === inviteRole)?.hint}
+              </p>
+            </div>
 
-      {/* Team List */}
-      <div className="bg-[#1e1e1e] border border-white/10 rounded-lg shadow-lg overflow-hidden">
-        <div className="p-4 border-b border-white/10 flex items-center gap-2">
-          <Shield size={18} className="text-blue-400" />
-          <h2 className="text-lg font-semibold text-white">Workspace Members ({teamMembers.length})</h2>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#2a2a2a]/50 text-xs uppercase tracking-wider text-gray-400">
-                <th className="p-4 font-medium">User</th>
-                <th className="p-4 font-medium">Role</th>
-                <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {teamMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-inner">
-                        {member.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-medium text-white">{member.name}</div>
-                        <div className="text-sm text-gray-400">{member.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="inline-block px-2 py-1 bg-[#2a2a2a] border border-white/10 rounded text-xs font-medium text-gray-300">
-                      {member.role}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    {member.status === 'Active' ? (
-                      <span className="inline-flex items-center gap-1 text-green-400 text-sm">
-                        <Check size={14} /> Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-yellow-400 text-sm">
-                        Pending
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right">
-                    <button className="p-2 text-gray-500 hover:text-white transition-colors rounded hover:bg-white/10">
-                      <MoreVertical size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            {/* Members */}
+            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Shield size={16} color="#60a5fa" />
+                <h2 style={{ margin: 0, fontSize: '1rem' }}>Workspace members ({members.length})</h2>
+              </div>
+
+              {loading ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
+                  <span className="spinner" style={{ width: 20, height: 20 }} />
+                </div>
+              ) : members.length === 0 ? (
+                <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
+                    No teammates yet. Invite someone above to collaborate on this workspace.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                        {['Member', 'Role', 'Status', ''].map((h, i) => (
+                          <th key={i} style={{ padding: '0.75rem 1.5rem', textAlign: i === 3 ? 'right' : 'left', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {members.map(m => (
+                        <tr key={m.id} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                          <td style={{ padding: '0.9rem 1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
+                                {m.email.charAt(0).toUpperCase()}
+                              </div>
+                              <span style={{ fontSize: '0.88rem' }}>{m.email}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '0.9rem 1.5rem' }}>
+                            <select value={m.role} onChange={e => handleRoleChange(m.id, e.target.value)}
+                              style={{ ...inputStyle, width: 'auto', padding: '0.35rem 0.55rem', fontSize: '0.82rem', appearance: 'auto' }}>
+                              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                            </select>
+                          </td>
+                          <td style={{ padding: '0.9rem 1.5rem' }}>
+                            {m.status === 'active' ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', color: '#10b981' }}>
+                                <Check size={13} /> Active
+                              </span>
+                            ) : (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', color: '#f59e0b' }}>
+                                <Clock size={13} /> Pending
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.9rem 1.5rem', textAlign: 'right' }}>
+                            <button onClick={() => handleRemove(m)} title={`Remove ${m.email}`}
+                              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: '0.35rem', borderRadius: 6, display: 'inline-flex' }}
+                              onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; }}
+                              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}>
+                              <Trash2 size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

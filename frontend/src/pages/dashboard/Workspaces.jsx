@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
 import {
   Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2,
-  Settings, X, Image, Link2, Facebook, Instagram, Linkedin, Twitter,
-  Save, Edit3, ChevronRight, Zap, Clock, Bot
+  Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter,
+  Save, Edit3, Zap, Clock, Bot, Trash2, AlertTriangle, Unplug
 } from 'lucide-react';
 
 const Workspaces = ({ user, token, showToast, updateAuth }) => {
@@ -32,8 +32,66 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
     linkedinAccessToken: '', twitterAccessToken: '', twitterAccessSecret: ''
   });
 
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const [connectingMeta, setConnectingMeta] = useState(false);
+
   const { activeWorkspaceId, setActiveWorkspace, refreshWorkspaces, workspaces } = useWorkspace();
   const businessList = workspaces && workspaces.length > 0 ? workspaces : (user?.businessProfiles || []);
+
+  // Surface the result of the Meta OAuth round-trip, then clean the URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const meta = params.get('meta');
+    if (!meta) return;
+    const message = params.get('message');
+    if (meta === 'connected') {
+      showToast(`Connected ${message || 'your Meta account'}. Automation will publish here.`);
+      refreshWorkspaces();
+    } else {
+      showToast(message || 'Could not connect your Meta account.', true);
+    }
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
+  const handleConnectMeta = async (workspaceId) => {
+    setConnectingMeta(true);
+    try {
+      const res = await authFetch(`${API_BASE}/meta/connect?workspace_id=${encodeURIComponent(workspaceId)}`, {}, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authUrl) {
+        throw new Error(data.detail || data.message || 'Meta connection is unavailable right now.');
+      }
+      window.location.href = data.authUrl;
+    } catch (err) {
+      showToast(err.message, true);
+      setConnectingMeta(false);
+    }
+  };
+
+  const handleDeleteBusiness = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await authFetch(`${API_BASE}/businesses/${deleteTarget.id}`, { method: 'DELETE' }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Failed to delete business');
+
+      showToast(data.message || `'${deleteTarget.name}' deleted.`);
+      if (activeWorkspaceId === deleteTarget.id) setActiveWorkspace(null);
+      setDeleteTarget(null);
+      setDeleteConfirmText('');
+      setEditModalOpen(false);
+      refreshWorkspaces();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleProfileSubmit = async () => {
     if (!businessModel) return showToast('Please select a business model', true);
@@ -149,7 +207,21 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
           )}
         </div>
 
-        {!isCreating ? (
+        {!isCreating && businessList.length === 0 ? (
+          <div className="glass-panel" style={{ padding: '4rem 2rem', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>
+            <div style={{ width: 64, height: 64, borderRadius: 18, margin: '0 auto 1.5rem', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Building2 size={28} color="var(--primary-color)" />
+            </div>
+            <h2 style={{ margin: '0 0 0.6rem 0', fontSize: '1.35rem' }}>Add your first business</h2>
+            <p style={{ margin: '0 0 1.75rem 0', fontSize: '0.92rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+              Tell us your website and what you sell. The AI reads your site, learns your brand voice,
+              and starts generating creatives and posts automatically.
+            </p>
+            <button className="btn btn-primary" onClick={() => setIsCreating(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem' }}>
+              <Plus size={18} /> Add Business
+            </button>
+          </div>
+        ) : !isCreating ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
             {businessList.map(bp => {
               const isActive = activeWorkspaceId === bp.id;
@@ -205,7 +277,15 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     {sc?.igAccountId && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(236,72,153,0.12)', color: '#f472b6' }}><Instagram size={12} /> {sc.igAccountName || 'Connected'}</span>}
                     {sc?.hasLinkedin && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(59,130,246,0.12)', color: '#93c5fd' }}><Linkedin size={12} /></span>}
                     {sc?.hasTwitter && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: '#e5e7eb' }}><Twitter size={12} /></span>}
-                    {!sc && <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>No social accounts linked</span>}
+                    {!sc?.hasFacebook && (
+                      <button
+                        onClick={() => handleConnectMeta(bp.id)}
+                        disabled={connectingMeta}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: '6px', background: 'rgba(24,119,242,0.15)', border: '1px solid rgba(24,119,242,0.35)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        <Facebook size={12} /> Connect
+                      </button>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
@@ -391,6 +471,23 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         {saving ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <Save size={15} />} Save Profile
                       </button>
                     </div>
+
+                    {/* Danger zone */}
+                    <div style={{ marginTop: '1.5rem', padding: '1.15rem', borderRadius: '10px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.9rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <AlertTriangle size={15} /> Danger zone
+                      </h4>
+                      <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                        Deleting this business permanently removes its media library, generated creatives,
+                        scheduled posts, campaigns, products, and social connections. This cannot be undone.
+                      </p>
+                      <button
+                        onClick={() => { setDeleteTarget(currentBp); setDeleteConfirmText(''); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem', borderRadius: '8px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        <Trash2 size={14} /> Delete this business
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -401,33 +498,68 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       Connect social accounts for this workspace. The AI will auto-post creatives to these accounts.
                     </p>
 
-                    {/* Facebook / Instagram */}
+                    {/* Facebook / Instagram — one-click OAuth */}
                     <div style={{ padding: '1.25rem', background: 'rgba(59,130,246,0.05)', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.15)' }}>
-                      <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Facebook size={16} color="#60a5fa" /> Meta (Facebook & Instagram)
+                      <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Facebook size={16} color="#60a5fa" /> Meta — Facebook &amp; Instagram
                       </h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div>
-                          <label style={labelStyle}>Page Access Token</label>
-                          <input style={inputStyle} type="password" placeholder={currentBp?.socialConnection?.hasFacebook ? '••••••• (connected)' : 'Paste token...'} value={socialData.fbAccessToken} onChange={e => setSocialData({...socialData, fbAccessToken: e.target.value})} />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Facebook Page ID</label>
-                          <input style={inputStyle} placeholder="e.g. 123456789" value={socialData.fbPageId} onChange={e => setSocialData({...socialData, fbPageId: e.target.value})} />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Page Name</label>
-                          <input style={inputStyle} placeholder="Your Brand Page" value={socialData.fbPageName} onChange={e => setSocialData({...socialData, fbPageName: e.target.value})} />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Instagram Account ID</label>
-                          <input style={inputStyle} placeholder="IG Business Account ID" value={socialData.igAccountId} onChange={e => setSocialData({...socialData, igAccountId: e.target.value})} />
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '0.75rem' }}>
-                        <label style={labelStyle}>Instagram Account Name</label>
-                        <input style={inputStyle} placeholder="@yourbrand" value={socialData.igAccountName} onChange={e => setSocialData({...socialData, igAccountName: e.target.value})} />
-                      </div>
+
+                      {currentBp?.socialConnection?.hasFacebook ? (
+                        <>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0.85rem 0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                              <CheckCircle2 size={14} color="#10b981" />
+                              <Facebook size={13} color="#60a5fa" />
+                              <span>{currentBp.socialConnection.fbPageName || 'Facebook Page'}</span>
+                            </div>
+                            {currentBp.socialConnection.igAccountId && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                                <CheckCircle2 size={14} color="#10b981" />
+                                <Instagram size={13} color="#f472b6" />
+                                <span>@{currentBp.socialConnection.igAccountName || 'instagram'}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className="btn btn-secondary" style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+                              onClick={() => handleConnectMeta(editWorkspaceId)} disabled={connectingMeta}>
+                              Reconnect
+                            </button>
+                            <button className="btn btn-secondary" style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#f87171' }}
+                              onClick={async () => {
+                                try {
+                                  const res = await authFetch(`${API_BASE}/meta/disconnect?workspace_id=${encodeURIComponent(editWorkspaceId)}`, { method: 'DELETE' }, token);
+                                  if (!res.ok) throw new Error('Failed to disconnect');
+                                  showToast('Meta account disconnected.');
+                                  refreshWorkspaces();
+                                } catch (err) { showToast(err.message, true); }
+                              }}>
+                              <Unplug size={13} /> Disconnect
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                            Sign in with Facebook and we'll automatically find your Page and its linked
+                            Instagram Business account. No tokens to copy.
+                          </p>
+                          <button
+                            onClick={() => handleConnectMeta(editWorkspaceId)}
+                            disabled={connectingMeta}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '0.55rem', width: '100%',
+                              justifyContent: 'center', padding: '0.7rem', borderRadius: '8px',
+                              background: '#1877f2', color: '#fff', border: 'none', fontSize: '0.9rem',
+                              fontWeight: 600, cursor: connectingMeta ? 'wait' : 'pointer',
+                              opacity: connectingMeta ? 0.7 : 1,
+                            }}
+                          >
+                            <Facebook size={17} />
+                            {connectingMeta ? 'Redirecting to Facebook…' : 'Connect Facebook & Instagram'}
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     {/* LinkedIn */}
@@ -511,6 +643,52 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DELETE CONFIRMATION */}
+        {deleteTarget && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}
+            onClick={e => { if (e.target === e.currentTarget && !deleting) setDeleteTarget(null); }}>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: 460, padding: '1.75rem' }}>
+              <h3 style={{ margin: '0 0 0.6rem 0', fontSize: '1.1rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={18} /> Delete “{deleteTarget.name}”?
+              </h3>
+              <p style={{ margin: '0 0 1.1rem 0', fontSize: '0.87rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+                This permanently deletes the business and everything belonging to it — media library,
+                generated creatives, scheduled and published posts, campaigns, products, and connected
+                social accounts. This cannot be undone.
+              </p>
+
+              <label style={{ ...labelStyle, marginBottom: '0.4rem' }}>
+                Type <strong style={{ color: '#f87171' }}>{deleteTarget.name}</strong> to confirm
+              </label>
+              <input
+                style={{ ...inputStyle, borderColor: 'rgba(239,68,68,0.3)' }}
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder={deleteTarget.name}
+                autoFocus
+              />
+
+              <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '1.35rem' }}>
+                <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button>
+                <button
+                  onClick={handleDeleteBusiness}
+                  disabled={deleting || deleteConfirmText !== deleteTarget.name}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.1rem',
+                    borderRadius: '8px', border: 'none', fontSize: '0.88rem', fontWeight: 600,
+                    background: deleteConfirmText === deleteTarget.name ? '#dc2626' : 'rgba(239,68,68,0.2)',
+                    color: deleteConfirmText === deleteTarget.name ? '#fff' : 'rgba(255,255,255,0.35)',
+                    cursor: deleteConfirmText === deleteTarget.name && !deleting ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {deleting ? <span className="spinner" style={{ width: 13, height: 13 }} /> : <Trash2 size={14} />}
+                  {deleting ? 'Deleting…' : 'Delete permanently'}
+                </button>
               </div>
             </div>
           </div>

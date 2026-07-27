@@ -35,7 +35,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
           <Route path="/social-scheduler" element={<SocialScheduler user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/email-suite" element={<EmailSuite user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/workspaces" element={<Workspaces user={user} token={token} showToast={showToast} updateAuth={updateAuth} />} />
-          <Route path="/team" element={<TeamManagement />} />
+          <Route path="/team" element={<TeamManagement user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
         </Routes>
       </div>
       <HelpWidget />
