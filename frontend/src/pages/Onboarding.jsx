@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Building2, Globe, Target, CreditCard, CheckCircle2, ArrowRight, Loader2, Bot, Cpu, ImageIcon } from 'lucide-react';
-import { API_BASE, authFetch } from '../App';
+import { API_BASE, authFetch } from '../config';
 
 const Onboarding = ({ user, token, showToast, updateAuth }) => {
   const [step, setStep] = useState(1);

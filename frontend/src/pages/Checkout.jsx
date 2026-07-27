@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import { Sparkles, CheckCircle2, ShieldCheck, LogOut, Building2 } from 'lucide-react';
-import { API_BASE } from '../App';
+import { API_BASE } from '../config';
 
 export default function Checkout({ user, onLogout }) {
   const navigate = useNavigate();

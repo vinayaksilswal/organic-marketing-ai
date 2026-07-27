@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../../App';
+import { API_BASE, authFetch } from '../../config';
 import { Sparkles, Check, Film, LayoutTemplate } from 'lucide-react';
 
 const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {

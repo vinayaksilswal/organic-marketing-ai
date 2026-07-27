@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../../App';
+import { API_BASE, authFetch } from '../../config';
 import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3 } from 'lucide-react';
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {

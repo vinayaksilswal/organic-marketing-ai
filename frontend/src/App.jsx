@@ -11,37 +11,7 @@ import Toast from './components/Toast';
 import { WorkspaceProvider } from './components/WorkspaceContext';
 import CookieBanner from './components/CookieBanner';
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai1.onrender.com/api/v1';
-
-/**
- * Helper: make authenticated API requests with automatic 401 handling.
- * Redirects to login on expired/invalid tokens instead of showing cryptic errors.
- */
-export const authFetch = async (url, options = {}, token, onLogout) => {
-  const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {}),
-    ...(options.headers || {}),
-  };
-
-  try {
-    const res = await fetch(url, { ...options, headers });
-
-    if (res.status === 401) {
-      // Token expired or invalid — auto-logout
-      if (onLogout) onLogout();
-      throw new Error('Session expired. Please log in again.');
-    }
-
-    return res;
-  } catch (err) {
-    // Network errors
-    if (err.message === 'Session expired. Please log in again.') throw err;
-    throw new Error('Network error. Please check your connection.');
-  }
-};
+export { API_BASE, authFetch } from './config';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);

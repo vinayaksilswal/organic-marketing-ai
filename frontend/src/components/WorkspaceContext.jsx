@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../App';
+import { API_BASE, authFetch } from '../config';
 
 const WorkspaceContext = createContext();
 

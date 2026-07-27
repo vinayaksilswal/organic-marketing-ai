@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../../App';
+import { API_BASE, authFetch } from '../../config';
 import { Upload, Trash2, Edit, Play, Eye, X } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {

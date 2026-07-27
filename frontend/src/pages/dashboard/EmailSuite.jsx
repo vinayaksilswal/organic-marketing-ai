@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../../App';
+import { API_BASE, authFetch } from '../../config';
 import { Mail, Users, Tag, Plus, Send, Eye, Search, X, CheckCircle2, TrendingUp, MousePointer, AlertOctagon, Sparkles } from 'lucide-react';
 
 const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
-import { API_BASE } from '../App';
+import { API_BASE } from '../config';
 
 const Auth = ({ onLogin, showToast }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);

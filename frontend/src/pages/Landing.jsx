@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
-import { API_BASE } from '../App';
+import { API_BASE } from '../config';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
 const premiumStyles = `

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { API_BASE, authFetch } from '../../App';
+import { API_BASE, authFetch } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
 import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, ShieldCheck, Key, Settings } from 'lucide-react';
 
