@@ -38,6 +38,7 @@ from services.ai_service import generate_campaign_variation
 from services.social_service import post_to_facebook, post_to_instagram
 from services.twitter_service import twitter_service
 from services.linkedin_service import linkedin_service
+from services.crypto_service import decrypt_token
 
 
 def utc_now() -> datetime:
@@ -384,12 +385,36 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
 
             # LinkedIn
             try:
-                # Assuming linkedin_service uses post_text
                 await linkedin_service.post_text(workspace_id, final_caption)
                 logger.info("✓ Posted to LinkedIn")
             except Exception as e:
                 errors.append(f"LinkedIn: {str(e)}")
                 logger.error(f"LinkedIn post failed: {e}")
+
+            # TikTok (video content only)
+            if media_urls and any(u.endswith(('.mp4', '.mov', '.webm')) for u in media_urls):
+                try:
+                    from database import SocialConnection
+                    conn_stmt = select(SocialConnection).where(
+                        SocialConnection.businessProfileId == workspace_id
+                    )
+                    conn = (await session.execute(conn_stmt)).scalars().first()
+                    if conn and getattr(conn, "tiktokAccessToken", None):
+                        from services.tiktok_service import post_to_tiktok
+                        import httpx
+                        tiktok_token = decrypt_token(conn.tiktokAccessToken) or conn.tiktokAccessToken
+                        video_url = next(u for u in media_urls if u.endswith(('.mp4', '.mov', '.webm')))
+                        async with httpx.AsyncClient(timeout=30) as http_client:
+                            video_resp = await http_client.get(video_url)
+                            if video_resp.status_code == 200:
+                                result = await post_to_tiktok(tiktok_token, final_caption, video_resp.content)
+                                if result.get("success"):
+                                    logger.info("✓ Posted to TikTok")
+                                else:
+                                    errors.append(f"TikTok: {result.get('error', 'Unknown error')}")
+                except Exception as e:
+                    errors.append(f"TikTok: {str(e)}")
+                    logger.error(f"TikTok post failed: {e}")
 
             # 5. Record the SocialPost (using correct field names!)
             is_success = fb_post_id is not None or ig_post_id is not None

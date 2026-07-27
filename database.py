@@ -319,6 +319,23 @@ class MarketingLog(Base):
     businessProfile = relationship('BusinessProfile', back_populates='marketinglogs')
 
 
+class TeamMember(Base):
+    __tablename__ = "TeamMember"
+    __table_args__ = (UniqueConstraint("businessProfileId", "email", name="uniq_workspace_team_email"),)
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    businessProfileId = Column(String, ForeignKey("BusinessProfile.id", ondelete="CASCADE"), nullable=False)
+    userId = Column(String, ForeignKey("User.id", ondelete="SET NULL"), nullable=True)
+    email = Column(String, nullable=False)
+    role = Column(String, default="editor", nullable=False)
+    status = Column(String, default="pending", nullable=False)
+    invitedAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    acceptedAt = Column(DateTime(timezone=True), nullable=True)
+
+    businessProfile = relationship("BusinessProfile")
+    user = relationship("User")
+
+
 # =============================================================================
 # Database Connection Manager
 # =============================================================================

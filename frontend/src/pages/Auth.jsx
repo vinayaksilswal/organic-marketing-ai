@@ -5,10 +5,33 @@ import { API_BASE } from '../App';
 
 const Auth = ({ onLogin, showToast }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
+  const [forgotMode, setForgotMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        showToast('If that email exists, a reset link has been sent.', false);
+        setForgotMode(false);
+      } else {
+        showToast('Something went wrong. Please try again.', true);
+      }
+    } catch {
+      showToast('Network error. Please try again.', true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -112,11 +135,27 @@ const Auth = ({ onLogin, showToast }) => {
           </div>
         </div>
 
-        <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{isLoginMode ? 'Welcome back' : 'Create an account'}</h2>
+        <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>{forgotMode ? 'Reset password' : isLoginMode ? 'Welcome back' : 'Create an account'}</h2>
         <p style={{ textAlign: 'center', marginBottom: '2.5rem', fontSize: '1.125rem' }}>
-          {isLoginMode ? 'Enter your details to access your dashboard.' : 'Start automating your organic marketing today.'}
+          {forgotMode ? 'Enter your email and we\'ll send you a reset link.' : isLoginMode ? 'Enter your details to access your dashboard.' : 'Start automating your organic marketing today.'}
         </p>
-        
+
+        {forgotMode ? (
+          <form onSubmit={handleForgotPassword}>
+            <div className="input-group">
+              <label>Email Address</label>
+              <input type="email" required placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', marginTop: '1rem', fontSize: '1.125rem' }} disabled={loading}>
+              <span>{loading ? 'Sending...' : 'Send Reset Link'}</span>
+            </button>
+            <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+              <a href="#" onClick={(e) => { e.preventDefault(); setForgotMode(false); }} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontSize: '0.95rem' }}>
+                Back to Sign In
+              </a>
+            </div>
+          </form>
+        ) : (
         <form onSubmit={handleSubmit}>
           <div className="input-group">
             <label>Email Address</label>
@@ -138,11 +177,19 @@ const Auth = ({ onLogin, showToast }) => {
               onChange={e => setPassword(e.target.value)}
             />
           </div>
+          {isLoginMode && (
+            <div style={{ textAlign: 'right', marginTop: '0.25rem' }}>
+              <a href="/reset-password-request" onClick={(e) => { e.preventDefault(); setForgotMode(true); }} style={{ fontSize: '0.85rem', color: 'var(--secondary-color, #7c3aed)', textDecoration: 'none' }}>
+                Forgot password?
+              </a>
+            </div>
+          )}
           <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1rem', marginTop: '1rem', fontSize: '1.125rem' }} disabled={loading}>
             <span>{isLoginMode ? 'Sign In' : 'Sign Up'}</span>
             {!loading ? <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} /> : <span className="spinner"></span>}
           </button>
         </form>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', margin: '2rem 0' }}>
           <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-color)' }}></div>

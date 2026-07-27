@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     # =========================================================================
     resend_api_key: str | None = None
     resend_from_email: str = "Organic Marketing AI <support@organicmarketing.ai>"
+    resend_from_domain: str = "organicai.pro"
 
     # =========================================================================
     # PayPal (Subscription Payments)
@@ -103,6 +104,7 @@ class Settings(BaseSettings):
     # =========================================================================
     stripe_secret_key: str | None = None
     stripe_webhook_secret: str | None = None
+    stripe_price_id: str | None = None
 
     # =========================================================================
     # YouTube API (Optional — for auto-posting Shorts)

@@ -70,6 +70,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from services.scheduler import create_scheduler, shutdown_scheduler
     from services.seed_service import run_all_seeds
 
+    # Initialize Sentry error tracking if configured
+    if settings.sentry_dsn:
+        try:
+            import sentry_sdk
+            sentry_sdk.init(
+                dsn=settings.sentry_dsn,
+                environment=settings.environment,
+                traces_sample_rate=0.1,
+            )
+            logger.info("Sentry error tracking initialized")
+        except Exception as e:
+            logger.warning(f"Sentry init failed: {e}")
+
     logger.info("=" * 60)
     logger.info("Organic Marketing AI Platform — Starting Up")
     logger.info(f"Environment: {settings.environment}")
@@ -239,6 +252,64 @@ async def healthz_check() -> JSONResponse:
     )
 
 
+@app.get("/api/v1/admin/system-status", tags=["Admin"])
+async def admin_system_status(request: Request):
+    """Admin-only system status: scheduler, DB pool, Redis, latest posts."""
+    from auth import verify_credentials
+    verify_credentials(request)
+
+    db_ready = getattr(request.app.state, "db_ready", False)
+    scheduler = getattr(request.app.state, "scheduler", None)
+    scheduler_running = scheduler.running if scheduler else False
+
+    redis_ok = False
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url, socket_connect_timeout=2)
+        await r.ping()
+        redis_ok = True
+        await r.aclose()
+    except Exception:
+        pass
+
+    pool_status = {}
+    engine = getattr(request.app.state, "db_engine", None)
+    if engine:
+        pool = engine.pool
+        pool_status = {
+            "size": pool.size(),
+            "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+        }
+
+    recent_posts = []
+    if db_ready:
+        try:
+            async with AsyncSessionLocal() as session:
+                stmt = select(SocialPost).order_by(SocialPost.createdAt.desc()).limit(5)
+                posts = (await session.execute(stmt)).scalars().all()
+                recent_posts = [
+                    {
+                        "id": p.id,
+                        "platform": p.platform,
+                        "status": p.status,
+                        "postedAt": p.postedAt.isoformat() if p.postedAt else None,
+                    }
+                    for p in posts
+                ]
+        except Exception:
+            pass
+
+    return {
+        "database": "connected" if db_ready else "disconnected",
+        "db_pool": pool_status,
+        "scheduler": "running" if scheduler_running else "stopped",
+        "redis": "connected" if redis_ok else "unavailable",
+        "recent_posts": recent_posts,
+    }
+
+
 @app.get("/logo.png", tags=["System"])
 async def serve_logo() -> FileResponse:
     return FileResponse("templates/logo.png")
@@ -256,12 +327,27 @@ templates = Jinja2Templates(directory="templates")
 # =============================================================================
 # Router Registration
 # =============================================================================
-from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api  # noqa: E402
+from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, team, stripe_webhook  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
+def _get_rate_limit_key(request: Request) -> str:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            import jwt as pyjwt
+            payload = pyjwt.decode(auth_header.split(" ")[1], options={"verify_signature": False})
+            uid = payload.get("sub")
+            if uid:
+                return f"user:{uid}"
+        except Exception:
+            pass
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_get_rate_limit_key, default_limits=["200/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -275,6 +361,8 @@ app.include_router(paypal_webhook.router)
 app.include_router(video.router)
 app.include_router(ecommerce.router)
 app.include_router(creative_api.router)
+app.include_router(team.router)
+app.include_router(stripe_webhook.router)
 
 
 # =============================================================================

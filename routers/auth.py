@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import secrets
+from datetime import timedelta
 from typing import Optional
 
 import bcrypt
@@ -198,6 +199,95 @@ async def api_login(data: UserLogin, request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+
+
+# =============================================================================
+# Password Reset
+# =============================================================================
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+
+@router.post("/api/v1/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest):
+    """Send a password reset email with a time-limited token."""
+    async with AsyncSessionLocal() as session:
+        stmt = select(User).where(User.email == data.email)
+        user = (await session.execute(stmt)).scalar_one_or_none()
+
+    if not user:
+        return {"success": True, "message": "If that email exists, a reset link has been sent."}
+
+    reset_token = create_access_token(
+        data={"sub": user.id, "type": "password_reset"},
+        expires_delta=timedelta(hours=1),
+    )
+
+    frontend_url = settings.allowed_origins[0] if settings.allowed_origins else "https://organic-marketing-ai.vercel.app"
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+
+    try:
+        import resend
+        resend.api_key = settings.resend_api_key
+        if settings.resend_api_key:
+            resend.Emails.send({
+                "from": f"OrganicAI <noreply@{settings.resend_from_domain or 'organicai.pro'}>",
+                "to": [data.email],
+                "subject": "Reset your OrganicAI password",
+                "html": (
+                    f"<p>You requested a password reset.</p>"
+                    f'<p><a href="{reset_link}">Click here to reset your password</a></p>'
+                    f"<p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>"
+                ),
+            })
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Failed to send reset email: {e}")
+
+    return {"success": True, "message": "If that email exists, a reset link has been sent."}
+
+
+@router.post("/api/v1/auth/reset-password")
+async def reset_password(data: ResetPasswordRequest):
+    """Verify the reset token and update the user's password."""
+    try:
+        payload = jwt.decode(data.token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        user_id = payload.get("sub")
+        token_type = payload.get("type")
+        if not user_id or token_type != "password_reset":
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Reset link has expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=400, detail="Invalid reset token")
+
+    async with AsyncSessionLocal() as session:
+        stmt = select(User).where(User.id == user_id)
+        user = (await session.execute(stmt)).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user.password = bcrypt.hashpw(data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        await session.commit()
+
+    return {"success": True, "message": "Password has been reset successfully"}
 
 
 # =============================================================================
