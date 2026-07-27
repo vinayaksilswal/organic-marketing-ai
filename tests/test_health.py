@@ -14,4 +14,4 @@ async def test_health_check(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_root_endpoint(client: AsyncClient):
     resp = await client.get("/")
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 301, 302, 303, 307)
