@@ -433,13 +433,37 @@ async def get_db_session() -> AsyncSession:
 from contextlib import asynccontextmanager
 from sqlalchemy import text
 
+def _is_postgres(session) -> bool:
+    """True when the session talks to PostgreSQL.
+
+    Defensive: set_config() is Postgres-only, and this must never be the thing
+    that raises — a failure here would take down every tenant-scoped endpoint.
+    """
+    try:
+        bind = session.get_bind() if hasattr(session, "get_bind") else session.bind
+        return bool(bind) and bind.dialect.name == "postgresql"
+    except Exception:
+        return False
+
+
 @asynccontextmanager
 async def get_tenant_session(workspace_id: str) -> AsyncSession:
     """Provide an async database session context configured with RLS for the given workspace."""
     if not _sessionmaker:
         await init_db()
     async with AsyncSessionLocal() as session:
-        if workspace_id:
-            # Set the local variable for PostgreSQL RLS policies to use
-            await session.execute(text("SET LOCAL app.current_workspace = :ws"), {"ws": workspace_id})
+        if workspace_id and _is_postgres(session):
+            # Set the workspace for the RLS policies in enable_rls.py to read.
+            #
+            # This MUST use set_config() rather than "SET LOCAL ... = :ws".
+            # SET is a utility statement and cannot take bind parameters, so the
+            # parameterised form compiled to "SET LOCAL ... = $1" and raised a
+            # syntax error on every request through this helper — which is every
+            # marketing endpoint. set_config(name, value, is_local=true) is an
+            # ordinary function call, is parameterisable, and is scoped to the
+            # transaction exactly like SET LOCAL.
+            await session.execute(
+                text("SELECT set_config('app.current_workspace', :ws, true)"),
+                {"ws": workspace_id},
+            )
         yield session

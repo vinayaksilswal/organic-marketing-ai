@@ -40,12 +40,27 @@ def upgrade() -> None:
         END $$
     """)
 
-    # Add composite unique constraint (userId + businessProfileId)
+    # Collapse any pre-existing duplicates, keeping the most recently updated
+    # row per (userId, businessProfileId). Without this the constraint below
+    # fails with unique_violation and takes the whole deploy down with it.
+    op.execute("""
+        DELETE FROM "SocialConnection" a
+        USING "SocialConnection" b
+        WHERE a."userId" = b."userId"
+          AND a."businessProfileId" IS NOT DISTINCT FROM b."businessProfileId"
+          AND (a."updatedAt", a.id) < (b."updatedAt", b.id)
+    """)
+
+    # Add composite unique constraint (userId + businessProfileId).
+    # Re-adding an existing constraint raises duplicate_object (42710), not
+    # duplicate_table — the previous handler did not catch it.
     op.execute("""
         DO $$ BEGIN
             ALTER TABLE "SocialConnection"
                 ADD CONSTRAINT uniq_user_workspace_social UNIQUE ("userId", "businessProfileId");
-        EXCEPTION WHEN duplicate_table THEN NULL;
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+            WHEN duplicate_table THEN NULL;
         END $$
     """)
 

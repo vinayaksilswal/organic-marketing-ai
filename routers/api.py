@@ -465,10 +465,20 @@ async def get_scheduler_status(
     except Exception:
         pass
 
+    workspace_id = request.headers.get("x-workspace-id")
+
     async with AsyncSessionLocal() as session:
-        stmt = select(MarketingState).where(MarketingState.userId == user_id)
+        # MarketingState is per-workspace, so a user with more than one business
+        # has several rows. Scope to the active workspace and take the first —
+        # scalar_one_or_none() here raised MultipleResultsFound (a 500) for every
+        # user with a second business.
+        stmt = select(MarketingState)
+        if workspace_id:
+            stmt = stmt.where(MarketingState.businessProfileId == workspace_id)
+        else:
+            stmt = stmt.where(MarketingState.userId == user_id)
         res = await session.execute(stmt)
-        state = res.scalar_one_or_none()
+        state = res.scalars().first()
 
         return StandardResponse(
             success=True,

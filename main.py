@@ -235,7 +235,11 @@ async def organic_marketing_exception_handler(
 # =============================================================================
 @app.get("/health", tags=["System"])
 async def health_check(request: Request) -> JSONResponse:
-    """Instant health check endpoint for Render/Docker monitoring."""
+    """Instant health check endpoint for Render/Docker monitoring.
+
+    Reports the running commit so deploy drift is detectable — a stale build
+    silently serving old code is otherwise invisible until endpoints 404.
+    """
     db_ready = getattr(request.app.state, "db_ready", False)
 
     return JSONResponse(
@@ -243,6 +247,8 @@ async def health_check(request: Request) -> JSONResponse:
         content={
             "status": "healthy",
             "database": "connected" if db_ready else "connecting",
+            "version": app.version,
+            "commit": os.getenv("RENDER_GIT_COMMIT", os.getenv("GIT_COMMIT", "unknown"))[:12],
         },
     )
 
