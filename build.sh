@@ -23,6 +23,12 @@ echo "=== Running Alembic Migrations ==="
 echo "--- current revision before upgrade ---"
 alembic current || echo "(no alembic_version table yet — first run)"
 
+# The database may carry a stamp from a previous, since-replaced migration set.
+# Alembic aborts on a revision id it cannot resolve, which fails the build and
+# silently keeps the old image live. Re-point a stranded stamp before upgrading.
+echo "--- checking for a stranded alembic stamp ---"
+python scripts/repair_alembic_state.py
+
 if ! alembic upgrade head; then
     echo ""
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
