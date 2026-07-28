@@ -87,6 +87,27 @@ def test_healthz_liveness(client):
     assert r.status_code == 200
 
 
+def test_required_integrations_are_configured(client):
+    """The env vars a paying customer's flow depends on are actually set.
+
+    Reports booleans only. Meta gates all posting, so without it there is no
+    product; PayPal gates revenue.
+    """
+    integrations = client.get("/health").json().get("integrations")
+    if integrations is None:
+        pytest.skip("deployed build predates integration reporting")
+
+    required = {
+        "meta": "Facebook/Instagram connect returns 503 — no posting is possible",
+        "paypal": "subscriptions cannot be verified — no revenue",
+        "paypal_webhook": "webhooks are unverified — renewals will not activate",
+        "openrouter": "no AI generation at all",
+        "cloudinary": "generated media cannot be stored",
+    }
+    unset = [f"{k}: {why}" for k, why in required.items() if not integrations.get(k)]
+    assert not unset, "Unconfigured integrations:\n  " + "\n  ".join(unset)
+
+
 # --------------------------------------------------------------------------
 # Routing: every route exists and nothing 500s before auth
 # --------------------------------------------------------------------------

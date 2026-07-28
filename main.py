@@ -242,6 +242,25 @@ async def health_check(request: Request) -> JSONResponse:
     """
     db_ready = getattr(request.app.state, "db_ready", False)
 
+    # Booleans only — never the values. Lets an operator confirm which
+    # integrations are actually wired up, instead of inferring it from a 503
+    # that only appears after authentication. Wrapped because /health is the
+    # liveness probe and must not fail for a reporting detail.
+    try:
+        integrations = {
+            "meta": bool(settings.fb_app_id and settings.fb_app_secret),
+            "paypal": bool(settings.paypal_client_id and settings.paypal_client_secret),
+            "paypal_webhook": bool(settings.paypal_webhook_id),
+            "openrouter": bool(settings.openrouter_api_key),
+            "cloudinary": bool(settings.cloudinary_cloud_name and settings.cloudinary_api_secret),
+            "resend": bool(
+                settings.resend_api_key and "your_resend" not in (settings.resend_api_key or "")
+            ),
+            "json2video": bool(settings.json2video_api_key),
+        }
+    except Exception:
+        integrations = {}
+
     return JSONResponse(
         status_code=200,
         content={
@@ -249,6 +268,7 @@ async def health_check(request: Request) -> JSONResponse:
             "database": "connected" if db_ready else "connecting",
             "version": app.version,
             "commit": os.getenv("RENDER_GIT_COMMIT", os.getenv("GIT_COMMIT", "unknown"))[:12],
+            "integrations": integrations,
         },
     )
 
