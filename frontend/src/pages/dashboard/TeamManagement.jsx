@@ -14,6 +14,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('editor');
   const [inviting, setInviting] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   const inputStyle = {
     width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px',
@@ -21,21 +22,36 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
     border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.9rem', outline: 'none',
   };
 
+  // showToast is deliberately NOT a dependency. It is redefined on every render
+  // of the parent, so including it made loadMembers a new function each render,
+  // which refired the effect, which toasted on failure, which re-rendered —
+  // an endless request loop against /team.
   const loadMembers = useCallback(async () => {
-    if (!activeWorkspaceId) { setLoading(false); return; }
+    if (!activeWorkspaceId) { setLoading(false); setMembers([]); return; }
     setLoading(true);
     try {
       const res = await authFetch(`${API_BASE}/team`, {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       }, token);
-      if (!res.ok) throw new Error('Could not load team members');
+      if (!res.ok) {
+        setLoadError(
+          res.status === 400
+            ? 'No business selected for this request.'
+            : `Could not load team members (error ${res.status}).`
+        );
+        setMembers([]);
+        return;
+      }
       setMembers(await res.json());
-    } catch (err) {
-      showToast(err.message, true);
+      setLoadError(null);
+    } catch {
+      setLoadError('Could not reach the server to load your team.');
+      setMembers([]);
     } finally {
       setLoading(false);
     }
-  }, [activeWorkspaceId, token, showToast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId, token]);
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
 
@@ -149,6 +165,14 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
               {loading ? (
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
                   <span className="spinner" style={{ width: 20, height: 20 }} />
+                </div>
+              ) : loadError ? (
+                <div style={{ padding: '2.5rem 2rem', textAlign: 'center' }}>
+                  <p style={{ margin: '0 0 0.85rem 0', color: '#fca5a5', fontSize: '0.9rem' }}>{loadError}</p>
+                  <button className="btn btn-secondary" onClick={loadMembers}
+                    style={{ padding: '0.45rem 0.9rem', fontSize: '0.83rem' }}>
+                    Retry
+                  </button>
                 </div>
               ) : members.length === 0 ? (
                 <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>

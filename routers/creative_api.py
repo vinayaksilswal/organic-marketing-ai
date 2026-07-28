@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from loguru import logger
 from pydantic import BaseModel
@@ -27,8 +28,11 @@ from database import (
     SocialCampaign,
     Media,
     MarketingState,
+    Product,
+    VideoApiConfig,
 )
 from routers.auth import verify_user
+from services.crypto_service import decrypt_token
 from services.creative_service import (
     generate_brand_context,
     generate_starter_creatives,
