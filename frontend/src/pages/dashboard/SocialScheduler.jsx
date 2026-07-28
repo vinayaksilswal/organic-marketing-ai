@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3 } from 'lucide-react';
+import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [posts, setPosts] = useState([]);
+  const [postsError, setPostsError] = useState(null);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [mediaList, setMediaList] = useState([]);
   const [activeTab, setActiveTab] = useState('social'); // 'social', 'email', 'audience'
   
@@ -37,10 +39,28 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   };
 
   const fetchPosts = async () => {
+    setPostsLoading(true);
     try {
       const res = await authFetch(`${API_BASE}/marketing/posts`, {}, token);
-      if (res.ok) setPosts(await res.json());
-    } catch (err) { console.error('Failed to fetch posts'); }
+      if (res.ok) {
+        setPosts(await res.json());
+        setPostsError(null);
+      } else {
+        // A failed request must never be shown as "no posts yet" — that reads
+        // as "the automation ran and produced nothing", which is a different
+        // and much more alarming problem than "the server errored".
+        setPostsError(
+          res.status >= 500
+            ? `The server could not return your delivery log (error ${res.status}).`
+            : `Could not load your delivery log (error ${res.status}).`
+        );
+      }
+    } catch (err) {
+      console.error('Failed to fetch posts', err);
+      setPostsError('Could not reach the server to load your delivery log.');
+    } finally {
+      setPostsLoading(false);
+    }
   };
   
   const fetchMedia = async () => {
@@ -81,7 +101,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
     showToast('Running AI Automation...', false);
     try {
       const res = await authFetch(`${API_BASE}/marketing/run-automation`, { method: 'POST' }, token);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         showToast('Automation Loop Completed! 🚀');
         if (data.post) {
@@ -90,11 +110,17 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
           fetchPosts(); // fallback refresh
         }
       } else {
-        showToast('Automation Failed', true);
+        // Surface why. "Automation Failed" gave the user nothing to act on —
+        // a server fault and "no media to post" need different responses.
+        const reason = data.detail || data.message
+          || (res.status >= 500
+                ? `the server returned error ${res.status}`
+                : `the request was rejected (${res.status})`);
+        showToast(`Automation did not run — ${reason}`, true);
       }
     } catch (err) {
       console.error(err);
-      showToast('Error running automation', true);
+      showToast(`Could not run automation — ${err.message}`, true);
     } finally {
       setRunningLoop(false);
     }
@@ -238,10 +264,32 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               </tr>
             </thead>
             <tbody>
-              {posts.length === 0 ? (
+              {postsLoading ? (
+                <tr>
+                  <td colSpan="4" style={{ padding: '3rem', textAlign: 'center' }}>
+                    <span className="spinner" style={{ width: 20, height: 20 }} />
+                  </td>
+                </tr>
+              ) : postsError ? (
+                <tr>
+                  <td colSpan="4" style={{ padding: '2.5rem', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                      <AlertTriangle size={22} color="#f87171" />
+                      <div style={{ color: '#fca5a5', fontSize: '0.9rem', maxWidth: 480, lineHeight: 1.55 }}>
+                        {postsError} This is a server fault, not an empty schedule — your automation
+                        history could not be read.
+                      </div>
+                      <button className="btn btn-secondary" onClick={fetchPosts}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', fontSize: '0.83rem' }}>
+                        <RefreshCw size={14} /> Retry
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : posts.length === 0 ? (
                 <tr>
                   <td colSpan="4" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No posts currently logged. Run the automation loop.
+                    No posts logged yet. Connect a social account and run the automation loop.
                   </td>
                 </tr>
               ) : (
