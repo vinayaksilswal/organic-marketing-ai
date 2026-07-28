@@ -38,13 +38,22 @@ GRAPH_API_VERSION = "v19.0"
 GRAPH_BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 
 # Permissions required to publish to a Page and its linked IG Business account
+# Exactly what this integration uses, and nothing more:
+#   pages_show_list          -> discover the user's Pages via /me/accounts
+#   pages_read_engagement    -> read Page metadata
+#   pages_manage_posts       -> publish to the Page
+#   instagram_basic          -> resolve the linked IG Business account
+#   instagram_content_publish-> publish to Instagram
+#
+# business_management was requested previously but never used. It is a
+# heavyweight permission that needs its own App Review justification and is a
+# common cause of "Invalid Scopes" at the login dialog, so it is not asked for.
 META_SCOPES = ",".join([
     "pages_show_list",
     "pages_read_engagement",
     "pages_manage_posts",
     "instagram_basic",
     "instagram_content_publish",
-    "business_management",
 ])
 
 # state token -> {workspace_id, user_id, expires}. Short-lived, single-use.
