@@ -246,7 +246,10 @@ class SocialPost(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     userId = Column(String, nullable=True)
-    campaignId = Column(String, ForeignKey("SocialCampaign.id", ondelete="CASCADE"), nullable=False)
+    # Nullable: a post triggered directly by the scheduler or the manual
+    # "Run Automation" button has no parent campaign. Requiring one made every
+    # such run fail with NotNullViolationError on campaignId.
+    campaignId = Column(String, ForeignKey("SocialCampaign.id", ondelete="CASCADE"), nullable=True)
     platform = Column(String, nullable=False)
     type = Column(String, default="AUTO", nullable=False)
     status = Column(String, default="DRAFT", nullable=False)

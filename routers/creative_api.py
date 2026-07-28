@@ -211,13 +211,28 @@ async def auto_video(
 
         profile_id, profile_name = profile.id, profile.name
 
-    result = await execute_video_pipeline(
-        product_name=subject_name,
-        product_url=subject_url,
-        image_url=subject_image,
-        goal=data.goal,
-        profile=profile,
-    )
+    try:
+        result = await execute_video_pipeline(
+            product_name=subject_name,
+            product_url=subject_url,
+            image_url=subject_image,
+            goal=data.goal,
+            profile=profile,
+        )
+    except Exception as e:
+        # The pipeline calls OpenRouter, whose free-tier models rate-limit
+        # aggressively. A 429 is an upstream capacity problem, not a fault in
+        # this request — report it as such instead of a bare 500 so the user
+        # knows to simply retry.
+        detail = str(e)
+        if "429" in detail or "Too Many Requests" in detail or "RetryError" in type(e).__name__:
+            logger.warning(f"AI provider rate-limited the video pipeline for workspace {profile_id}")
+            raise HTTPException(
+                status_code=503,
+                detail="The AI provider is rate-limiting requests right now. Please try again in a minute.",
+            )
+        logger.exception(f"Video pipeline failed for workspace {profile_id}")
+        raise HTTPException(status_code=502, detail="The AI provider could not complete this request.")
 
     veo_prompt = result.get("veo_prompt")
     if not veo_prompt:
