@@ -38,6 +38,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [deleting, setDeleting] = useState(false);
 
   const [connectingMeta, setConnectingMeta] = useState(false);
+  const [pageChoices, setPageChoices] = useState(null); // { token, pages, workspaceId }
+  const [selectingPage, setSelectingPage] = useState(null);
 
   const { activeWorkspaceId, setActiveWorkspace, refreshWorkspaces, workspaces } = useWorkspace();
   const businessList = workspaces && workspaces.length > 0 ? workspaces : (user?.businessProfiles || []);
@@ -48,14 +50,56 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
     const meta = params.get('meta');
     if (!meta) return;
     const message = params.get('message');
+
     if (meta === 'connected') {
       showToast(`Connected ${message || 'your Meta account'}. Automation will publish here.`);
       refreshWorkspaces();
+    } else if (meta === 'select') {
+      // The account owns several Pages — let the user pick which one this
+      // business publishes as, rather than silently taking the first.
+      const t = params.get('token');
+      if (t) loadPageChoices(t);
     } else {
       showToast(message || 'Could not connect your Meta account.', true);
     }
     window.history.replaceState({}, '', window.location.pathname);
   }, []);
+
+  const loadPageChoices = async (t) => {
+    try {
+      const res = await authFetch(`${API_BASE}/meta/pages?token=${encodeURIComponent(t)}`, {}, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Could not load your Pages.');
+      setPageChoices({ token: t, pages: data.pages || [], workspaceId: data.workspaceId });
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
+
+  const handleSelectPage = async (pageId) => {
+    setSelectingPage(pageId);
+    try {
+      const res = await authFetch(`${API_BASE}/meta/select-page`, {
+        method: 'POST',
+        body: JSON.stringify({ token: pageChoices.token, page_id: pageId }),
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Could not save that Page.');
+
+      const c = data.connected || {};
+      showToast(
+        c.instagramUsername
+          ? `Connected ${c.name} + @${c.instagramUsername}.`
+          : `Connected ${c.name}.`
+      );
+      setPageChoices(null);
+      refreshWorkspaces();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSelectingPage(null);
+    }
+  };
 
   const handleConnectMeta = async (workspaceId) => {
     setConnectingMeta(true);
@@ -643,6 +687,59 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* META PAGE PICKER — shown when the account owns several Pages */}
+        {pageChoices && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: 520, padding: '1.75rem', maxHeight: '85vh', overflow: 'auto' }}>
+              <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Facebook size={18} color="#60a5fa" /> Choose a Page
+              </h3>
+              <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.55 }}>
+                Your Facebook account manages more than one Page. Pick the one this business
+                should publish as — its linked Instagram account will be connected too.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                {pageChoices.pages.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleSelectPage(p.id)}
+                    disabled={!!selectingPage}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
+                      padding: '0.85rem 1rem', borderRadius: '10px', textAlign: 'left',
+                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: '#fff', cursor: selectingPage ? 'wait' : 'pointer',
+                      opacity: selectingPage && selectingPage !== p.id ? 0.4 : 1,
+                    }}
+                  >
+                    <Facebook size={17} color="#60a5fa" style={{ flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 600 }}>{p.name}</div>
+                      {p.instagramUsername ? (
+                        <div style={{ fontSize: '0.78rem', color: '#f472b6', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.15rem' }}>
+                          <Instagram size={11} /> @{p.instagramUsername}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.15rem' }}>
+                          No Instagram Business account linked
+                        </div>
+                      )}
+                    </div>
+                    {selectingPage === p.id && <span className="spinner" style={{ width: 14, height: 14 }} />}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.35rem' }}>
+                <button className="btn btn-secondary" onClick={() => setPageChoices(null)} disabled={!!selectingPage}>
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

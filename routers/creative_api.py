@@ -142,6 +142,161 @@ async def generate_video_campaign(
 
     return result
 
+class AutoVideoRequest(BaseModel):
+    product_id: Optional[str] = None   # optional; e-commerce workspaces only
+    goal: str = "conversion"
+    render: bool = True                # attempt a render if a key is configured
+
+
+@router.post("/auto-video")
+async def auto_video(
+    data: AutoVideoRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """One-click video prompt for the active business.
+
+    Derives everything from the workspace's own brand profile — no manual form.
+    Picks a product when the workspace has a catalog, otherwise pitches the
+    business itself. Always saves the prompt to the media library; renders a
+    video too when a json2video key is configured for the workspace.
+    """
+    from services.video_pipeline_service import execute_video_pipeline
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+
+    async with AsyncSessionLocal() as session:
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+            if profile and profile.userId != user_id:
+                raise HTTPException(status_code=403, detail="That workspace is not yours")
+        else:
+            profile = (await session.execute(
+                select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            )).scalars().first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Add a business first, then generate a video.")
+
+        # Choose the subject: an explicit product, else any product in the
+        # catalog, else the business itself.
+        product = None
+        if data.product_id:
+            product = await session.get(Product, data.product_id)
+            if product and product.businessProfileId != profile.id:
+                raise HTTPException(status_code=403, detail="That product belongs to another workspace")
+        if not product:
+            product = (await session.execute(
+                select(Product).where(Product.businessProfileId == profile.id).limit(1)
+            )).scalars().first()
+
+        if product:
+            subject_name = product.title
+            subject_url = product.url or profile.websiteUrl
+            subject_image = product.imageUrl or profile.logoUrl or ""
+        else:
+            subject_name = profile.name
+            subject_url = profile.websiteUrl
+            subject_image = profile.logoUrl or ""
+
+        video_cfg = (await session.execute(
+            select(VideoApiConfig).where(and_(
+                VideoApiConfig.userId == user_id,
+                VideoApiConfig.businessProfileId == profile.id,
+            ))
+        )).scalars().first()
+
+        profile_id, profile_name = profile.id, profile.name
+
+    result = await execute_video_pipeline(
+        product_name=subject_name,
+        product_url=subject_url,
+        image_url=subject_image,
+        goal=data.goal,
+        profile=profile,
+    )
+
+    veo_prompt = result.get("veo_prompt")
+    if not veo_prompt:
+        raise HTTPException(status_code=502, detail="The AI did not return a usable prompt. Please try again.")
+
+    media_id = None
+    async with AsyncSessionLocal() as session:
+        media = Media(
+            userId=user_id,
+            businessProfileId=profile_id,
+            filename=f"Video prompt — {subject_name}",
+            mimeType="text/plain",
+            url=subject_image or "",
+            tags=[subject_name, "video-prompt", "ai-generated"],
+            aiGenerated=True,
+            prompt=veo_prompt,
+            promptType="video",
+        )
+        session.add(media)
+        await session.commit()
+        await session.refresh(media)
+        media_id = media.id
+
+    # Render only if the workspace actually has a key. Absence is a normal
+    # state, not an error — the prompt is still the deliverable.
+    render_status = "skipped"
+    render_detail = "No video API key configured for this business."
+    api_key = None
+    if data.render and video_cfg and video_cfg.apiKey:
+        try:
+            api_key = decrypt_token(video_cfg.apiKey)
+        except Exception:
+            logger.warning(f"Could not decrypt video API key for workspace {profile_id}")
+            api_key = None
+
+    if api_key:
+        try:
+            payload = {
+                "resolution": "instagram-story",
+                "quality": "high",
+                "scenes": [{
+                    "elements": (
+                        [{"type": "image", "src": subject_image, "duration": 8}] if subject_image else []
+                    ) + [{
+                        "type": "text",
+                        "text": subject_name,
+                        "duration": 8,
+                        "settings": {"font-size": "64px", "font-family": "Poppins"},
+                    }],
+                }],
+            }
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.post(
+                    "https://api.json2video.com/v2/movies",
+                    json=payload,
+                    headers={"x-api-key": api_key, "Content-Type": "application/json"},
+                )
+            if resp.status_code < 300:
+                body = resp.json()
+                render_status = "queued"
+                render_detail = body.get("project") or "Render queued with json2video."
+            else:
+                render_status = "failed"
+                render_detail = f"json2video returned {resp.status_code}."
+                logger.warning(f"json2video render failed for workspace {profile_id}: {resp.text[:200]}")
+        except Exception as e:
+            render_status = "failed"
+            render_detail = "Could not reach the video service."
+            logger.exception(f"json2video render error for workspace {profile_id}")
+
+    return {
+        "status": "success",
+        "business": profile_name,
+        "subject": subject_name,
+        "usedProduct": bool(product),
+        "veo_prompt": veo_prompt,
+        "intelligence": result.get("intelligence"),
+        "creative_strategy": result.get("creative_strategy"),
+        "mediaId": media_id,
+        "render": {"status": render_status, "detail": render_detail},
+    }
+
+
 @router.post("/generate")
 async def generate_creatives(
     data: GenerateRequest,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy } from 'lucide-react';
+import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaList, setMediaList] = useState([]);
@@ -12,19 +12,34 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [previewMedia, setPreviewMedia] = useState(null);
   const [editingMedia, setEditingMedia] = useState(null);
   const [editCaption, setEditCaption] = useState('');
+  const [loadError, setLoadError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchMedia();
   }, [activeWorkspaceId]);
 
   const fetchMedia = async () => {
+    setLoading(true);
     try {
       const res = await authFetch(`${API_BASE}/marketing/media`, {}, token);
       if (res.ok) {
         setMediaList(await res.json());
+        setLoadError(null);
+      } else {
+        // Never let a failed request masquerade as "you have no media" — that
+        // sends users hunting for an upload that actually succeeded.
+        setLoadError(
+          res.status >= 500
+            ? 'The server could not return your media (error ' + res.status + '). Your uploads are safe — this is a server-side fault.'
+            : 'Could not load your media (error ' + res.status + ').'
+        );
       }
     } catch (err) {
       console.error('Failed to fetch media', err);
+      setLoadError('Could not reach the server to load your media.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -168,10 +183,31 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                 </tr>
               </thead>
               <tbody>
-                {mediaList.length === 0 ? (
+                {loading ? (
                   <tr>
                     <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No campaigns found. Upload media to create one.
+                      <span className="spinner" style={{ width: 20, height: 20 }} />
+                    </td>
+                  </tr>
+                ) : loadError ? (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '2.5rem', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                        <AlertTriangle size={22} color="#f87171" />
+                        <div style={{ color: '#fca5a5', fontSize: '0.9rem', maxWidth: 460, lineHeight: 1.55 }}>
+                          {loadError}
+                        </div>
+                        <button className="btn btn-secondary" onClick={fetchMedia}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', fontSize: '0.83rem' }}>
+                          <RefreshCw size={14} /> Retry
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : mediaList.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No media yet. Upload a file above, or generate one in AI Video Studio.
                     </td>
                   </tr>
                 ) : (

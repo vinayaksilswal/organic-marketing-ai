@@ -23,6 +23,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 from loguru import logger
 from sqlalchemy import select
 
@@ -49,6 +50,53 @@ META_SCOPES = ",".join([
 # state token -> {workspace_id, user_id, expires}. Short-lived, single-use.
 _OAUTH_STATE: dict[str, dict[str, Any]] = {}
 _STATE_TTL_SECONDS = 600
+
+# selection token -> {workspace_id, user_id, pages, expires}.
+# Used when the account owns several Pages and the user must choose which one
+# this business should publish to. Page tokens are held here only until the
+# choice is made, then encrypted into the database.
+_PENDING_SELECTION: dict[str, dict[str, Any]] = {}
+_SELECTION_TTL_SECONDS = 900
+
+
+def _serialise_page(page: dict[str, Any]) -> dict[str, Any]:
+    """Public-safe view of a Page — never includes the access token."""
+    ig = page.get("instagram_business_account") or {}
+    return {
+        "id": page["id"],
+        "name": page.get("name") or "Facebook Page",
+        "instagramId": ig.get("id"),
+        "instagramUsername": ig.get("username"),
+    }
+
+
+async def _store_connection(user_id: str, workspace_id: str, page: dict[str, Any]) -> dict[str, Any]:
+    """Encrypt and persist the chosen Page (and its linked IG account)."""
+    ig = page.get("instagram_business_account") or {}
+    async with AsyncSessionLocal() as session:
+        stmt = select(SocialConnection).where(
+            SocialConnection.userId == user_id,
+            SocialConnection.businessProfileId == workspace_id,
+        )
+        conn = (await session.execute(stmt)).scalars().first()
+        if not conn:
+            conn = SocialConnection(userId=user_id, businessProfileId=workspace_id)
+            session.add(conn)
+
+        conn.fbAccessToken = encrypt_token(page["access_token"])
+        conn.fbPageId = page["id"]
+        conn.fbPageName = page.get("name")
+        # Clear any previous IG link so switching Pages cannot leave a stale one
+        conn.igAccountId = ig.get("id")
+        conn.igAccountName = ig.get("username")
+
+        await session.commit()
+
+    logger.info(
+        f"Meta connected for workspace {workspace_id}: "
+        f"page={page.get('name')} ig={ig.get('username')}"
+    )
+    return _serialise_page(page)
 
 
 def _redirect_uri() -> str:
@@ -161,32 +209,28 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
                 status_code=303,
             )
 
-        page = pages[0]
-        ig = page.get("instagram_business_account") or {}
+        # With several Pages we must not guess which one this business posts as.
+        if len(pages) > 1:
+            for key in [k for k, v in _PENDING_SELECTION.items() if v["expires"] < time.time()]:
+                _PENDING_SELECTION.pop(key, None)
 
-        async with AsyncSessionLocal() as session:
-            stmt = select(SocialConnection).where(
-                SocialConnection.userId == user_id,
-                SocialConnection.businessProfileId == workspace_id,
+            sel_token = secrets.token_urlsafe(32)
+            _PENDING_SELECTION[sel_token] = {
+                "workspace_id": workspace_id,
+                "user_id": user_id,
+                "pages": pages,
+                "expires": time.time() + _SELECTION_TTL_SECONDS,
+            }
+            return RedirectResponse(
+                _dashboard_url("select", "") + f"&token={sel_token}",
+                status_code=303,
             )
-            conn = (await session.execute(stmt)).scalars().first()
-            if not conn:
-                conn = SocialConnection(userId=user_id, businessProfileId=workspace_id)
-                session.add(conn)
 
-            conn.fbAccessToken = encrypt_token(page["access_token"])
-            conn.fbPageId = page["id"]
-            conn.fbPageName = page.get("name")
-            if ig.get("id"):
-                conn.igAccountId = ig["id"]
-                conn.igAccountName = ig.get("username")
-
-            await session.commit()
-
-        logger.info(f"Meta connected for workspace {workspace_id}: page={page.get('name')} ig={ig.get('username')}")
-        connected = page.get("name") or "Facebook Page"
-        if ig.get("username"):
-            connected += f" + @{ig['username']}"
+        page = pages[0]
+        saved = await _store_connection(user_id, workspace_id, page)
+        connected = saved["name"]
+        if saved.get("instagramUsername"):
+            connected += f" + @{saved['instagramUsername']}"
         return RedirectResponse(_dashboard_url("connected", connected), status_code=303)
 
     except httpx.HTTPStatusError as e:
@@ -196,6 +240,48 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
     except Exception as e:
         logger.exception(f"Meta OAuth callback failed for workspace {workspace_id}")
         return RedirectResponse(_dashboard_url("error", "Could not complete the connection."), status_code=303)
+
+
+@router.get("/pages")
+async def list_pending_pages(token: str, user_id: str = Depends(verify_user)):
+    """List the Pages discovered during OAuth so the user can choose one."""
+    ctx = _PENDING_SELECTION.get(token)
+    if not ctx or ctx["expires"] < time.time():
+        _PENDING_SELECTION.pop(token, None)
+        raise HTTPException(status_code=410, detail="This selection expired. Please connect again.")
+    if ctx["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="This selection belongs to another account.")
+
+    return {
+        "success": True,
+        "workspaceId": ctx["workspace_id"],
+        "pages": [_serialise_page(p) for p in ctx["pages"]],
+    }
+
+
+class SelectPageRequest(BaseModel):
+    token: str
+    page_id: str
+
+
+@router.post("/select-page")
+async def select_page(data: SelectPageRequest, user_id: str = Depends(verify_user)):
+    """Persist the Page the user chose for this workspace."""
+    ctx = _PENDING_SELECTION.get(data.token)
+    if not ctx or ctx["expires"] < time.time():
+        _PENDING_SELECTION.pop(data.token, None)
+        raise HTTPException(status_code=410, detail="This selection expired. Please connect again.")
+    if ctx["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="This selection belongs to another account.")
+
+    page = next((p for p in ctx["pages"] if p["id"] == data.page_id), None)
+    if not page:
+        raise HTTPException(status_code=404, detail="That Page was not part of this connection.")
+
+    saved = await _store_connection(user_id, ctx["workspace_id"], page)
+    _PENDING_SELECTION.pop(data.token, None)  # single-use; drops the held tokens
+
+    return {"success": True, "connected": saved}
 
 
 @router.delete("/disconnect")
