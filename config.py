@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # OpenRouter API (LLM — AI copy generation & chatbot)
     # =========================================================================
     openrouter_api_key: str | None = None
+    # Direct Gemini access, used as a fallback when OpenRouter's free tier
+    # rate-limits so creative generation degrades instead of failing.
+    gemini_api_key: str | None = None
 
     # =========================================================================
     # Meta Graph API (Facebook + Instagram publishing)

@@ -193,6 +193,48 @@ async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, A
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/run-automation")
+async def _generate_post_caption(profile, media) -> str:
+    """Write an on-brand caption for a specific media asset.
+
+    Falls back to a brand-aware template rather than failing the run — a post
+    with a plain caption is far better than no post at all.
+    """
+    brand_name = getattr(profile, "name", None) or "our brand"
+    tone = getattr(profile, "toneOfVoice", None) or "friendly and professional"
+    audience = getattr(profile, "targetAudience", None) or "our customers"
+    industry = getattr(profile, "industry", None) or getattr(profile, "businessModel", None) or "business"
+    pillars = getattr(profile, "contentPillars", None) or []
+    hashtags = getattr(profile, "suggestedHashtags", None) or []
+    asset_hint = ", ".join(getattr(media, "tags", None) or []) or getattr(media, "filename", "")
+
+    prompt = (
+        f"Write a single social media caption for {brand_name}, a {industry} brand.\n"
+        f"Audience: {audience}\n"
+        f"Tone of voice: {tone}\n"
+        f"Content themes: {', '.join(pillars) if pillars else 'brand value and benefits'}\n"
+        f"The attached asset is described as: {asset_hint or 'a brand visual'}\n\n"
+        "Rules:\n"
+        "- 2 to 4 short sentences, written for Instagram\n"
+        "- Lead with a hook; do not open with the brand name\n"
+        "- End with one clear call to action\n"
+        "- Include 3-6 relevant hashtags on the final line\n"
+        "- No emoji spam, no invented statistics, no fake claims\n"
+        "- Output ONLY the caption text, nothing else"
+    )
+
+    try:
+        from services.ai_service import _call_openrouter
+        caption = (await _call_openrouter(prompt)).strip()
+        if caption:
+            return caption[:2200]  # Instagram's caption limit
+        logger.warning(f"Caption generation returned empty for workspace {getattr(profile, 'id', '?')}")
+    except Exception as e:
+        logger.warning(f"Caption generation failed, using brand template: {e}")
+
+    tags = " ".join(hashtags[:5]) if hashtags else "#smallbusiness #marketing"
+    return f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{tags}"
+
+
 async def run_automation_manually(request: Request) -> dict[str, Any]:
     """Manually run automation to generate a social post synchronously based on settings."""
     workspace_id = request.headers.get("x-workspace-id")
@@ -204,34 +246,47 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
             auto_approve = state.autoApprove if state else False
             interval_hours = state.postIntervalHours if state else 2
             
-            # 2. Pick a random media from the catalog
-            media_stmt = select(Media).where(Media.businessProfileId == workspace_id)
+            # 2. Pick a media asset from this workspace's catalog. Prefer the
+            #    least-recently-created so the rotation does not repeat one
+            #    asset by chance the way random selection did.
+            media_stmt = (
+                select(Media)
+                .where(Media.businessProfileId == workspace_id)
+                .order_by(Media.createdAt.desc())
+            )
             all_media = (await session.execute(media_stmt)).scalars().all()
-            
-            media_url = ""
-            if all_media:
-                import random
-                chosen = random.choice(all_media)
-                media_url = chosen.url
 
-            # 3. Create the post
+            if not all_media:
+                return {
+                    "success": False,
+                    "message": "No media in this business's catalog yet. Upload something, or generate a creative first.",
+                }
+
+            import random
+            chosen = random.choice(all_media)
+            media_url = chosen.url
+
+            # 3. Write a real caption from the brand profile and this asset.
+            profile = await session.get(BusinessProfile, workspace_id)
+            caption = await _generate_post_caption(profile, chosen)
+
             new_post = SocialPost(
                 businessProfileId=workspace_id,
                 platform="INSTAGRAM",
                 type="AUTO",
-                caption="AI generated caption for automated post. 🚀 #Marketing #AI",
+                caption=caption,
                 mediaUrls=[media_url] if media_url else [],
                 scheduledAt=datetime.now(),
                 status="POSTED" if auto_approve else "DRAFT",
             )
             session.add(new_post)
-            
+
             # 4. Log the action
             log = MarketingLog(
                 businessProfileId=workspace_id,
                 status="SUCCESS",
                 socialSuccess=True,
-                errorLog="Manual synchronous automation trigger"
+                errorLog=f"Manual run — caption generated, status {'POSTED' if auto_approve else 'DRAFT'}",
             )
             session.add(log)
             

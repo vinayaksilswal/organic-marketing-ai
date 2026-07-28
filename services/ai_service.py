@@ -55,7 +55,7 @@ LLM_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
         f"OpenRouter retry attempt {retry_state.attempt_number}"
     ),
 )
-async def _call_openrouter(
+async def _call_openrouter_once(
     prompt: str,
     *,
     model: str = MARKETING_MODEL,
@@ -104,6 +104,100 @@ async def _call_openrouter(
         result = response.json()
         content = result["choices"][0]["message"]["content"].strip()
         return content
+
+
+# =============================================================================
+# Provider fallback chain
+# =============================================================================
+# OpenRouter's free tier rate-limits hard (429). A single model being busy must
+# not fail the whole request, so we try several free models, then fall back to
+# calling Gemini directly if a key is available.
+FREE_MODEL_CHAIN = [
+    "google/gemma-2-9b-it:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+    "qwen/qwen-2.5-7b-instruct:free",
+]
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+GEMINI_MODEL = "gemini-2.0-flash"
+
+
+async def _call_gemini(
+    prompt: str,
+    *,
+    json_response: bool = False,
+    system_prompt: str | None = None,
+) -> str:
+    """Direct Gemini call, used when OpenRouter is exhausted."""
+    key = getattr(settings, "gemini_api_key", None)
+    if not key:
+        return ""
+
+    text = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+    body: dict[str, Any] = {"contents": [{"parts": [{"text": text}]}]}
+    if json_response:
+        body["generationConfig"] = {"response_mime_type": "application/json"}
+
+    async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as client:
+        resp = await client.post(
+            GEMINI_URL.format(model=GEMINI_MODEL),
+            headers={"Content-Type": "application/json", "x-goog-api-key": key},
+            json=body,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+async def _call_openrouter(
+    prompt: str,
+    *,
+    model: str = MARKETING_MODEL,
+    json_response: bool = False,
+    system_prompt: str | None = None,
+) -> str:
+    """Call an LLM, degrading through providers rather than failing outright.
+
+    Order: the requested model, then the other free models, then Gemini direct.
+    Only raises if every option is exhausted, so a single 429 no longer takes
+    down creative generation.
+    """
+    tried: list[str] = []
+    chain = [model] + [m for m in FREE_MODEL_CHAIN if m != model]
+
+    for candidate in chain:
+        try:
+            result = await _call_openrouter_once(
+                prompt,
+                model=candidate,
+                json_response=json_response,
+                system_prompt=system_prompt,
+            )
+            if result:
+                if tried:
+                    logger.info(f"LLM succeeded on fallback model {candidate} after {tried} failed")
+                return result
+        except Exception as e:
+            tried.append(candidate)
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            # 429/5xx are capacity problems worth retrying elsewhere; a 401 or
+            # 400 will fail identically on every model, so stop early.
+            if status in (400, 401, 403):
+                logger.error(f"LLM request rejected ({status}) — not retrying other models")
+                break
+            logger.warning(f"LLM model {candidate} unavailable ({status or type(e).__name__}); trying next")
+
+    try:
+        gemini = await _call_gemini(prompt, json_response=json_response, system_prompt=system_prompt)
+        if gemini:
+            logger.info("LLM served by Gemini fallback after OpenRouter was exhausted")
+            return gemini
+    except Exception as e:
+        logger.warning(f"Gemini fallback also failed: {e}")
+
+    logger.error(f"All LLM providers failed. Tried: {tried}")
+    raise RuntimeError("Every configured AI provider is unavailable or rate-limited.")
 
 
 def _parse_json_response(text: str) -> dict | None:
