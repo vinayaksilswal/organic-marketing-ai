@@ -10,6 +10,7 @@ import Workspaces from './dashboard/Workspaces';
 import TeamManagement from './dashboard/TeamManagement';
 import { useWorkspace } from '../components/WorkspaceContext';
 import HelpWidget from '../components/HelpWidget';
+import SystemBanner from '../components/SystemBanner';
 
 const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
   const { activeWorkspaceId, setActiveWorkspace, workspaces } = useWorkspace();
@@ -28,6 +29,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
       />
       
       <div style={{ flex: 1, marginLeft: '260px', overflowY: 'auto' }}>
+        <SystemBanner token={token} />
         <Routes>
           <Route path="/" element={<Overview user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/video-studio" element={<VideoStudio user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />

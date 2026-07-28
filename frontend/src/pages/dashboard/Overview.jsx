@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UploadCloud, CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Sparkles, BarChart3, Activity, Clock, RefreshCw, Send } from 'lucide-react';
 import { API_BASE, authFetch } from '../../config';
 
 
-const Dashboard = ({ user, token, showToast }) => {
-  const [metaConnected, setMetaConnected] = useState(false);
-  const [xConnected, setXConnected] = useState(false);
-  const [linkedinConnected, setLinkedinConnected] = useState(false);
+const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
+  const navigate = useNavigate();
+  // Real connection state for the active workspace, loaded from the API.
+  const [connection, setConnection] = useState(null);
+  const [connecting, setConnecting] = useState(false);
   const [files, setFiles] = useState([]);
   const [baseCaption, setBaseCaption] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,9 +43,21 @@ const Dashboard = ({ user, token, showToast }) => {
           setStats(statsData.data);
         }
       }
+
+      // Real social connection state for the active workspace
+      const bizRes = await authFetch(`${API_BASE}/businesses`, {}, token);
+      if (bizRes.ok) {
+        const businesses = await bizRes.json();
+        const active = Array.isArray(businesses)
+          ? businesses.find(b => b.id === activeWorkspaceId) || businesses[0]
+          : null;
+        setConnection(active?.socialConnection || null);
+      }
     } catch (err) {
+      // SystemBanner already reports backend outages persistently. Toasting on
+      // every failed poll produced a stream of duplicate errors that buried any
+      // message the user actually needed to act on.
       console.error('Error fetching dashboard data:', err);
-      showToast(`Dashboard sync failed: ${err.message}`, true);
     } finally {
       setRefreshing(false);
     }
@@ -51,7 +65,42 @@ const Dashboard = ({ user, token, showToast }) => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [token]);
+  }, [token, activeWorkspaceId]);
+
+  // Report the outcome of the Meta OAuth round-trip when redirected back here
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const meta = params.get('meta');
+    if (!meta) return;
+    const message = params.get('message');
+    if (meta === 'connected') {
+      showToast(`Connected ${message || 'your Meta account'}.`);
+      fetchDashboardData();
+    } else {
+      showToast(message || 'Could not connect your Meta account.', true);
+    }
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
+  const handleConnectMeta = async () => {
+    if (!activeWorkspaceId) {
+      return showToast('Select a business first, then connect its accounts.', true);
+    }
+    setConnecting(true);
+    try {
+      const res = await authFetch(
+        `${API_BASE}/meta/connect?workspace_id=${encodeURIComponent(activeWorkspaceId)}`, {}, token
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authUrl) {
+        throw new Error(data.detail || data.message || 'Meta connection is unavailable right now.');
+      }
+      window.location.href = data.authUrl;
+    } catch (err) {
+      showToast(err.message, true);
+      setConnecting(false);
+    }
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -196,61 +245,77 @@ const Dashboard = ({ user, token, showToast }) => {
               <p style={{ fontSize: '0.875rem', marginBottom: '2rem', color: 'var(--text-muted)' }}>Link your accounts to enable automated posting.</p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Meta Integration */}
+                {/* Meta — real OAuth */}
                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: metaConnected ? '1rem' : '0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Facebook size={20} color="#1877F2" />
-                      <Instagram size={20} color="#E4405F" />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <Facebook size={19} color="#1877F2" />
+                      <Instagram size={19} color="#E4405F" />
                       <span style={{ fontWeight: '600' }}>Meta</span>
                     </div>
-                    {metaConnected ? (
-                      <span className="badge active" style={{ fontSize: '0.65rem' }}>Connected</span>
+                    {connection?.hasFacebook ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '999px', background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
+                        <CheckCircle2 size={11} /> CONNECTED
+                      </span>
                     ) : (
-                      <button className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => { setMetaConnected(true); showToast('Meta connected successfully!'); }}>Connect</button>
+                      <button
+                        onClick={handleConnectMeta}
+                        disabled={connecting}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 600, borderRadius: '7px', background: '#1877f2', color: '#fff', border: 'none', cursor: connecting ? 'wait' : 'pointer', opacity: connecting ? 0.7 : 1, whiteSpace: 'nowrap' }}
+                      >
+                        <Facebook size={13} /> {connecting ? 'Redirecting…' : 'Connect'}
+                      </button>
                     )}
                   </div>
-                  {metaConnected && (
-                    <div className="fade-in">
-                      <div className="input-group" style={{ marginBottom: '0.75rem' }}>
-                        <select style={{ padding: '0.5rem', fontSize: '0.875rem' }}><option>My Business Page</option></select>
+                  {connection?.hasFacebook && (
+                    <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.75)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <Facebook size={13} color="#60a5fa" /> {connection.fbPageName || 'Facebook Page'}
                       </div>
-                      <div className="input-group" style={{ marginBottom: '0' }}>
-                        <select style={{ padding: '0.5rem', fontSize: '0.875rem' }}><option>@mybusiness_ig</option></select>
-                      </div>
+                      {connection.igAccountId && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <Instagram size={13} color="#f472b6" /> @{connection.igAccountName || 'instagram'}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* X Integration */}
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Twitter size={20} color="#1DA1F2" />
-                      <span style={{ fontWeight: '600' }}>X (Twitter)</span>
+                {/* X and LinkedIn — token-based, configured per business */}
+                {[
+                  { key: 'hasTwitter', label: 'X (Twitter)', icon: <Twitter size={19} color="#1DA1F2" /> },
+                  { key: 'hasLinkedin', label: 'LinkedIn', icon: <Linkedin size={19} color="#0A66C2" /> },
+                ].map(p => (
+                  <div key={p.key} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        {p.icon}
+                        <span style={{ fontWeight: '600' }}>{p.label}</span>
+                      </div>
+                      {connection?.[p.key] ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '999px', background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
+                          <CheckCircle2 size={11} /> CONNECTED
+                        </span>
+                      ) : (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                          onClick={() => navigate('/dashboard/workspaces')}
+                        >
+                          Set up
+                        </button>
+                      )}
                     </div>
-                    {xConnected ? (
-                      <span className="badge active" style={{ fontSize: '0.65rem' }}>Connected</span>
-                    ) : (
-                      <button className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => { setXConnected(true); showToast('X connected successfully!'); }}>Connect</button>
-                    )}
                   </div>
-                </div>
+                ))}
 
-                {/* LinkedIn Integration */}
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Linkedin size={20} color="#0A66C2" />
-                      <span style={{ fontWeight: '600' }}>LinkedIn</span>
-                    </div>
-                    {linkedinConnected ? (
-                      <span className="badge active" style={{ fontSize: '0.65rem' }}>Connected</span>
-                    ) : (
-                      <button className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }} onClick={() => { setLinkedinConnected(true); showToast('LinkedIn connected successfully!'); }}>Connect</button>
-                    )}
-                  </div>
-                </div>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                  Accounts are linked per business. Manage them under{' '}
+                  <button onClick={() => navigate('/dashboard/workspaces')}
+                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', font: 'inherit' }}>
+                    Businesses → Social Accounts
+                  </button>.
+                </p>
               </div>
             </div>
 
