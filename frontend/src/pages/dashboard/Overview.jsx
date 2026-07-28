@@ -8,6 +8,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
   const navigate = useNavigate();
   // Real connection state for the active workspace, loaded from the API.
   const [connection, setConnection] = useState(null);
+  const [activeBusiness, setActiveBusiness] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [files, setFiles] = useState([]);
   const [baseCaption, setBaseCaption] = useState('');
@@ -52,6 +53,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
           ? businesses.find(b => b.id === activeWorkspaceId) || businesses[0]
           : null;
         setConnection(active?.socialConnection || null);
+        setActiveBusiness(active || null);
       }
     } catch (err) {
       // SystemBanner already reports backend outages persistently. Toasting on
@@ -359,7 +361,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
                 <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '0.5rem 1rem', borderRadius: '999px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Sparkles size={16} color="var(--primary-color)" />
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-color)' }}>Context: {user?.businessProfile?.businessModel || 'AI Tuned'}</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-color)' }}>Context: {activeBusiness?.businessModel || 'AI Tuned'}</span>
                 </div>
               </div>
               

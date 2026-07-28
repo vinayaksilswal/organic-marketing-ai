@@ -20,7 +20,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -337,6 +337,7 @@ templates = Jinja2Templates(directory="templates")
 # Router Registration
 # =============================================================================
 from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, team, meta_oauth  # noqa: E402
+from routers.auth import verify_user  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -388,33 +389,64 @@ async def root() -> RedirectResponse:
 # Quick Stats API
 # =============================================================================
 @app.get("/api/v1/stats")
-async def get_stats(request: Request) -> dict:
-    """Return high-level platform statistics using SQLAlchemy session."""
+async def get_stats(request: Request, user_id: str = Depends(verify_user)) -> dict:
+    """Stats for the caller's active workspace.
+
+    This previously counted every row in the database — all users, all posts,
+    all campaigns, platform-wide — with no authentication. Every customer saw
+    identical totals that included other customers' data, and the numbers never
+    changed when switching business. Now scoped to the caller, and to the
+    active workspace when one is supplied.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+
     try:
         async with AsyncSessionLocal() as session:
-            u_stmt = select(func.count(User.id))
-            a_stmt = select(func.count(Audience.id))
-            p_stmt = select(func.count(SocialPost.id))
-            c_stmt = select(func.count(SocialCampaign.id))
+            # Confirm the workspace belongs to the caller before counting by it,
+            # so a forged header cannot read another tenant's numbers.
+            if workspace_id:
+                owned = (await session.execute(
+                    select(BusinessProfile.id).where(
+                        BusinessProfile.id == workspace_id,
+                        BusinessProfile.userId == user_id,
+                    )
+                )).scalar_one_or_none()
+                if not owned:
+                    workspace_id = None
 
-            users = (await session.execute(u_stmt)).scalar() or 0
-            audiences = (await session.execute(a_stmt)).scalar() or 0
-            posts = (await session.execute(p_stmt)).scalar() or 0
-            campaigns = (await session.execute(c_stmt)).scalar() or 0
+            def scoped(model):
+                stmt = select(func.count(model.id))
+                if workspace_id:
+                    return stmt.where(model.businessProfileId == workspace_id)
+                # No workspace selected: everything this user owns
+                return stmt.where(model.businessProfileId.in_(
+                    select(BusinessProfile.id).where(BusinessProfile.userId == user_id)
+                ))
+
+            audiences = (await session.execute(scoped(Audience))).scalar() or 0
+            posts = (await session.execute(scoped(SocialPost))).scalar() or 0
+            campaigns = (await session.execute(scoped(SocialCampaign))).scalar() or 0
+            workspaces = (await session.execute(
+                select(func.count(BusinessProfile.id)).where(BusinessProfile.userId == user_id)
+            )).scalar() or 0
 
         return {
             "success": True,
             "data": {
-                "users": users,
-                "audience": audiences,
                 "posts": posts,
                 "campaigns": campaigns,
+                "audience": audiences,
+                "workspaces": workspaces,
+                # Retained for the existing card; now means "your businesses",
+                # not "every account on the platform".
+                "users": workspaces,
             },
         }
-    except Exception as e:
+    except Exception:
+        logger.exception(f"Stats query failed for user {user_id}")
         return {
-            "success": True,
-            "data": {"users": 0, "audience": 0, "posts": 0, "campaigns": 0},
+            "success": False,
+            "data": {"posts": 0, "campaigns": 0, "audience": 0, "workspaces": 0, "users": 0},
         }
 
 
