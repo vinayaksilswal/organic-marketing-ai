@@ -225,11 +225,17 @@ async def auto_video(
         # this request — report it as such instead of a bare 500 so the user
         # knows to simply retry.
         detail = str(e)
-        if "429" in detail or "Too Many Requests" in detail or "RetryError" in type(e).__name__:
-            logger.warning(f"AI provider rate-limited the video pipeline for workspace {profile_id}")
+        exhausted = (
+            "429" in detail
+            or "Too Many Requests" in detail
+            or "unavailable or rate-limited" in detail   # every provider tried
+            or "RetryError" in type(e).__name__
+        )
+        if exhausted:
+            logger.warning(f"All AI providers unavailable for workspace {profile_id}: {detail}")
             raise HTTPException(
                 status_code=503,
-                detail="The AI provider is rate-limiting requests right now. Please try again in a minute.",
+                detail="Every AI provider is busy or rate-limited right now. Please try again in a minute.",
             )
         logger.exception(f"Video pipeline failed for workspace {profile_id}")
         raise HTTPException(status_code=502, detail="The AI provider could not complete this request.")

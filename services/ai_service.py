@@ -25,6 +25,7 @@ from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
 from tenacity import (
     retry,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
@@ -47,12 +48,29 @@ LLM_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
 # =============================================================================
 # Core LLM Call — Async with Retry
 # =============================================================================
+def _is_worth_retrying(exc: BaseException) -> bool:
+    """Retry only faults that a second attempt on the SAME model might fix.
+
+    A 429 means this model is out of capacity — retrying it wastes time we
+    should spend on the next model in the chain. Retrying every status here
+    turned one busy model into 3 backed-off attempts, and with 4 models in the
+    chain that became up to 12 slow calls and a request that timed out rather
+    than degrading. 4xx are caller faults and never retryable.
+    """
+    if isinstance(exc, httpx.RequestError):
+        return True  # connection reset, DNS blip, timeout
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500  # provider-side, may recover
+    return False
+
+
 @retry(
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    stop=stop_after_attempt(3),
-    retry=retry_if_exception_type((httpx.RequestError, httpx.HTTPStatusError)),
+    wait=wait_exponential(multiplier=1, min=1, max=6),
+    stop=stop_after_attempt(2),
+    retry=retry_if_exception(_is_worth_retrying),
+    reraise=True,
     before_sleep=lambda retry_state: logger.warning(
-        f"OpenRouter retry attempt {retry_state.attempt_number}"
+        f"LLM transient error, retry {retry_state.attempt_number}"
     ),
 )
 async def _call_openrouter_once(
