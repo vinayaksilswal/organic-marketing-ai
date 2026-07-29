@@ -270,38 +270,91 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
             profile = await session.get(BusinessProfile, workspace_id)
             caption = await _generate_post_caption(profile, chosen)
 
+            media_urls = [media_url] if media_url else []
+
+            # 4. With auto-approve on, actually publish. This previously set
+            #    status="POSTED" without calling the platform APIs at all, so
+            #    the log claimed success while nothing ever reached Facebook or
+            #    Instagram.
+            fb_post_id = ig_post_id = None
+            errors: list[str] = []
+            posted_at = None
+
+            if auto_approve:
+                try:
+                    ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=media_urls)
+                    if not ig_post_id:
+                        errors.append("IG: publish returned no post id")
+                except Exception as e:
+                    errors.append(f"IG: {e}")
+
+                try:
+                    fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=media_urls)
+                    if not fb_post_id:
+                        errors.append("FB: publish returned no post id")
+                except Exception as e:
+                    errors.append(f"FB: {e}")
+
+            published = bool(fb_post_id or ig_post_id)
+            if published:
+                posted_at = datetime.now()
+
+            if auto_approve:
+                status = "POSTED" if published else "FAILED"
+            else:
+                status = "DRAFT"
+
             new_post = SocialPost(
                 businessProfileId=workspace_id,
                 platform="INSTAGRAM",
                 type="AUTO",
                 caption=caption,
-                mediaUrls=[media_url] if media_url else [],
+                mediaUrls=media_urls,
                 scheduledAt=datetime.now(),
-                status="POSTED" if auto_approve else "DRAFT",
+                status=status,
+                fbPostId=fb_post_id,
+                igPostId=ig_post_id,
+                postedAt=posted_at,
+                errorLog=" | ".join(errors) if errors else None,
             )
             session.add(new_post)
 
-            # 4. Log the action
+            # 5. Log what actually happened, not what was intended
+            if not auto_approve:
+                log_note = "Manual run — caption generated, queued as draft for review"
+            elif published:
+                log_note = f"Manual run — published (fb={bool(fb_post_id)}, ig={bool(ig_post_id)})"
+            else:
+                log_note = f"Manual run — publish failed: {' | '.join(errors) or 'unknown error'}"
+
             log = MarketingLog(
                 businessProfileId=workspace_id,
-                status="SUCCESS",
-                socialSuccess=True,
-                errorLog=f"Manual run — caption generated, status {'POSTED' if auto_approve else 'DRAFT'}",
+                status="SUCCESS" if (published or not auto_approve) else "FAILED",
+                socialSuccess=published,
+                errorLog=log_note,
             )
             session.add(log)
             
             await session.commit()
             await session.refresh(new_post)
 
+        if new_post.status == "POSTED":
+            message = "Published to your connected accounts."
+        elif new_post.status == "FAILED":
+            message = f"Caption generated, but publishing failed: {new_post.errorLog}"
+        else:
+            message = "Draft created. Turn on Auto-Approve to publish automatically."
+
         return {
-            "success": True, 
-            "message": "Automation generated post successfully.",
+            "success": new_post.status != "FAILED",
+            "message": message,
             "post": {
                 "id": new_post.id,
                 "platform": new_post.platform,
                 "status": new_post.status,
                 "caption": new_post.caption,
                 "mediaUrls": new_post.mediaUrls,
+                "errorLog": new_post.errorLog,
                 "scheduledAt": new_post.scheduledAt.isoformat() if new_post.scheduledAt else None
             }
         }
