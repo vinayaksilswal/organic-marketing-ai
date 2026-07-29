@@ -38,7 +38,35 @@ class OnboardingService:
                 await session.commit()
                 await session.refresh(profile)
 
-                # Enqueue enterprise background tasks to ARQ
+                # Build the brand profile inline rather than only in the
+                # background. Everything downstream — captions, video prompts,
+                # creative generation — is generic without it, and when the
+                # background attempt failed the workspace stayed that way. This
+                # takes a few seconds and makes a new business usable
+                # immediately. Failure is tolerated: the marketing loop retries,
+                # so a rate limit at signup no longer leaves a dead workspace.
+                try:
+                    from services.creative_service import generate_brand_context
+
+                    ctx = await generate_brand_context(profile)
+                    profile.industry = ctx["industry"]
+                    profile.targetAudience = ctx["targetAudience"]
+                    profile.toneOfVoice = ctx["toneOfVoice"]
+                    profile.contentPillars = ctx["contentPillars"]
+                    profile.suggestedHashtags = ctx["suggestedHashtags"]
+                    profile.brandColors = ctx["brandColors"]
+                    profile.brandAnalysisComplete = True
+                    await session.commit()
+                    await session.refresh(profile)
+                    logger.info(f"Brand profile built at creation for workspace {profile.id}")
+                except Exception as e:
+                    await session.rollback()
+                    logger.warning(
+                        f"Brand profile could not be built at creation for {profile.id} ({e}); "
+                        f"the marketing loop will retry"
+                    )
+
+                # Enqueue the heavier work (creatives, catalog sync) in the background
                 await OnboardingService._enqueue_onboarding_tasks(user_id, profile.id, profile.productCatalogUrl)
 
                 return profile

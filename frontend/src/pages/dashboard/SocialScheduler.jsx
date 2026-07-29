@@ -6,6 +6,7 @@ import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const navigate = useNavigate();
   const [previewTab, setPreviewTab] = useState('feed'); // 'reels' | 'feed' | 'profile'
+  const [mediaRatio, setMediaRatio] = useState(null);   // width / height of the attached asset
   const [business, setBusiness] = useState(null);
   const [posts, setPosts] = useState([]);
   const [postsError, setPostsError] = useState(null);
@@ -424,20 +425,46 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     const handle = (business?.name || 'yourbrand').toLowerCase().replace(/[^a-z0-9]/g, '');
                     // Real Instagram surfaces: Reels 9:16, Feed 4:5, Profile 1:1 grid.
                     const ratio = previewTab === 'reels' ? '9/16' : previewTab === 'profile' ? '1/1' : '4/5';
-                    // contain, not cover — cover silently cropped portrait video in a
-                    // square frame, so most of the clip was never visible.
+                    // Match what each surface actually does. Reels letterboxes
+                    // anything that is not 9:16; Feed and the profile grid crop
+                    // to fill. Using one mode everywhere misrepresented both.
+                    const fit = previewTab === 'reels' ? 'contain' : 'cover';
+
+                    // Natural dimensions drive the warning below, so the user
+                    // learns before posting that a landscape clip will be
+                    // pillarboxed in Reels or cropped in the grid.
+                    const onMeta = (e) => {
+                      const el = e.currentTarget;
+                      const w = el.videoWidth || el.naturalWidth;
+                      const h = el.videoHeight || el.naturalHeight;
+                      if (w && h) setMediaRatio(w / h);
+                    };
+
                     const mediaEl = !editMedia ? (
                       <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
                         <Video size={30} style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
                         <p style={{ margin: 0, fontSize: '0.8rem' }}>No media attached</p>
                       </div>
                     ) : isVideo ? (
-                      <video src={editMedia} controls playsInline preload="metadata"
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+                      <video src={editMedia} controls playsInline preload="metadata" onLoadedMetadata={onMeta}
+                        style={{ width: '100%', height: '100%', objectFit: fit, background: '#000' }} />
                     ) : (
-                      <img src={editMedia} alt="Preview"
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+                      <img src={editMedia} alt="Preview" onLoad={onMeta}
+                        style={{ width: '100%', height: '100%', objectFit: fit, background: '#000' }} />
                     );
+
+                    // What this surface will do to this specific asset.
+                    let fitNote = null;
+                    if (mediaRatio) {
+                      const shape = mediaRatio > 1.15 ? 'landscape' : mediaRatio < 0.85 ? 'portrait' : 'square';
+                      if (previewTab === 'reels' && shape !== 'portrait') {
+                        fitNote = `${shape} media — Reels will show bars around it. 9:16 fills the screen.`;
+                      } else if (previewTab === 'feed' && shape === 'landscape') {
+                        fitNote = 'Landscape media — the feed crops the top and bottom to 4:5.';
+                      } else if (previewTab === 'profile' && shape !== 'square') {
+                        fitNote = `${shape} media — the grid centre-crops it to a square.`;
+                      }
+                    }
 
                     return (
                       <>
@@ -455,11 +482,18 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           ))}
                         </div>
 
-                        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.75rem' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.75rem', textAlign: 'center' }}>
                           {previewTab === 'reels' ? '9:16 — full screen'
                             : previewTab === 'profile' ? '1:1 — grid thumbnail'
                             : '4:5 — feed post'}
                         </div>
+
+                        {fitNote && (
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', maxWidth: 330, marginBottom: '0.85rem', padding: '0.5rem 0.7rem', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                            <AlertTriangle size={12} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
+                            <span style={{ fontSize: '0.72rem', color: '#fcd34d', lineHeight: 1.45 }}>{fitNote}</span>
+                          </div>
+                        )}
 
                         {previewTab === 'profile' ? (
                           /* Profile grid: how it sits among other posts */

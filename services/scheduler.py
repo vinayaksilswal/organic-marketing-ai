@@ -80,12 +80,35 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                 logger.info("[MARKETING LOOP] No workspaces found")
                 return
 
-            incomplete = [p.name for p in profiles if not p.brandAnalysisComplete]
-            if incomplete:
-                logger.info(
-                    f"[MARKETING LOOP] {len(incomplete)} workspace(s) still lack a brand "
-                    f"profile and will use fallback captions: {', '.join(incomplete[:5])}"
-                )
+            # Self-heal a missing brand profile rather than degrading forever.
+            # Onboarding builds one automatically, but if that attempt failed —
+            # a rate limit, a dropped task — the workspace previously stayed
+            # generic permanently and the only remedy was a manual button. The
+            # loop already runs every couple of hours, so it is the natural
+            # place to retry. Each attempt is isolated: a failure here must not
+            # stop the workspace from posting.
+            for profile in profiles:
+                if profile.brandAnalysisComplete:
+                    continue
+                try:
+                    from services.creative_service import generate_brand_context
+                    logger.info(f"[MARKETING LOOP] Building missing brand profile for {profile.name}")
+                    ctx = await generate_brand_context(profile)
+                    profile.industry = ctx["industry"]
+                    profile.targetAudience = ctx["targetAudience"]
+                    profile.toneOfVoice = ctx["toneOfVoice"]
+                    profile.contentPillars = ctx["contentPillars"]
+                    profile.suggestedHashtags = ctx["suggestedHashtags"]
+                    profile.brandColors = ctx["brandColors"]
+                    profile.brandAnalysisComplete = True
+                    await session.commit()
+                    logger.info(f"[MARKETING LOOP] Brand profile ready for {profile.name}")
+                except Exception as e:
+                    await session.rollback()
+                    logger.warning(
+                        f"[MARKETING LOOP] Brand profile for {profile.name} still unavailable "
+                        f"({e}); posting continues with fallback captions"
+                    )
 
             for profile in profiles:
                 try:

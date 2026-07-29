@@ -50,6 +50,39 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   }, [activeWorkspaceId, token]);
 
   const [analyzing, setAnalyzing] = useState(false);
+  const [showVideoConfig, setShowVideoConfig] = useState(false);
+  const [videoProvider, setVideoProvider] = useState('json2video');
+  const [videoKey, setVideoKey] = useState('');
+  const [videoEndpoint, setVideoEndpoint] = useState('');
+  const [savingVideoConfig, setSavingVideoConfig] = useState(false);
+
+  const saveVideoConfig = async () => {
+    if (!activeWorkspaceId) return showToast('Select a business first.', true);
+    setSavingVideoConfig(true);
+    try {
+      const res = await authFetch(`${API_BASE}/video/config`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          provider: videoProvider,
+          apiKey: videoKey,
+          endpoint: videoEndpoint || null,
+        }),
+      }, token);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || d.message || 'Could not save the video API settings');
+      }
+      showToast('Video API saved. Generated prompts will now render to video automatically.');
+      if (videoKey) setVideoKeySet(true);
+      setVideoKey('');
+      setShowVideoConfig(false);
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSavingVideoConfig(false);
+    }
+  };
 
   /**
    * Build the brand profile. Onboarding runs this automatically, but if that
@@ -222,13 +255,55 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   : <><Wand2 size={18} /> Generate Video Prompt</>}
               </button>
 
-              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.42)' }}>
+              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.42)', flexWrap: 'wrap' }}>
                 {videoKeySet ? (
-                  <><Video size={13} color="#10b981" /> Video rendering is connected — a video will be queued automatically.</>
+                  <><Video size={13} color="#10b981" /> Video rendering connected — renders are queued and saved to your media library automatically.</>
                 ) : (
-                  <><Settings size={13} /> No video API key set, so only the prompt is produced. Take it to Veo or Seed Dance, then upload the result below.</>
+                  <><Settings size={13} /> No video API connected, so only the prompt is produced.</>
                 )}
+                <button onClick={() => setShowVideoConfig(v => !v)}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                  {showVideoConfig ? 'Hide' : videoKeySet ? 'Change' : 'Connect a video API'}
+                </button>
               </div>
+
+              {showVideoConfig && (
+                <div style={{ ...card, marginTop: '1rem' }}>
+                  <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.92rem' }}>Video generation API</h4>
+                  <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                    With a key set, generated prompts are rendered to video and saved straight to
+                    this business’s media library — no manual step.
+                  </p>
+                  <div style={{ display: 'grid', gap: '0.7rem' }}>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Provider</label>
+                      <select value={videoProvider} onChange={e => setVideoProvider(e.target.value)}
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.88rem', appearance: 'auto' }}>
+                        <option value="json2video">JSON2Video</option>
+                        <option value="custom">Other (custom endpoint)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>API key</label>
+                      <input type="password" value={videoKey} onChange={e => setVideoKey(e.target.value)}
+                        placeholder={videoKeySet ? '••••••••  (leave blank to keep current)' : 'Paste your API key'}
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.88rem' }} />
+                    </div>
+                    {videoProvider === 'custom' && (
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Endpoint URL</label>
+                        <input type="url" value={videoEndpoint} onChange={e => setVideoEndpoint(e.target.value)}
+                          placeholder="https://api.example.com/v1/render"
+                          style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.88rem' }} />
+                      </div>
+                    )}
+                    <button className="btn btn-primary" onClick={saveVideoConfig} disabled={savingVideoConfig}
+                      style={{ padding: '0.55rem 1rem', fontSize: '0.85rem', width: 'fit-content' }}>
+                      {savingVideoConfig ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Result */}
