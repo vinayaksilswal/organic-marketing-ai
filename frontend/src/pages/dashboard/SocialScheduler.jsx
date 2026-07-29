@@ -5,6 +5,8 @@ import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const navigate = useNavigate();
+  const [previewTab, setPreviewTab] = useState('feed'); // 'reels' | 'feed' | 'profile'
+  const [business, setBusiness] = useState(null);
   const [posts, setPosts] = useState([]);
   const [postsError, setPostsError] = useState(null);
   const [postsLoading, setPostsLoading] = useState(true);
@@ -25,6 +27,18 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
     fetchSettings();
     fetchPosts();
     fetchMedia();
+    // The preview shows the real business name and handle rather than a
+    // hardcoded "OrganicAI", so it reflects what will actually be published.
+    (async () => {
+      try {
+        const res = await authFetch(`${API_BASE}/businesses`, {}, token);
+        if (!res.ok) return;
+        const all = await res.json();
+        if (Array.isArray(all)) {
+          setBusiness(all.find(b => b.id === activeWorkspaceId) || all[0] || null);
+        }
+      } catch { /* preview falls back to a neutral placeholder */ }
+    })();
   }, [activeWorkspaceId]);
 
   const fetchSettings = async () => {
@@ -405,55 +419,107 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 {/* Right Side: Preview */}
                 <div style={{ flex: 1, padding: '1.5rem', background: 'rgba(0,0,0,0.5)', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(255,255,255,0.1)', padding: '0.25rem', borderRadius: '30px' }}>
-                     <button style={{ padding: '0.4rem 1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: '600', cursor: 'pointer' }}>Reels</button>
-                     <button style={{ padding: '0.4rem 1rem', background: 'var(--secondary-color)', borderRadius: '20px', border: 'none', color: '#fff', fontWeight: '600', cursor: 'pointer' }}>Feed</button>
-                     <button style={{ padding: '0.4rem 1rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontWeight: '600', cursor: 'pointer' }}>Profile</button>
-                  </div>
-
-                  <div style={{ width: '100%', maxWidth: '350px', background: '#111', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                    {/* Fake Instagram Header */}
-                    <div style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                         <span style={{ color: 'var(--secondary-color)', fontWeight: 'bold' }}>O</span>
+                  {(() => {
+                    const isVideo = !!editMedia && (editMedia.includes('video') || /\.(mp4|mov|webm)$/i.test(editMedia));
+                    const handle = (business?.name || 'yourbrand').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    // Real Instagram surfaces: Reels 9:16, Feed 4:5, Profile 1:1 grid.
+                    const ratio = previewTab === 'reels' ? '9/16' : previewTab === 'profile' ? '1/1' : '4/5';
+                    // contain, not cover — cover silently cropped portrait video in a
+                    // square frame, so most of the clip was never visible.
+                    const mediaEl = !editMedia ? (
+                      <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+                        <Video size={30} style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
+                        <p style={{ margin: 0, fontSize: '0.8rem' }}>No media attached</p>
                       </div>
-                      <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>OrganicAI</span>
-                      <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
-                        <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
-                        <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
-                        <div style={{ width: '4px', height: '4px', background: 'var(--text-muted)', borderRadius: '50%' }}></div>
-                      </div>
-                    </div>
+                    ) : isVideo ? (
+                      <video src={editMedia} controls playsInline preload="metadata"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+                    ) : (
+                      <img src={editMedia} alt="Preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+                    );
 
-                    {/* Media */}
-                    <div style={{ width: '100%', aspectRatio: '1/1', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {editMedia ? (
-                        editMedia.includes('video') || editMedia.endsWith('.mp4') ? (
-                          <video src={editMedia} style={{ width: '100%', height: '100%', objectFit: 'cover' }} controls />
+                    return (
+                      <>
+                        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.08)', padding: '0.25rem', borderRadius: '30px' }}>
+                          {[['reels', 'Reels'], ['feed', 'Feed'], ['profile', 'Profile']].map(([k, label]) => (
+                            <button key={k} onClick={() => setPreviewTab(k)}
+                              style={{
+                                padding: '0.4rem 1.1rem', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                                fontWeight: 600, fontSize: '0.85rem',
+                                background: previewTab === k ? 'var(--secondary-color)' : 'transparent',
+                                color: previewTab === k ? '#fff' : 'var(--text-muted)',
+                              }}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.75rem' }}>
+                          {previewTab === 'reels' ? '9:16 — full screen'
+                            : previewTab === 'profile' ? '1:1 — grid thumbnail'
+                            : '4:5 — feed post'}
+                        </div>
+
+                        {previewTab === 'profile' ? (
+                          /* Profile grid: how it sits among other posts */
+                          <div style={{ width: '100%', maxWidth: 330, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                            <div style={{ aspectRatio: '1/1', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--secondary-color)' }}>
+                              {mediaEl}
+                            </div>
+                            {Array.from({ length: 8 }).map((_, i) => (
+                              <div key={i} style={{ aspectRatio: '1/1', background: 'rgba(255,255,255,0.04)' }} />
+                            ))}
+                          </div>
+                        ) : previewTab === 'reels' ? (
+                          /* Reels: caption overlays the video, as it does on Instagram */
+                          <div style={{ width: '100%', maxWidth: 260, aspectRatio: '9/16', background: '#000', borderRadius: 14, overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{mediaEl}</div>
+                            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0.85rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'linear-gradient(135deg,var(--primary-color),var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700 }}>
+                                  {(business?.name || 'B').charAt(0).toUpperCase()}
+                                </div>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 600 }}>{handle}</span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.72rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {editCaption || 'Your caption will appear here'}
+                              </p>
+                            </div>
+                          </div>
                         ) : (
-                          <img src={editMedia} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        )
-                      ) : (
-                         <div style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
-                           <Video size={32} style={{ opacity: 0.5, marginBottom: '0.5rem' }}/>
-                           <p style={{ margin: 0, fontSize: '0.8rem' }}>No media attached</p>
-                         </div>
-                      )}
-                    </div>
+                          /* Feed post */
+                          <div style={{ width: '100%', maxWidth: 350, background: '#111', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                            <div style={{ padding: '0.7rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--primary-color),var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
+                                {(business?.name || 'B').charAt(0).toUpperCase()}
+                              </div>
+                              <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{handle}</span>
+                              <div style={{ marginLeft: 'auto', display: 'flex', gap: 3 }}>
+                                {[0, 1, 2].map(i => <div key={i} style={{ width: 3.5, height: 3.5, background: 'var(--text-muted)', borderRadius: '50%' }} />)}
+                              </div>
+                            </div>
 
-                    {/* Fake Instagram Footer */}
-                    <div style={{ padding: '0.75rem' }}>
-                       <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem' }}>
-                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                       </div>
-                       <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.4 }}>
-                         <span style={{ fontWeight: '600', marginRight: '0.5rem' }}>OrganicAI</span>
-                         {editCaption}
-                       </p>
-                    </div>
-                  </div>
+                            <div style={{ width: '100%', aspectRatio: ratio, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {mediaEl}
+                            </div>
+
+                            <div style={{ padding: '0.7rem 0.75rem' }}>
+                              <div style={{ display: 'flex', gap: '0.9rem', marginBottom: '0.5rem', color: '#fff' }}>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.83rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                                <span style={{ fontWeight: 600, marginRight: '0.4rem' }}>{handle}</span>
+                                {editCaption || 'Your caption will appear here'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                 </div>
               </div>

@@ -31,7 +31,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from database import (
     get_tenant_session,
     User,
@@ -195,43 +195,164 @@ async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, A
 async def _generate_post_caption(profile, media) -> str:
     """Write an on-brand caption for a specific media asset.
 
-    Falls back to a brand-aware template rather than failing the run — a post
-    with a plain caption is far better than no post at all.
+    Feeds the model everything actually known about the business and the asset.
+    An earlier version passed only name/tone/audience, so captions were generic
+    filler that could have described any SaaS — it never learned what the
+    business does. The website description and the asset's own generation
+    prompt are the two strongest signals and were both being discarded.
     """
-    brand_name = getattr(profile, "name", None) or "our brand"
-    tone = getattr(profile, "toneOfVoice", None) or "friendly and professional"
-    audience = getattr(profile, "targetAudience", None) or "our customers"
-    industry = getattr(profile, "industry", None) or getattr(profile, "businessModel", None) or "business"
+    brand_name = getattr(profile, "name", None) or "the brand"
+    description = (getattr(profile, "description", None) or "").strip()
+    website = getattr(profile, "websiteUrl", None) or ""
+    tone = getattr(profile, "toneOfVoice", None) or "confident, specific, no hype"
+    audience = getattr(profile, "targetAudience", None) or ""
+    industry = getattr(profile, "industry", None) or getattr(profile, "businessModel", None) or ""
+    niche = getattr(profile, "niche", None) or ""
     pillars = getattr(profile, "contentPillars", None) or []
     hashtags = getattr(profile, "suggestedHashtags", None) or []
-    asset_hint = ", ".join(getattr(media, "tags", None) or []) or getattr(media, "filename", "")
+
+    # What the asset actually depicts. The stored generation prompt describes
+    # the image far better than a filename does.
+    asset_prompt = (getattr(media, "prompt", None) or "").strip()
+    asset_tags = ", ".join(getattr(media, "tags", None) or [])
+    is_video = (getattr(media, "mimeType", "") or "").startswith("video/")
+
+    known = [f"Business name: {brand_name}"]
+    if description: known.append(f"What it does (from their own site): {description}")
+    if website:     known.append(f"Website: {website}")
+    if industry:    known.append(f"Industry: {industry}")
+    if niche:       known.append(f"Niche: {niche}")
+    if audience:    known.append(f"Target audience: {audience}")
+    if pillars:     known.append(f"Content themes: {', '.join(pillars)}")
+    known.append(f"Tone of voice: {tone}")
+
+    asset_lines = []
+    if asset_prompt: asset_lines.append(f"The visual shows: {asset_prompt[:600]}")
+    if asset_tags:   asset_lines.append(f"Asset tags: {asset_tags}")
+    asset_lines.append(f"Format: {'short video / reel' if is_video else 'single image'}")
+
+    system_prompt = (
+        "You are a senior social media copywriter for B2B and DTC brands. You write "
+        "captions that sound like a specific company wrote them, never like generic "
+        "marketing filler. You never invent facts, metrics, offers or features that "
+        "were not given to you."
+    )
 
     prompt = (
-        f"Write a single social media caption for {brand_name}, a {industry} brand.\n"
-        f"Audience: {audience}\n"
-        f"Tone of voice: {tone}\n"
-        f"Content themes: {', '.join(pillars) if pillars else 'brand value and benefits'}\n"
-        f"The attached asset is described as: {asset_hint or 'a brand visual'}\n\n"
-        "Rules:\n"
-        "- 2 to 4 short sentences, written for Instagram\n"
-        "- Lead with a hook; do not open with the brand name\n"
-        "- End with one clear call to action\n"
-        "- Include 3-6 relevant hashtags on the final line\n"
-        "- No emoji spam, no invented statistics, no fake claims\n"
-        "- Output ONLY the caption text, nothing else"
+        "Write ONE social media caption for the post described below.\n\n"
+        "=== THE BUSINESS ===\n" + "\n".join(known) + "\n\n"
+        "=== THIS POST'S VISUAL ===\n" + "\n".join(asset_lines) + "\n\n"
+        "=== REQUIREMENTS ===\n"
+        "1. It must be obvious from the caption WHAT THIS COMPANY ACTUALLY DOES. "
+        "Reference their real product or problem space, not generic 'automation' "
+        "or 'solutions' language.\n"
+        "2. Connect the caption to what is in the visual. If the visual shows a "
+        "specific object, concept or scene, speak to it.\n"
+        "3. Open with a hook that earns the second line. Never open with the brand name.\n"
+        "4. 2-4 sentences. Plain language. No buzzwords, no 'unlock', 'elevate', "
+        "'game-changer', 'revolutionise', 'in today's fast-paced world'.\n"
+        "5. One clear call to action at the end.\n"
+        "6. Do NOT write 'link in bio' unless there is genuinely a link in the bio.\n"
+        "7. Invent nothing: no statistics, no customer counts, no free trial or "
+        "discount unless stated above.\n"
+        "8. Final line: 3-6 hashtags specific to this industry. No #love #instagood.\n\n"
+        "Output ONLY the caption. No preamble, no quotes, no explanation."
     )
 
     try:
         from services.ai_service import _call_openrouter
-        caption = (await _call_openrouter(prompt)).strip()
+        caption = (await _call_openrouter(prompt, system_prompt=system_prompt)).strip()
+        # Models sometimes wrap output in quotes or add a lead-in line.
+        if caption.startswith('"') and caption.endswith('"'):
+            caption = caption[1:-1].strip()
+        for lead in ("Caption:", "Here's the caption:", "Here is the caption:"):
+            if caption.lower().startswith(lead.lower()):
+                caption = caption[len(lead):].strip()
         if caption:
             return caption[:2200]  # Instagram's caption limit
         logger.warning(f"Caption generation returned empty for workspace {getattr(profile, 'id', '?')}")
     except Exception as e:
         logger.warning(f"Caption generation failed, using brand template: {e}")
 
-    tags = " ".join(hashtags[:5]) if hashtags else "#smallbusiness #marketing"
+    # Fallback still says something true about the business rather than filler.
+    tags = " ".join(hashtags[:5]) if hashtags else "#b2b #technology"
+    if description:
+        first = description.split(".")[0].strip()
+        return f"{first}.\n\nMore at {website or brand_name}.\n\n{tags}"
     return f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{tags}"
+
+
+async def _generate_email_campaign(profile, media) -> dict[str, str] | None:
+    """Draft a marketing email for this business.
+
+    Returns {subject, preheader, bodyText, bodyHtml} or None if the model could
+    not produce usable output. Never raises — a failed email must not take down
+    the social post that shares the same automation run.
+    """
+    brand_name = getattr(profile, "name", None) or "the brand"
+    description = (getattr(profile, "description", None) or "").strip()
+    website = getattr(profile, "websiteUrl", None) or ""
+    tone = getattr(profile, "toneOfVoice", None) or "direct and credible"
+    audience = getattr(profile, "targetAudience", None) or ""
+    industry = getattr(profile, "industry", None) or getattr(profile, "businessModel", None) or ""
+    asset_prompt = (getattr(media, "prompt", None) or "").strip() if media else ""
+
+    known = [f"Business: {brand_name}"]
+    if description: known.append(f"What it does (from their own site): {description}")
+    if website:     known.append(f"Website: {website}")
+    if industry:    known.append(f"Industry: {industry}")
+    if audience:    known.append(f"Audience: {audience}")
+    known.append(f"Tone: {tone}")
+    if asset_prompt: known.append(f"This campaign's visual shows: {asset_prompt[:400]}")
+
+    system_prompt = (
+        "You are a B2B email copywriter. You write short, specific emails that get "
+        "replies. You never invent facts, offers, metrics or customer names. You do "
+        "not write like a newsletter template."
+    )
+
+    prompt = (
+        "Write one marketing email for the business below.\n\n"
+        "=== THE BUSINESS ===\n" + "\n".join(known) + "\n\n"
+        "=== REQUIREMENTS ===\n"
+        "- Subject line: under 55 characters, specific, no clickbait, no emoji\n"
+        "- Preheader: one line that adds to the subject rather than repeating it\n"
+        "- Body: 90-160 words, plain text, short paragraphs\n"
+        "- It must be clear what this company actually does\n"
+        "- Lead with the reader's problem, not the company\n"
+        "- Exactly one call to action\n"
+        "- No 'Dear valued customer', no 'I hope this email finds you well'\n"
+        "- Invent nothing: no statistics, discounts, testimonials or deadlines\n\n"
+        "Return ONLY valid JSON:\n"
+        '{"subject": "...", "preheader": "...", "body": "..."}'
+    )
+
+    try:
+        from services.ai_service import _call_openrouter, _parse_json_response
+        raw = await _call_openrouter(prompt, system_prompt=system_prompt, json_response=True)
+        data = _parse_json_response(raw) or {}
+        subject = (data.get("subject") or "").strip()
+        body = (data.get("body") or "").strip()
+        preheader = (data.get("preheader") or "").strip()
+        if not subject or not body:
+            logger.warning("Email generation returned incomplete JSON")
+            return None
+
+        paragraphs = "".join(
+            f"<p style='margin:0 0 16px;line-height:1.6;color:#111'>{p.strip()}</p>"
+            for p in body.split("\n") if p.strip()
+        )
+        body_html = (
+            "<div style=\"font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;"
+            "max-width:560px;margin:0 auto;padding:24px;font-size:15px\">"
+            f"{paragraphs}"
+            f"<p style='margin:24px 0 0;font-size:12px;color:#888'>{brand_name}"
+            f"{' &middot; ' + website if website else ''}</p></div>"
+        )
+        return {"subject": subject[:200], "preheader": preheader, "bodyText": body, "bodyHtml": body_html}
+    except Exception as e:
+        logger.warning(f"Email generation failed: {e}")
+        return None
 
 
 @router.post("/run-automation")
@@ -327,10 +448,41 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
             else:
                 log_note = f"Manual run — publish failed: {' | '.join(errors) or 'unknown error'}"
 
+            # 6. Draft an email campaign from the same brand context. Always a
+            #    DRAFT — sending to a real list is a separate, deliberate action.
+            email_summary = None
+            email_data = await _generate_email_campaign(profile, chosen)
+            if email_data:
+                audience_count = (await session.execute(
+                    select(func.count(Audience.id)).where(
+                        Audience.businessProfileId == workspace_id,
+                        Audience.unsubscribed == False,  # noqa: E712
+                    )
+                )).scalar() or 0
+
+                email = EmailCampaign(
+                    businessProfileId=workspace_id,
+                    status="DRAFT",
+                    subject=email_data["subject"],
+                    bodyText=email_data["bodyText"],
+                    bodyHtml=email_data["bodyHtml"],
+                    scheduledAt=datetime.now(),
+                    recipientCount=audience_count,
+                )
+                session.add(email)
+                email_summary = {
+                    "subject": email_data["subject"],
+                    "preheader": email_data.get("preheader", ""),
+                    "recipientCount": audience_count,
+                }
+                log_note += f" | email drafted ({audience_count} recipients)"
+
             log = MarketingLog(
                 businessProfileId=workspace_id,
                 status="SUCCESS" if (published or not auto_approve) else "FAILED",
                 socialSuccess=published,
+                emailSuccess=bool(email_data),
+                emailCount=1 if email_data else 0,
                 errorLog=log_note,
             )
             session.add(log)
@@ -344,10 +496,13 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
             message = f"Caption generated, but publishing failed: {new_post.errorLog}"
         else:
             message = "Draft created. Turn on Auto-Approve to publish automatically."
+        if email_summary:
+            message += " An email campaign was drafted in Email Suite."
 
         return {
             "success": new_post.status != "FAILED",
             "message": message,
+            "email": email_summary,
             "post": {
                 "id": new_post.id,
                 "platform": new_post.platform,
