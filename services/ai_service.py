@@ -42,7 +42,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # google/gemma-2-9b-it:free — Used for marketing copy generation (free tier)
 # google/gemma-2-9b-it:free was retired by OpenRouter and returned 404 on every
 # call, so the default model for all marketing copy was silently dead.
-MARKETING_MODEL = "google/gemma-4-31b-it:free"
+MARKETING_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 # Shared timeout for LLM API calls (LLMs can be slow)
 LLM_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
@@ -138,11 +138,17 @@ async def _call_openrouter_once(
 # fallback returned 404 and only the rate-limited primary was ever tried. These
 # are the seed values; _free_models() refreshes them from the API at runtime.
 FREE_MODEL_CHAIN = [
+    # Ordered by capability for marketing copy, strongest first. The chain
+    # falls through on rate limits, so leading with the best model costs
+    # nothing when it is busy but noticeably improves caption quality when it
+    # is not.
+    "nvidia/nemotron-3-ultra-550b-a55b:free",      # 550B MoE, 1M ctx
+    "nvidia/nemotron-3-super-120b-a12b:free",      # 120B MoE
+    "inclusionai/ling-3.0-flash:free",             # 124B MoE
     "google/gemma-4-31b-it:free",
     "google/gemma-4-26b-a4b-it:free",
     "openai/gpt-oss-20b:free",
     "nvidia/nemotron-3-nano-30b-a3b:free",
-    "inclusionai/ling-3.0-flash:free",
 ]
 
 # Models unsuited to marketing copy: safety classifiers, code-only, vision-only.
