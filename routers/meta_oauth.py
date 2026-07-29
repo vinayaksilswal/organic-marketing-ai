@@ -18,9 +18,11 @@ Flow:
 import json
 import secrets
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -56,9 +58,42 @@ META_SCOPES = ",".join([
     "instagram_content_publish",
 ])
 
-# state token -> {workspace_id, user_id, expires}. Short-lived, single-use.
-_OAUTH_STATE: dict[str, dict[str, Any]] = {}
+# The OAuth `state` is a signed, expiring JWT rather than a server-side dict.
+#
+# It was previously held in memory, which silently broke the flow in
+# production: Render restarts the service on every deploy and when the free
+# instance sleeps, so a restart between /connect and Facebook's redirect back
+# discarded the state. The callback then took the "link expired" branch — which
+# also returns 303, making a failed connect indistinguishable from a successful
+# one in the access log. The same applies to any multi-worker deployment, where
+# the callback can land on a different process than the one that issued it.
 _STATE_TTL_SECONDS = 600
+
+
+def _encode_state(workspace_id: str, user_id: str) -> str:
+    return jwt.encode(
+        {
+            "ws": workspace_id,
+            "sub": user_id,
+            "purpose": "meta_oauth",
+            "exp": datetime.now(timezone.utc) + timedelta(seconds=_STATE_TTL_SECONDS),
+        },
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def _decode_state(state: str) -> dict[str, Any] | None:
+    """Return the state payload, or None if it is invalid, expired or foreign."""
+    try:
+        payload = jwt.decode(state, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except Exception as e:
+        logger.warning(f"Meta OAuth state rejected: {e}")
+        return None
+    if payload.get("purpose") != "meta_oauth":
+        logger.warning("Meta OAuth state had the wrong purpose claim")
+        return None
+    return payload
 
 # selection token -> {workspace_id, user_id, pages, expires}.
 # Used when the account owns several Pages and the user must choose which one
@@ -126,12 +161,6 @@ def _dashboard_url(status: str, message: str = "") -> str:
     return f"{frontend}/dashboard/workspaces?{query}"
 
 
-def _purge_expired_state() -> None:
-    now = time.time()
-    for key in [k for k, v in _OAUTH_STATE.items() if v["expires"] < now]:
-        _OAUTH_STATE.pop(key, None)
-
-
 @router.get("/connect")
 async def meta_connect(request: Request, workspace_id: str, user_id: str = Depends(verify_user)):
     """Return the Facebook authorisation URL for this workspace."""
@@ -146,13 +175,7 @@ async def meta_connect(request: Request, workspace_id: str, user_id: str = Depen
         if not bp or bp.userId != user_id:
             raise HTTPException(status_code=404, detail="Workspace not found")
 
-    _purge_expired_state()
-    state = secrets.token_urlsafe(32)
-    _OAUTH_STATE[state] = {
-        "workspace_id": workspace_id,
-        "user_id": user_id,
-        "expires": time.time() + _STATE_TTL_SECONDS,
-    }
+    state = _encode_state(workspace_id, user_id)
 
     from urllib.parse import urlencode
     params = urlencode({
@@ -173,13 +196,16 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
     if not code or not state:
         return RedirectResponse(_dashboard_url("error", "Missing authorisation code"), status_code=303)
 
-    _purge_expired_state()
-    ctx = _OAUTH_STATE.pop(state, None)  # single-use
+    ctx = _decode_state(state)
     if not ctx:
-        return RedirectResponse(_dashboard_url("error", "This connection link expired. Please try again."), status_code=303)
+        return RedirectResponse(
+            _dashboard_url("error", "This connection link expired. Please try connecting again."),
+            status_code=303,
+        )
 
-    workspace_id = ctx["workspace_id"]
-    user_id = ctx["user_id"]
+    workspace_id = ctx["ws"]
+    user_id = ctx["sub"]
+    logger.info(f"Meta OAuth callback accepted for workspace {workspace_id}")
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
