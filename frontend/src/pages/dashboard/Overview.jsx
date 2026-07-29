@@ -1,441 +1,256 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Sparkles, BarChart3, Activity, Clock, RefreshCw, Send } from 'lucide-react';
+import {
+  CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Activity,
+  BarChart3, Clock, RefreshCw, Image as ImageIcon, AlertTriangle,
+  Building2, Sparkles, XCircle
+} from 'lucide-react';
 import { API_BASE, authFetch } from '../../config';
 
-
+/**
+ * Command Center — a read-only status view.
+ *
+ * Deliberately contains no actions. Connecting accounts, uploading media and
+ * running automation each already have a canonical home; duplicating them here
+ * made it ambiguous which control was authoritative. This page answers one
+ * question: is my marketing running, and what has it done lately.
+ */
 const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
   const navigate = useNavigate();
-  // Real connection state for the active workspace, loaded from the API.
+  const [business, setBusiness] = useState(null);
   const [connection, setConnection] = useState(null);
-  const [activeBusiness, setActiveBusiness] = useState(null);
-  const [connecting, setConnecting] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [baseCaption, setBaseCaption] = useState('');
-  const [loading, setLoading] = useState(false);
   const [recentPosts, setRecentPosts] = useState([]);
   const [schedulerStatus, setSchedulerStatus] = useState(null);
   const [stats, setStats] = useState(null);
+  const [mediaCount, setMediaCount] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchDashboardData = async () => {
+  const load = useCallback(async () => {
     setRefreshing(true);
-    try {
-      const postsRes = await authFetch(`${API_BASE}/social/recent-posts`, {}, token);
-      if (postsRes.ok) {
-        const postsData = await postsRes.json();
-        if (postsData.success && postsData.data) {
-          setRecentPosts(postsData.data);
-        }
-      }
+    const get = async (path) => {
+      try {
+        const res = await authFetch(`${API_BASE}${path}`, {}, token);
+        return res.ok ? await res.json() : null;
+      } catch { return null; }
+    };
 
-      const schedRes = await authFetch(`${API_BASE}/social/scheduler-status`, {}, token);
-      if (schedRes.ok) {
-        const schedData = await schedRes.json();
-        if (schedData.success && schedData.data) {
-          setSchedulerStatus(schedData.data);
-        }
-      }
+    const [biz, posts, sched, st, media] = await Promise.all([
+      get('/businesses'),
+      get('/social/recent-posts'),
+      get('/social/scheduler-status'),
+      get('/stats'),
+      get('/marketing/media'),
+    ]);
 
-      const statsRes = await authFetch(`${API_BASE}/stats`, {}, token);
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        if (statsData.success && statsData.data) {
-          setStats(statsData.data);
-        }
-      }
-
-      // Real social connection state for the active workspace
-      const bizRes = await authFetch(`${API_BASE}/businesses`, {}, token);
-      if (bizRes.ok) {
-        const businesses = await bizRes.json();
-        const active = Array.isArray(businesses)
-          ? businesses.find(b => b.id === activeWorkspaceId) || businesses[0]
-          : null;
-        setConnection(active?.socialConnection || null);
-        setActiveBusiness(active || null);
-      }
-    } catch (err) {
-      // SystemBanner already reports backend outages persistently. Toasting on
-      // every failed poll produced a stream of duplicate errors that buried any
-      // message the user actually needed to act on.
-      console.error('Error fetching dashboard data:', err);
-    } finally {
-      setRefreshing(false);
+    if (Array.isArray(biz)) {
+      const active = biz.find(b => b.id === activeWorkspaceId) || biz[0] || null;
+      setBusiness(active);
+      setConnection(active?.socialConnection || null);
     }
-  };
+    if (posts?.success && posts.data) setRecentPosts(posts.data);
+    if (sched?.success && sched.data) setSchedulerStatus(sched.data);
+    if (st?.success && st.data) setStats(st.data);
+    if (Array.isArray(media)) setMediaCount(media.length);
 
-  useEffect(() => {
-    fetchDashboardData();
+    setLoading(false);
+    setRefreshing(false);
   }, [token, activeWorkspaceId]);
 
-  // Report the outcome of the Meta OAuth round-trip when redirected back here
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const meta = params.get('meta');
-    if (!meta) return;
-    const message = params.get('message');
-    if (meta === 'connected') {
-      showToast(`Connected ${message || 'your Meta account'}.`);
-      fetchDashboardData();
-    } else {
-      showToast(message || 'Could not connect your Meta account.', true);
-    }
-    window.history.replaceState({}, '', window.location.pathname);
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
-  const handleConnectMeta = async () => {
-    if (!activeWorkspaceId) {
-      return showToast('Select a business first, then connect its accounts.', true);
-    }
-    setConnecting(true);
-    try {
-      const res = await authFetch(
-        `${API_BASE}/meta/connect?workspace_id=${encodeURIComponent(activeWorkspaceId)}`, {}, token
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.authUrl) {
-        throw new Error(data.detail || data.message || 'Meta connection is unavailable right now.');
-      }
-      window.location.href = data.authUrl;
-    } catch (err) {
-      showToast(err.message, true);
-      setConnecting(false);
-    }
-  };
+  const panel = { background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: '1.5rem' };
+  const muted = { color: 'rgba(255,255,255,0.45)' };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const newFiles = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-    setFiles(prev => [...prev, ...newFiles]);
-  };
+  const connected = [
+    connection?.hasFacebook && { icon: <Facebook size={14} color="#60a5fa" />, label: connection.fbPageName || 'Facebook Page' },
+    connection?.igAccountId && { icon: <Instagram size={14} color="#f472b6" />, label: `@${connection.igAccountName || 'instagram'}` },
+    connection?.hasLinkedin && { icon: <Linkedin size={14} color="#93c5fd" />, label: 'LinkedIn' },
+    connection?.hasTwitter && { icon: <Twitter size={14} color="#e5e7eb" />, label: 'X (Twitter)' },
+  ].filter(Boolean);
 
-  const handleFileChange = (e) => {
-    const newFiles = Array.from(e.target.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-    setFiles(prev => [...prev, ...newFiles]);
-  };
+  // The engine is only genuinely running when it can both create and publish.
+  const canPublish = connected.length > 0;
+  const hasMedia = (mediaCount ?? 0) > 0;
+  const live = canPublish && hasMedia;
 
-  const startAutomation = async () => {
-    if (files.length === 0 && !baseCaption.trim()) {
-      return showToast('Please provide a campaign angle or upload media.', true);
-    }
-    
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-    for (const f of files) {
-      if (f.size > MAX_FILE_SIZE) {
-        return showToast(`File ${f.name} exceeds the 50MB limit.`, true);
-      }
-    }
+  const blockers = [
+    !canPublish && { text: 'No social account connected', where: 'Businesses → Edit → Social Accounts' },
+    !hasMedia && { text: 'No media in this business’s catalog', where: 'Media & Catalog' },
+    business && !business.brandAnalysisComplete && { text: 'Brand profile still building — captions will be generic', where: null },
+  ].filter(Boolean);
 
-    setLoading(true);
-    try {
-      let uploadedMediaUrl = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800';
-      let mediaType = 'image';
+  const Stat = ({ icon, label, value, hint }) => (
+    <div style={{ ...panel, display: 'flex', alignItems: 'center', gap: '1.15rem' }}>
+      <div style={{ background: 'rgba(139,92,246,0.1)', padding: '0.9rem', borderRadius: 12, display: 'flex' }}>{icon}</div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '0.85rem', ...muted }}>{label}</div>
+        {loading
+          ? <div style={{ width: 52, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.06)', marginTop: 4 }} />
+          : <div style={{ fontSize: '1.85rem', fontWeight: 700, lineHeight: 1.2 }}>{value ?? 0}</div>}
+        {hint && <div style={{ fontSize: '0.75rem', ...muted }}>{hint}</div>}
+      </div>
+    </div>
+  );
 
-      if (files.length > 0) {
-        const fileToUpload = files[0];
-        mediaType = fileToUpload.type.startsWith('video/') ? 'video' : 'image';
-        const formData = new FormData();
-        formData.append('file', fileToUpload);
-
-        const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
-        const uploadRes = await fetch(`${API_BASE}/upload-media`, {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {})
-          },
-          body: formData
-        });
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          if (uploadData.success && uploadData.data?.url) {
-            uploadedMediaUrl = uploadData.data.url;
-          }
-        }
-      }
-
-      // 1. Create Social Campaign record
-      const campaignRes = await authFetch(`${API_BASE}/campaigns`, {
-        method: 'POST',
-        body: JSON.stringify({
-          baseCaption: baseCaption || 'Automated high-converting growth post by OrganicAI',
-          mediaUrl: uploadedMediaUrl,
-          mediaType: mediaType
-        })
-      }, token);
-
-      if (!campaignRes.ok) {
-        const errJson = await campaignRes.json().catch(() => ({}));
-        throw new Error(errJson.detail || 'Failed to create campaign record');
-      }
-
-      // 2. Trigger immediate social marketing loop iteration
-      const triggerRes = await authFetch(`${API_BASE}/social/trigger`, {
-        method: 'POST'
-      }, token);
-
-      if (!triggerRes.ok) {
-        const errJson = await triggerRes.json().catch(() => ({}));
-        throw new Error(errJson.detail || 'Failed to trigger marketing loop');
-      }
-
-      showToast('Campaign Generated! Marketing loop triggered successfully.');
-      setFiles([]);
-      setBaseCaption('');
-      fetchDashboardData();
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const statusColor = live ? '#10b981' : '#f59e0b';
 
   return (
     <div className="view">
-      <div className="container" style={{ padding: '3rem 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+      <div className="container" style={{ padding: '2.5rem 0 3rem' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
           <div>
-            <h1>Command Center</h1>
-            <p className="text-muted" style={{ fontSize: '1.125rem' }}>
-              Welcome back. Your automation engine is <span className="badge active"><span className="status-dot green"></span>Active</span>
-            </p>
+            <h1 style={{ margin: 0, fontSize: '2.25rem' }}>Command Center</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+              <span style={{ ...muted, fontSize: '0.95rem' }}>{business?.name || 'No business selected'} —</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.2rem 0.65rem', borderRadius: 999, background: `${statusColor}22`, color: statusColor, fontSize: '0.78rem', fontWeight: 700 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor }} />
+                {live ? 'AUTOMATION LIVE' : 'NOT PUBLISHING'}
+              </span>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ margin: 0, fontWeight: '600' }}>Pro Plan <span style={{ color: 'var(--primary-color)' }}>$17/mo</span></p>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>{user?.email}</p>
-          </div>
+          <button onClick={load} disabled={refreshing} className="btn btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}>
+            <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} /> Refresh
+          </button>
         </div>
 
-        {/* Stats Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>
-          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '1rem', borderRadius: '12px' }}>
-              <Activity size={24} color="var(--primary-color)" />
+        {/* Blockers — the reason it is not publishing, stated plainly */}
+        {!loading && blockers.length > 0 && (
+          <div style={{ ...panel, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <AlertTriangle size={16} color="#f59e0b" />
+              <strong style={{ fontSize: '0.95rem', color: '#fcd34d' }}>
+                {canPublish && hasMedia ? 'Worth attending to' : 'Automation cannot publish yet'}
+              </strong>
             </div>
-            <div>
-              <h4 style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Posts Generated</h4>
-              {refreshing && !stats ? <div className="skeleton-card" style={{ width: '60px', height: '36px', borderRadius: '6px' }}></div> : <h2 style={{ margin: 0 }}>{stats ? stats.posts : (recentPosts.length || 0)}</h2>}
-            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {blockers.map((b, i) => (
+                <li key={i} style={{ fontSize: '0.87rem', color: 'rgba(255,255,255,0.75)' }}>
+                  {b.text}{b.where && <span style={{ ...muted }}> — {b.where}</span>}
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '12px' }}>
-              <BarChart3 size={24} color="var(--secondary-color)" />
-            </div>
-            <div>
-              <h4 style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Total Campaigns</h4>
-              {refreshing && !stats ? <div className="skeleton-card" style={{ width: '60px', height: '36px', borderRadius: '6px' }}></div> : <h2 style={{ margin: 0 }}>{stats ? stats.campaigns : 0}</h2>}
-            </div>
-          </div>
-          <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '1rem', borderRadius: '12px' }}>
-              <Sparkles size={24} color="var(--success)" />
-            </div>
-            <div>
-              <h4 style={{ margin: 0, color: 'var(--text-muted)', fontWeight: '500' }}>Active Users</h4>
-              {refreshing && !stats ? <div className="skeleton-card" style={{ width: '60px', height: '36px', borderRadius: '6px' }}></div> : <h2 style={{ margin: 0 }}>{stats ? stats.users : 1}</h2>}
-            </div>
-          </div>
+        )}
+
+        {/* Counts */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+          <Stat icon={<Activity size={22} color="var(--primary-color)" />} label="Posts published" value={stats?.posts} />
+          <Stat icon={<BarChart3 size={22} color="var(--secondary-color)" />} label="Campaigns" value={stats?.campaigns} />
+          <Stat icon={<ImageIcon size={22} color="#10b981" />} label="Media assets" value={mediaCount} />
+          <Stat icon={<Building2 size={22} color="#f59e0b" />} label="Businesses" value={stats?.workspaces} />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-          {/* Left Column: Integrations & Scheduler Status */}
-          <div>
-            <div className="glass-panel" style={{ padding: '2rem', marginBottom: '2rem' }}>
-              <h3>Connected Platforms</h3>
-              <p style={{ fontSize: '0.875rem', marginBottom: '2rem', color: 'var(--text-muted)' }}>Link your accounts to enable automated posting.</p>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Meta — real OAuth */}
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <Facebook size={19} color="#1877F2" />
-                      <Instagram size={19} color="#E4405F" />
-                      <span style={{ fontWeight: '600' }}>Meta</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) 2fr', gap: '1.5rem', alignItems: 'start' }}>
+
+          {/* Status column */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={panel}>
+              <h3 style={{ margin: '0 0 1rem', fontSize: '1rem' }}>Connected accounts</h3>
+              {connected.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  {connected.map((c, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.87rem' }}>
+                      <CheckCircle2 size={14} color="#10b981" />
+                      {c.icon}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
                     </div>
-                    {connection?.hasFacebook ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '999px', background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
-                        <CheckCircle2 size={11} /> CONNECTED
-                      </span>
-                    ) : (
-                      <button
-                        onClick={handleConnectMeta}
-                        disabled={connecting}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.8rem', fontWeight: 600, borderRadius: '7px', background: '#1877f2', color: '#fff', border: 'none', cursor: connecting ? 'wait' : 'pointer', opacity: connecting ? 0.7 : 1, whiteSpace: 'nowrap' }}
-                      >
-                        <Facebook size={13} /> {connecting ? 'Redirecting…' : 'Connect'}
-                      </button>
-                    )}
-                  </div>
-                  {connection?.hasFacebook && (
-                    <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.75)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <Facebook size={13} color="#60a5fa" /> {connection.fbPageName || 'Facebook Page'}
-                      </div>
-                      {connection.igAccountId && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <Instagram size={13} color="#f472b6" /> @{connection.igAccountName || 'instagram'}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  ))}
                 </div>
-
-                {/* X and LinkedIn — token-based, configured per business */}
-                {[
-                  { key: 'hasTwitter', label: 'X (Twitter)', icon: <Twitter size={19} color="#1DA1F2" /> },
-                  { key: 'hasLinkedin', label: 'LinkedIn', icon: <Linkedin size={19} color="#0A66C2" /> },
-                ].map(p => (
-                  <div key={p.key} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        {p.icon}
-                        <span style={{ fontWeight: '600' }}>{p.label}</span>
-                      </div>
-                      {connection?.[p.key] ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '999px', background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
-                          <CheckCircle2 size={11} /> CONNECTED
-                        </span>
-                      ) : (
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-                          onClick={() => navigate('/dashboard/workspaces')}
-                        >
-                          Set up
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                <p style={{ margin: 0, fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
-                  Accounts are linked per business. Manage them under{' '}
-                  <button onClick={() => navigate('/dashboard/workspaces')}
-                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', font: 'inherit' }}>
-                    Businesses → Social Accounts
-                  </button>.
-                </p>
-              </div>
-            </div>
-
-            {/* Scheduler Details Panel */}
-            <div className="glass-panel" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Clock size={18} color="var(--primary-color)" /> Automation Loop
-                </h4>
-                <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={fetchDashboardData} disabled={refreshing}>
-                  <RefreshCw size={14} className={refreshing ? 'spin' : ''} />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: 'rgba(255,255,255,0.5)' }}>
+                  <XCircle size={14} color="#f87171" /> None connected
+                </div>
+              )}
+              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', ...muted }}>
+                Managed in{' '}
+                <button onClick={() => navigate('/dashboard/workspaces')}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', font: 'inherit' }}>
+                  Businesses
                 </button>
               </div>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                Bi-hourly automated scheduling loop status:
-              </p>
-              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span>Status:</span>
-                  <span style={{ fontWeight: '600', color: schedulerStatus?.schedulerRunning ? 'var(--success)' : 'var(--text-muted)' }}>
-                    {schedulerStatus?.schedulerRunning ? 'RUNNING' : 'ACTIVE'}
+            </div>
+
+            <div style={panel}>
+              <h3 style={{ margin: '0 0 1rem', fontSize: '1rem' }}>Automation</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', fontSize: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={muted}>Scheduler</span>
+                  <span style={{ color: schedulerStatus?.schedulerRunning ? '#10b981' : '#f87171', fontWeight: 600 }}>
+                    {schedulerStatus?.schedulerRunning ? 'Running' : 'Stopped'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Auto Approve:</span>
-                  <span style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
-                    {schedulerStatus?.autoApprove ? 'ON' : 'OFF'}
+                  <span style={muted}>Auto-approve</span>
+                  <span style={{ color: schedulerStatus?.autoApprove ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                    {schedulerStatus?.autoApprove ? 'On — publishes directly' : 'Off — queues drafts'}
                   </span>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={muted}>Posts every</span>
+                  <span style={{ fontWeight: 600 }}>{business?.postIntervalHours ?? 2}h</span>
+                </div>
+                {schedulerStatus?.nextRunAt && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={muted}>Next run</span>
+                    <span style={{ fontWeight: 600 }}>{new Date(schedulerStatus.nextRunAt).toLocaleTimeString()}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right Column: AI Campaign Generator & Post Feed */}
-          <div>
-            <div className="glass-panel" style={{ padding: '2.5rem', marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
-                <div>
-                  <h3>AI Campaign Generator</h3>
-                  <p style={{ color: 'var(--text-muted)' }}>Upload raw media & optional context. Our AI will analyze it, write platform-specific copy, and post or schedule.</p>
-                </div>
-                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '0.5rem 1rem', borderRadius: '999px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Sparkles size={16} color="var(--primary-color)" />
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--primary-color)' }}>Context: {activeBusiness?.businessModel || 'AI Tuned'}</span>
-                </div>
-              </div>
-              
-              <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                <label style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>Campaign Angle / Topic (Optional)</label>
-                <input 
-                  type="text"
-                  placeholder="e.g. Summer special deal, Product showcase, Behind the scenes"
-                  value={baseCaption}
-                  onChange={e => setBaseCaption(e.target.value)}
-                />
-              </div>
-
-              <div 
-                className="dropzone" 
-                onDragOver={e => e.preventDefault()} 
-                onDrop={handleDrop}
-                onClick={() => document.getElementById('file-input').click()}
-              >
-                <UploadCloud className="dropzone-icon" />
-                <h4>Drag & Drop media here</h4>
-                <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>Supports Images & Videos (Max 50MB)</p>
-                <input type="file" id="file-input" multiple accept="image/*,video/*" className="hidden" onChange={handleFileChange} />
-              </div>
-
-              {files.length > 0 && (
-                <div className="media-grid fade-in" style={{ marginTop: '1rem' }}>
-                  {files.map((file, i) => (
-                    <div key={i} className="media-item">
-                      {file.type.startsWith('image/') ? 
-                        <img src={URL.createObjectURL(file)} alt="preview" /> : 
-                        <video src={URL.createObjectURL(file)} />
-                      }
-                      <button style={{ position: 'absolute', top: '0.25rem', right: '0.25rem', background: 'rgba(0,0,0,0.5)', border: 'none', color: 'white', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); setFiles(files.filter((_, idx) => idx !== i)); }}>&times;</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button className="btn btn-primary btn-large" style={{ width: '100%', marginTop: '1.5rem' }} onClick={startAutomation} disabled={loading}>
-                <span className="btn-text">Generate & Schedule Campaign</span>
-                {loading ? <span className="spinner"></span> : <Send size={18} style={{ marginLeft: '0.5rem' }} />}
-              </button>
+          {/* Recent activity */}
+          <div style={{ ...panel, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Clock size={16} color="var(--primary-color)" />
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>Recent posts</h3>
+              <span style={{ marginLeft: 'auto', fontSize: '0.78rem', ...muted }}>{recentPosts.length} shown</span>
             </div>
 
-            {/* Live Social Posts Activity Feed */}
-            {/* Live Social Posts Activity Feed */}
-            {refreshing && recentPosts.length === 0 ? (
-              <div className="glass-panel" style={{ padding: '2rem' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Recent Automated Posts</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {Array(3).fill(0).map((_, i) => <div key={i} className="skeleton-card" style={{ height: '90px', borderRadius: '12px' }}></div>)}
+            {loading ? (
+              <div style={{ padding: '3rem', textAlign: 'center' }}><span className="spinner" style={{ width: 20, height: 20 }} /></div>
+            ) : recentPosts.length === 0 ? (
+              <div style={{ padding: '3rem 2rem', textAlign: 'center', fontSize: '0.9rem', ...muted }}>
+                <Sparkles size={22} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
+                <div>Nothing published yet.</div>
+                <div style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
+                  Posts appear here once the automation runs.
                 </div>
               </div>
-            ) : recentPosts.length > 0 && (
-              <div className="glass-panel" style={{ padding: '2rem' }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>Recent Automated Posts</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {recentPosts.map((post) => (
-                    <div key={post.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: '600', fontSize: '0.85rem', color: 'var(--primary-color)' }}>{post.platform}</span>
-                        <span className={`badge ${post.status === 'POSTED' ? 'active' : ''}`} style={{ fontSize: '0.7rem' }}>
-                          {post.status}
-                        </span>
+            ) : (
+              <div>
+                {recentPosts.slice(0, 8).map((p, i) => {
+                  const ok = p.status === 'POSTED';
+                  const failed = p.status === 'FAILED';
+                  const color = ok ? '#10b981' : failed ? '#f87171' : '#f59e0b';
+                  return (
+                    <div key={p.id || i} style={{ display: 'flex', gap: '0.85rem', padding: '0.9rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, marginTop: 7, flexShrink: 0 }} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: '0.86rem', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {p.caption || 'No caption'}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.3rem', fontSize: '0.74rem', ...muted, flexWrap: 'wrap' }}>
+                          <span style={{ color, fontWeight: 600 }}>{p.status}</span>
+                          <span>{p.platform}</span>
+                          {p.scheduledAt && <span>{new Date(p.scheduledAt).toLocaleString()}</span>}
+                        </div>
+                        {failed && p.errorLog && (
+                          <div style={{ fontSize: '0.74rem', color: '#fca5a5', marginTop: '0.25rem' }}>{p.errorLog}</div>
+                        )}
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-main)' }}>{post.caption}</p>
-                      {post.postedAt && (
-                        <p style={{ margin: '0.5rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          Published at: {new Date(post.postedAt).toLocaleString()}
-                        </p>
-                      )}
                     </div>
-                  ))}
+                  );
+                })}
+                <div style={{ padding: '0.85rem 1.5rem', textAlign: 'center' }}>
+                  <button onClick={() => navigate('/dashboard/social-scheduler')}
+                    style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.83rem', fontWeight: 600 }}>
+                    View full delivery log
+                  </button>
                 </div>
               </div>
             )}
