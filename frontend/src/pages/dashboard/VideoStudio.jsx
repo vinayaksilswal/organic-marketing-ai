@@ -49,6 +49,34 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     return () => { cancelled = true; };
   }, [activeWorkspaceId, token]);
 
+  const [analyzing, setAnalyzing] = useState(false);
+
+  /**
+   * Build the brand profile. Onboarding runs this automatically, but if that
+   * attempt failed — a rate limit, a dropped background task — the workspace
+   * was stuck without one forever and every caption and video prompt came out
+   * generic, with no way for the user to retry. The endpoint existed; nothing
+   * in the UI called it.
+   */
+  const buildBrandProfile = async () => {
+    if (!activeWorkspaceId) return showToast('Select a business first.', true);
+    setAnalyzing(true);
+    try {
+      const res = await authFetch(`${API_BASE}/creatives/re-analyze`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Brand analysis failed');
+      showToast('Brand profile built. Captions and prompts will now be specific to this business.');
+      setBusiness(b => (b ? { ...b, brandAnalysisComplete: true } : b));
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const generate = async () => {
     if (!activeWorkspaceId) return showToast('Select a business first.', true);
     setGenerating(true);
@@ -130,14 +158,38 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     {(business?.name || 'B').charAt(0).toUpperCase()}
                   </div>
                 )}
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: '1.05rem' }}>{business?.name || 'Active business'}</div>
                   <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)' }}>
                     {business?.businessModel || 'General'}
-                    {business?.brandAnalysisComplete ? ' · brand profile ready' : ' · brand profile still building'}
+                    {business?.brandAnalysisComplete ? ' · brand profile ready' : ' · no brand profile yet'}
                   </div>
                 </div>
               </div>
+
+              {business && !business.brandAnalysisComplete && (
+                <div style={{ ...card, marginBottom: '1.25rem', borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
+                    <AlertTriangle size={16} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fcd34d', marginBottom: '0.3rem' }}>
+                        No brand profile for this business
+                      </div>
+                      <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                        Without it the AI has no stored sense of your tone, audience or content
+                        themes, so captions and video prompts come out generic. Building it reads
+                        your website and takes about a minute.
+                      </p>
+                      <button className="btn btn-primary" onClick={buildBrandProfile} disabled={analyzing}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                        {analyzing
+                          ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Analysing your site…</>
+                          : <><Sparkles size={14} /> Build brand profile</>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Product is optional, and only meaningful with a catalog */}
               {products.length > 0 && (
