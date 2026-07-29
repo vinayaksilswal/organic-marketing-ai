@@ -192,7 +192,6 @@ async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, A
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/run-automation")
 async def _generate_post_caption(profile, media) -> str:
     """Write an on-brand caption for a specific media asset.
 
@@ -235,6 +234,7 @@ async def _generate_post_caption(profile, media) -> str:
     return f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{tags}"
 
 
+@router.post("/run-automation")
 async def run_automation_manually(request: Request) -> dict[str, Any]:
     """Manually run automation to generate a social post synchronously based on settings."""
     workspace_id = request.headers.get("x-workspace-id")

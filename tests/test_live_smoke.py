@@ -123,6 +123,22 @@ def test_route_exists_and_is_auth_gated(client, method, path):
     )
 
 
+@pytest.mark.parametrize("method,path", AUTH_ROUTES)
+def test_route_does_not_demand_unexpected_params(client, method, path):
+    """A 422 without a token means the route wants query params it should not.
+
+    This caught a real defect: a helper function was inserted between a
+    @router.post decorator and its handler, so the decorator bound to the
+    helper and FastAPI demanded the helper's arguments as query parameters.
+    The endpoint returned 422 for everyone.
+    """
+    r = client.request(method, path)
+    assert r.status_code != 422, (
+        f"{method} {path} returns 422 unauthenticated — it is likely bound to "
+        f"the wrong function, or requires query params it should not"
+    )
+
+
 @pytest.mark.parametrize("path", PUBLIC_ROUTES)
 def test_public_route_returns_json(client, path):
     r = client.get(path)

@@ -67,12 +67,25 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
 
     try:
         async with AsyncSessionLocal() as session:
-            stmt = select(BusinessProfile).where(BusinessProfile.brandAnalysisComplete == True)
+            # Every workspace is eligible, not just those whose brand analysis
+            # finished. Gating on brandAnalysisComplete meant a workspace whose
+            # analysis failed once — a rate limit, a dropped background task —
+            # was skipped forever with no error and no way to recover. Brand
+            # analysis improves caption quality; it is not a precondition for
+            # posting. Workspaces without it fall back to a brand template.
+            stmt = select(BusinessProfile)
             profiles = (await session.execute(stmt)).scalars().all()
 
             if not profiles:
-                logger.info("[MARKETING LOOP] No active workspaces found")
+                logger.info("[MARKETING LOOP] No workspaces found")
                 return
+
+            incomplete = [p.name for p in profiles if not p.brandAnalysisComplete]
+            if incomplete:
+                logger.info(
+                    f"[MARKETING LOOP] {len(incomplete)} workspace(s) still lack a brand "
+                    f"profile and will use fallback captions: {', '.join(incomplete[:5])}"
+                )
 
             for profile in profiles:
                 try:

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE, authFetch } from '../../config';
 import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
+  const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [postsError, setPostsError] = useState(null);
   const [postsLoading, setPostsLoading] = useState(true);
@@ -208,22 +210,20 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
           </div>
           
           <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            {/* Frequency */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-               <Clock size={16} className="text-muted" />
-               <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Post Every</span>
-               <select 
-                 value={frequencyHours} 
-                 onChange={(e) => handleFrequencyChange(Number(e.target.value))}
-                 style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '700' }}
-               >
-                 <option value={1}>1 Hour</option>
-                 <option value={2}>2 Hours</option>
-                 <option value={4}>4 Hours</option>
-                 <option value={6}>6 Hours</option>
-                 <option value={12}>12 Hours</option>
-                 <option value={24}>24 Hours</option>
-               </select>
+            {/* Posting frequency is owned by Businesses -> Edit -> Automation.
+                Two controls writing the same setting was a source of confusion
+                about which one actually applied. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <Clock size={15} className="text-muted" />
+              <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
+                Posts every <strong style={{ color: '#fff' }}>{frequencyHours}h</strong>
+              </span>
+              <button
+                onClick={() => navigate('/dashboard/workspaces')}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
+              >
+                Change
+              </button>
             </div>
 
             {/* Auto Approve Toggle */}
