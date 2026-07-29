@@ -13,7 +13,7 @@ const PUBLIC_API = API_BASE.replace('/api/v1', '');
  *                 endpoints this UI depends on, so features 404 for no visible
  *                 reason. This is the deploy-drift case.
  */
-export default function SystemBanner({ token }) {
+export default function SystemBanner() {
   const [state, setState] = useState(null); // null | 'unreachable' | 'degraded'
   const [detail, setDetail] = useState('');
   const [dismissed, setDismissed] = useState(false);
@@ -30,18 +30,14 @@ export default function SystemBanner({ token }) {
       }
       const health = await res.json().catch(() => ({}));
 
-      // Probe one endpoint this UI needs. A 404 means the running build predates
-      // it — everything downstream will fail in confusing ways.
-      const probe = await fetch(`${API_BASE}/team`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (probe.status === 404) {
+      // Detect a stale build from /health alone. This previously probed
+      // /api/v1/team, which requires an X-Workspace-Id header the banner has
+      // no business knowing — so every poll logged a 400 in the console, once
+      // a minute, forever. /health reports the running commit and integration
+      // status and needs no auth or workspace context.
+      if (!health.commit || health.commit === 'unknown' || !health.integrations) {
         setState('degraded');
-        setDetail(
-          health.commit
-            ? `The server is running build ${health.commit}, which is missing features this page needs.`
-            : 'The server is running an older build that is missing features this page needs.'
-        );
+        setDetail('The server is running an older build that is missing features this page needs.');
         return;
       }
 
@@ -59,7 +55,7 @@ export default function SystemBanner({ token }) {
     check();
     const id = setInterval(check, 60000);
     return () => clearInterval(id);
-  }, [token]);
+  }, []);
 
   if (!state || dismissed) return null;
 

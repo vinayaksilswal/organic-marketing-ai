@@ -29,7 +29,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
       />
       
       <div style={{ flex: 1, marginLeft: '260px', overflowY: 'auto' }}>
-        <SystemBanner token={token} />
+        <SystemBanner />
         <Routes>
           <Route path="/" element={<Overview user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/video-studio" element={<VideoStudio user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
