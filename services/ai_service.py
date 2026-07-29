@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -39,7 +40,9 @@ from config import settings
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # google/gemma-2-9b-it:free — Used for marketing copy generation (free tier)
-MARKETING_MODEL = "google/gemma-2-9b-it:free"
+# google/gemma-2-9b-it:free was retired by OpenRouter and returned 404 on every
+# call, so the default model for all marketing copy was silently dead.
+MARKETING_MODEL = "google/gemma-4-31b-it:free"
 
 # Shared timeout for LLM API calls (LLMs can be slow)
 LLM_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
@@ -130,12 +133,56 @@ async def _call_openrouter_once(
 # OpenRouter's free tier rate-limits hard (429). A single model being busy must
 # not fail the whole request, so we try several free models, then fall back to
 # calling Gemini directly if a key is available.
+# Verified against OpenRouter's live catalogue. Hardcoding slugs is fragile —
+# an earlier chain listed four models that had all been retired, so every
+# fallback returned 404 and only the rate-limited primary was ever tried. These
+# are the seed values; _free_models() refreshes them from the API at runtime.
 FREE_MODEL_CHAIN = [
-    "google/gemma-2-9b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "qwen/qwen-2.5-7b-instruct:free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "inclusionai/ling-3.0-flash:free",
 ]
+
+# Models unsuited to marketing copy: safety classifiers, code-only, vision-only.
+_MODEL_EXCLUDE = ("content-safety", "-code", "-vl", "guard")
+
+_model_cache: dict[str, Any] = {"models": None, "fetched_at": 0.0}
+_MODEL_CACHE_TTL = 3600  # seconds
+
+
+async def _free_models() -> list[str]:
+    """The free models OpenRouter currently offers, cached for an hour.
+
+    Discovering these rather than hardcoding them means a retired model can no
+    longer silently break the fallback chain. Falls back to FREE_MODEL_CHAIN if
+    the catalogue cannot be reached.
+    """
+    now = time.time()
+    if _model_cache["models"] and now - _model_cache["fetched_at"] < _MODEL_CACHE_TTL:
+        return _model_cache["models"]
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            resp = await client.get("https://openrouter.ai/api/v1/models")
+            resp.raise_for_status()
+            ids = [
+                m["id"] for m in resp.json().get("data", [])
+                if m.get("id", "").endswith(":free")
+                and not any(x in m["id"] for x in _MODEL_EXCLUDE)
+            ]
+        if ids:
+            # Keep our preferred models first, then everything else discovered.
+            ordered = [m for m in FREE_MODEL_CHAIN if m in ids]
+            ordered += [m for m in ids if m not in ordered]
+            _model_cache.update({"models": ordered, "fetched_at": now})
+            logger.info(f"Refreshed OpenRouter free model list: {len(ordered)} available")
+            return ordered
+    except Exception as e:
+        logger.warning(f"Could not refresh OpenRouter model list, using defaults: {e}")
+
+    return FREE_MODEL_CHAIN
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_MODEL = "gemini-2.0-flash"
@@ -182,7 +229,8 @@ async def _call_openrouter(
     down creative generation.
     """
     tried: list[str] = []
-    chain = [model] + [m for m in FREE_MODEL_CHAIN if m != model]
+    available = await _free_models()
+    chain = [model] + [m for m in available if m != model]
 
     for candidate in chain:
         try:
