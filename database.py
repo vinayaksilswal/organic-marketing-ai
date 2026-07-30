@@ -330,6 +330,13 @@ class Media(Base):
     caption = Column(Text, nullable=True)
     # Deactivated assets stay in the catalog but are never chosen for posting.
     isActive = Column(Boolean, default=True, nullable=False)
+    # Generation state for assets produced asynchronously.
+    # NULL = nothing to generate (a plain upload). PENDING/READY/FAILED track a
+    # background AI job, so the request can return immediately instead of
+    # holding an HTTP connection open for minutes and being killed by the
+    # server's timeout — which reaches the browser as a bogus CORS error.
+    generationStatus = Column(String, nullable=True)
+    generationError = Column(Text, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
     businessProfile = relationship('BusinessProfile', back_populates='medias')

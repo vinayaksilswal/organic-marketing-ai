@@ -230,41 +230,13 @@ async def auto_video(
 
         profile_id, profile_name = profile.id, profile.name
 
-    try:
-        result = await execute_video_pipeline(
-            product_name=subject_name,
-            product_url=subject_url,
-            image_url=subject_image,
-            goal=data.goal,
-            profile=profile,
-            recent_prompts=recent_prompts,
-        )
-    except Exception as e:
-        # The pipeline calls OpenRouter, whose free-tier models rate-limit
-        # aggressively. A 429 is an upstream capacity problem, not a fault in
-        # this request — report it as such instead of a bare 500 so the user
-        # knows to simply retry.
-        detail = str(e)
-        exhausted = (
-            "429" in detail
-            or "Too Many Requests" in detail
-            or "unavailable or rate-limited" in detail   # every provider tried
-            or "RetryError" in type(e).__name__
-        )
-        if exhausted:
-            logger.warning(f"All AI providers unavailable for workspace {profile_id}: {detail}")
-            raise HTTPException(
-                status_code=503,
-                detail="Every AI provider is busy or rate-limited right now. Please try again in a minute.",
-            )
-        logger.exception(f"Video pipeline failed for workspace {profile_id}")
-        raise HTTPException(status_code=502, detail="The AI provider could not complete this request.")
-
-    veo_prompt = result.get("veo_prompt")
-    if not veo_prompt:
-        raise HTTPException(status_code=502, detail="The AI did not return a usable prompt. Please try again.")
-
-    media_id = None
+    # Create the asset row FIRST, as PENDING, and return straight away.
+    #
+    # The pipeline runs several LLM calls in sequence, each of which may walk a
+    # fallback chain of free models that rate-limit. Holding the HTTP request
+    # open for that regularly exceeded the server timeout, and a killed worker
+    # sends no response at all — so the browser saw a missing CORS header and
+    # reported a CORS failure for an endpoint whose CORS config was correct.
     async with AsyncSessionLocal() as session:
         media = Media(
             userId=user_id,
@@ -274,73 +246,163 @@ async def auto_video(
             url=subject_image or "",
             tags=[subject_name, "video-prompt", "ai-generated"],
             aiGenerated=True,
-            prompt=veo_prompt,
             promptType="video",
-            caption=veo_prompt,
+            generationStatus="PENDING",
         )
         session.add(media)
         await session.commit()
         await session.refresh(media)
         media_id = media.id
 
-    # Render only if the workspace actually has a key. Absence is a normal
-    # state, not an error — the prompt is still the deliverable.
-    render_status = "skipped"
-    render_detail = "No video API key configured for this business."
-    api_key = None
+    render_key = None
     if data.render and video_cfg and video_cfg.apiKey:
         try:
-            api_key = decrypt_token(video_cfg.apiKey)
+            render_key = decrypt_token(video_cfg.apiKey)
         except Exception:
             logger.warning(f"Could not decrypt video API key for workspace {profile_id}")
-            api_key = None
 
-    if api_key:
-        try:
-            payload = {
-                "resolution": "instagram-story",
-                "quality": "high",
-                "scenes": [{
-                    "elements": (
-                        [{"type": "image", "src": subject_image, "duration": 8}] if subject_image else []
-                    ) + [{
-                        "type": "text",
-                        "text": subject_name,
-                        "duration": 8,
-                        "settings": {"font-size": "64px", "font-family": "Poppins"},
-                    }],
-                }],
-            }
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(
-                    "https://api.json2video.com/v2/movies",
-                    json=payload,
-                    headers={"x-api-key": api_key, "Content-Type": "application/json"},
-                )
-            if resp.status_code < 300:
-                body = resp.json()
-                render_status = "queued"
-                render_detail = body.get("project") or "Render queued with json2video."
-            else:
-                render_status = "failed"
-                render_detail = f"json2video returned {resp.status_code}."
-                logger.warning(f"json2video render failed for workspace {profile_id}: {resp.text[:200]}")
-        except Exception as e:
-            render_status = "failed"
-            render_detail = "Could not reach the video service."
-            logger.exception(f"json2video render error for workspace {profile_id}")
+    asyncio.create_task(
+        _run_video_generation(
+            media_id=media_id,
+            profile_id=profile_id,
+            subject_name=subject_name,
+            subject_url=subject_url,
+            subject_image=subject_image,
+            goal=data.goal,
+            recent_prompts=recent_prompts,
+            render_key=render_key,
+        )
+    )
 
     return {
-        "status": "success",
+        "status": "pending",
         "business": profile_name,
         "subject": subject_name,
         "usedProduct": bool(product),
-        "veo_prompt": veo_prompt,
-        "intelligence": result.get("intelligence"),
-        "creative_strategy": result.get("creative_strategy"),
         "mediaId": media_id,
-        "render": {"status": render_status, "detail": render_detail},
+        "message": "Writing your prompt. It will appear below in under a minute.",
     }
+
+
+async def _run_video_generation(
+    media_id: str,
+    profile_id: str,
+    subject_name: str,
+    subject_url: Optional[str],
+    subject_image: str,
+    goal: str,
+    recent_prompts: list,
+    render_key: Optional[str],
+) -> None:
+    """Generate the prompt out of band and write the result onto the asset row.
+
+    Runs detached from any request, so nothing here may raise into a caller —
+    every failure has to land on the row as FAILED with a readable reason, or
+    the user is left staring at PENDING forever.
+    """
+    from services.video_pipeline_service import execute_video_pipeline
+
+    async def _finish(**fields) -> None:
+        try:
+            async with AsyncSessionLocal() as session:
+                row = await session.get(Media, media_id)
+                if not row:
+                    return
+                for k, v in fields.items():
+                    setattr(row, k, v)
+                await session.commit()
+        except Exception:
+            logger.exception(f"Could not record generation result for media {media_id}")
+
+    try:
+        async with AsyncSessionLocal() as session:
+            profile = await session.get(BusinessProfile, profile_id)
+
+        # A hard ceiling. Without one a stuck provider leaves the row PENDING
+        # indefinitely and the user has no idea whether to wait or retry.
+        result = await asyncio.wait_for(
+            execute_video_pipeline(
+                product_name=subject_name,
+                product_url=subject_url,
+                image_url=subject_image,
+                goal=goal,
+                profile=profile,
+                recent_prompts=recent_prompts,
+            ),
+            timeout=600,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(f"Video pipeline timed out for workspace {profile_id}")
+        await _finish(
+            generationStatus="FAILED",
+            generationError="Generation took too long and was stopped. Please try again.",
+        )
+        return
+    except Exception as e:
+        detail = str(e)
+        exhausted = (
+            "429" in detail
+            or "Too Many Requests" in detail
+            or "unavailable or rate-limited" in detail
+            or "RetryError" in type(e).__name__
+        )
+        logger.exception(f"Video pipeline failed for workspace {profile_id}")
+        await _finish(
+            generationStatus="FAILED",
+            generationError=(
+                "Every AI provider is busy or rate-limited right now. Please try again in a minute."
+                if exhausted else
+                "The AI provider could not complete this request."
+            ),
+        )
+        return
+
+    veo_prompt = (result or {}).get("veo_prompt")
+    if not veo_prompt:
+        await _finish(
+            generationStatus="FAILED",
+            generationError="The AI did not return a usable prompt. Please try again.",
+        )
+        return
+
+    await _finish(
+        generationStatus="READY",
+        generationError=None,
+        prompt=veo_prompt,
+        caption=veo_prompt,
+    )
+
+    # Rendering is optional and must never turn a good prompt into a failure.
+    if not render_key:
+        return
+
+    try:
+        payload = {
+            "resolution": "instagram-story",
+            "quality": "high",
+            "scenes": [{
+                "elements": (
+                    [{"type": "image", "src": subject_image, "duration": 8}] if subject_image else []
+                ) + [{
+                    "type": "text",
+                    "text": subject_name,
+                    "duration": 8,
+                    "settings": {"font-size": "64px", "font-family": "Poppins"},
+                }],
+            }],
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.json2video.com/v2/movies",
+                json=payload,
+                headers={"x-api-key": render_key, "Content-Type": "application/json"},
+            )
+        if resp.status_code >= 300:
+            logger.warning(
+                f"json2video render failed for workspace {profile_id}: {resp.text[:200]}"
+            )
+    except Exception:
+        logger.exception(f"json2video render error for workspace {profile_id}")
 
 
 @router.post("/generate")

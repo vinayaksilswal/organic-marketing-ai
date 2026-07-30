@@ -1549,6 +1549,8 @@ async def get_workspace_media(request: Request) -> Any:
                 "caption": m.caption or m.prompt,
                 "isActive": m.isActive,
                 "postable": _is_postable(m),
+                "generationStatus": m.generationStatus,
+                "generationError": m.generationError,
                 "createdAt": m.createdAt.isoformat() if m.createdAt else None,
             }
             for m in media_list

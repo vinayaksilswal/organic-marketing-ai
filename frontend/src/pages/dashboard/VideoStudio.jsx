@@ -38,10 +38,12 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
         return;
       }
       const all = await res.json();
-      setHistory(
-        (Array.isArray(all) ? all : []).filter(m => m.promptType === 'video' || m.prompt)
+      const rows = (Array.isArray(all) ? all : []).filter(
+        m => m.promptType === 'video' || m.prompt || m.generationStatus
       );
+      setHistory(rows);
       setHistoryError(null);
+      return rows;
     } catch {
       setHistoryError('Could not reach the server to load your prompts.');
     } finally {
@@ -209,17 +211,40 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
       if (!res.ok) throw new Error(data.detail || data.message || 'Generation failed');
 
       setResult(data);
-      const r = data.render || {};
-      if (r.status === 'queued') showToast('Prompt generated and video render queued.');
-      else if (r.status === 'failed') showToast('Prompt saved, but the video render failed.', true);
-      else showToast('Prompt generated and saved to your media library.');
+      showToast(data.message || 'Writing your prompt — it will appear below shortly.');
       await fetchHistory();
+      // The prompt is written by a background task now, so watch the row until
+      // it settles instead of holding the request open (which used to exceed
+      // the server timeout and surface as a bogus CORS error).
+      startPolling(data.mediaId);
     } catch (err) {
       showToast(err.message, true);
     } finally {
       setGenerating(false);
     }
   };
+
+  const startPolling = useCallback((mediaId) => {
+    if (!mediaId) return;
+    let tries = 0;
+    const tick = async () => {
+      tries += 1;
+      const rows = await fetchHistory();
+      const row = (rows || []).find(m => m.id === mediaId);
+
+      if (row?.generationStatus === 'READY') {
+        showToast('Your prompt is ready.');
+        return;
+      }
+      if (row?.generationStatus === 'FAILED') {
+        showToast(row.generationError || 'Generation failed.', true);
+        return;
+      }
+      // ~5 minutes of polling, then stop and let the row speak for itself.
+      if (tries < 60) setTimeout(tick, 5000);
+    };
+    setTimeout(tick, 4000);
+  }, [fetchHistory, showToast]);
 
   // Attaches to the prompt row just generated, so the prompt stays as the
   // asset's description rather than the video landing as an unlabelled file.

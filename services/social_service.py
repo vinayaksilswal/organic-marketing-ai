@@ -36,6 +36,7 @@ from tenacity import (
 )
 
 from config import settings
+from exceptions import IntegrationError
 from services.lock_service import distributed_lock
 from database import AsyncSessionLocal, SocialConnection
 from sqlalchemy import select
@@ -172,8 +173,14 @@ async def post_to_facebook(
             logger.error(f"Could not acquire lock for Facebook Page {page_id}")
             return None
 
-        # Ensure absolute URLs for Facebook API
-        media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
+        # Facebook fetches the media itself, so relative paths must be made
+        # absolute against THIS backend. The previous hardcoded marketing
+        # domain does not serve media, so any relative URL was unfetchable.
+        _base = (settings.backend_public_url or "").rstrip("/")
+        media_urls = [
+            f"{_base}{url}" if url.startswith("/") and _base else url
+            for url in media_urls
+        ]
 
         video_urls = [url for url in media_urls if _is_video(url)]
         image_urls = [url for url in media_urls if not _is_video(url)]
@@ -293,8 +300,10 @@ async def _poll_container_status(
         True if the container is ready (FINISHED), False on error/timeout
     """
     url = f"{GRAPH_BASE_URL}/{container_id}"
+    # `status` carries Meta's human-readable reason on ERROR; status_code alone
+    # only says "ERROR", which is what made every failure look identical.
     params = {
-        "fields": "status_code",
+        "fields": "status_code,status",
         "access_token": access_token,
     }
 
@@ -310,10 +319,9 @@ async def _poll_container_status(
                 )
                 return True
             elif status == "ERROR":
-                logger.error(
-                    f"IG container {container_id} failed processing"
-                )
-                return False
+                detail = result.get("status") or "Instagram could not process the media."
+                logger.error(f"IG container {container_id} failed processing: {detail}")
+                raise IntegrationError(f"Instagram rejected the media: {detail}")
             else:
                 # Still processing — wait and try again
                 logger.debug(
@@ -358,26 +366,53 @@ async def post_to_instagram(
         media_urls: List of media URLs (required — IG needs at least one)
 
     Returns:
-        The Instagram post ID string, or None on failure
+        The Instagram post ID string.
+
+    Raises:
+        IntegrationError: with a reason the user can act on. This function used
+        to swallow every failure and return None, so the delivery log could only
+        say "Post returned None" whether the account was missing, the file was
+        the wrong format, or Meta could not fetch the URL.
     """
+    # Every failure below used to `return None`, and the caller could only
+    # report "Post returned None" — identical text for a missing account, an
+    # unfetchable video and a rejected format. Each now says what happened.
     access_token, ig_user_id = await _get_ig_credentials(workspace_id)
     if not access_token or not ig_user_id:
-        logger.warning("Instagram credentials missing — skipping post")
-        return None
+        raise IntegrationError(
+            "No Instagram account is connected to this business. Connect one in "
+            "Businesses → Edit."
+        )
 
     if not media_urls:
-        logger.warning("Instagram requires at least one media URL")
-        return None
+        raise IntegrationError(
+            "Instagram posts must include an image or video. This post has no media."
+        )
 
     # Acquire distributed lock to prevent concurrent posts to the same IG account
     lock_key = f"ig_post_{ig_user_id}"
     async with distributed_lock(lock_key, timeout_seconds=300) as acquired:
         if not acquired:
-            logger.error(f"Could not acquire lock for Instagram Account {ig_user_id}")
-            return None
+            raise IntegrationError(
+                "Another post to this Instagram account is already in progress. "
+                "Try again in a moment."
+            )
 
-        # Ensure absolute URLs for Instagram API
-        media_urls = [f"https://organicmarketing.ai{url}" if url.startswith("/") else url for url in media_urls]
+        # Instagram fetches the media itself, so a relative path cannot work.
+        # The old prefix here was a hardcoded marketing domain that does not
+        # serve media at all, guaranteeing an unfetchable URL.
+        absolute = []
+        for url in media_urls:
+            if url.startswith("/"):
+                base = (settings.backend_public_url or "").rstrip("/")
+                if not base:
+                    raise IntegrationError(
+                        "Media URL is relative and no public backend URL is configured, "
+                        "so Instagram cannot fetch it."
+                    )
+                url = f"{base}{url}"
+            absolute.append(url)
+        media_urls = absolute
 
         # Separate videos and images
         video_urls = [url for url in media_urls if _is_video(url)]
@@ -402,8 +437,11 @@ async def post_to_instagram(
                 post_ids.append(img_id)
 
         if not post_ids:
-            logger.warning("No successful Instagram posts created")
-            return None
+            raise IntegrationError(
+                "Instagram accepted no media from this post. Check that the file is "
+                "a supported format (MP4/H.264 for Reels, JPG or PNG for images) and "
+                "that its URL is publicly reachable."
+            )
 
         return ",".join(post_ids)
 
@@ -423,14 +461,18 @@ async def _ig_post_video(
         res = await _graph_post(container_url, container_payload)
         container_id = res.get("id")
         if not container_id:
-            logger.error("Failed to create IG video container — no ID returned")
-            return None
+            raise IntegrationError(
+                "Instagram would not accept the video. Check it is MP4/H.264, "
+                "under 90 seconds, and that its URL is publicly reachable."
+            )
 
         # Poll until the video is processed and ready
         is_ready = await _poll_container_status(container_id, access_token)
         if not is_ready:
-            logger.error("IG video container not ready after polling")
-            return None
+            raise IntegrationError(
+                "Instagram was still processing the video when we gave up waiting. "
+                "A shorter or smaller file usually resolves this."
+            )
 
         # Publish
         publish_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media_publish"
@@ -444,9 +486,10 @@ async def _ig_post_video(
         return post_id
 
     except Exception as e:
-        # Catch "Unsupported post request" and similar errors gracefully
+        # Log with context, then re-raise so the reason reaches the delivery
+        # log. Swallowing it here is what produced "Post returned None".
         _handle_ig_error("video/REELS", e)
-        return None
+        raise IntegrationError(f"Reel upload failed: {e}") from e
 
 
 async def _ig_post_single_image(
@@ -463,12 +506,15 @@ async def _ig_post_single_image(
         res = await _graph_post(container_url, container_payload)
         container_id = res.get("id")
         if not container_id:
-            return None
+            raise IntegrationError(
+                "Instagram would not accept the image. Check it is JPG or PNG and "
+                "that its URL is publicly reachable."
+            )
 
         # Images are usually ready immediately, but poll to be safe
         is_ready = await _poll_container_status(container_id, access_token)
         if not is_ready:
-            return None
+            raise IntegrationError("Instagram never finished processing the image.")
 
         publish_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media_publish"
         publish_payload = {
@@ -546,7 +592,7 @@ async def _ig_post_carousel(
 
     except Exception as e:
         _handle_ig_error("carousel", e)
-        return None
+        raise IntegrationError(f"Carousel upload failed: {e}") from e
 
 
 def _handle_ig_error(post_type: str, error: Exception) -> None:
