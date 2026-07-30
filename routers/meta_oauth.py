@@ -239,10 +239,43 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
             pages = pages_res.json().get("data", [])
 
         if not pages:
-            return RedirectResponse(
-                _dashboard_url("error", "No Facebook Pages found. You need a Page (not a personal profile) to publish."),
-                status_code=303,
+            # An empty /me/accounts has two very different causes and the user
+            # can only act on the right one. Ask Facebook which permissions were
+            # actually granted rather than guessing "you have no Pages" — a
+            # reconnect silently reuses a previous, possibly narrower, grant.
+            granted: set[str] = set()
+            declined: set[str] = set()
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    perm_res = await client.get(
+                        f"{GRAPH_BASE_URL}/me/permissions",
+                        params={"access_token": long_token},
+                    )
+                for p in perm_res.json().get("data", []):
+                    (granted if p.get("status") == "granted" else declined).add(p.get("permission"))
+            except Exception as e:
+                logger.warning(f"Could not read granted Meta permissions: {e}")
+
+            logger.warning(
+                f"Meta connect returned no Pages for workspace {workspace_id}. "
+                f"granted={sorted(granted)} declined={sorted(declined)}"
             )
+
+            missing = {"pages_show_list", "pages_manage_posts"} - granted
+            if missing:
+                msg = (
+                    "Facebook did not grant Page access ("
+                    + ", ".join(sorted(missing))
+                    + "). Press Connect again and choose 'Edit settings' / 'Edit access', "
+                    "then tick your Page — a reconnect reuses your previous choices."
+                )
+            else:
+                msg = (
+                    "Page permissions were granted but no Page was selected. Press Connect "
+                    "again, choose 'Edit settings', and select the Page you want to publish to. "
+                    "You need a Facebook Page — a personal profile cannot be published to."
+                )
+            return RedirectResponse(_dashboard_url("error", msg), status_code=303)
 
         # With several Pages we must not guess which one this business posts as.
         if len(pages) > 1:

@@ -24,6 +24,7 @@ import urllib.parse
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
+from sqlalchemy import select
 
 from database import (
     AsyncSessionLocal,
@@ -32,7 +33,7 @@ from database import (
     Media,
     MarketingState,
 )
-from services.ai_service import generate_campaign_variation
+from services.ai_service import generate_campaign_variation, _call_openrouter
 
 
 async def _call_llm(prompt: str) -> str:
@@ -43,6 +44,83 @@ async def _call_llm(prompt: str) -> str:
     except Exception as e:
         logger.error(f"LLM call failed: {e}")
         return ""
+
+
+async def generate_image_prompt(
+    profile: BusinessProfile,
+    topic: str,
+    recent_prompts: Optional[List[str]] = None,
+) -> str:
+    """Write a concrete image-generation prompt for one creative.
+
+    This used to be an f-string — "Modern social media graphic for {name},
+    {model}, topic: {topic}, professional design, 8k quality" — which is why
+    every asset came back as the same generic abstract shape regardless of the
+    business or the topic. Diffusion models need a described scene, not a
+    category label.
+
+    recent_prompts are the last few used for this workspace; the model is told
+    to differ from them so a catalog does not fill with near-identical images.
+    """
+    brand_name = profile.name or "the brand"
+    description = (profile.description or "").strip()
+    industry = profile.industry or profile.businessModel or ""
+    audience = profile.targetAudience or ""
+    colors = ", ".join(profile.brandColors or []) or "a restrained, modern palette"
+
+    avoid = ""
+    if recent_prompts:
+        joined = "\n".join(f"- {p[:160]}" for p in recent_prompts[:5])
+        avoid = (
+            "\n\nRecent images for this brand used the scenes below. Choose a "
+            "visibly different subject, setting and composition:\n" + joined
+        )
+
+    instruction = (
+        f"Write ONE image-generation prompt for a social media post.\n\n"
+        f"Brand: {brand_name}\n"
+        + (f"What it does: {description}\n" if description else "")
+        + (f"Industry: {industry}\n" if industry else "")
+        + (f"Audience: {audience}\n" if audience else "")
+        + f"Brand colours: {colors}\n"
+        f"Post topic: {topic}\n"
+        f"{avoid}\n\n"
+        "Rules for the prompt you write:\n"
+        "- Describe a specific, literal scene a camera could photograph: subject, "
+        "setting, lighting, camera angle, depth of field, mood.\n"
+        "- Ground it in this industry's real world — the objects, tools, screens "
+        "and environments these people actually use.\n"
+        "- No text, words, letters, logos or UI copy in the image; diffusion "
+        "models render text as gibberish.\n"
+        "- No abstract blobs, no generic 'digital network' or 'glowing brain' "
+        "imagery, no floating holograms, no stock-photo handshakes.\n"
+        "- 40-70 words, comma-separated descriptive phrases.\n\n"
+        "Output ONLY the prompt text."
+    )
+
+    try:
+        prompt = (await _call_openrouter(
+            instruction,
+            system_prompt=(
+                "You are an art director writing prompts for image generation "
+                "models. You describe concrete scenes, never marketing abstractions."
+            ),
+        )).strip()
+        if prompt.startswith('"') and prompt.endswith('"'):
+            prompt = prompt[1:-1].strip()
+        if prompt:
+            # Keep brand colours and a quality suffix the model may have omitted.
+            return f"{prompt[:900]}, {colors} colour palette, photographic, sharp focus, no text"
+    except Exception as e:
+        logger.warning(f"Image prompt generation failed for {profile.id}, using descriptive fallback: {e}")
+
+    # Fallback still describes a scene rather than naming a category.
+    subject = description.split(".")[0][:120] if description else f"{industry or 'modern business'} workspace"
+    return (
+        f"Editorial photograph illustrating {subject}, {topic.lower()}, natural light, "
+        f"shallow depth of field, clean composition, {colors} colour palette, "
+        f"photographic, sharp focus, no text"
+    )
 
 
 async def generate_brand_context(profile: BusinessProfile) -> Dict[str, Any]:
@@ -261,13 +339,15 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
             for creative in creatives:
                 media_id = str(uuid.uuid4())
 
-                # Generate AI image prompt
-                img_prompt = (
-                    f"Modern professional social media graphic for {profile.name}, "
-                    f"{profile.businessModel or 'business'}, "
-                    f"topic: {creative['topic']}, clean design, minimal text, "
-                    f"brand colors {', '.join(profile.brandColors or ['#8B5CF6'])}"
-                )
+                # Written by the model against brand context, and told what the
+                # recent images looked like so the catalog does not repeat itself.
+                recent = (await session.execute(
+                    select(Media.prompt)
+                    .where(Media.businessProfileId == workspace_id, Media.prompt.isnot(None))
+                    .order_by(Media.createdAt.desc())
+                    .limit(5)
+                )).scalars().all()
+                img_prompt = await generate_image_prompt(profile, creative["topic"], list(recent))
                 pollinations_url = get_pollinations_image_url(img_prompt, 1080, 1080)
 
                 # Upload to Cloudinary (returns secure URL, falls back to direct URL)
@@ -376,12 +456,13 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                 media_id = str(uuid.uuid4())
                 topic = creative.get("topic", "Brand Highlight")
 
-                img_prompt = (
-                    f"Modern social media graphic for {profile.name}, "
-                    f"{profile.businessModel or 'Business'}, "
-                    f"niche {profile.industry or 'Tech'}, "
-                    f"topic: {topic}, professional design, 8k quality"
-                )
+                recent = (await session.execute(
+                    select(Media.prompt)
+                    .where(Media.businessProfileId == workspace_id, Media.prompt.isnot(None))
+                    .order_by(Media.createdAt.desc())
+                    .limit(5)
+                )).scalars().all()
+                img_prompt = await generate_image_prompt(profile, topic, list(recent))
                 pollinations_url = get_pollinations_image_url(img_prompt, 1080, 1080)
 
                 # Upload to Cloudinary
