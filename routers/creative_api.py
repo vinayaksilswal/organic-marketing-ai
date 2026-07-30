@@ -149,6 +149,32 @@ async def generate_video_campaign(
 
     return result
 
+# asyncio keeps only a WEAK reference to a running task. Without a strong
+# reference of our own the task can be garbage-collected mid-execution, which
+# leaves the asset row stuck on PENDING with an empty prompt and no error —
+# exactly the "it generates but the prompt is empty" symptom.
+# https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _spawn_background(coro) -> asyncio.Task:
+    """Run a coroutine detached from the request, holding it alive until done."""
+    task = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+
+    def _log_failure(t: asyncio.Task) -> None:
+        if t.cancelled():
+            logger.warning("Background generation task was cancelled")
+            return
+        exc = t.exception()
+        if exc:
+            logger.opt(exception=exc).error("Background generation task crashed")
+
+    task.add_done_callback(_log_failure)
+    return task
+
+
 class AutoVideoRequest(BaseModel):
     product_id: Optional[str] = None   # optional; e-commerce workspaces only
     goal: str = "conversion"
@@ -261,7 +287,7 @@ async def auto_video(
         except Exception:
             logger.warning(f"Could not decrypt video API key for workspace {profile_id}")
 
-    asyncio.create_task(
+    _spawn_background(
         _run_video_generation(
             media_id=media_id,
             profile_id=profile_id,

@@ -548,23 +548,76 @@ Return the JSON object and nothing else.
     from services.ai_service import _call_openrouter
 
     combined_prompt = f"{sys_message}\n\nUSER PROMPT:\n{prompt}"
-    result = await _call_openrouter(combined_prompt, model=TEXT_MODEL, json_response=True)
 
-    try:
-        cleaned = result.strip()
+    def _extract(raw: str) -> str:
+        """Pull the prompt text out of whatever shape the model returned.
+
+        Free models are inconsistent: some honour response_format, some wrap
+        the object in an array, some emit a bare string, some fence it in
+        markdown. Every one of those used to be able to yield an empty result,
+        which reached the user as an asset with no prompt at all.
+        """
+        cleaned = (raw or "").strip()
+        if not cleaned:
+            return ""
+
         if cleaned.startswith("```"):
-            cleaned = cleaned.split("\n", 1)[1]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-        parsed = json.loads(cleaned.strip())
-        generated = parsed.get("prompt") or ""
-        if generated:
-            return generated.strip()
-        logger.warning("Video prompt JSON parsed but carried no 'prompt' field")
-        return cleaned.strip()
-    except Exception as e:
-        logger.error(f"Failed to parse generation prompt JSON: {e}")
-        return result.strip()
+            parts = cleaned.split("\n", 1)
+            cleaned = parts[1] if len(parts) > 1 else ""
+            if cleaned.rstrip().endswith("```"):
+                cleaned = cleaned.rstrip()[:-3]
+            cleaned = cleaned.strip()
+
+        try:
+            parsed = json.loads(cleaned)
+        except Exception:
+            # Not JSON at all — a bare prompt is perfectly usable.
+            return cleaned
+
+        # Some models wrap the object in a list, or under an "output" key.
+        if isinstance(parsed, list) and parsed:
+            parsed = parsed[0]
+        if isinstance(parsed, dict) and "prompt" not in parsed:
+            for key in ("output", "result", "data", "response"):
+                inner = parsed.get(key)
+                if isinstance(inner, dict) and "prompt" in inner:
+                    parsed = inner
+                    break
+
+        if isinstance(parsed, dict):
+            value = parsed.get("prompt")
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            # JSON with no usable prompt field — the raw text beats nothing.
+            logger.warning("Video prompt JSON carried no usable 'prompt' field")
+            return cleaned
+        if isinstance(parsed, str) and parsed.strip():
+            return parsed.strip()
+        return cleaned
+
+    result = await _call_openrouter(combined_prompt, model=TEXT_MODEL, json_response=True)
+    generated = _extract(result)
+
+    if not generated:
+        # Asking for JSON is itself a failure mode: several free models reject
+        # response_format outright. Retry in plain text before giving up.
+        logger.warning("Video prompt came back empty; retrying without JSON mode")
+        plain = await _call_openrouter(
+            combined_prompt
+            + "\n\nIMPORTANT: reply with the prompt text ONLY — no JSON, no keys, "
+            "no markdown, no preamble.",
+            model=TEXT_MODEL,
+        )
+        generated = _extract(plain)
+
+    if not generated:
+        # Never hand back an empty string: the caller cannot tell an empty
+        # prompt from a successful one, and the user gets a blank asset.
+        raise RuntimeError(
+            "The AI returned an empty prompt after two attempts."
+        )
+
+    return generated
 
 
 async def execute_video_pipeline(

@@ -115,6 +115,7 @@ def _serialise_page(page: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": page["id"],
         "name": page.get("name") or "Facebook Page",
+        "category": page.get("category"),
         "instagramId": ig.get("id"),
         "instagramUsername": ig.get("username"),
     }
@@ -136,6 +137,7 @@ async def _store_connection(user_id: str, workspace_id: str, page: dict[str, Any
         conn.fbAccessToken = encrypt_token(page["access_token"])
         conn.fbPageId = page["id"]
         conn.fbPageName = page.get("name")
+        conn.fbPageCategory = page.get("category")
         # Clear any previous IG link so switching Pages cannot leave a stale one
         conn.igAccountId = ig.get("id")
         conn.igAccountName = ig.get("username")
@@ -256,7 +258,10 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
             #    do not expire, which is what we want for unattended posting.
             pages_res = await client.get(f"{GRAPH_BASE_URL}/me/accounts", params={
                 "access_token": long_token,
-                "fields": "id,name,access_token,instagram_business_account{id,username}",
+                # `category` is the Page's own niche as Meta classifies it, and
+                # it costs nothing extra to ask for. It feeds the caption and
+                # video writers so each account sounds like its own sector.
+                "fields": "id,name,category,access_token,instagram_business_account{id,username}",
             })
             pages_res.raise_for_status()
             pages = pages_res.json().get("data", [])
@@ -281,7 +286,10 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
                                     f"{GRAPH_BASE_URL}/{biz['id']}/{edge}",
                                     params={
                                         "access_token": long_token,
-                                        "fields": "id,name,access_token,instagram_business_account{id,username}",
+                                        # `category` is the Page's own niche as Meta classifies it, and
+                # it costs nothing extra to ask for. It feeds the caption and
+                # video writers so each account sounds like its own sector.
+                "fields": "id,name,category,access_token,instagram_business_account{id,username}",
                                     },
                                 )
                                 if edge_res.status_code >= 300:

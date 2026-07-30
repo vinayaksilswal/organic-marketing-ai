@@ -60,6 +60,40 @@ else:
 # =============================================================================
 # Application Lifespan — Non-Blocking Async Context Manager
 # =============================================================================
+async def _fail_orphaned_generations() -> None:
+    """Close out prompt generations that a restart interrupted.
+
+    A row left on PENDING shows in the UI as an entry with no prompt and no
+    explanation, which reads as "it generated nothing". Marking them FAILED
+    tells the user plainly that the run died and they should try again.
+
+    Defensive: this runs during bootstrap and must never prevent startup.
+    """
+    try:
+        from sqlalchemy import update
+        from database import AsyncSessionLocal, Media
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                update(Media)
+                .where(Media.generationStatus == "PENDING")
+                .values(
+                    generationStatus="FAILED",
+                    generationError=(
+                        "Generation was interrupted by a server restart. "
+                        "Please generate again."
+                    ),
+                )
+            )
+            await session.commit()
+            if result.rowcount:
+                logger.warning(
+                    f"Marked {result.rowcount} interrupted prompt generation(s) as FAILED"
+                )
+    except Exception as e:
+        logger.warning(f"Could not reconcile interrupted generations: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -98,6 +132,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             # 2. Run all database seeds (system user, superadmin, etc.)
             await run_all_seeds()
+
+            # 3. Recover generations orphaned by a restart. Prompt writing runs
+            #    in a background task; if the worker is replaced mid-flight the
+            #    row is left PENDING forever with an empty prompt and no reason.
+            await _fail_orphaned_generations()
 
             # 4. Start the APScheduler for marketing automation
             scheduler = create_scheduler()

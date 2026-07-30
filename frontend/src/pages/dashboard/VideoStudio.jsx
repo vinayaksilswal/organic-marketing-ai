@@ -413,13 +413,24 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               )}
             </div>
 
-            {/* Result */}
-            {result && (
+            {/* Result. The prompt is written by a background task, so read the
+                live row rather than the response — which no longer carries it. */}
+            {result && (() => {
+              const row = history.find(m => m.id === result.mediaId) || {};
+              const genStatus = row.generationStatus;
+              const promptText = row.prompt || row.caption || '';
+              const pending = genStatus === 'PENDING' || (!promptText && genStatus !== 'FAILED');
+              const failed = genStatus === 'FAILED';
+              return (
               <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
                 <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Check size={17} color="#10b981" />
+                  {pending ? <span className="spinner" style={{ width: 15, height: 15 }} />
+                    : failed ? <AlertTriangle size={17} color="#f87171" />
+                    : <Check size={17} color="#10b981" />}
                   <h3 style={{ margin: 0, fontSize: '1.02rem' }}>
-                    Prompt for “{result.subject}”
+                    {pending ? `Writing a prompt for “${result.subject}”…`
+                      : failed ? `Could not write a prompt for “${result.subject}”`
+                      : `Prompt for “${result.subject}”`}
                   </h3>
                   <span style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '0.18rem 0.55rem', borderRadius: 999, background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)', fontWeight: 600 }}>
                     {result.usedProduct ? 'PRODUCT' : 'BRAND'}
@@ -434,21 +445,47 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                         Saved to this business's media library
                       </span>
                     </label>
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => { navigator.clipboard.writeText(result.veo_prompt); showToast('Prompt copied to clipboard'); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.42rem 0.85rem', fontSize: '0.82rem' }}
-                    >
-                      <Copy size={14} /> Copy
-                    </button>
+                    {promptText && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => { navigator.clipboard.writeText(promptText); showToast('Prompt copied to clipboard'); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.42rem 0.85rem', fontSize: '0.82rem' }}
+                      >
+                        <Copy size={14} /> Copy
+                      </button>
+                    )}
                   </div>
 
-                  <textarea
-                    value={result.veo_prompt}
-                    readOnly
-                    onFocus={e => e.target.select()}
-                    style={{ width: '100%', minHeight: 150, padding: '1rem', fontSize: '0.9rem', lineHeight: 1.6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9, color: '#e4e4e7', resize: 'vertical' }}
-                  />
+                  {/* An empty textarea reads as "it generated nothing". Show
+                      what is actually happening instead. */}
+                  {pending ? (
+                    <div style={{ ...card, display: 'flex', alignItems: 'center', gap: '0.7rem', minHeight: 110 }}>
+                      <span className="spinner" style={{ width: 16, height: 16 }} />
+                      <div style={{ fontSize: '0.87rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.55 }}>
+                        Writing the prompt. Free AI providers queue under load, so this
+                        can take up to a minute — you can leave this page and it will
+                        still finish.
+                      </div>
+                    </div>
+                  ) : failed ? (
+                    <div style={{ ...card, borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.87rem', color: '#fca5a5', lineHeight: 1.55 }}>
+                        <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
+                        {row.generationError || 'Generation failed. Please try again.'}
+                      </div>
+                      <button className="btn btn-secondary" onClick={generate} disabled={generating}
+                        style={{ marginTop: '0.85rem', padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}>
+                        Try again
+                      </button>
+                    </div>
+                  ) : (
+                    <textarea
+                      value={promptText}
+                      readOnly
+                      onFocus={e => e.target.select()}
+                      style={{ width: '100%', minHeight: 150, padding: '1rem', fontSize: '0.9rem', lineHeight: 1.6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9, color: '#e4e4e7', resize: 'vertical' }}
+                    />
+                  )}
 
                   {/* Render outcome — absence of a key is normal, not an error */}
                   {result.render?.status === 'queued' && (
@@ -466,8 +503,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     </div>
                   )}
 
-                  {/* Manual upload path when there is no render key */}
-                  {result.render?.status !== 'queued' && (
+                  {/* Manual upload path — only once there is a prompt to render */}
+                  {promptText && !pending && !failed && (
                     <div style={{ ...card, marginTop: '1.1rem', borderStyle: 'dashed' }}>
                       <h5 style={{ margin: '0 0 0.4rem 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <ImageIcon size={14} /> Made the video elsewhere?
@@ -492,7 +529,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   )}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* One hidden input drives every row's attach button. */}
             <input
@@ -545,6 +583,11 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   const busy = attachingId === item.id;
                   const open = expandedId === item.id;
                   const text = item.prompt || item.caption || '';
+                  // A row with no prompt used to render as an empty card with
+                  // buttons and no explanation.
+                  const gen = item.generationStatus;
+                  const isGenerating = gen === 'PENDING' || (!text && gen !== 'FAILED');
+                  const genFailed = gen === 'FAILED';
                   return (
                     <div key={item.id} style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
@@ -563,23 +606,40 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
                             <span style={{
                               fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4,
-                              background: live ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.15)',
-                              color: live ? 'var(--success)' : '#fbbf24',
+                              background: genFailed ? 'rgba(239,68,68,0.15)'
+                                : isGenerating ? 'rgba(148,163,184,0.15)'
+                                : live ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.15)',
+                              color: genFailed ? '#f87171'
+                                : isGenerating ? '#94a3b8'
+                                : live ? 'var(--success)' : '#fbbf24',
                             }}>
-                              {live ? 'IN POSTING CYCLE' : 'PROMPT ONLY'}
+                              {genFailed ? 'FAILED'
+                                : isGenerating ? 'WRITING…'
+                                : live ? 'IN POSTING CYCLE' : 'PROMPT ONLY'}
                             </span>
                             <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
                               {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
                             </span>
                           </div>
 
-                          <p style={{
-                            margin: 0, fontSize: '0.83rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic',
-                            whiteSpace: 'pre-wrap',
-                            ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
-                          }}>
-                            {text}
-                          </p>
+                          {isGenerating ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>
+                              <span className="spinner" style={{ width: 12, height: 12 }} />
+                              Writing this prompt — it will appear here when it is done.
+                            </div>
+                          ) : genFailed ? (
+                            <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: 1.55, color: '#fca5a5' }}>
+                              {item.generationError || 'Generation failed. Try generating again.'}
+                            </p>
+                          ) : (
+                            <p style={{
+                              margin: 0, fontSize: '0.83rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic',
+                              whiteSpace: 'pre-wrap',
+                              ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
+                            }}>
+                              {text}
+                            </p>
+                          )}
 
                           {text.length > 180 && (
                             <button
@@ -591,6 +651,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                           )}
 
                           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                            {/* Copy and attach make no sense without a prompt. */}
+                            {text && (
                             <button
                               className="btn btn-secondary"
                               onClick={() => { navigator.clipboard.writeText(text); showToast('Prompt copied to clipboard'); }}
@@ -598,7 +660,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             >
                               <Copy size={12} /> Copy
                             </button>
+                            )}
 
+                            {text && (
                             <button
                               className={live ? 'btn btn-secondary' : 'btn btn-primary'}
                               disabled={busy}
@@ -611,6 +675,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                                   ? <><Upload size={12} /> Replace video</>
                                   : <><Send size={12} /> Add video → posting cycle</>}
                             </button>
+                            )}
 
                             <button
                               className="btn btn-secondary"
@@ -622,7 +687,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             </button>
                           </div>
 
-                          {!live && (
+                          {!live && text && (
                             <p style={{ margin: '0.6rem 0 0 0', fontSize: '0.74rem', color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
                               This is a saved prompt, not a file — the scheduler skips it. Render it in
                               your video tool, then attach the result to put it in rotation.

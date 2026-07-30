@@ -145,6 +145,36 @@ class VideoApiConfig(Base):
     businessProfile = relationship('BusinessProfile', back_populates='videoapiconfigs')
 
 
+class EmailConfig(Base):
+    """Per-workspace email sending credentials.
+
+    Sending was previously possible only through one global RESEND_API_KEY, so
+    every customer's mail would leave from the platform's own domain — bad for
+    deliverability and impossible for a business that wants its own sender.
+    """
+
+    __tablename__ = "EmailConfig"
+    __table_args__ = (
+        UniqueConstraint("businessProfileId", name="uniq_email_config_workspace"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    provider = Column(String, default="resend", nullable=False)
+    apiKey = Column(Text, nullable=False)          # Fernet-encrypted at rest
+    fromEmail = Column(String, nullable=False)
+    fromName = Column(String, nullable=True)
+    replyTo = Column(String, nullable=True)
+    verified = Column(Boolean, default=False, nullable=False)
+    lastError = Column(Text, nullable=True)
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    businessProfileId = Column(
+        String, ForeignKey("BusinessProfile.id", ondelete="CASCADE"), nullable=True
+    )
+
+
 class Product(Base):
     __tablename__ = "Product"
 
@@ -173,6 +203,11 @@ class SocialConnection(Base):
     fbAccessToken = Column(Text, nullable=True)
     fbPageId = Column(String, nullable=True)
     fbPageName = Column(String, nullable=True)
+    # The Page's own category from Meta ("Software Company", "Clothing Store",
+    # "Restaurant"). Captured at connect time and fed to the writers, so an
+    # account's niche comes from the platform itself rather than being guessed.
+    # This is what keeps two businesses on one login from sounding alike.
+    fbPageCategory = Column(String, nullable=True)
     igAccountId = Column(String, nullable=True)
     igAccountName = Column(String, nullable=True)
     twitterAccessToken = Column(Text, nullable=True)

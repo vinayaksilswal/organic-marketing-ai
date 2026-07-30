@@ -339,6 +339,28 @@ def _is_postable(media) -> bool:
     return mime.startswith("image/") or mime.startswith("video/")
 
 
+async def _account_niche(workspace_id) -> str:
+    """The connected Page's own category, as Meta classifies it.
+
+    A niche taken from the platform beats one inferred from a website, and it
+    is what stops two businesses on the same login producing interchangeable
+    copy. Never fatal — absence just means one less signal.
+    """
+    if not workspace_id:
+        return ""
+    try:
+        from database import SocialConnection
+        async with get_tenant_session(workspace_id) as session:
+            conn = (await session.execute(
+                select(SocialConnection).where(
+                    SocialConnection.businessProfileId == workspace_id
+                )
+            )).scalars().first()
+            return (getattr(conn, "fbPageCategory", None) or "").strip() if conn else ""
+    except Exception:
+        return ""
+
+
 async def _generate_post_caption(profile, media, product=None) -> str:
     """Write an on-brand caption for a specific media asset.
 
@@ -387,6 +409,10 @@ async def _generate_post_caption(profile, media, product=None) -> str:
     if niche:       known.append(f"Niche: {niche}")
     if audience:    known.append(f"Target audience: {audience}")
     if pillars:     known.append(f"Content themes: {', '.join(pillars)}")
+    page_category = await _account_niche(getattr(profile, "id", None))
+    if page_category:
+        known.append(f"The connected Facebook Page is categorised as: {page_category}")
+
     known.append(f"Tone of voice: {tone}")
     if offer:       known.append(f"The one action to drive (use this exact offer): {offer}")
 
@@ -710,7 +736,11 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
 
             new_post = SocialPost(
                 businessProfileId=workspace_id,
-                platform="INSTAGRAM",
+                # This run publishes to Facebook AND Instagram, but the row was
+                # labelled INSTAGRAM. Retrying it from Edit/Preview reads this
+                # field to decide where to send, so Facebook was silently
+                # skipped on every retry.
+                platform="BOTH",
                 type="AUTO",
                 caption=caption,
                 mediaUrls=media_urls,
@@ -1298,6 +1328,11 @@ async def get_email_campaigns(request: Request) -> Any:
                 "id": e.id,
                 "status": e.status,
                 "subject": e.subject,
+                # The body was always stored and never returned, so the UI
+                # could not preview or edit a draft before sending it.
+                "bodyText": e.bodyText,
+                "bodyHtml": e.bodyHtml,
+                "errorLog": e.errorLog,
                 "type": getattr(e, "type", "AUTOMATED"),
                 "scheduledAt": e.scheduledAt.isoformat() if e.scheduledAt else None,
                 "sentAt": e.sentAt.isoformat() if e.sentAt else None,
