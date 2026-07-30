@@ -178,14 +178,31 @@ async def meta_connect(request: Request, workspace_id: str, user_id: str = Depen
     state = _encode_state(workspace_id, user_id)
 
     from urllib.parse import urlencode
-    params = urlencode({
+
+    query: dict[str, str] = {
         "client_id": settings.fb_app_id,
         "redirect_uri": _redirect_uri(),
         "state": state,
-        "scope": META_SCOPES,
         "response_type": "code",
-    })
-    return {"success": True, "authUrl": f"https://www.facebook.com/{GRAPH_API_VERSION}/dialog/oauth?{params}"}
+    }
+
+    if settings.fb_config_id:
+        # Facebook Login for Business. The configuration decides which assets
+        # the user is asked to grant, and drives the Page/Instagram picker.
+        # scope must be omitted here — FLB rejects the two together.
+        query["config_id"] = settings.fb_config_id
+    else:
+        query["scope"] = META_SCOPES
+        # Force the picker instead of silently reusing an earlier, narrower
+        # grant. Without this a "Reconnect" can complete with no Page attached,
+        # leaving /me/accounts empty even though permissions look granted.
+        query["auth_type"] = "rerequest"
+
+    return {
+        "success": True,
+        "authUrl": f"https://www.facebook.com/{GRAPH_API_VERSION}/dialog/oauth?{urlencode(query)}",
+        "mode": "business_config" if settings.fb_config_id else "classic",
+    }
 
 
 @router.get("/callback")

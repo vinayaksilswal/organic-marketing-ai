@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     # =========================================================================
     fb_app_id: str | None = None
     fb_app_secret: str | None = None
+    # Facebook Login for Business configuration id. FLB uses a saved
+    # configuration to decide which assets (Pages, IG accounts) the user is
+    # asked to grant. Without it the dialog can complete while attaching no
+    # Page at all, leaving /me/accounts empty despite permissions being granted.
+    fb_config_id: str | None = None
     fb_page_access_token: str | None = None
     fb_page_id: str | None = None
     ig_business_account_id: str | None = None
