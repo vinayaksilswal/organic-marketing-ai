@@ -3,7 +3,12 @@ services:
     name: organic-marketing-ai
     env: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker"
+    # --timeout 120: a run-automation request performs LLM generation and then
+    # publishes, which regularly exceeds gunicorn's 30s default. The worker was
+    # being killed mid-request, so no response (and therefore no CORS header)
+    # reached the browser — surfacing as a misleading CORS error. The Dockerfile
+    # already carried this; render.yaml did not.
+    startCommand: "gunicorn main:app -w 1 -k uvicorn.workers.UvicornWorker --timeout 120 --graceful-timeout 30"
     region: ohio
     plan: starter
     healthCheckPath: /health

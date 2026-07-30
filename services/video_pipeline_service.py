@@ -352,7 +352,9 @@ async def generate_prompt(intelligence: Dict[str, Any], creative_strategy: Dict[
     cf = creative_strategy.get("creative_format", {})
     vm = creative_strategy.get("variation_modifier", {})
     
-    sys_message = """You are an elite creative director and video prompt engineer specializing in AI-generated commercial video for enterprise marketing. Take the reference product profile and translate it into two highly optimized, production-ready prompts for Veo 3.1 (temporal video).
+    sys_message = """You are an elite creative director writing prompts for AI video used as Instagram Reels and paid social ads. Take the reference product profile and translate it into ONE production-ready Veo 3.1 prompt for a single 8-second vertical (9:16) clip.
+
+LENGTH DISCIPLINE: 60-90 words. These models lose detail past roughly 100 words, so a longer prompt yields a WORSE video, not a richer one. Every word must earn its place. Cut atmosphere adjectives before you cut the subject, the action or the on-screen line.
 Default Behavior & Enterprise Commercial Requirements
 If user instructions lack detail: Generate a high-end commercial studio setting matching the product's category.
 Default to high-fidelity, professional cinematic scenes unless explicitly overridden.
@@ -370,7 +372,7 @@ No Fabrication: Never invent extra claims, features, statistics, or numbers.
 OUTPUT REQUIREMENTS:
 - Output ONLY this exact JSON, no markdown, no wrapping:
 {
-  "prompt": "<single unified video prompt — minimum 120 words, following 5-part formula, combining both scenes into one cohesive narrative arc>"
+  "prompt": "<single-scene vertical video prompt, 60-90 words, following the 5-part formula>"
 }
 - First character must be { and last must be }
 - No \\n, no escaped quotes, no array wrapping
@@ -406,7 +408,7 @@ ENTERPRISE_SAAS: Modern office — glass walls. Subject: Professional using prod
 ═══════════════════════════════════════════════════════════
 MANDATORY CREATIVE RULES:
 RULE 1 — FORMAT COMPLIANCE: Build the entire prompt around the assigned creative format.
-RULE 2 — TWO-SCENE NARRATIVE ARC IN ONE PROMPT: The single prompt must contain two distinct scenes separated by a natural cinematic transition phrase ("Then, cutting to a new scene").
+RULE 2 — ONE SCENE, 8 SECONDS, VERTICAL. This renders as a single 8-second 9:16 clip for an Instagram Reel or a paid ad. Do NOT write two scenes and do NOT use transition phrases like "Then, cutting to a new scene" — there is no time for a second setup, and asking for one produces a prompt the model silently truncates. Pick the single strongest moment. The hook must land in the first second.
 RULE 3 — BRAND COLOR ON JUSTIFIED SURFACES ONLY: Use exact color names from the brand profile on real surfaces.
 RULE 4 — ALL PRODUCT TEXT IN DOUBLE QUOTES: Every product name, tagline, CTA, and UI text visible must be in exact double quotes.
 RULE 5 — VARIATION MODIFIER INTEGRATION: The modifier must visibly influence at least one scene's atmosphere.
@@ -420,7 +422,7 @@ First character = {{ Last character = }}
 "creative_format_used": "<assigned format name>",
 "variation_modifier_applied": "<assigned modifier name>",
 "product_type": "<product type from marketing intel>",
-"prompt": "<single unified Veo prompt — minimum 150 words — two scenes connected by natural cinematic transition — five-part formula applied to each scene — all brand text in double quotes — no hex codes — no forbidden phrases>"
+"prompt": "<single-scene vertical Veo prompt, 60-90 words and no more — one moment, hook in the first second, five-part formula, at most one short on-screen line in double quotes, no hex codes, no forbidden phrases>"
 }}
 """
     from services.ai_service import _call_openrouter

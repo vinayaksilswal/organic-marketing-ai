@@ -275,7 +275,10 @@ class EmailCampaign(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     userId = Column(String, nullable=True)
-    campaignId = Column(String, ForeignKey("SocialCampaign.id", ondelete="CASCADE"), nullable=False)
+    # Nullable for the same reason as SocialPost.campaignId: an email drafted
+    # by the automation run has no parent social campaign, and requiring one
+    # made every run fail on NotNullViolationError.
+    campaignId = Column(String, ForeignKey("SocialCampaign.id", ondelete="CASCADE"), nullable=True)
     status = Column(String, default="DRAFT", nullable=False)
     subject = Column(String, nullable=True)
     bodyText = Column(Text, nullable=True)
