@@ -56,6 +56,12 @@ META_SCOPES = ",".join([
     "pages_manage_posts",
     "instagram_basic",
     "instagram_content_publish",
+    # Required when the Page belongs to a Business Portfolio rather than the
+    # personal account. Without it /me/accounts returns an empty list even
+    # though the Page permissions were granted — which looked exactly like
+    # "you have no Pages". Dropping this scope was a mistake for any account
+    # that manages its Pages through Meta Business Suite.
+    "business_management",
 ])
 
 # The OAuth `state` is a signed, expiring JWT rather than a server-side dict.
@@ -255,6 +261,44 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
             pages_res.raise_for_status()
             pages = pages_res.json().get("data", [])
 
+            # /me/accounts only lists Pages attached directly to the person.
+            # A Page administered through a Business Portfolio does not appear
+            # there, so walk the user's businesses and collect the Pages they
+            # own or manage as clients.
+            if not pages:
+                logger.info("No Pages on /me/accounts; checking Business Portfolios")
+                try:
+                    biz_res = await client.get(
+                        f"{GRAPH_BASE_URL}/me/businesses",
+                        params={"access_token": long_token, "fields": "id,name"},
+                    )
+                    businesses = biz_res.json().get("data", []) if biz_res.status_code < 300 else []
+                    seen: set[str] = set()
+                    for biz in businesses:
+                        for edge in ("owned_pages", "client_pages"):
+                            try:
+                                edge_res = await client.get(
+                                    f"{GRAPH_BASE_URL}/{biz['id']}/{edge}",
+                                    params={
+                                        "access_token": long_token,
+                                        "fields": "id,name,access_token,instagram_business_account{id,username}",
+                                    },
+                                )
+                                if edge_res.status_code >= 300:
+                                    continue
+                                for pg in edge_res.json().get("data", []):
+                                    # Only usable if a Page token came back.
+                                    if pg.get("id") in seen or not pg.get("access_token"):
+                                        continue
+                                    seen.add(pg["id"])
+                                    pages.append(pg)
+                            except Exception as e:
+                                logger.warning(f"Could not read {edge} for business {biz.get('id')}: {e}")
+                    if pages:
+                        logger.info(f"Found {len(pages)} Page(s) via Business Portfolio")
+                except Exception as e:
+                    logger.warning(f"Business Portfolio lookup failed: {e}")
+
         if not pages:
             # An empty /me/accounts has two very different causes and the user
             # can only act on the right one. Ask Facebook which permissions were
@@ -278,7 +322,7 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
                 f"granted={sorted(granted)} declined={sorted(declined)}"
             )
 
-            missing = {"pages_show_list", "pages_manage_posts"} - granted
+            missing = {"pages_show_list", "pages_manage_posts", "business_management"} - granted
             if missing:
                 msg = (
                     "Facebook did not grant Page access ("
