@@ -122,11 +122,11 @@ generation_conditioning:
         "model": VISION_MODEL,
         "messages": [
             {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_url}}
-                ]
+            "role": "user",
+            "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": image_url}}
+            ]
             }
         ]
     }
@@ -257,7 +257,7 @@ OUTPUT — valid JSON only. First character = {{ Last character = }}
         if response.startswith("```"):
             response = response.split("\n", 1)[1]
             if response.endswith("```"):
-                response = response[:-3]
+            response = response[:-3]
         return json.loads(response.strip())
     except Exception as e:
         logger.error(f"Failed to parse marketing intelligence JSON: {e}")
@@ -351,37 +351,42 @@ async def generate_prompt(intelligence: Dict[str, Any], creative_strategy: Dict[
     """Generate final Veo 3.1 video prompt."""
     cf = creative_strategy.get("creative_format", {})
     vm = creative_strategy.get("variation_modifier", {})
-    
-    sys_message = """You are an elite creative director writing prompts for AI video used as Instagram Reels and paid social ads. Take the reference product profile and translate it into ONE production-ready Veo 3.1 prompt for a single 8-second vertical (9:16) clip.
+    sys_message = """You are an elite creative director and video prompt engineer specializing in AI-generated commercial video for enterprise marketing. Take the reference product profile and translate it into two highly optimized, production-ready prompts for Veo 3.1 (temporal video) combined into one single unified prompt covering a 10s video.
 
-LENGTH DISCIPLINE: 60-90 words. These models lose detail past roughly 100 words, so a longer prompt yields a WORSE video, not a richer one. Every word must earn its place. Cut atmosphere adjectives before you cut the subject, the action or the on-screen line.
 Default Behavior & Enterprise Commercial Requirements
 If user instructions lack detail: Generate a high-end commercial studio setting matching the product's category.
 Default to high-fidelity, professional cinematic scenes unless explicitly overridden.
 Follow explicit brand color, typography, and material requests provided in the reference JSON.
+
 The 5-Part Veo 3.1 Formula (Strictly Enforced)
 Every prompt must follow this exact sequential structure: [Cinematography] + [Subject] + [Action] + [Context] + [Style/Ambiance].
 Cinematography: Explicitly dictate the camera movement (e.g., "dolly shot", "slow pan") and lens choice.
 Subject: Front-load the subject with a clear identity anchor and stable visual traits.
-Action & Physics: Define motion using active, force-based verbs (e.g., "push", "pull", "strike").
-Context (Setting): Detail the environment as an active system.
+Action & Physics: Define motion using active, force-based verbs (e.g., "push", "pull", "strike", "slam").
+Context (Setting): Detail the environment as an active system (e.g., "dust suspended in harsh volumetric light") rather than a static backdrop.
 Style & Ambiance: Specify the overall aesthetic, mood, and lighting conditions. Include surgical negative prompts (-v oversaturated, plastic, artificial).
+
 Text Preservation & Brand Safety
 All visible product names, logos, or taglines must be enclosed in exact double quotes.
 No Fabrication: Never invent extra claims, features, statistics, or numbers.
+
 OUTPUT REQUIREMENTS:
-- Output ONLY this exact JSON, no markdown, no wrapping:
+Output ONLY this exact JSON, no markdown, no wrapping:
 {
-  "prompt": "<single-scene vertical video prompt, 60-90 words, following the 5-part formula>"
+  "creative_format_used": "<assigned format name>",
+  "variation_modifier_applied": "<assigned modifier name>",
+  "product_type": "<product type from marketing intel>",
+  "prompt": "<single unified Veo prompt — minimum 150 words — two scenes connected by natural cinematic transition — five-part formula applied to each scene — all brand text in double quotes — no hex codes — no forbidden phrases>"
 }
 - First character must be { and last must be }
 - No \\n, no escaped quotes, no array wrapping
+
 CRITICAL OUTPUT OVERRIDE:
 Return ONLY the raw, unescaped JSON object. Do NOT wrap the JSON in an array, do NOT wrap it in an "output" key, and do NOT use markdown formatting or stringified escape characters.
 """
 
     prompt = f"""You are a world-class creative director and video prompt engineer specializing in AI-generated commercial video for enterprise marketing. You have directed campaigns for Fortune 500 brands, DTC unicorns, and funded startups across every industry vertical.
-Your task: translate the provided product intelligence, brand profile, and assigned creative format into ONE unified, production-ready Veo 3.1 video prompt that covers both scenes as a single narrative arc.
+Your task: translate the provided product intelligence, brand profile, and assigned creative format into ONE unified, production-ready Veo 3.1 video prompt that covers both scenes as a single narrative arc for a 10-second video.
 ═══════════════════════════════════════════════════════════
 INPUT DATA (injected dynamically):
 ═══════════════════════════════════════════════════════════
@@ -398,23 +403,96 @@ Format Avoid List: {', '.join(cf.get('avoid', []))}
 Variation Modifier: {vm.get('modifier', '')}
 Modifier Note: {vm.get('note', '')}
 ═══════════════════════════════════════════════════════════
-PRODUCT TYPE VISUAL RULEBOOK:
-DIGITAL_SAAS / DATA_API: Dark IDE, clean modern office, Bloomberg-terminal aesthetic. Props: Multiple monitors, real UI.
-PHYSICAL_GOODS: Studio with controlled lighting OR aspirational context. Camera: Macro close-ups, orbital dollies.
-CONSUMABLE: Kitchen counter, bathroom vanity. Camera: Macro pour shots, condensation, texture.
-APPAREL: Match the brand tier. Subject: Fabric movement, fit on body, material texture.
-EDUCATION_PLATFORM: Real learning spaces. Subject: Student's face showing comprehension.
-ENTERPRISE_SAAS: Modern office — glass walls. Subject: Professional using product with visible result.
+PRODUCT TYPE VISUAL RULEBOOK (apply based on product_type field):
 ═══════════════════════════════════════════════════════════
-MANDATORY CREATIVE RULES:
-RULE 1 — FORMAT COMPLIANCE: Build the entire prompt around the assigned creative format.
-RULE 2 — ONE SCENE, 8 SECONDS, VERTICAL. This renders as a single 8-second 9:16 clip for an Instagram Reel or a paid ad. Do NOT write two scenes and do NOT use transition phrases like "Then, cutting to a new scene" — there is no time for a second setup, and asking for one produces a prompt the model silently truncates. Pick the single strongest moment. The hook must land in the first second.
-RULE 3 — BRAND COLOR ON JUSTIFIED SURFACES ONLY: Use exact color names from the brand profile on real surfaces.
-RULE 4 — ALL PRODUCT TEXT IN DOUBLE QUOTES: Every product name, tagline, CTA, and UI text visible must be in exact double quotes.
-RULE 5 — VARIATION MODIFIER INTEGRATION: The modifier must visibly influence at least one scene's atmosphere.
-RULE 6 — VEO 3.1 FIVE-PART FORMULA: [CINEMATOGRAPHY] + [SUBJECT & ACTION] + [ENVIRONMENT] + [BRAND TEXT] + [ATMOSPHERE]
-RULE 7 — FORBIDDEN PHRASES: "futuristic holographic", "neon-lit trading floor", "dynamic and vibrant", hex codes (#XXXXXX).
+DIGITAL_SAAS / DATA_API:
+Environment: Dark IDE, clean modern office, Bloomberg-terminal aesthetic
+Human archetype: Analyst, developer, founder — precise and focused
+Props: Multiple monitors, terminal windows, real UI on screen
+Lighting: Cool institutional or warm confident depending on scene beat
+NEVER: Holographic dashboards, flying data particles, generic "tech" visuals
+
+PHYSICAL_GOODS:
+Environment: Studio with controlled lighting OR aspirational real-world context
+Subject: Product is hero — show material, finish, weight, craftsmanship
+Camera: Macro close-ups, orbital dollies, dramatic reveals
+Lighting: Rim lighting for edge definition, soft boxes for texture
+NEVER: White infinity backdrop unless luxury segment, floating products
+
+CONSUMABLE (supplements, food, beverage, skincare):
+Environment: Kitchen counter, bathroom vanity, outdoor natural setting
+Subject: Product + ingredient story — show what's INSIDE
+Camera: Macro pour shots, steam, condensation, texture close-ups
+Lighting: Warm naturals, soft window light, golden hour
+NEVER: Clinical/sterile environments, generic health stock
+
+APPAREL:
+Environment: Match the brand tier — luxury = negative space editorial, streetwear = urban grit
+Subject: Fabric movement, fit on body, material texture
+Camera: Fashion film pacing — slow reveals, editorial framing
+Lighting: Soft directional for premium, harsh directional for edge brands
+NEVER: Static product flat lay as primary shot, plain mannequin
+
+EDUCATION_PLATFORM:
+Environment: Real learning spaces — desk, café, library — NOT generic classroom
+Subject: Student's face showing comprehension, the moment of "getting it"
+Camera: Intimate close-ups of face and screen interaction
+Lighting: Warm focused desk light or soft natural
+NEVER: Generic graduation imagery, stock photo students
+
+ENTERPRISE_SAAS:
+Environment: Modern office — glass walls, standing desks, confident professionals
+Subject: Professional using product with visible result on screen
+Camera: Wide establishing then tight on screen reaction
+Lighting: Clean office daylight, confident and clear
+NEVER: Casual hoodie-wearing devs (unless startup positioning), empty boardrooms
 ═══════════════════════════════════════════════════════════
+MANDATORY CREATIVE RULES (ALL PRODUCT TYPES):
+═══════════════════════════════════════════════════════════
+RULE 1 — FORMAT COMPLIANCE:
+Build the entire prompt around the assigned creative format. If format is "ugc_testimonial" — real human face, natural environment, zero CGI. If "cinematic_product_hero" — no humans, product as sole subject. Never default to holographic dashboards.
+RULE 2 — TWO-SCENE NARRATIVE ARC IN ONE PROMPT:
+The single prompt must contain two distinct scenes separated by a natural cinematic transition phrase ("Then, cutting to a new scene," or "As the camera pulls back,"). Each scene must have:
+- Different camera distance (one wide, one close OR one establishing, one intimate)
+- Different emotional beat (scene 1 = problem/texture/aspiration, scene 2 = resolution/transformation/identity)
+- Different lighting condition where possible
+RULE 3 — BRAND COLOR ON JUSTIFIED SURFACES ONLY:
+Use exact color names (NOT hex codes) from the brand profile. Colors must appear on real surfaces: UI elements, clothing, lighting gels, signage, product itself. NEVER floating color gradients or arbitrary atmospheric color.
+RULE 4 — ALL PRODUCT TEXT IN DOUBLE QUOTES:
+Every product name, tagline, CTA, and UI text visible in the video must be in exact double quotes. Example: "QuantCAI", "Stop guessing the market. Let AI decode the alpha.", "Request Early Access". NEVER fabricate statistics or claims not present in the source URL.
+RULE 5 — VARIATION MODIFIER INTEGRATION:
+The modifier must visibly influence at least one scene's atmosphere. If modifier is "golden_hour" — actual warm late afternoon light. If "dark_institutional" — cold precision lighting with terminal energy.
+RULE 6 — VEO 3.1 FIVE-PART FORMULA (STRICTLY ENFORCED):
+Every scene within the prompt must follow this structure:
+[CINEMATOGRAPHY] Shot type + lens + movement — technically specific
+[SUBJECT & ACTION] Who/what + what they are doing + force verbs (slam, grip, push, reveal, strike)
+[ENVIRONMENT] Active system description — not a static backdrop
+[BRAND TEXT] Exact quoted text appearing on screen
+[ATMOSPHERE] Light temperature + mood + sound design direction
+RULE 7 — FORBIDDEN PHRASES (automatic rewrite required):
+Never use any of these: "futuristic holographic" / "holographic display", "neon-lit trading floor", "data streams surge" / "pulse and ripple", "180-degree arc shot" (unless explicitly called for), "dynamic and vibrant", "state of the art", "cutting-edge", Any color written as a hex code (#XXXXXX), SD-style negative prompts (-v, --no)
+RULE 8 — INDUSTRY CALIBRATION (from industry_visual_language field):
+Fintech/Crypto: Terminal precision, Bloomberg energy, institutional authority
+Wellness/Health: Warm naturals, human skin tones, ingredient macro
+Fashion/Apparel: Editorial framing, fabric physics, negative space
+Developer Tools: Dark IDE, precise cursor movement, terminal green
+Food/Beverage: Steam, condensation, macro texture, appetite-first
+Fitness: High contrast, sweat, kinetic energy, physical exertion
+Enterprise SaaS: Clean office, confident professionals, screen clarity
+Education: Human face of comprehension, desk warmth, screen glow
+Quantum Computing: Physics lab precision, chalkboard equations, controlled drama
+═══════════════════════════════════════════════════════════
+OUTPUT REQUIREMENTS:
+═══════════════════════════════════════════════════════════
+Output ONLY this exact JSON. No markdown. No preamble. No array wrapper.
+First character = {{ Last character = }}
+{{
+"creative_format_used": "<assigned format name>",
+"variation_modifier_applied": "<assigned modifier name>",
+"product_type": "<product type from marketing intel>",
+"prompt": "<single unified Veo prompt — minimum 150 words — two scenes connected by natural cinematic transition — five-part formula applied to each scene — all brand text in double quotes — no hex codes — no forbidden phrases>"
+}}
+"""��═════════════════════════════════════════════════════════
 OUTPUT REQUIREMENTS:
 Output ONLY this exact JSON. No markdown. No preamble.
 First character = {{ Last character = }}
@@ -436,7 +514,7 @@ First character = {{ Last character = }}
         if result.startswith("```"):
             result = result.split("\n", 1)[1]
             if result.endswith("```"):
-                result = result[:-3]
+            result = result[:-3]
         parsed = json.loads(result.strip())
         return parsed.get("prompt", result)
     except Exception as e:

@@ -16,7 +16,7 @@ import os
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from services.storage_service import upload_media_to_cloudinary
 from fastapi.responses import FileResponse
 from loguru import logger
@@ -78,9 +78,15 @@ class CampaignUpdate(BaseModel):
 async def upload_media(
     request: Request,
     file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
     user_id: str = Depends(verify_user),
 ) -> StandardResponse:
-    """Upload a video or image file to the database and register in Media catalog."""
+    """Upload a video or image file to the database and register in Media catalog.
+
+    `caption` describes what the asset shows. The frontend has always sent it,
+    but this endpoint had no such parameter, so FastAPI dropped it silently and
+    every upload landed with no description at all.
+    """
     try:
         mime_type = file.content_type or "application/octet-stream"
         file_content = await file.read()
@@ -117,6 +123,7 @@ async def upload_media(
                 mimeType=mime_type,
                 url=final_url,
                 data=file_content if not cloudinary_res else None,
+                caption=(caption or "").strip() or None,
             )
             session.add(media)
             await session.commit()

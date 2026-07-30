@@ -12,6 +12,8 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [previewMedia, setPreviewMedia] = useState(null);
   const [editingMedia, setEditingMedia] = useState(null);
   const [editCaption, setEditCaption] = useState('');
+  const [editFile, setEditFile] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -97,18 +99,60 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   
   const handleEditMedia = (item) => {
     setEditingMedia(item);
-    setEditCaption(item.caption || item.filename || '');
+    // Fall back to the generation prompt, never the filename — the filename is
+    // not a description and feeding it to the caption writer taught it nothing.
+    setEditCaption(item.caption || item.prompt || '');
+    setEditFile(null);
   };
 
   const handleSaveEdit = async () => {
-    // In a real app, send update to backend
-    showToast('Campaign updated!');
-    setEditingMedia(null);
-    fetchMedia(); // Mock refresh
+    if (!editingMedia) return;
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append('caption', editCaption);
+      if (editFile) formData.append('file', editFile);
+
+      const res = await authFetch(`${API_BASE}/marketing/media/${editingMedia.id}`, {
+        method: 'PATCH',
+        body: formData,
+      }, token);
+
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail.detail || `Save failed (error ${res.status})`);
+      }
+
+      showToast(editFile ? 'Caption and media updated' : 'Base caption updated');
+      setEditingMedia(null);
+      setEditFile(null);
+      await fetchMedia();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDeactivate = (id) => {
-    showToast('Campaign deactivated (Mock action)');
+  const handleToggleActive = async (item) => {
+    try {
+      const formData = new FormData();
+      formData.append('isActive', item.isActive === false ? 'true' : 'false');
+
+      const res = await authFetch(`${API_BASE}/marketing/media/${item.id}`, {
+        method: 'PATCH',
+        body: formData,
+      }, token);
+
+      if (!res.ok) throw new Error(`Could not update (error ${res.status})`);
+
+      showToast(item.isActive === false
+        ? 'Asset reactivated — automation can post it again'
+        : 'Asset deactivated — automation will skip it');
+      await fetchMedia();
+    } catch (err) {
+      showToast(err.message, true);
+    }
   };
 
   return (
@@ -213,7 +257,8 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                 ) : (
                   mediaList.map(item => {
                     const isVideo = item.mimeType?.startsWith('video/') || item.filename?.endsWith('.mp4');
-                    const captionPreview = item.caption || item.filename || 'No caption available...';
+                    const caption = item.caption || item.prompt || '';
+                    const inactive = item.isActive === false;
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding: '1rem 1.5rem', width: '80px' }}>
@@ -226,8 +271,18 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                           </div>
                         </td>
                         <td style={{ padding: '1rem 1.5rem', maxWidth: '340px' }}>
-                          <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                            {captionPreview}
+                          {caption ? (
+                            <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {caption}
+                            </p>
+                          ) : (
+                            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.4, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <AlertTriangle size={13} />
+                              No description — the AI cannot see this asset. Add one via Edit.
+                            </p>
+                          )}
+                          <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            {item.filename}
                           </p>
                           {item.prompt && (
                             <details style={{ marginTop: '0.5rem' }}>
@@ -301,7 +356,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
               <div className="input-group" style={{ marginBottom: '2rem' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>Update Media (Optional)</label>
                 <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem' }}>
-                  <input type="file" style={{ fontSize: '0.85rem', width: '100%', color: 'var(--text-muted)' }} />
+                  <input type="file" onChange={(e) => setEditFile(e.target.files[0])} style={{ fontSize: '0.85rem', width: '100%', color: 'var(--text-muted)' }} />
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.5rem 0 0 0' }}>Leave empty to keep existing media.</p>
               </div>

@@ -59,6 +59,7 @@ from services.social_service import (
     update_instagram_post,
 )
 from services.scheduler import execute_marketing_loop
+from services.storage_service import upload_media_to_cloudinary
 
 router = APIRouter(
     prefix="/api/v1/marketing",
@@ -192,6 +193,23 @@ async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, A
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _is_postable(media) -> bool:
+    """True when this row is an actual publishable asset.
+
+    The catalog also holds prompt-only rows (mimeType text/plain, empty url)
+    saved by the Video Studio so the user can copy the prompt. Those are notes,
+    not assets — selecting one for a post produced a caption with no image
+    attached, or a publish failure.
+    """
+    if not getattr(media, "isActive", True):
+        return False
+    url = (getattr(media, "url", None) or "").strip()
+    if not url:
+        return False
+    mime = (getattr(media, "mimeType", None) or "").lower()
+    return mime.startswith("image/") or mime.startswith("video/")
+
+
 async def _generate_post_caption(profile, media) -> str:
     """Write an on-brand caption for a specific media asset.
 
@@ -211,8 +229,11 @@ async def _generate_post_caption(profile, media) -> str:
     pillars = getattr(profile, "contentPillars", None) or []
     hashtags = getattr(profile, "suggestedHashtags", None) or []
 
-    # What the asset actually depicts. The stored generation prompt describes
-    # the image far better than a filename does.
+    # What the asset actually depicts. The base caption is authoritative — it
+    # is either what the user typed about this asset or the prompt that
+    # generated it, and in both cases it beats a filename. The raw generation
+    # prompt is kept as a secondary signal when the two differ.
+    asset_caption = (getattr(media, "caption", None) or "").strip()
     asset_prompt = (getattr(media, "prompt", None) or "").strip()
     asset_tags = ", ".join(getattr(media, "tags", None) or [])
     is_video = (getattr(media, "mimeType", "") or "").startswith("video/")
@@ -227,36 +248,38 @@ async def _generate_post_caption(profile, media) -> str:
     known.append(f"Tone of voice: {tone}")
 
     asset_lines = []
-    if asset_prompt: asset_lines.append(f"The visual shows: {asset_prompt[:600]}")
+    if asset_caption:
+        asset_lines.append(f"The visual shows: {asset_caption[:900]}")
+    if asset_prompt and asset_prompt != asset_caption:
+        asset_lines.append(f"It was generated from this brief: {asset_prompt[:600]}")
+    if not asset_caption and not asset_prompt:
+        # Be explicit rather than letting the model invent a scene.
+        asset_lines.append(
+            "No description of the visual is available — write about the "
+            "business itself and do not describe what is on screen."
+        )
     if asset_tags:   asset_lines.append(f"Asset tags: {asset_tags}")
     asset_lines.append(f"Format: {'short video / reel' if is_video else 'single image'}")
 
     system_prompt = (
-        "You are a senior social media copywriter for B2B and DTC brands. You write "
-        "captions that sound like a specific company wrote them, never like generic "
-        "marketing filler. You never invent facts, metrics, offers or features that "
-        "were not given to you."
+        "You are an elite, enterprise-grade social media copywriter specializing in high-converting ads and organic content for top-tier brands. "
+        "You craft compelling, persuasive, and authentic copy that drives engagement and action. You never invent facts, metrics, offers or features that "
+        "were not explicitly provided."
     )
 
     prompt = (
-        "Write ONE social media caption for the post described below.\n\n"
+        "Write ONE highly engaging, enterprise-grade social media caption for the post described below.\n\n"
         "=== THE BUSINESS ===\n" + "\n".join(known) + "\n\n"
         "=== THIS POST'S VISUAL ===\n" + "\n".join(asset_lines) + "\n\n"
         "=== REQUIREMENTS ===\n"
-        "1. It must be obvious from the caption WHAT THIS COMPANY ACTUALLY DOES. "
-        "Reference their real product or problem space, not generic 'automation' "
-        "or 'solutions' language.\n"
-        "2. Connect the caption to what is in the visual. If the visual shows a "
-        "specific object, concept or scene, speak to it.\n"
-        "3. Open with a hook that earns the second line. Never open with the brand name.\n"
-        "4. 2-4 sentences. Plain language. No buzzwords, no 'unlock', 'elevate', "
-        "'game-changer', 'revolutionise', 'in today's fast-paced world'.\n"
-        "5. One clear call to action at the end.\n"
-        "6. Never put a URL in the caption — Instagram does not make them "
-        "clickable. If you point somewhere, say 'link in bio'.\n"
-        "7. Invent nothing: no statistics, no customer counts, no free trial or "
-        "discount unless stated above.\n"
-        "8. Final line: 3-6 hashtags specific to this industry. No #love #instagood.\n\n"
+        "1. Structure the caption using a proven marketing framework (e.g., AIDA or PAS).\n"
+        "2. Hook the reader immediately with a scroll-stopping first line. Never open with the brand name.\n"
+        "3. Connect the message to the visual seamlessly, providing clear value.\n"
+        "4. Keep it punchy, professional, yet approachable. Avoid overused buzzwords ('unlock', 'elevate', 'game-changer', 'revolutionize').\n"
+        "5. Conclude with a singular, strong, and actionable Call-To-Action (CTA).\n"
+        "6. Never put a URL in the caption — use 'link in bio' or similar if necessary.\n"
+        "7. Invent nothing: no fake statistics, customer counts, or discounts.\n"
+        "8. Final line: include 3-5 hyper-relevant industry hashtags. Do NOT use generic tags like #love or #instagood.\n\n"
         "Output ONLY the caption. No preamble, no quotes, no explanation."
     )
 
@@ -377,15 +400,27 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
                 .order_by(Media.createdAt.desc())
             )
             all_media = (await session.execute(media_stmt)).scalars().all()
+            postable = [m for m in all_media if _is_postable(m)]
 
-            if not all_media:
+            if not postable:
+                # Distinguish "nothing here" from "nothing here that can be
+                # posted" — they need different actions from the user.
+                if all_media:
+                    return {
+                        "success": False,
+                        "message": (
+                            "This catalog only contains prompt notes or deactivated "
+                            "assets. Upload an image or video, or render one in AI "
+                            "Video Studio, before running automation."
+                        ),
+                    }
                 return {
                     "success": False,
                     "message": "No media in this business's catalog yet. Upload something, or generate a creative first.",
                 }
 
             import random
-            chosen = random.choice(all_media)
+            chosen = random.choice(postable)
             media_url = chosen.url
 
             # 3. Write a real caption from the brand profile and this asset.
@@ -590,20 +625,42 @@ async def edit_social_post(
         # Process new file uploads
         new_media_urls: list[str] = []
         if files:
+            import uuid
             for file in files:
                 if file.filename:
-                    file_location = os.path.join(UPLOAD_DIR, file.filename)
-                    with open(file_location, "wb") as buffer:
-                        shutil.copyfileobj(file.file, buffer)
+                    file_content = await file.read()
+                    media_id = str(uuid.uuid4())
                     
-                    base_url = str(request.base_url).rstrip("/")
-                    url = f"{base_url}/uploads/{file.filename}"
+                    cloudinary_res = await upload_media_to_cloudinary(
+                        workspace_id=workspace_id or "default",
+                        media_id=media_id,
+                        filename=file.filename,
+                        source=file_content,
+                        resource_type="auto"
+                    )
                     
-                    is_video_ext = file.filename.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv"))
-                    if (file.content_type and file.content_type.startswith("video/")) or is_video_ext:
-                        url += "?type=video"
-                        
-                    new_media_urls.append(url)
+                    final_url = cloudinary_res["secure_url"] if cloudinary_res else f"/api/v1/media/{media_id}"
+                    mime_type = file.content_type or "application/octet-stream"
+                    
+                    media = Media(
+                        id=media_id,
+                        userId=existing.userId,
+                        businessProfileId=workspace_id,
+                        filename=file.filename,
+                        mimeType=mime_type,
+                        url=final_url,
+                        data=file_content if not cloudinary_res else None,
+                    )
+                    session.add(media)
+                    
+                    is_video_ext = mime_type.startswith("video/") or file.filename.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv"))
+                    url_suffix = "?type=video" if is_video_ext else ""
+                    
+                    if final_url.startswith("http"):
+                        new_media_urls.append(final_url)
+                    else:
+                        base_url = str(request.base_url).rstrip("/")
+                        new_media_urls.append(f"{base_url}{final_url}{url_suffix}")
 
         cleaned_existing_media = []
         base_url_str = str(request.base_url).rstrip("/")
@@ -708,65 +765,23 @@ async def api_generate_caption(
     """Generates an AI caption for a given product ID without creating a post."""
     workspace_id = request.headers.get('x-workspace-id')
     async with get_tenant_session(workspace_id) as session:
-        campaign = await session.get(SocialCampaign, product_id)
-        if not campaign:
-            raise HTTPException(status_code=404, detail="Campaign not found")
-        
-        caption = await generate_campaign_variation(campaign.baseCaption)
-        return {"success": True, "caption": caption}
+                        media_urls.append(f"{base_url}{final_url}{url_suffix}")
 
-@router.post("/posts/manual")
-async def create_manual_social_post(
-    request: Request,
-    platform: str = Form("BOTH"),
-    generate_ai_caption: str = Form("false"),
-    product_id: Optional[str] = Form(None),
-    manual_caption: Optional[str] = Form(""),
-    status: str = Form("DRAFT"),
-    files: List[UploadFile] = File(None),
-) -> dict[str, Any]:
-    """
-    Manual Override: Create and publish a social media post (SQLAlchemy).
-
-    Allows manual media uploads and optional AI caption generation.
-    Overrides the automated scheduler flow.
-    """
-    # Handle file uploads
-    media_urls: list[str] = []
-    if files:
-        for file in files:
-            if file.filename:
-                file_location = os.path.join(UPLOAD_DIR, file.filename)
-                with open(file_location, "wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
-                
-                base_url = str(request.base_url).rstrip("/")
-                url = f"{base_url}/uploads/{file.filename}"
-                
-                is_video_ext = file.filename.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv"))
-                if (file.content_type and file.content_type.startswith("video/")) or is_video_ext:
-                    url += "?type=video"
-                    
-                media_urls.append(url)
-
-    caption = manual_caption or ""
-    campaign = None
-
-    workspace_id = request.headers.get('x-workspace-id')
-    async with get_tenant_session(workspace_id) as session:
+        # 2. Setup Campaign and Caption
+        campaign = None
         if product_id:
             campaign = await session.get(SocialCampaign, product_id)
-            # If campaign found but no manual media, use campaign media
-            if campaign and not media_urls:
-                if campaign.mediaUrl:
-                    media_urls.append(campaign.mediaUrl)
+            if campaign and not media_urls and campaign.mediaUrl:
+                media_urls.append(campaign.mediaUrl)
 
-        # Generate AI caption if requested
+        caption = manual_caption or ""
         if generate_ai_caption.lower() == "true" and campaign:
             caption = await generate_campaign_variation(campaign.baseCaption)
+        
+        import re
+        caption = re.sub(r"http\S+", "", caption).strip()
 
-        # Create the post record
-        workspace_id = request.headers.get("x-workspace-id")
+        # 3. Create Record
         post = SocialPost(
             businessProfileId=workspace_id,
             campaignId=campaign.id if campaign else None,
@@ -775,7 +790,7 @@ async def create_manual_social_post(
             caption=caption,
             mediaUrls=media_urls,
             scheduledAt=datetime.now(),
-            status="DRAFT",
+            status=status,
         )
         session.add(post)
         await session.commit()
@@ -787,14 +802,13 @@ async def create_manual_social_post(
             "status": post.status,
             "caption": post.caption,
             "mediaUrls": post.mediaUrls,
+            "scheduledAt": post.scheduledAt.isoformat() if post.scheduledAt else None,
+            "postedAt": post.postedAt.isoformat() if post.postedAt else None,
         }
 
         if status == "DRAFT":
             return {"success": True, "post": post_data, "errors": []}
 
-        # Post to platforms
-        fb_post_id, ig_post_id = None, None
-        errors: list[str] = []
 
         if platform in ("FACEBOOK", "BOTH"):
             try:
@@ -1189,19 +1203,101 @@ async def get_workspace_media(request: Request) -> Any:
                 "aiGenerated": m.aiGenerated,
                 "prompt": m.prompt,
                 "promptType": m.promptType,
+                # Fall back to the generation prompt so pre-migration assets
+                # still show their description instead of a bare filename.
+                "caption": m.caption or m.prompt,
+                "isActive": m.isActive,
+                "postable": _is_postable(m),
                 "createdAt": m.createdAt.isoformat() if m.createdAt else None,
             }
             for m in media_list
         ]
+
+
+async def _load_owned_media(session, media_id: str, workspace_id: str | None) -> Media:
+    """Fetch a media row, refusing ids that belong to another workspace.
+
+    Row-level security is not currently filtering, so an id alone must never be
+    treated as proof of ownership.
+    """
+    media = await session.get(Media, media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="Media asset not found")
+    if workspace_id and media.businessProfileId and media.businessProfileId != workspace_id:
+        raise HTTPException(status_code=403, detail="That asset belongs to another business")
+    return media
+
+
+@router.patch("/media/{media_id}")
+async def update_workspace_media(
+    media_id: str,
+    request: Request,
+    caption: Optional[str] = Form(None),
+    isActive: Optional[bool] = Form(None),
+    file: Optional[UploadFile] = File(None),
+) -> Any:
+    """Update an asset's description, its active flag, or the file itself.
+
+    The dashboard's Edit dialog previously only *claimed* to save — it showed a
+    success toast and called nothing. Both the caption and the replacement file
+    were thrown away.
+    """
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        media = await _load_owned_media(session, media_id, workspace_id)
+
+        if caption is not None:
+            media.caption = caption.strip() or None
+
+        if isActive is not None:
+            media.isActive = isActive
+
+        if file is not None and file.filename:
+            content = await file.read()
+            if not content:
+                raise HTTPException(status_code=400, detail="The uploaded file was empty.")
+            uploaded = await upload_media_to_cloudinary(
+                workspace_id=media.businessProfileId or workspace_id or "default",
+                media_id=media.id,
+                filename=file.filename,
+                source=content,
+                resource_type="auto",
+            )
+            if uploaded:
+                media.url = uploaded["secure_url"]
+                media.data = None
+            else:
+                # No Cloudinary configured — keep the bytes locally so the
+                # replacement still takes effect rather than silently no-oping.
+                media.url = f"/api/v1/media/{media.id}"
+                media.data = content
+            media.filename = file.filename
+            media.mimeType = file.content_type or media.mimeType
+
+        await session.commit()
+        await session.refresh(media)
+        return {
+            "success": True,
+            "media": {
+                "id": media.id,
+                "filename": media.filename,
+                "mimeType": media.mimeType,
+                "url": media.url,
+                "caption": media.caption,
+                "prompt": media.prompt,
+                "promptType": media.promptType,
+                "isActive": media.isActive,
+                "postable": _is_postable(media),
+            },
+        }
+
 
 @router.delete("/media/{media_id}")
 async def delete_workspace_media(media_id: str, request: Request) -> Any:
     """Delete a media asset from the catalog."""
     workspace_id = request.headers.get('x-workspace-id')
     async with get_tenant_session(workspace_id) as session:
-        media = await session.get(Media, media_id)
-        if not media:
-            raise HTTPException(status_code=404, detail="Media asset not found")
+        media = await _load_owned_media(session, media_id, workspace_id)
         await session.delete(media)
         await session.commit()
         return {"success": True, "message": "Media asset deleted successfully"}

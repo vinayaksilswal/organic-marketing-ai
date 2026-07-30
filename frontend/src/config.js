@@ -2,8 +2,12 @@ export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketi
 
 export const authFetch = async (url, options = {}, token, onLogout) => {
   const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');
+  // FormData must NOT carry an explicit Content-Type: the browser has to set
+  // it itself so it can append the multipart boundary. Forcing application/json
+  // here made every file upload through authFetch unparseable server-side.
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {}),
     ...(options.headers || {}),

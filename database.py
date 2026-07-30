@@ -310,6 +310,13 @@ class Media(Base):
     aiGenerated = Column(Boolean, default=False, nullable=False)
     prompt = Column(Text, nullable=True)  # The AI prompt that produced this asset
     promptType = Column(String, nullable=True)  # 'image' | 'video'
+    # What this asset actually shows, in words. This is the single strongest
+    # signal the caption writer has — a filename tells it nothing. For AI
+    # assets it is seeded from the generation prompt; for uploads the user
+    # types it. Editable either way.
+    caption = Column(Text, nullable=True)
+    # Deactivated assets stay in the catalog but are never chosen for posting.
+    isActive = Column(Boolean, default=True, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
     businessProfile = relationship('BusinessProfile', back_populates='medias')

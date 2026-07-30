@@ -19,7 +19,7 @@ from typing import Any
 
 from arq.connections import RedisSettings
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from config import settings
 from database import (
@@ -76,7 +76,7 @@ async def _get_next_campaign_for_workspace(
             businessProfileId=profile.id,
             lastSocialIdx=0,
             lastEmailIdx=0,
-            autoApprove=getattr(profile, "autoGenerateCreatives", True),
+            autoApprove=False,
         )
         session.add(state)
         await session.flush()
@@ -118,7 +118,7 @@ async def _get_next_product_for_workspace(
             lastSocialIdx=0,
             lastEmailIdx=0,
             lastProductIdx=0,
-            autoApprove=getattr(profile, "autoGenerateCreatives", True),
+            autoApprove=False,
         )
         session.add(state)
         await session.flush()
@@ -139,13 +139,22 @@ async def _select_media_for_post(
     Select the best media URL from the workspace's Media catalog.
     Prioritizes AI-generated, unused media. Falls back to any available media.
     """
+    # Only rows that are actually publishable. The catalog also holds
+    # prompt-only notes (text/plain, empty url) from the Video Studio; those
+    # used to be eligible, producing posts with no media attached. Filtered in
+    # SQL rather than in Python so the LIMIT counts real assets.
+    postable = and_(
+        Media.businessProfileId == profile.id,
+        Media.isActive == True,  # noqa: E712 — SQL boolean, not Python identity
+        Media.url != "",
+        Media.url.isnot(None),
+        or_(Media.mimeType.startswith("image/"), Media.mimeType.startswith("video/")),
+    )
+
     # Try to find AI-generated media that hasn't been used in a post yet
     media_stmt = (
         select(Media)
-        .where(
-            Media.businessProfileId == profile.id,
-            Media.aiGenerated == True,
-        )
+        .where(postable, Media.aiGenerated == True)
         .order_by(Media.createdAt.desc())
         .limit(20)
     )
@@ -154,10 +163,7 @@ async def _select_media_for_post(
     if not all_media:
         # Fall back to any media in the catalog
         fallback_stmt = (
-            select(Media)
-            .where(Media.businessProfileId == profile.id)
-            .order_by(Media.createdAt.desc())
-            .limit(10)
+            select(Media).where(postable).order_by(Media.createdAt.desc()).limit(10)
         )
         all_media = (await session.execute(fallback_stmt)).scalars().all()
 
@@ -213,6 +219,10 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 logger.error(f"Workspace {workspace_id} not found.")
                 return "error_workspace_not_found"
 
+            state_stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+            state = (await session.execute(state_stmt)).scalars().first()
+            auto_approve = state.autoApprove if state else False
+
             if profile.businessModel == "E-commerce" and getattr(profile, "productCatalogUrl", None):
                 # E-commerce Flow: Pick a product and generate a post
                 product = await _get_next_product_for_workspace(session, profile)
@@ -227,13 +237,18 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     media_urls = [media_url] if media_url else []
                     
                     prompt = (
-                        f"Write a highly engaging social media post for {profile.name} "
-                        f"(Industry: {profile.industry or 'General'}, "
-                        f"Tone: {profile.toneOfVoice or 'Professional'}). "
-                        f"Base content: {campaign.baseCaption}. "
-                        f"Include 3-5 relevant hashtags from: "
-                        f"{', '.join(profile.suggestedHashtags or ['#business', '#growth'])}. "
-                        f"Make it compelling with emojis and a clear CTA."
+                        f"You are a world-class, enterprise-grade copywriter for {profile.name} (Industry: {profile.industry or 'General'}).\n"
+                        f"Business Description: {profile.description or 'No description provided.'}\n"
+                        f"Target Audience: {profile.targetAudience or 'General audience'}\n"
+                        f"Tone of Voice: {profile.toneOfVoice or 'Professional'}\n"
+                        f"Content Pillars: {', '.join(profile.contentPillars or [])}\n"
+                        f"Base Idea: {campaign.baseCaption}\n\n"
+                        "Instructions: Write a high-converting social media post following the AIDA (Attention, Interest, Desire, Action) framework.\n"
+                        "1. Start with a scroll-stopping hook.\n"
+                        "2. Provide compelling value and build desire.\n"
+                        "3. End with a strong, actionable Call-To-Action (CTA).\n"
+                        f"Include 3-5 relevant hashtags from: {', '.join(profile.suggestedHashtags or ['#business', '#growth'])}.\n"
+                        "Make it sound natural, professional, and use emojis appropriately."
                     )
                     fallback_caption = campaign.baseCaption
                     campaign_id = campaign.id
@@ -247,15 +262,18 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                         
                     price_info = f" Price: ${product.price}." if getattr(product, "price", None) else ""
                     prompt = (
-                        f"Write a highly engaging product highlight social media post for {profile.name} "
-                        f"(Industry: {profile.industry or 'E-commerce'}, "
-                        f"Tone: {profile.toneOfVoice or 'Persuasive & Excited'}). "
-                        f"Product Name: {product.title}. "
-                        f"Description: {product.description or 'A high quality product.'}{price_info} "
-                        f"Include 3-5 relevant hashtags from: "
-                        f"{', '.join(profile.suggestedHashtags or ['#ecommerce', '#musthave'])}. "
-                        f"Make it compelling with emojis and end with a clear Call-To-Action. "
-                        f"Include this purchase link at the end: {product.url or profile.websiteUrl or ''}"
+                        f"You are an elite, enterprise-grade e-commerce copywriter for {profile.name} (Industry: {profile.industry or 'E-commerce'}).\n"
+                        f"Business Description: {profile.description or 'No description provided.'}\n"
+                        f"Target Audience: {profile.targetAudience or 'General audience'}\n"
+                        f"Tone of Voice: {profile.toneOfVoice or 'Persuasive & Excited'}\n"
+                        f"Product Name: {product.title}\n"
+                        f"Product Description: {product.description or 'A high quality product.'}{price_info}\n\n"
+                        "Instructions: Write a high-converting product highlight post following the PAS (Problem, Agitate, Solution) framework.\n"
+                        "1. Hook the reader with a relevant problem or strong desire.\n"
+                        "2. Highlight how this product solves it flawlessly.\n"
+                        "3. End with an urgent and clear Call-To-Action to buy now.\n"
+                        f"Include the purchase link precisely at the end: {product.url or profile.websiteUrl or ''}\n"
+                        f"Include 3-5 relevant hashtags from: {', '.join(profile.suggestedHashtags or ['#ecommerce', '#musthave'])}."
                     )
                     fallback_caption = f"Check out our amazing {product.title}! Get it here: {product.url or profile.websiteUrl or ''}"
                     # Use a dummy campaign ID or the first active one if required by DB schema
@@ -296,13 +314,18 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 char_reference = f"\nCHARACTER VISUAL REFERENCE URL: {profile.influencerReferenceUrl}" if getattr(profile, "influencerReferenceUrl", None) else ""
                 
                 prompt = (
-                    f"Write a highly engaging social media post from the first-person perspective of an AI Influencer "
-                    f"named {profile.name} (Tone: {profile.toneOfVoice or 'Authentic & Playful'}). "
-                    f"Base content: {campaign.baseCaption}. "
-                    f"Include 3-5 relevant hashtags from: "
-                    f"{', '.join(profile.suggestedHashtags or ['#aiinfluencer', '#lifestyle'])}."
-                    f"{char_reference} "
-                    f"Make it sound like a real person sharing their life or thoughts. Use emojis naturally."
+                    f"You are a top-tier digital persona and AI Influencer named {profile.name}.\n"
+                    f"Tone of Voice: {profile.toneOfVoice or 'Authentic & Playful'}\n"
+                    f"Persona Description: {profile.description or 'No description provided.'}\n"
+                    f"Target Audience: {profile.targetAudience or 'General audience'}\n"
+                    f"Content Pillars: {', '.join(profile.contentPillars or [])}\n"
+                    f"Base Idea: {campaign.baseCaption}\n"
+                    f"{char_reference}\n\n"
+                    "Instructions: Write a highly authentic, first-person social media post. Focus on building parasocial connection with the audience.\n"
+                    "1. Start with an engaging, conversational hook.\n"
+                    "2. Share a personal thought, lifestyle moment, or relatable story.\n"
+                    "3. End with a question or community-driven CTA to encourage comments and engagement.\n"
+                    f"Include 3-5 hashtags naturally at the bottom from: {', '.join(profile.suggestedHashtags or ['#aiinfluencer', '#lifestyle'])}."
                 )
                 fallback_caption = campaign.baseCaption
                 campaign_id = campaign.id
@@ -324,13 +347,18 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
 
                 # 3. Generate fresh AI caption
                 prompt = (
-                    f"Write a highly engaging social media post for {profile.name} "
-                    f"(Industry: {profile.industry or 'General'}, "
-                    f"Tone: {profile.toneOfVoice or 'Professional'}). "
-                    f"Base content: {campaign.baseCaption}. "
-                    f"Include 3-5 relevant hashtags from: "
-                    f"{', '.join(profile.suggestedHashtags or ['#business', '#growth'])}. "
-                    f"Make it compelling with emojis and a clear CTA."
+                    f"You are a world-class, enterprise-grade copywriter for {profile.name} (Industry: {profile.industry or 'General'}).\n"
+                    f"Business Description: {profile.description or 'No description provided.'}\n"
+                    f"Target Audience: {profile.targetAudience or 'General audience'}\n"
+                    f"Tone of Voice: {profile.toneOfVoice or 'Professional'}\n"
+                    f"Content Pillars: {', '.join(profile.contentPillars or [])}\n"
+                    f"Base Idea: {campaign.baseCaption}\n\n"
+                    "Instructions: Write a high-converting social media post following the AIDA (Attention, Interest, Desire, Action) framework.\n"
+                    "1. Start with a scroll-stopping hook.\n"
+                    "2. Provide compelling value and build desire.\n"
+                    "3. End with a strong, actionable Call-To-Action (CTA).\n"
+                    f"Include 3-5 relevant hashtags from: {', '.join(profile.suggestedHashtags or ['#business', '#growth'])}.\n"
+                    "Make it sound natural, professional, and use emojis appropriately."
                 )
                 fallback_caption = campaign.baseCaption
                 campaign_id = campaign.id
@@ -348,76 +376,82 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             fb_post_id = None
             ig_post_id = None
 
-            # Facebook
-            try:
-                fb_post_id = await post_to_facebook(workspace_id, final_caption, media_urls=media_urls)
-                if fb_post_id:
-                    logger.info(f"✓ Posted to Facebook: {fb_post_id}")
-                else:
-                    errors.append("FB: Post returned None (credentials may be missing)")
-            except Exception as e:
-                errors.append(f"FB: {str(e)}")
-                logger.error(f"Facebook post failed: {e}")
-
-            # Instagram (requires media)
-            ig_post_id = None
-            if media_urls:
+            if auto_approve:
+                # Facebook
                 try:
-                    ig_post_id = await post_to_instagram(workspace_id, final_caption, media_urls=media_urls)
-                    if ig_post_id:
-                        logger.info(f"✓ Posted to Instagram: {ig_post_id}")
+                    fb_post_id = await post_to_facebook(workspace_id, final_caption, media_urls=media_urls)
+                    if fb_post_id:
+                        logger.info(f"✓ Posted to Facebook: {fb_post_id}")
                     else:
-                        errors.append("IG: Post returned None (credentials may be missing)")
+                        errors.append("FB: Post returned None (credentials may be missing)")
                 except Exception as e:
-                    errors.append(f"IG: {str(e)}")
-                    logger.error(f"Instagram post failed: {e}")
+                    errors.append(f"FB: {str(e)}")
+                    logger.error(f"Facebook post failed: {e}")
 
-            # Twitter
-            try:
-                tweet_text = final_caption
-                if len(tweet_text) > 280:
-                    tweet_text = tweet_text[:277] + "..."
-                await twitter_service.post_tweet(workspace_id, tweet_text)
-                logger.info("✓ Posted to Twitter")
-            except Exception as e:
-                errors.append(f"Twitter: {str(e)}")
-                logger.error(f"Twitter post failed: {e}")
+                # Instagram (requires media)
+                if media_urls:
+                    try:
+                        ig_post_id = await post_to_instagram(workspace_id, final_caption, media_urls=media_urls)
+                        if ig_post_id:
+                            logger.info(f"✓ Posted to Instagram: {ig_post_id}")
+                        else:
+                            errors.append("IG: Post returned None (credentials may be missing)")
+                    except Exception as e:
+                        errors.append(f"IG: {str(e)}")
+                        logger.error(f"Instagram post failed: {e}")
 
-            # LinkedIn
-            try:
-                await linkedin_service.post_text(workspace_id, final_caption)
-                logger.info("✓ Posted to LinkedIn")
-            except Exception as e:
-                errors.append(f"LinkedIn: {str(e)}")
-                logger.error(f"LinkedIn post failed: {e}")
-
-            # TikTok (video content only)
-            if media_urls and any(u.endswith(('.mp4', '.mov', '.webm')) for u in media_urls):
+                # Twitter
                 try:
-                    from database import SocialConnection
-                    conn_stmt = select(SocialConnection).where(
-                        SocialConnection.businessProfileId == workspace_id
-                    )
-                    conn = (await session.execute(conn_stmt)).scalars().first()
-                    if conn and getattr(conn, "tiktokAccessToken", None):
-                        from services.tiktok_service import post_to_tiktok
-                        import httpx
-                        tiktok_token = decrypt_token(conn.tiktokAccessToken) or conn.tiktokAccessToken
-                        video_url = next(u for u in media_urls if u.endswith(('.mp4', '.mov', '.webm')))
-                        async with httpx.AsyncClient(timeout=30) as http_client:
-                            video_resp = await http_client.get(video_url)
-                            if video_resp.status_code == 200:
-                                result = await post_to_tiktok(tiktok_token, final_caption, video_resp.content)
-                                if result.get("success"):
-                                    logger.info("✓ Posted to TikTok")
-                                else:
-                                    errors.append(f"TikTok: {result.get('error', 'Unknown error')}")
+                    tweet_text = final_caption
+                    if len(tweet_text) > 280:
+                        tweet_text = tweet_text[:277] + "..."
+                    await twitter_service.post_tweet(workspace_id, tweet_text)
+                    logger.info("✓ Posted to Twitter")
                 except Exception as e:
-                    errors.append(f"TikTok: {str(e)}")
-                    logger.error(f"TikTok post failed: {e}")
+                    errors.append(f"Twitter: {str(e)}")
+                    logger.error(f"Twitter post failed: {e}")
+
+                # LinkedIn
+                try:
+                    await linkedin_service.post_text(workspace_id, final_caption)
+                    logger.info("✓ Posted to LinkedIn")
+                except Exception as e:
+                    errors.append(f"LinkedIn: {str(e)}")
+                    logger.error(f"LinkedIn post failed: {e}")
+
+                # TikTok (video content only)
+                if media_urls and any(u.endswith(('.mp4', '.mov', '.webm')) for u in media_urls):
+                    try:
+                        from database import SocialConnection
+                        conn_stmt = select(SocialConnection).where(
+                            SocialConnection.businessProfileId == workspace_id
+                        )
+                        conn = (await session.execute(conn_stmt)).scalars().first()
+                        if conn and getattr(conn, "tiktokAccessToken", None):
+                            from services.tiktok_service import post_to_tiktok
+                            import httpx
+                            tiktok_token = decrypt_token(conn.tiktokAccessToken) or conn.tiktokAccessToken
+                            video_url = next(u for u in media_urls if u.endswith(('.mp4', '.mov', '.webm')))
+                            async with httpx.AsyncClient(timeout=30) as http_client:
+                                video_resp = await http_client.get(video_url)
+                                if video_resp.status_code == 200:
+                                    result = await post_to_tiktok(tiktok_token, final_caption, video_resp.content)
+                                    if result.get("success"):
+                                        logger.info("✓ Posted to TikTok")
+                                    else:
+                                        errors.append(f"TikTok: {result.get('error', 'Unknown error')}")
+                    except Exception as e:
+                        errors.append(f"TikTok: {str(e)}")
+                        logger.error(f"TikTok post failed: {e}")
 
             # 5. Record the SocialPost (using correct field names!)
-            is_success = fb_post_id is not None or ig_post_id is not None
+            if auto_approve:
+                is_success = fb_post_id is not None or ig_post_id is not None
+                status = "POSTED" if is_success else "FAILED"
+            else:
+                is_success = True
+                status = "DRAFT"
+
             post = SocialPost(
                 id=str(uuid.uuid4()),
                 userId=profile.userId,
@@ -427,9 +461,9 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 type="AUTO",
                 caption=final_caption,              # Fixed: was 'content'
                 mediaUrls=media_urls,               # Fixed: was 'mediaUrl' (string)
-                status="POSTED" if is_success else "FAILED",
+                status=status,
                 scheduledAt=utc_now(),
-                postedAt=utc_now() if is_success else None,
+                postedAt=utc_now() if (auto_approve and is_success) else None,
                 fbPostId=fb_post_id,
                 igPostId=ig_post_id,
                 errorLog=" | ".join(errors) if errors else None,
@@ -448,18 +482,21 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
 
             await session.commit()
 
-            if is_success:
-                logger.info(
-                    f"[ARQ Worker] ✓ Successfully posted for workspace {workspace_id} "
-                    f"(FB: {fb_post_id}, IG: {ig_post_id})"
-                )
+            if auto_approve:
+                if is_success:
+                    logger.info(
+                        f"[ARQ Worker] ✓ Successfully posted for workspace {workspace_id} "
+                        f"(FB: {fb_post_id}, IG: {ig_post_id})"
+                    )
+                else:
+                    logger.warning(
+                        f"[ARQ Worker] Failed for workspace {workspace_id}: "
+                        f"{', '.join(errors)}"
+                    )
+                    from exceptions import IntegrationError
+                    raise IntegrationError(f"Social post failed: {', '.join(errors)}")
             else:
-                logger.warning(
-                    f"[ARQ Worker] Failed for workspace {workspace_id}: "
-                    f"{', '.join(errors)}"
-                )
-                from exceptions import IntegrationError
-                raise IntegrationError(f"Social post failed: {', '.join(errors)}")
+                logger.info(f"[ARQ Worker] ✓ Successfully drafted for workspace {workspace_id}")
 
             return "success"
 

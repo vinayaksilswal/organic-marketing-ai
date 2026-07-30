@@ -373,6 +373,9 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                     aiGenerated=True,
                     prompt=img_prompt,
                     promptType="image",
+                    # The image prompt is the description of what this asset
+                    # shows — hand it to the caption writer as the base caption.
+                    caption=img_prompt,
                 )
                 session.add(media)
 
@@ -484,6 +487,7 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                     aiGenerated=True,
                     prompt=img_prompt,
                     promptType="image",
+                    caption=img_prompt,
                 )
                 session.add(media)
 

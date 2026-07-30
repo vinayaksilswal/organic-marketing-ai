@@ -139,6 +139,9 @@ async def generate_video_campaign(
                     aiGenerated=True,
                     prompt=veo_prompt,
                     promptType="video",
+                    # Seed the base caption from the prompt so the caption
+                    # writer knows what this asset depicts. The user can edit it.
+                    caption=veo_prompt,
                 ))
                 await session.commit()
         except Exception:
@@ -256,6 +259,7 @@ async def auto_video(
             aiGenerated=True,
             prompt=veo_prompt,
             promptType="video",
+            caption=veo_prompt,
         )
         session.add(media)
         await session.commit()
