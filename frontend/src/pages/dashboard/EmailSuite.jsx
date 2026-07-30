@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Mail, Users, Tag, Plus, Send, Eye, Search, X, CheckCircle2, TrendingUp, MousePointer, AlertOctagon, Sparkles } from 'lucide-react';
+import { Mail, Users, Tag, Plus, Send, Eye, Search, X, CheckCircle2, TrendingUp, MousePointer, AlertOctagon, Sparkles, Edit3, AlertTriangle, Settings, Link2 } from 'lucide-react';
 
 const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
   const [campaigns, setCampaigns] = useState([]);
@@ -23,10 +23,121 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
   const [audSubmitting, setAudSubmitting] = useState(false);
   const [audSearch, setAudSearch] = useState('');
 
+  // Edit / preview an existing campaign before it goes out.
+  const [editing, setEditing] = useState(null);
+  const [editSubject, setEditSubject] = useState('');
+  const [editBodyHtml, setEditBodyHtml] = useState('');
+  const [editBodyText, setEditBodyText] = useState('');
+  const [editTab, setEditTab] = useState('preview');   // 'preview' | 'edit'
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [sendingEdit, setSendingEdit] = useState(false);
+
+  // Sending credentials for this business.
+  const [emailCfg, setEmailCfg] = useState(null);
+  const [showCfg, setShowCfg] = useState(false);
+  const [cfgKey, setCfgKey] = useState('');
+  const [cfgFrom, setCfgFrom] = useState('');
+  const [cfgName, setCfgName] = useState('');
+  const [cfgReply, setCfgReply] = useState('');
+  const [savingCfg, setSavingCfg] = useState(false);
+
   useEffect(() => {
     fetchCampaigns();
     fetchAudiences();
+    fetchEmailConfig();
   }, [activeWorkspaceId]);
+
+  const fetchEmailConfig = async () => {
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/email-config`, {}, token);
+      if (!res.ok) return;
+      const cfg = await res.json();
+      setEmailCfg(cfg);
+      setCfgFrom(cfg.fromEmail || '');
+      setCfgName(cfg.fromName || '');
+      setCfgReply(cfg.replyTo || '');
+    } catch {
+      /* non-fatal — the page still works without it */
+    }
+  };
+
+  const saveEmailConfig = async () => {
+    if (!cfgFrom.trim()) return showToast('Enter the address campaigns should send from', true);
+    setSavingCfg(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/email-config`, {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: 'resend',
+          apiKey: cfgKey || null,
+          fromEmail: cfgFrom,
+          fromName: cfgName || null,
+          replyTo: cfgReply || null,
+        }),
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'Could not save email settings');
+      showToast(data.message || 'Email connected.');
+      setCfgKey('');
+      setShowCfg(false);
+      await fetchEmailConfig();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSavingCfg(false);
+    }
+  };
+
+  const openEditor = (camp) => {
+    setEditing(camp);
+    setEditSubject(camp.subject || '');
+    setEditBodyHtml(camp.bodyHtml || '');
+    setEditBodyText(camp.bodyText || '');
+    setEditTab('preview');
+  };
+
+  const saveDraft = async ({ send } = { send: false }) => {
+    if (!editing) return;
+    if (!editSubject.trim()) return showToast('A subject line is required', true);
+    if (send && !window.confirm(
+      `Send "${editSubject}" to every subscriber of this business? This cannot be undone.`
+    )) return;
+
+    send ? setSendingEdit(true) : setSavingEdit(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/emails/${editing.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          subject: editSubject,
+          bodyHtml: editBodyHtml,
+          bodyText: editBodyText,
+          ...(send ? { status: 'SENT' } : {}),
+        }),
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+
+      // The server decides whether a send actually succeeded — trust its
+      // status, not the fact that the request returned 200.
+      if (send) {
+        if (data.status === 'SENT') {
+          showToast('Campaign sent.');
+          setEditing(null);
+        } else {
+          showToast(data.errorLog || 'The send failed. See the campaign for details.', true);
+        }
+      } else {
+        showToast('Draft saved.');
+        setEditing(null);
+      }
+      await fetchCampaigns();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSavingEdit(false);
+      setSendingEdit(false);
+    }
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -165,7 +276,13 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   };
 
-  const filteredAudiences = audiences.filter(a => 
+  const inputStyle = {
+    width: '100%', padding: '0.55rem 0.75rem', borderRadius: 8,
+    background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-color)',
+    color: '#fff', fontSize: '0.86rem',
+  };
+
+  const filteredAudiences = audiences.filter(a =>
     a.email.toLowerCase().includes(audSearch.toLowerCase()) || 
     (a.name && a.name.toLowerCase().includes(audSearch.toLowerCase()))
   );
@@ -175,8 +292,11 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
   const totalSent = campaigns.reduce((acc, c) => acc + (c.recipientCount || 0), 0);
   const totalOpens = campaigns.reduce((acc, c) => acc + (c.openCount || 0), 0);
   const totalClicks = campaigns.reduce((acc, c) => acc + (c.clickCount || 0), 0);
-  const avgOpenRate = totalSent > 0 ? ((totalOpens / totalSent) * 100).toFixed(1) : '24.5';
-  const avgCtr = totalOpens > 0 ? ((totalClicks / totalOpens) * 100).toFixed(1) : '4.2';
+  // Never invent performance figures. These previously fell back to "24.5" and
+  // "4.2" when nothing had been sent, which reads as real data and would be a
+  // lie in front of a customer.
+  const avgOpenRate = totalSent > 0 ? ((totalOpens / totalSent) * 100).toFixed(1) : null;
+  const avgCtr = totalOpens > 0 ? ((totalClicks / totalOpens) * 100).toFixed(1) : null;
 
   return (
     <div className="view">
@@ -208,6 +328,86 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
           </button>
         </div>
 
+        {/* SENDING STATUS — a campaign cannot go anywhere without this. */}
+        {activeTab === 'campaigns' && emailCfg && (
+          <div className="glass-panel" style={{
+            padding: '1.15rem 1.5rem', marginBottom: '1.5rem',
+            border: emailCfg.configured ? '1px solid var(--border-color)' : '1px solid rgba(245,158,11,0.35)',
+            background: emailCfg.configured ? undefined : 'rgba(245,158,11,0.06)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', flexWrap: 'wrap' }}>
+              {emailCfg.configured
+                ? <CheckCircle2 size={17} color="var(--success)" />
+                : <AlertTriangle size={17} color="#f59e0b" />}
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ fontSize: '0.92rem', fontWeight: 600 }}>
+                  {emailCfg.configured
+                    ? (emailCfg.usingPlatformDefault
+                        ? 'Sending through the platform’s shared address'
+                        : `Sending as ${emailCfg.fromEmail}`)
+                    : 'Email sending is not connected'}
+                </div>
+                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  {emailCfg.configured
+                    ? (emailCfg.usingPlatformDefault
+                        ? 'Connect your own domain so mail comes from your brand and lands in inboxes rather than spam.'
+                        : 'Campaigns send from your own domain.')
+                    : 'Campaigns cannot be delivered until you add a sending key. Drafts are still saved.'}
+                </p>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setShowCfg(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem', fontSize: '0.83rem' }}>
+                <Link2 size={14} /> {showCfg ? 'Hide' : emailCfg.configured && !emailCfg.usingPlatformDefault ? 'Change' : 'Connect email'}
+              </button>
+            </div>
+
+            {emailCfg.lastError && (
+              <p style={{ margin: '0.7rem 0 0 0', fontSize: '0.8rem', color: '#fca5a5' }}>
+                Last send error: {emailCfg.lastError}
+              </p>
+            )}
+
+            {showCfg && (
+              <div style={{ marginTop: '1.2rem', paddingTop: '1.2rem', borderTop: '1px solid var(--border-color)', display: 'grid', gap: '0.85rem' }}>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                  Paste a <strong>Resend</strong> API key and the address you have verified with them.
+                  Mail then leaves from your domain, which is what keeps it out of spam folders.
+                  The key is encrypted before it is stored and never shown again.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                      API key {emailCfg.hasKey && <span style={{ color: 'var(--success)' }}>· saved</span>}
+                    </label>
+                    <input type="password" value={cfgKey} onChange={e => setCfgKey(e.target.value)}
+                      placeholder={emailCfg.hasKey ? '••••••••  (leave blank to keep)' : 're_...'}
+                      style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Send from</label>
+                    <input type="email" value={cfgFrom} onChange={e => setCfgFrom(e.target.value)}
+                      placeholder="hello@yourdomain.com" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Sender name</label>
+                    <input type="text" value={cfgName} onChange={e => setCfgName(e.target.value)}
+                      placeholder="Your Brand" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Reply-to (optional)</label>
+                    <input type="email" value={cfgReply} onChange={e => setCfgReply(e.target.value)}
+                      placeholder="support@yourdomain.com" style={inputStyle} />
+                  </div>
+                </div>
+                <button className="btn btn-primary" onClick={saveEmailConfig} disabled={savingCfg}
+                  style={{ width: 'fit-content', padding: '0.5rem 1.1rem', fontSize: '0.85rem' }}>
+                  {savingCfg ? 'Saving…' : 'Save sending settings'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* CAMPAIGNS TAB */}
         {activeTab === 'campaigns' && (
           <div className="glass-panel" style={{ padding: '2rem' }}>
@@ -227,10 +427,19 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
               ) : (
                 campaigns.map(camp => (
-                  <div key={camp.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
+                  <div key={camp.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 260 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                        <span className={`badge ${camp.status === 'SENT' ? 'active' : ''}`} style={{ fontSize: '0.7rem', textTransform: 'uppercase' }}>
+                        <span style={{
+                          fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700,
+                          padding: '0.18rem 0.55rem', borderRadius: 4,
+                          background: camp.status === 'SENT' ? 'rgba(16,185,129,0.15)'
+                            : camp.status === 'FAILED' ? 'rgba(239,68,68,0.15)'
+                            : 'rgba(245,158,11,0.15)',
+                          color: camp.status === 'SENT' ? 'var(--success)'
+                            : camp.status === 'FAILED' ? '#f87171'
+                            : '#f59e0b',
+                        }}>
                           {camp.status}
                         </span>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '600' }}>
@@ -239,11 +448,25 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
                       </div>
                       <p style={{ margin: '0 0 0.4rem 0', fontSize: '1.05rem', fontWeight: '600' }}>{camp.subject}</p>
                       <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {camp.status === 'SENT' 
-                          ? `Sent: ${new Date(camp.sentAt).toLocaleString()} • Recipients: ${camp.recipientCount} • Opens: ${camp.openCount} • Clicks: ${camp.clickCount}` 
-                          : `Created: ${new Date(camp.createdAt).toLocaleString()}`}
+                        {camp.status === 'SENT' && camp.sentAt
+                          ? `Sent ${new Date(camp.sentAt).toLocaleString()} • ${camp.recipientCount || 0} recipients`
+                          : camp.createdAt ? `Created ${new Date(camp.createdAt).toLocaleString()}` : ''}
                       </p>
+
+                      {/* Recorded all along, never shown. */}
+                      {camp.status === 'FAILED' && camp.errorLog && (
+                        <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.7rem', borderRadius: 7, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', maxWidth: 480 }}>
+                          <p style={{ margin: 0, fontSize: '0.75rem', color: '#fca5a5', lineHeight: 1.5 }}>
+                            {camp.errorLog}
+                          </p>
+                        </div>
+                      )}
                     </div>
+
+                    <button className="btn btn-secondary" onClick={() => openEditor(camp)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', fontSize: '0.85rem' }}>
+                      {camp.status === 'SENT' ? <><Eye size={15} /> View</> : <><Edit3 size={15} /> Edit / Preview</>}
+                    </button>
                   </div>
                 ))
               )}
@@ -272,7 +495,9 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>AVG OPEN RATE</span>
-                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: 'var(--success)' }}>{avgOpenRate}%</h2>
+                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: avgOpenRate ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {avgOpenRate ? `${avgOpenRate}%` : '—'}
+                  </h2>
                 </div>
               </div>
 
@@ -282,7 +507,9 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>CLICK-THROUGH RATE</span>
-                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: 'var(--secondary-color)' }}>{avgCtr}%</h2>
+                  <h2 style={{ margin: 0, fontSize: '1.75rem', color: avgCtr ? 'var(--secondary-color)' : 'var(--text-muted)' }}>
+                    {avgCtr ? `${avgCtr}%` : '—'}
+                  </h2>
                 </div>
               </div>
             </div>
@@ -364,6 +591,116 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
         )}
 
         {/* Create Newsletter Modal */}
+        {/* EDIT / PREVIEW an existing campaign */}
+        {editing && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: 980, maxHeight: '90vh', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+              <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Mail size={18} color="var(--primary-color)" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>
+                  {editing.status === 'SENT' ? 'Sent campaign' : 'Edit / Preview'}
+                </h3>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+                  {['preview', 'edit'].map(t => (
+                    <button key={t} onClick={() => setEditTab(t)}
+                      className={`btn ${editTab === t ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '0.35rem 0.85rem', fontSize: '0.8rem', textTransform: 'capitalize' }}>
+                      {t}
+                    </button>
+                  ))}
+                  <button onClick={() => setEditing(null)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.35rem', display: 'flex' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+                {editTab === 'edit' ? (
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                        Subject line <span style={{ color: editSubject.length > 55 ? '#f59e0b' : 'var(--text-muted)' }}>({editSubject.length}/55 recommended)</span>
+                      </label>
+                      <input value={editSubject} onChange={e => setEditSubject(e.target.value)} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>HTML body</label>
+                      <textarea rows={14} value={editBodyHtml} onChange={e => setEditBodyHtml(e.target.value)}
+                        style={{ ...inputStyle, fontFamily: 'monospace', fontSize: '0.78rem', lineHeight: 1.6, resize: 'vertical' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                        Plain-text version — shown by clients that block HTML
+                      </label>
+                      <textarea rows={5} value={editBodyText} onChange={e => setEditBodyText(e.target.value)}
+                        style={{ ...inputStyle, resize: 'vertical' }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Inbox chrome, so the subject is judged the way a
+                        recipient actually sees it. */}
+                    <div style={{ maxWidth: 640, margin: '0 auto' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', borderRadius: '10px 10px 0 0', padding: '0.9rem 1.1rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          From: {emailCfg?.fromName || emailCfg?.fromEmail || 'your business'}
+                          {emailCfg?.fromEmail && emailCfg?.fromName ? ` <${emailCfg.fromEmail}>` : ''}
+                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: 700, marginTop: '0.3rem' }}>
+                          {editSubject || <span style={{ color: 'var(--text-muted)' }}>(no subject)</span>}
+                        </div>
+                      </div>
+                      <div style={{ background: '#ffffff', borderRadius: '0 0 10px 10px', minHeight: 260, overflow: 'hidden' }}>
+                        {editBodyHtml ? (
+                          <iframe
+                            title="Email preview"
+                            srcDoc={editBodyHtml}
+                            sandbox=""
+                            style={{ width: '100%', height: 420, border: 'none', background: '#fff' }}
+                          />
+                        ) : (
+                          <div style={{ padding: '2rem', color: '#666', fontFamily: 'Arial, sans-serif', whiteSpace: 'pre-wrap' }}>
+                            {editBodyText || 'This campaign has no content yet. Switch to Edit to write it.'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: '1.1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginRight: 'auto' }}>
+                  {editing.status === 'SENT'
+                    ? `Delivered to ${editing.recipientCount || 0} subscribers`
+                    : `Will send to ${audiences.length} subscriber${audiences.length === 1 ? '' : 's'}`}
+                </span>
+
+                {editing.status !== 'SENT' && (
+                  <>
+                    <button className="btn btn-secondary" onClick={() => saveDraft({ send: false })} disabled={savingEdit || sendingEdit}
+                      style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+                      {savingEdit ? 'Saving…' : 'Save draft'}
+                    </button>
+                    <button className="btn btn-primary" onClick={() => saveDraft({ send: true })}
+                      disabled={savingEdit || sendingEdit || audiences.length === 0 || !emailCfg?.configured}
+                      title={
+                        audiences.length === 0 ? 'No subscribers to send to'
+                          : !emailCfg?.configured ? 'Connect email sending first'
+                          : ''
+                      }
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1.1rem', fontSize: '0.85rem' }}>
+                      {sendingEdit ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Sending…</> : <><Send size={15} /> Send now</>}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {isCampaignModalOpen && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div className="glass-panel" style={{ maxWidth: '780px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>

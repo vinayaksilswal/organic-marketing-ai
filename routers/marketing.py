@@ -1591,6 +1591,10 @@ async def edit_email_campaign(
             "subject": existing.subject,
             "scheduledAt": existing.scheduledAt.isoformat() if existing.scheduledAt else None,
             "sentAt": existing.sentAt.isoformat() if existing.sentAt else None,
+            # Without this a failed send returned 200 with no explanation, so
+            # the UI could only say "something went wrong".
+            "errorLog": existing.errorLog,
+            "recipientCount": existing.recipientCount,
         }
 
 @router.post("/emails/manual")
