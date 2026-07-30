@@ -244,6 +244,51 @@ async def update_interval(
         await session.refresh(state)
         return {"success": True, "intervalHours": state.postIntervalHours}
 
+_BANNED_CAPTION_PHRASES = (
+    "unlock", "elevate", "game-changer", "game changer", "revolutioni",
+    "seamless", "cutting-edge", "cutting edge", "leverage", "synergy",
+    "empower", "supercharge", "take it to the next level",
+    "in today's fast-paced", "in a world where", "let that sink in",
+    "here's the truth nobody", "the analytical layer", "black box",
+    "signal gets lost", "needle barely",
+)
+
+# "Most X don't have a Y problem. They have a Z problem." and its cousins.
+_BANNED_OPENER_RE = re.compile(
+    r"^\s*(most \w+ (don't|do not) have a .{0,40}problem"
+    r"|it'?s not about .{0,40}\bit'?s about"
+    r"|let'?s talk about"
+    r"|here'?s the truth)",
+    re.IGNORECASE,
+)
+
+
+def _caption_quality_issues(caption: str) -> list[str]:
+    """Return the reasons a caption should be rejected, empty if it passes.
+
+    The prompt bans these, but a banned-word list only works if something
+    checks. Models reliably drift back into marketing register on retry-free
+    generation, which is how "We build the analytical layer that translates raw
+    metrics into decisive action" reached a real feed.
+    """
+    issues = []
+    low = caption.lower()
+
+    hits = [p for p in _BANNED_CAPTION_PHRASES if p in low]
+    if hits:
+        issues.append(f"uses banned marketing filler: {', '.join(hits[:4])}")
+
+    if _BANNED_OPENER_RE.search(caption):
+        issues.append("opens with an exhausted LinkedIn formula")
+
+    body = re.sub(r"#\w+", "", caption)
+    words = len(body.split())
+    if words > 130:
+        issues.append(f"too long at {words} words before hashtags")
+
+    return issues
+
+
 def _cloudinary_configured() -> bool:
     """Whether this deployment has object storage at all.
 
@@ -294,7 +339,7 @@ def _is_postable(media) -> bool:
     return mime.startswith("image/") or mime.startswith("video/")
 
 
-async def _generate_post_caption(profile, media) -> str:
+async def _generate_post_caption(profile, media, product=None) -> str:
     """Write an on-brand caption for a specific media asset.
 
     Feeds the model everything actually known about the business and the asset.
@@ -324,6 +369,17 @@ async def _generate_post_caption(profile, media) -> str:
 
     offer = (getattr(profile, "primaryOffer", None) or "").strip()
 
+    # A caption can only be as specific as the profile behind it. When the
+    # description is missing or a one-liner, the model has nothing concrete to
+    # anchor on and reliably falls back to category-level thought leadership —
+    # which is exactly how a generic "we translate metrics into action" caption
+    # gets written. Say so rather than letting it improvise.
+    if len(description) < 40:
+        logger.warning(
+            f"Workspace {getattr(profile, 'id', '?')} has a thin brand description "
+            f"({len(description)} chars). Captions will be generic until it is filled in."
+        )
+
     known = [f"Business name: {brand_name}"]
     if description: known.append(f"What it does (from their own site): {description}")
     if website:     known.append(f"Website: {website}")
@@ -333,6 +389,17 @@ async def _generate_post_caption(profile, media) -> str:
     if pillars:     known.append(f"Content themes: {', '.join(pillars)}")
     known.append(f"Tone of voice: {tone}")
     if offer:       known.append(f"The one action to drive (use this exact offer): {offer}")
+
+    # When the post is about a specific catalog item, the product's own facts
+    # outrank the brand-level summary — that is what makes an e-commerce post
+    # sell a thing rather than describe a company.
+    if product is not None:
+        p_title = getattr(product, "title", None)
+        p_desc = (getattr(product, "description", None) or "").strip()
+        p_price = getattr(product, "price", None)
+        if p_title: known.append(f"THIS POST IS ABOUT THIS PRODUCT: {p_title}")
+        if p_desc:  known.append(f"Product details: {p_desc[:400]}")
+        if p_price: known.append(f"Price: {p_price} (state it only if it reads naturally)")
 
     asset_lines = []
     if asset_caption:
@@ -349,20 +416,34 @@ async def _generate_post_caption(profile, media) -> str:
     asset_lines.append(f"Format: {'short video / reel' if is_video else 'single image'}")
 
     system_prompt = (
-        "You are an elite, enterprise-grade social media copywriter specializing in high-converting ads and organic content for top-tier brands. "
-        "You craft compelling, persuasive, and authentic copy that drives engagement and action. You never invent facts, metrics, offers or features that "
-        "were not explicitly provided."
+        "You write social captions for real companies. Your defining trait is "
+        "concreteness: a reader must finish the caption knowing what this "
+        "specific company does, in plain words. You have contempt for "
+        "LinkedIn thought-leadership voice — the abstract problem/insight essay "
+        "that could describe any company in the category. You never invent "
+        "facts, metrics, offers or features that were not given to you."
     )
 
     prompt = (
-        "Write ONE highly engaging, enterprise-grade social media caption for the post described below.\n\n"
+        "Write ONE social media caption for the post described below.\n\n"
         "=== THE BUSINESS ===\n" + "\n".join(known) + "\n\n"
         "=== THIS POST'S VISUAL ===\n" + "\n".join(asset_lines) + "\n\n"
         "=== REQUIREMENTS ===\n"
-        "1. Structure the caption using a proven marketing framework (e.g., AIDA or PAS).\n"
-        "2. Hook the reader immediately with a scroll-stopping first line. Never open with the brand name.\n"
-        "3. Connect the message to the visual seamlessly, providing clear value.\n"
-        "4. Keep it punchy, professional, yet approachable. Avoid overused buzzwords ('unlock', 'elevate', 'game-changer', 'revolutionize').\n"
+        "1. CONCRETE, NOT ABSTRACT. Name the actual thing this company does, "
+        "using the nouns from its description above. If your caption would "
+        "still make sense with a competitor's name swapped in, it has failed. "
+        "Never describe the product as 'the layer', 'the framework', 'the "
+        "system', 'the platform', 'the solution' or 'the engine' — say what it "
+        "literally does.\n"
+        "2. HOOK IN UNDER 10 WORDS. Instagram truncates after roughly one line, "
+        "so the first line must carry the point on its own. Never open with the "
+        "brand name.\n"
+        "3. REFERENCE THE VISUAL. Say something only someone who watched this "
+        "specific video or saw this specific image could write. Do not describe "
+        "it literally — react to it, or pick up the moment it shows.\n"
+        "4. SHORT. 40-90 words total, excluding hashtags. Three short "
+        "paragraphs maximum. Cut every sentence that is only setting up the "
+        "next one.\n"
         + (
             f'5. End with this exact call to action, word for word: "{offer}". '
             "Do not reword it, shorten it, or swap in your own.\n"
@@ -374,19 +455,77 @@ async def _generate_post_caption(profile, media) -> str:
         + "6. Never put a URL in the caption — Instagram does not linkify them, so "
         "a raw link reads as spam and wastes the strongest line. Say 'link in bio'.\n"
         "7. Invent nothing: no fake statistics, customer counts, or discounts.\n"
-        "8. Final line: include 3-5 hyper-relevant industry hashtags. Do NOT use generic tags like #love or #instagood.\n\n"
+        "8. Final line: 3-5 hashtags specific to this industry. No #love, no "
+        "#instagood, no #business.\n\n"
+        "=== BANNED OPENERS ===\n"
+        "These formulas are exhausted. Using any of them fails the brief:\n"
+        "- \"Most [people] don't have a [X] problem. They have a [Y] problem.\"\n"
+        "- \"It's not about X. It's about Y.\"\n"
+        "- \"Here's the truth nobody tells you about...\"\n"
+        "- \"Let's talk about...\" / \"Let that sink in.\"\n"
+        "- \"In today's fast-paced world\" / \"In a world where...\"\n"
+        "- Any opener that states a generic industry problem before naming what "
+        "this company does.\n\n"
+        "=== BANNED WORDS ===\n"
+        "unlock, elevate, game-changer, revolutionise, revolutionize, "
+        "seamless, cutting-edge, leverage, synergy, robust, empower, "
+        "supercharge, transform your, take it to the next level, needle, "
+        "signal vs noise, black box.\n\n"
+        + (
+            ""
+            if len(description) >= 40 else
+            "=== WARNING: THIN BRAND DATA ===\n"
+            "The description above is very short, so you do not know much about "
+            "this company. Do NOT compensate by writing about the industry in "
+            "general — that produces filler. Stay narrow: write only about what "
+            "the visual shows and what the business name and niche imply, and "
+            "keep it to two short sentences.\n\n"
+        )
+        + "=== BEFORE YOU ANSWER ===\n"
+        "Check your draft against these. If any answer is no, rewrite it:\n"
+        "- Could a reader say what this company sells, in one sentence?\n"
+        "- Would the caption break if a competitor's name replaced this one?\n"
+        "  (It should.)\n"
+        "- Does it react to THIS visual rather than the category in general?\n"
+        "- Is it under 90 words before hashtags?\n\n"
         "Output ONLY the caption. No preamble, no quotes, no explanation."
     )
 
+    def _clean(text: str) -> str:
+        text = (text or "").strip()
+        if text.startswith('"') and text.endswith('"'):
+            text = text[1:-1].strip()
+        for lead in ("Caption:", "Here's the caption:", "Here is the caption:"):
+            if text.lower().startswith(lead.lower()):
+                text = text[len(lead):].strip()
+        return text
+
     try:
         from services.ai_service import _call_openrouter
-        caption = (await _call_openrouter(prompt, system_prompt=system_prompt)).strip()
-        # Models sometimes wrap output in quotes or add a lead-in line.
-        if caption.startswith('"') and caption.endswith('"'):
-            caption = caption[1:-1].strip()
-        for lead in ("Caption:", "Here's the caption:", "Here is the caption:"):
-            if caption.lower().startswith(lead.lower()):
-                caption = caption[len(lead):].strip()
+        caption = _clean(await _call_openrouter(prompt, system_prompt=system_prompt))
+
+        # One corrective pass. Naming the specific failure works far better
+        # than asking again, because the model can see what it did wrong.
+        issues = _caption_quality_issues(caption)
+        if issues:
+            logger.info(
+                f"Caption rejected for workspace {getattr(profile, 'id', '?')} "
+                f"({'; '.join(issues)}), retrying once"
+            )
+            retry = (
+                prompt
+                + "\n\n=== YOUR PREVIOUS ATTEMPT WAS REJECTED ===\n"
+                + caption
+                + "\n\nReasons: "
+                + "; ".join(issues)
+                + ".\nWrite a different caption that fixes these. Be more "
+                "concrete and considerably shorter. Name what the company "
+                "actually does in plain words."
+            )
+            second = _clean(await _call_openrouter(retry, system_prompt=system_prompt))
+            # Keep the retry only if it genuinely improved.
+            if second and len(_caption_quality_issues(second)) < len(issues):
+                caption = second
         # Enforce the no-links rule rather than trusting the model to obey it.
         # The prompt forbids URLs, but models slip, and a raw link in an
         # Instagram caption is unclickable text that reads as spam.

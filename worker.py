@@ -132,12 +132,21 @@ async def _get_next_product_for_workspace(
     state.lastProductIdx = next_idx
     return products[next_idx]
 
-async def _select_media_for_post(
+async def _select_media_for_post(session: Any, profile: BusinessProfile) -> str | None:
+    """Backwards-compatible wrapper returning just the URL."""
+    media = await _select_media_object_for_post(session, profile)
+    return media.url if media else None
+
+
+async def _select_media_object_for_post(
     session: Any, profile: BusinessProfile
-) -> str | None:
+) -> Any:
     """
-    Select the best media URL from the workspace's Media catalog.
+    Select the best media asset from the workspace's Media catalog.
     Prioritizes AI-generated, unused media. Falls back to any available media.
+
+    Returns the Media row, not just its URL: the caption writer needs the
+    asset's description to write about what is actually on screen.
     """
     # Only rows that are actually publishable. The catalog also holds
     # prompt-only notes (text/plain, empty url) from the Video Studio; those
@@ -186,10 +195,10 @@ async def _select_media_for_post(
     # Pick first unused media
     for media in all_media:
         if media.url not in used_urls:
-            return media.url
+            return media
 
     # If all used, just pick the first one (rotate)
-    return all_media[0].url if all_media else None
+    return all_media[0] if all_media else None
 
 
 async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
@@ -231,6 +240,12 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             # to drafting, never to publishing.
             auto_approve = bool(state.autoApprove) if state else False
 
+            # Only some branches below set these. Initialise them here so the
+            # shared caption path cannot hit an UnboundLocalError — the same
+            # class of bug that `campaign` vs `campaign_id` caused.
+            media_obj = None
+            product = None
+
             if profile.businessModel == "E-commerce" and getattr(profile, "productCatalogUrl", None):
                 # E-commerce Flow: Pick a product and generate a post
                 product = await _get_next_product_for_workspace(session, profile)
@@ -239,7 +254,8 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     campaign = await _get_next_campaign_for_workspace(session, profile)
                     if not campaign:
                         return "no_campaigns"
-                    media_url = await _select_media_for_post(session, profile)
+                    media_obj = await _select_media_object_for_post(session, profile)
+                    media_url = media_obj.url if media_obj else None
                     if not media_url and campaign.mediaUrl:
                         media_url = campaign.mediaUrl
                     media_urls = [media_url] if media_url else []
@@ -262,6 +278,9 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     campaign_id = campaign.id
                 else:
                     logger.info(f"Selected product {product.id} ({product.title}) for workspace {workspace_id}")
+                    # The product's own image is the subject here, not a catalog
+                    # asset — so there is no Media row to describe.
+                    media_obj = None
                     media_urls = []
                     if getattr(product, "videoUrl", None):
                         media_urls.append(product.videoUrl)
@@ -310,7 +329,8 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 
                 logger.info(f"Selected campaign {campaign.id} for AI Influencer workspace {workspace_id}")
                 
-                media_url = await _select_media_for_post(session, profile)
+                media_obj = await _select_media_object_for_post(session, profile)
+                media_url = media_obj.url if media_obj else None
                 if getattr(profile, "influencerReferenceUrl", None):
                     # If they have a reference URL, prioritize it if we don't have fresh media
                     if not media_url:
@@ -349,7 +369,8 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 logger.info(f"Selected campaign {campaign.id} for workspace {workspace_id}")
 
                 # 2. Select media from catalog (prefer unused AI-generated)
-                media_url = await _select_media_for_post(session, profile)
+                media_obj = await _select_media_object_for_post(session, profile)
+                media_url = media_obj.url if media_obj else None
                 if not media_url and campaign.mediaUrl:
                     media_url = campaign.mediaUrl
                 media_urls = [media_url] if media_url else []
@@ -372,8 +393,24 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 fallback_caption = campaign.baseCaption
                 campaign_id = campaign.id
 
+            # Caption generation. The scheduled loop used to build its own
+            # inline prompt from campaign.baseCaption, which meant unattended
+            # posts — the large majority — were written without ever knowing
+            # what the visual showed, without the business's primary offer, and
+            # without the no-URL rule. The manual "Run Automation" button used
+            # a much better writer. Both now share one path.
+            from routers.marketing import _generate_post_caption, _strip_urls
+
+            final_caption = None
             try:
-                final_caption = await generate_campaign_variation(prompt)
+                if media_obj is not None or product is not None:
+                    final_caption = await _generate_post_caption(
+                        profile, media_obj, product=product
+                    )
+                else:
+                    # Nothing visual to describe — fall back to the campaign's
+                    # own idea, which is all the context that exists.
+                    final_caption = await generate_campaign_variation(prompt)
             except Exception as e:
                 logger.warning(f"AI caption generation failed, using base caption: {e}")
                 final_caption = None
@@ -381,9 +418,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             if not final_caption or len(final_caption) < 10:
                 final_caption = fallback_caption
 
-            # Backstop the no-links rule. The prompts forbid URLs, but models
-            # slip, and a raw link in an Instagram caption is dead text.
-            from routers.marketing import _strip_urls
+            # Backstop the no-links rule even on the fallback paths.
             final_caption = _strip_urls(final_caption) or fallback_caption
 
             # 4. Post to all platforms
