@@ -347,7 +347,48 @@ def run_creative_engine(intelligence_json: Dict[str, Any], goal: str) -> Dict[st
         "variation_modifier": variation_modifier
     }
 
-async def generate_prompt(intelligence: Dict[str, Any], creative_strategy: Dict[str, Any], image_url: str) -> str:
+def _recent_prompts_block(recent_prompts: Optional[list]) -> str:
+    """Render already-used prompts as an explicit avoid-list.
+
+    Telling a model to "be creative" does nothing; showing it exactly what it
+    already produced and naming the axes it must change does.
+    """
+    cleaned = [str(p).strip() for p in (recent_prompts or []) if p and str(p).strip()]
+    if not cleaned:
+        return ""
+
+    lines = [
+        "",
+        "═══════════════════════════════════════════════════════════",
+        "ALREADY USED FOR THIS BRAND — DO NOT REPEAT",
+        "═══════════════════════════════════════════════════════════",
+        "These prompts were generated for this same business. Yours must be a",
+        "visibly different piece of content, not a paraphrase.",
+        "",
+    ]
+    for i, p in enumerate(cleaned[:6], 1):
+        lines.append(f"{i}. {p[:400]}")
+    lines += [
+        "",
+        "Your prompt MUST differ from every one above on at least THREE of these axes:",
+        "  - the setting (a different room, surface, time of day or location)",
+        "  - the camera (a different shot size, lens and movement)",
+        "  - the opening beat (a different first frame — do not reuse the same hook)",
+        "  - who or what is on screen (person vs product vs screen vs hands)",
+        "  - the lighting (different direction, temperature and hardness)",
+        "  - the on-screen line (different words and a different claim angle)",
+        "If your draft reuses the same opening as any prompt above, discard it and",
+        "write a different one.",
+    ]
+    return "\n".join(lines)
+
+
+async def generate_prompt(
+    intelligence: Dict[str, Any],
+    creative_strategy: Dict[str, Any],
+    image_url: str,
+    recent_prompts: Optional[list] = None,
+) -> str:
     """Generate the final video-model prompt for a 10-second vertical ad.
 
     Length discipline is the whole game here. Text-to-video models degrade
@@ -359,6 +400,7 @@ async def generate_prompt(intelligence: Dict[str, Any], creative_strategy: Dict[
     """
     cf = creative_strategy.get("creative_format", {})
     vm = creative_strategy.get("variation_modifier", {})
+    recent_block = _recent_prompts_block(recent_prompts)
 
     sys_message = """You are an elite creative director writing prompts for AI video used as Instagram Reels, TikToks and paid social ads. You translate a product profile into ONE production-ready prompt for a single 10-second vertical (9:16) clip.
 
@@ -471,6 +513,17 @@ RULE 6 — INVENT NOTHING. No statistics, no prices, no ratings, no claims absen
 
 RULE 7 — 90-120 WORDS. Count them. A prompt over 120 words will be rejected.
 
+RULE 8 — IT MUST SELL, NOT JUST LOOK GOOD. This is an ad, not a showreel. A
+viewer who watches it with the sound off must come away knowing what this
+business does and why it matters. The single strongest moment is almost always
+the product visibly WORKING — a result appearing, a number resolving, a face
+reacting to it. Choose that moment over any establishing or atmosphere shot.
+
+RULE 9 — BRAND IT. The brand's name or product name must be legible on screen
+at least once, in double quotes, on a real surface — a screen, a label, a
+package. A viewer must be able to name the company after watching. Do not open
+on the logo; earn it by second seven.
+{recent_block}
 Return the JSON object and nothing else.
 """
 
@@ -496,8 +549,21 @@ Return the JSON object and nothing else.
         return result.strip()
 
 
-async def execute_video_pipeline(product_name: str, product_url: Optional[str] = None, image_url: str = "", goal: str = "conversion", profile: Optional[Any] = None) -> Dict[str, Any]:
-    """Execute the full end-to-end creative video pipeline."""
+async def execute_video_pipeline(
+    product_name: str,
+    product_url: Optional[str] = None,
+    image_url: str = "",
+    goal: str = "conversion",
+    profile: Optional[Any] = None,
+    recent_prompts: Optional[list] = None,
+) -> Dict[str, Any]:
+    """Execute the full end-to-end creative video pipeline.
+
+    `recent_prompts` is what this business has already generated. Without it
+    every run started from the same brand profile and creative format and
+    produced near-identical scenes, so a feed of these videos looked like one
+    video posted repeatedly.
+    """
     logger.info(f"Starting video pipeline for {product_name}")
     
     # 1. Scrape
@@ -524,7 +590,9 @@ product_placement: 'center'
     creative_strategy = run_creative_engine(intelligence, goal)
     
     # 5. Prompt Generation
-    final_prompt = await generate_prompt(intelligence, creative_strategy, image_url)
+    final_prompt = await generate_prompt(
+        intelligence, creative_strategy, image_url, recent_prompts=recent_prompts
+    )
     
     logger.info("Video pipeline completed successfully.")
     

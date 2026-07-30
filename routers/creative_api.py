@@ -212,6 +212,22 @@ async def auto_video(
             ))
         )).scalars().first()
 
+        # What this business has already had generated. Fed to the model as an
+        # explicit avoid-list — otherwise every run reads the same brand profile
+        # and returns near-identical scenes.
+        recent_prompts = [
+            p for p in (await session.execute(
+                select(Media.prompt)
+                .where(and_(
+                    Media.businessProfileId == profile.id,
+                    Media.promptType == "video",
+                    Media.prompt.isnot(None),
+                ))
+                .order_by(Media.createdAt.desc())
+                .limit(6)
+            )).scalars().all() if p
+        ]
+
         profile_id, profile_name = profile.id, profile.name
 
     try:
@@ -221,6 +237,7 @@ async def auto_video(
             image_url=subject_image,
             goal=data.goal,
             profile=profile,
+            recent_prompts=recent_prompts,
         )
     except Exception as e:
         # The pipeline calls OpenRouter, whose free-tier models rate-limit

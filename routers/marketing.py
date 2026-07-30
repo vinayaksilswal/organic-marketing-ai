@@ -244,6 +244,19 @@ async def update_interval(
         await session.refresh(state)
         return {"success": True, "intervalHours": state.postIntervalHours}
 
+def _cloudinary_configured() -> bool:
+    """Whether this deployment has object storage at all.
+
+    upload_media_to_cloudinary returns None both when Cloudinary is not set up
+    and when it rejected the file. Those need opposite handling: the first is a
+    normal dev setup that should fall back to local disk, the second is a real
+    failure the user must hear about, because the local fallback produces a
+    relative URL that Facebook and Instagram cannot fetch.
+    """
+    from config import settings
+    return bool(settings.cloudinary_cloud_name and settings.cloudinary_api_secret)
+
+
 _URL_RE = re.compile(r"\bhttps?://\S+|\bwww\.\S+", re.IGNORECASE)
 
 
@@ -1410,9 +1423,23 @@ async def update_workspace_media(
             if uploaded:
                 media.url = uploaded["secure_url"]
                 media.data = None
+            elif _cloudinary_configured():
+                # Storage is set up but refused this file. Saying "saved" here
+                # would leave an asset the social platforms cannot fetch.
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Your storage provider rejected this file — it is usually an "
+                        "unsupported format or too large. Try an MP4 (H.264) or a JPG/PNG."
+                    ),
+                )
             else:
-                # No Cloudinary configured — keep the bytes locally so the
-                # replacement still takes effect rather than silently no-oping.
+                # No object storage configured (local/dev). Keep the bytes so
+                # the replacement still takes effect rather than no-oping.
+                logger.warning(
+                    "No Cloudinary configured; storing media %s locally. Facebook and "
+                    "Instagram cannot fetch this URL.", media.id
+                )
                 media.url = f"/api/v1/media/{media.id}"
                 media.data = content
             media.filename = file.filename

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE, authFetch } from '../../config';
 import {
   Sparkles, Film, Copy, Check, Wand2, Package, Building2,
-  AlertTriangle, Settings, Video, Image as ImageIcon
+  AlertTriangle, Settings, Video, Image as ImageIcon,
+  Upload, Trash2, RefreshCw, Clock, Send
 } from 'lucide-react';
 
 const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
@@ -14,6 +15,90 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   const [videoKeySet, setVideoKeySet] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef(null);
+
+  // Prompt history for this business, and the attach-a-video flow that turns
+  // a prompt into something the scheduler can actually post.
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState(null);
+  const [attachingId, setAttachingId] = useState(null);
+  const [attachTargetId, setAttachTargetId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const attachInputRef = React.useRef(null);
+
+  const fetchHistory = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    setLoadingHistory(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media`, {
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      }, token);
+      if (!res.ok) {
+        setHistoryError(`Could not load your prompts (error ${res.status}).`);
+        return;
+      }
+      const all = await res.json();
+      setHistory(
+        (Array.isArray(all) ? all : []).filter(m => m.promptType === 'video' || m.prompt)
+      );
+      setHistoryError(null);
+    } catch {
+      setHistoryError('Could not reach the server to load your prompts.');
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [activeWorkspaceId, token]);
+
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+  /**
+   * Attach a rendered video to the prompt that produced it.
+   *
+   * This is the step that moves an asset into the posting cycle. A prompt row
+   * carries no file, so the scheduler skips it. PATCHing the file onto the SAME
+   * row keeps the prompt as the asset's base caption, which is what the caption
+   * writer reads at posting time. Uploading the video as a separate row instead
+   * — which this page used to do — threw that context away.
+   */
+  const attachVideo = async (mediaId, file) => {
+    if (!file) return;
+    setAttachingId(mediaId);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await authFetch(`${API_BASE}/marketing/media/${mediaId}`, {
+        method: 'PATCH',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: fd,
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Upload failed (error ${res.status})`);
+
+      showToast('Video attached. This asset is now in the posting rotation.');
+      await fetchHistory();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setAttachingId(null);
+      setAttachTargetId(null);
+      if (attachInputRef.current) attachInputRef.current.value = '';
+    }
+  };
+
+  const deletePrompt = async (mediaId) => {
+    if (!window.confirm('Delete this prompt and its media?')) return;
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/${mediaId}`, {
+        method: 'DELETE',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      }, token);
+      if (!res.ok) throw new Error(`Could not delete (error ${res.status})`);
+      showToast('Deleted.');
+      await fetchHistory();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
 
   // Load the active business, its catalog, and whether a render key exists
   useEffect(() => {
@@ -128,6 +213,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
       if (r.status === 'queued') showToast('Prompt generated and video render queued.');
       else if (r.status === 'failed') showToast('Prompt saved, but the video render failed.', true);
       else showToast('Prompt generated and saved to your media library.');
+      await fetchHistory();
     } catch (err) {
       showToast(err.message, true);
     } finally {
@@ -135,25 +221,21 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   };
 
+  // Attaches to the prompt row just generated, so the prompt stays as the
+  // asset's description rather than the video landing as an unlabelled file.
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!result?.mediaId) {
+      showToast('Generate a prompt first.', true);
+      return;
+    }
     setUploading(true);
-    const fd = new FormData();
-    fd.append('file', file);
     try {
-      const res = await fetch(`${API_BASE}/upload-media`, {
-        method: 'POST',
-        body: fd,
-        headers: { Authorization: `Bearer ${token}`, 'X-Workspace-Id': activeWorkspaceId || '' },
-      });
-      if (!res.ok) throw new Error('Upload failed');
-      showToast('Video added to your media library.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err) {
-      showToast(err.message, true);
+      await attachVideo(result.mediaId, file);
     } finally {
       setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -366,8 +448,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                         <ImageIcon size={14} /> Made the video elsewhere?
                       </h5>
                       <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-                        Paste the prompt into Veo, Seed Dance, or Runway, then upload the result here
-                        so the scheduler can post it.
+                        Paste the prompt into Veo, Flow, Seed Dance or Runway, then upload the result
+                        here. It attaches to this prompt — so the prompt becomes the video's
+                        description, and the caption writer knows what is on screen.
                       </p>
                       <input type="file" accept="video/*" ref={fileInputRef} onChange={handleUpload} style={{ display: 'none' }} />
                       <button
@@ -385,6 +468,148 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
               </div>
             )}
+
+            {/* One hidden input drives every row's attach button. */}
+            <input
+              type="file"
+              accept="video/*,image/*"
+              ref={attachInputRef}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f && attachTargetId) attachVideo(attachTargetId, f);
+              }}
+              style={{ display: 'none' }}
+            />
+
+            {/* PROMPT LOG */}
+            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', marginTop: '1.5rem' }}>
+              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                <Clock size={16} color="var(--primary-color)" />
+                <h3 style={{ margin: 0, fontSize: '1.02rem' }}>Generated prompts</h3>
+                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>
+                  {history.length > 0 && `${history.length} total`}
+                </span>
+                <button
+                  onClick={fetchHistory}
+                  title="Refresh"
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', padding: 4 }}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+
+              {loadingHistory ? (
+                <div style={{ padding: '2.5rem', textAlign: 'center' }}>
+                  <span className="spinner" style={{ width: 20, height: 20 }} />
+                </div>
+              ) : historyError ? (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                  <AlertTriangle size={20} color="#f87171" />
+                  <p style={{ margin: '0.6rem 0 0.9rem', fontSize: '0.87rem', color: '#fca5a5' }}>{historyError}</p>
+                  <button className="btn btn-secondary" onClick={fetchHistory} style={{ padding: '0.42rem 0.9rem', fontSize: '0.82rem' }}>
+                    Retry
+                  </button>
+                </div>
+              ) : history.length === 0 ? (
+                <div style={{ padding: '2.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.88rem' }}>
+                  No prompts yet. Generate one above and it will appear here.
+                </div>
+              ) : (
+                history.map(item => {
+                  const live = item.postable === true;
+                  const busy = attachingId === item.id;
+                  const open = expandedId === item.id;
+                  const text = item.prompt || item.caption || '';
+                  return (
+                    <div key={item.id} style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
+                        {/* Thumbnail only once a real file is attached */}
+                        <div style={{ width: 46, height: 46, borderRadius: 9, background: 'rgba(255,255,255,0.04)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {live && item.mimeType?.startsWith('video/') ? (
+                            <video src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
+                          ) : live ? (
+                            <img src={item.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <Film size={17} color="rgba(255,255,255,0.3)" />
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                            <span style={{
+                              fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4,
+                              background: live ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.15)',
+                              color: live ? 'var(--success)' : '#fbbf24',
+                            }}>
+                              {live ? 'IN POSTING CYCLE' : 'PROMPT ONLY'}
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
+                              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+                            </span>
+                          </div>
+
+                          <p style={{
+                            margin: 0, fontSize: '0.83rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic',
+                            whiteSpace: 'pre-wrap',
+                            ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
+                          }}>
+                            {text}
+                          </p>
+
+                          {text.length > 180 && (
+                            <button
+                              onClick={() => setExpandedId(open ? null : item.id)}
+                              style={{ background: 'none', border: 'none', padding: 0, marginTop: '0.35rem', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              {open ? 'Show less' : 'Show full prompt'}
+                            </button>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => { navigator.clipboard.writeText(text); showToast('Prompt copied to clipboard'); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.38rem 0.75rem', fontSize: '0.78rem' }}
+                            >
+                              <Copy size={12} /> Copy
+                            </button>
+
+                            <button
+                              className={live ? 'btn btn-secondary' : 'btn btn-primary'}
+                              disabled={busy}
+                              onClick={() => { setAttachTargetId(item.id); attachInputRef.current?.click(); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.38rem 0.75rem', fontSize: '0.78rem' }}
+                            >
+                              {busy
+                                ? <><span className="spinner" style={{ width: 11, height: 11 }} /> Uploading…</>
+                                : live
+                                  ? <><Upload size={12} /> Replace video</>
+                                  : <><Send size={12} /> Add video → posting cycle</>}
+                            </button>
+
+                            <button
+                              className="btn btn-secondary"
+                              onClick={() => deletePrompt(item.id)}
+                              style={{ padding: '0.38rem 0.55rem', color: 'var(--error)' }}
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+
+                          {!live && (
+                            <p style={{ margin: '0.6rem 0 0 0', fontSize: '0.74rem', color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+                              This is a saved prompt, not a file — the scheduler skips it. Render it in
+                              your video tool, then attach the result to put it in rotation.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </>
         )}
       </div>
