@@ -152,7 +152,14 @@ async def marketing_intelligence_synthesis(product_name: str, scrape_content: st
         )
         offer = (getattr(profile, "primaryOffer", None) or "").strip()
         if offer:
-            brand_context += f"- Primary offer / call to action: {offer}\n"
+            # Context only. This must NOT be written onto the screen: a full
+            # offer sentence renders as garbled glyphs, which is exactly how
+            # "Start free simulation -> Scan your domain -> Upgrade at 10 runs"
+            # ended up burned into a video. The caption carries it verbatim.
+            brand_context += (
+                f"- What the ad should make a viewer want to do: {offer}\n"
+                f"  (Context for the mood only — do NOT put this sentence on screen.)\n"
+            )
     
     prompt = f"""You are a senior product marketing strategist and brand intelligence engine. Your task is to synthesize all available product data into a comprehensive marketing intelligence profile that will drive AI video creative generation.
 YOU HAVE THREE TIERS OF INPUT — use them in this exact priority order:
@@ -413,43 +420,94 @@ async def generate_prompt(
     vm = creative_strategy.get("variation_modifier", {})
     recent_block = _recent_prompts_block(recent_prompts)
 
-    sys_message = """You are an elite creative director writing prompts for AI video used as Instagram Reels, TikToks and paid social ads. You translate a product profile into ONE production-ready prompt for a single 10-second vertical (9:16) clip.
+    sys_message = """You are a creative director who writes prompts for AI video generators used as Instagram Reels and paid social ads. You have shot hundreds of these, so you write for what the MODEL CAN ACTUALLY RENDER, not for what reads well on paper. A prompt that describes a beautiful film the model cannot produce is a failed prompt.
 
-LENGTH DISCIPLINE — THE MOST IMPORTANT RULE:
-90-120 words. Never more. These models lose detail past roughly 120 words, so a longer prompt yields a WORSE video, not a richer one. Every word must earn its place. Cut atmosphere adjectives before you cut the subject, the action, or the on-screen line.
+════════════════════════════════════════
+THE FOUR THINGS THAT RUIN AI VIDEO
+Every bad render traces back to one of these. Avoid them absolutely.
+════════════════════════════════════════
 
-TEN SECONDS OF SCREEN TIME — WHAT ACTUALLY FITS:
-One continuous shot, or one shot with a single cut at roughly the halfway mark. That is all. Do not write three scenes. Do not write a montage. Pick the single strongest moment in the story and shoot it properly.
-- Seconds 0-1: the hook. Something must already be happening on the first frame. No establishing drift, no slow fade in, no logo card.
-- Seconds 1-7: the substance. The product does the thing, or the person reacts to it.
-- Seconds 7-10: the payoff. A result on screen, a face registering it, or the brand line landing.
+1. LEGIBLE SCREEN CONTENT — THE #1 KILLER.
+   These models CANNOT render readable interfaces. Asking for a "GitHub
+   Actions workflow", "a dashboard showing statevector probabilities",
+   "terminal logs scrolling", "a compliance score resolving", or any named
+   UI produces smeared pseudo-text and warped glyphs every single time.
+   NEVER describe what is legible on a screen.
+   If a screen is in frame, describe it ONLY as light and colour:
+     GOOD: "a monitor throws cyan light across his face, content out of focus"
+     GOOD: "screen glow reflected in his glasses, shallow depth of field"
+     BAD:  "the monitor shows a passing QuantCAI step emitting a CBOM hash"
+     BAD:  "live probabilities resolve on the circuit builder"
 
-THE FIVE-PART FORMULA (in this order, always):
-[Cinematography] + [Subject] + [Action] + [Context] + [Style/Ambiance]
-- Cinematography: name the shot and the move — "handheld medium close-up, slight sway", "locked-off macro", "slow dolly in on a 35mm lens".
-- Subject: front-load a clear identity anchor with stable visual traits. The model holds whatever you name first.
-- Action: active, physical verbs — taps, slams, pours, pulls, snaps. Not "showcases", not "highlights", not "represents".
-- Context: the environment as an active system — "steam curling off the cup", "dust suspended in hard window light" — not a static backdrop.
-- Style/Ambiance: aesthetic, mood, lighting, and lens character. End with surgical negatives: -v oversaturated, plastic, artificial, warped text, extra fingers.
+2. ON-SCREEN TEXT LONGER THAN FOUR WORDS.
+   Text is rendered glyph by glyph and degrades fast. A sentence becomes
+   gibberish. You get ONE text element, 1-4 words, or none at all.
+     GOOD: "Start free"  /  "QuantCAI"  /  no text at all
+     BAD:  "Start free simulation -> Scan your domain -> Upgrade at 10 runs"
+   The full call to action belongs in the post caption, not burned into the
+   video. Do not try to fit an offer sentence on screen.
 
-AUDIO (these models generate sound — direct it in one short clause):
-Name the ambience and one punctuating sound: "low room tone, a single crisp keystroke click on impact". No music genre essays. No dialogue unless the format is a testimonial, and then at most one short spoken line.
+3. COMPLEX CAMERA MOVES.
+   A camera that rotates, flips, or changes its mind mid-shot produces
+   morphing and melted geometry. Choose exactly ONE move from this list and
+   nothing else: slow push-in, slow pull-back, slow pan left or right,
+   locked-off static, gentle handheld sway, slow overhead descent.
+     BAD: "at 5s the phone rotates 180 degrees to reveal her face"
+     BAD: "then flips to show the screen"
 
-BRAND SAFETY AND TEXT:
-- Every visible product name, tagline, UI string or CTA goes in exact double quotes. The model renders quoted text far more reliably.
-- At most ONE short on-screen line. Two competing text elements in ten seconds renders as garbled lettering.
-- Never invent claims, features, statistics, prices, ratings or customer counts. If it is not in the input data, it does not go in the video.
-- Never write a URL or a hex code into the prompt. Name colors in words.
+4. TOO MANY THINGS AT ONCE.
+   Ten seconds holds ONE subject doing ONE action in ONE place. Every extra
+   element steals fidelity from the main one. A screen AND a face AND hands
+   AND coffee steam AND a keyboard AND glasses reflections is five subjects
+   competing, and all five come out mushy.
+   Name one subject. Give it one action. Add at most two atmosphere details.
 
-BANNED — these mark a prompt as machine-generated filler:
-"futuristic holographic", "neon-lit trading floor", "dynamic and vibrant", "cutting-edge", "seamlessly", "in today's fast-paced world", floating UI panels, flying data particles, generic glowing orbs, endless neon cityscapes.
+════════════════════════════════════════
+WHAT RENDERS BEAUTIFULLY — BUILD FROM THIS
+════════════════════════════════════════
+Physical, tactile, real-world things:
+  - human faces and hands in natural light, one person only
+  - objects with real material — glass, metal, fabric, paper, liquid
+  - motion with physics: pouring, steam, dust in light, fabric settling
+  - shallow depth of field, single hard or soft key light, real rooms
+Prefer a HUMAN REACTION over a screen. A person's face registering a result
+sells software far better than the software's interface ever will.
+
+════════════════════════════════════════
+LENGTH: 55-85 WORDS. Never more.
+════════════════════════════════════════
+Shorter is stronger. Under 85 words the model holds everything you asked
+for; past that it silently drops whatever it likes. Cut atmosphere before
+you cut the subject or the action.
+
+STRUCTURE (in this order):
+[One camera move] + [One subject, front-loaded] + [One physical action] +
+[Room and light] + [Mood] + [One audio clause] + [Negatives]
+
+TEN SECONDS:
+  0-1s   something is already happening. No fade in, no logo card.
+  1-7s   the single action plays out.
+  7-10s  the reaction, or the result landing on a face.
+
+AUDIO — one short clause. Ambience plus one punctuating sound:
+"low room tone, a single keyboard click". No music essays, no dialogue.
+
+TRUTH:
+Never invent claims, statistics, prices, ratings or customer counts. Never
+write a URL or a hex code — name colours in words.
+
+BANNED PHRASES — these mark a prompt as machine filler:
+"futuristic holographic", "neon-lit trading floor", "dynamic and vibrant",
+"cutting-edge", "seamlessly", "in today's fast-paced world", floating UI
+panels, flying data particles, glowing orbs, neon cityscapes, "Bloomberg
+terminal", fish-eye, 180-degree rotations.
 
 OUTPUT — valid JSON only. First character { and last character }. No markdown, no array wrapper, no "output" key, no escaped newlines.
 {
   "creative_format_used": "<assigned format name>",
   "variation_modifier_applied": "<assigned modifier name>",
   "product_type": "<product type from marketing intel>",
-  "prompt": "<one 10-second vertical shot, 90-120 words, five-part formula in order, hook on frame one, at most one quoted on-screen line, one short audio clause, negatives at the end>"
+  "prompt": "<one 10-second vertical shot, 55-85 words, ONE camera move, ONE subject, ONE action, no legible screen content, at most four words of on-screen text, one audio clause, negatives at the end>"
 }
 """
 
@@ -475,10 +533,16 @@ Modifier Note: {vm.get('note', '')}
 PRODUCT TYPE VISUAL RULEBOOK — apply the row matching product_type
 ═══════════════════════════════════════════════════════════
 DIGITAL_SAAS / DATA_API
-  World: dark IDE, real terminal output, Bloomberg-terminal restraint.
-  Human: analyst, developer or founder — precise, unglamorous, focused.
-  Props: real UI on a real monitor, mechanical keyboard, coffee going cold.
-  Never: holographic dashboards, flying data particles, glowing blue "AI" mist.
+  Software is the hardest thing to film, because the interface is exactly
+  what the model cannot draw. So do not film the interface. Film the PERSON.
+  Subject: one developer, analyst or founder — a face, hands, a posture.
+  The moment: the second the result lands. Shoulders drop. A slow nod. A
+  breath let out. Leaning back from the desk.
+  Screens: present only as coloured light on skin and walls, always out of
+  focus. Never describe what is on them.
+  Props: a mechanical keyboard, a cold coffee, a notebook — at most two.
+  Never: readable dashboards or terminals, holographic panels, flying data
+  particles, glowing blue "AI" mist, "Bloomberg terminal".
 
 PHYSICAL_GOODS
   World: controlled studio light, or the aspirational place the thing gets used.
@@ -512,35 +576,42 @@ MANDATORY RULES
 ═══════════════════════════════════════════════════════════
 RULE 1 — FORMAT COMPLIANCE. Build the whole prompt around the assigned creative format. "ugc_testimonial" means a real face in a real room with zero CGI. "cinematic_product_hero" means no humans and the product as sole subject. Never fall back to a generic tech visual.
 
-RULE 2 — ONE MOMENT, TEN SECONDS, VERTICAL 9:16. One continuous shot, or one cut at the halfway mark at most. No montages, no "then we cut to" chains. The hook must land on the first frame.
+RULE 2 — ONE SHOT. ONE MOVE. TEN SECONDS. VERTICAL 9:16.
+A single continuous take with one camera move chosen from: slow push-in, slow
+pull-back, slow pan, locked-off static, gentle handheld sway, slow overhead
+descent. No cuts. No "then it flips". No rotations. No montages.
 
-RULE 3 — BRAND COLOR ON JUSTIFIED SURFACES. Use the brand's color names on real surfaces that would plausibly carry them — a screen, a label, a wall, a jacket. Never as free-floating light. Never as a hex code.
+RULE 3 — NOTHING LEGIBLE ON ANY SCREEN. The model cannot draw interfaces; it
+draws smeared pseudo-text. If a screen appears, it is light and colour only,
+out of focus. Never state what it displays.
 
-RULE 4 — QUOTED TEXT, ONCE. Every visible brand string in exact double quotes, and no more than one such element on screen.
+RULE 4 — ON-SCREEN TEXT: 1-4 WORDS, ONCE, OR NONE.
+In double quotes. Usually the brand name alone. Longer text renders as
+gibberish, so the offer sentence goes in the caption instead of the video.
 
-RULE 5 — THE VARIATION MODIFIER MUST BE VISIBLE. It has to change the atmosphere, the lighting, or the camera behaviour in a way a viewer would notice. This is what stops every video for this brand looking identical.
+RULE 5 — BRAND COLOR ON REAL SURFACES. Use the brand's colour names on things
+that would plausibly carry them — a wall, a jacket, a mug, light spilling from
+a screen. Never as free-floating glow. Never as a hex code.
 
-RULE 6 — INVENT NOTHING. No statistics, no prices, no ratings, no claims absent from the input data.
+RULE 6 — THE VARIATION MODIFIER MUST BE VISIBLE. It has to change the
+atmosphere, the lighting, or the camera in a way a viewer would notice. This is
+what stops every video for this brand looking identical.
 
-RULE 7 — 90-120 WORDS. Count them. A prompt over 120 words will be rejected.
+RULE 7 — INVENT NOTHING. No statistics, prices, ratings or claims absent from
+the input data.
 
-RULE 8 — IT MUST SELL, NOT JUST LOOK GOOD. This is an ad, not a showreel. A
-viewer who watches it with the sound off must come away knowing what this
-business does and why it matters. The single strongest moment is almost always
-the product visibly WORKING — a result appearing, a number resolving, a face
-reacting to it. Choose that moment over any establishing or atmosphere shot.
+RULE 8 — 55-85 WORDS. Count them. Over 85 will be rejected. Density is the
+enemy: three vivid elements beat nine listed ones.
 
-RULE 9 — BRAND IT. The brand's name or product name must be legible on screen
-at least once, in double quotes, on a real surface — a screen, a label, a
-package. A viewer must be able to name the company after watching. Do not open
-on the logo; earn it by second seven.
+RULE 9 — IT MUST SELL, NOT JUST LOOK GOOD. This is an ad. The strongest moment
+in almost every case is a HUMAN REACTION — the second the result lands, the
+shoulders dropping, the slow nod, the breath let out. Choose that over any
+establishing shot, and over any attempt to show the product's interface.
 
-RULE 10 — THE CALL TO ACTION IS GIVEN, NOT INVENTED. If a primary offer appears
-in the business profile above, that exact wording is the on-screen line — copy
-it verbatim, in double quotes, landing in the final beat. Do not paraphrase it,
-shorten it, or substitute a different offer. If no offer is given, use a soft
-line that promises nothing specific ("See how it works") and never invent a free
-trial, discount, price or guarantee.
+RULE 10 — ONE SUBJECT, ONE ACTION, ONE PLACE. Name a single subject and give it
+a single physical action. At most two atmosphere details. A face AND a screen
+AND hands AND steam AND a keyboard is five subjects competing for fidelity, and
+all five come out mushy.
 {recent_block}
 Return the JSON object and nothing else.
 """

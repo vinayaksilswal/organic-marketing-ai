@@ -1313,6 +1313,112 @@ async def create_post_from_media(
 # =============================================================================
 # Email Campaign Endpoints
 # =============================================================================
+class EmailConfigUpdate(BaseModel):
+    provider: str = "resend"
+    apiKey: Optional[str] = None      # blank on edit = keep the existing key
+    fromEmail: str
+    fromName: Optional[str] = None
+    replyTo: Optional[str] = None
+
+
+@router.get("/email-config")
+async def get_email_config(request: Request) -> dict[str, Any]:
+    """Whether this business can send email, and from where.
+
+    Never returns the key itself — not even encrypted. The client only needs
+    to know whether one is set.
+    """
+    from config import settings
+    from database import EmailConfig
+
+    workspace_id = request.headers.get("x-workspace-id")
+    global_ready = bool(
+        settings.resend_api_key and "your_resend" not in (settings.resend_api_key or "")
+    )
+
+    if not workspace_id:
+        return {"success": True, "configured": global_ready, "usingPlatformDefault": global_ready}
+
+    async with get_tenant_session(workspace_id) as session:
+        cfg = (await session.execute(
+            select(EmailConfig).where(EmailConfig.businessProfileId == workspace_id)
+        )).scalars().first()
+
+    if cfg:
+        return {
+            "success": True,
+            "configured": True,
+            "usingPlatformDefault": False,
+            "provider": cfg.provider,
+            "fromEmail": cfg.fromEmail,
+            "fromName": cfg.fromName,
+            "replyTo": cfg.replyTo,
+            "hasKey": bool(cfg.apiKey),
+            "lastError": cfg.lastError,
+        }
+
+    return {
+        "success": True,
+        "configured": global_ready,
+        "usingPlatformDefault": global_ready,
+        "provider": "resend",
+        "fromEmail": None,
+        "hasKey": False,
+    }
+
+
+@router.post("/email-config")
+async def save_email_config(
+    data: EmailConfigUpdate,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Store this business's own sending credentials, key encrypted at rest."""
+    from database import EmailConfig
+    from services.crypto_service import encrypt_token
+
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="Select a business first.")
+
+    sender = (data.fromEmail or "").strip()
+    if "@" not in sender or "." not in sender.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Enter a valid sender email address.")
+
+    async with get_tenant_session(workspace_id) as session:
+        cfg = (await session.execute(
+            select(EmailConfig).where(EmailConfig.businessProfileId == workspace_id)
+        )).scalars().first()
+
+        if not cfg:
+            if not data.apiKey:
+                raise HTTPException(
+                    status_code=400,
+                    detail="An API key is required the first time you connect email.",
+                )
+            cfg = EmailConfig(
+                userId=user_id,
+                businessProfileId=workspace_id,
+                apiKey=encrypt_token(data.apiKey),
+                fromEmail=sender,
+            )
+            session.add(cfg)
+        elif data.apiKey:
+            # Blank means "keep the current key" so the form never needs it back.
+            cfg.apiKey = encrypt_token(data.apiKey)
+
+        cfg.provider = data.provider or "resend"
+        cfg.fromEmail = sender
+        cfg.fromName = (data.fromName or "").strip() or None
+        cfg.replyTo = (data.replyTo or "").strip() or None
+        cfg.lastError = None
+
+        await session.commit()
+
+    logger.info(f"Email sending configured for workspace {workspace_id} as {sender}")
+    return {"success": True, "message": f"Email connected. Campaigns will send from {sender}."}
+
+
 @router.get("/emails")
 async def get_email_campaigns(request: Request) -> Any:
     """List all email campaigns, newest first."""
@@ -1377,13 +1483,18 @@ async def edit_email_campaign(
             body_text = data.bodyText or existing.bodyText
             
             try:
+                # The keywords here were html_body/text_body, which this
+                # function does not accept — every send raised TypeError and
+                # was swallowed into a FAILED status. The count key was wrong
+                # too, so recipientCount was always 0.
                 result = await send_email_blast(
                     subject=subject,
-                    html_body=body_html,
-                    text_body=body_text,
+                    body_html=body_html,
+                    body_text=body_text,
+                    workspace_id=workspace_id,
                 )
                 is_success = result.get("success", False)
-                recipient_count = result.get("count", 0)
+                recipient_count = result.get("sent_count", 0)
                 error_log = result.get("error")
 
                 existing.status = "SENT" if is_success else "FAILED"
@@ -1457,11 +1568,12 @@ async def create_manual_email(
         try:
             result = await send_email_blast(
                 subject=subject,
-                html_body=body_html,
-                text_body=body_text,
+                body_html=body_html,
+                body_text=body_text,
+                workspace_id=workspace_id,
             )
             is_success = result.get("success", False)
-            recipient_count = result.get("count", 0)
+            recipient_count = result.get("sent_count", 0)
             error_log = result.get("error")
 
             campaign.status = "SENT" if is_success else "FAILED"
