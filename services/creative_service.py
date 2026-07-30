@@ -144,11 +144,19 @@ Return a JSON object with exactly these fields (nothing else, no markdown):
     "toneOfVoice": "one of: Professional, Casual, Bold, Playful, Authoritative, Friendly, Visionary",
     "contentPillars": ["pillar1", "pillar2", "pillar3", "pillar4"],
     "suggestedHashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
-    "brandColors": ["#8B5CF6", "#3B82F6"]
+    "brandColors": ["#8B5CF6", "#3B82F6"],
+    "primaryOffer": "the single action this business wants a viewer to take, in their own words"
 }}
 
 Ensure contentPillars are 4 specific, actionable content themes for social media that drive engagement and sales.
-Ensure suggestedHashtags are 5 highly relevant, trending hashtags WITH the # prefix."""
+Ensure suggestedHashtags are 5 highly relevant, trending hashtags WITH the # prefix.
+
+primaryOffer is the call to action that will appear on every video and caption,
+so it must be something this business can actually honour. Use the wording from
+their own site if they state one ("Start free — no credit card", "Book a demo",
+"Shop the new drop"). If the site states no offer, return a neutral one such as
+"See how it works" — never invent a free trial, discount, price or guarantee
+they have not advertised. Keep it under 60 characters."""
 
     try:
         result = await _call_llm(prompt)
@@ -169,6 +177,9 @@ Ensure suggestedHashtags are 5 highly relevant, trending hashtags WITH the # pre
             "contentPillars": parsed.get("contentPillars", ["Industry News", "Tips & Tricks", "Behind the Scenes", "Customer Stories"]),
             "suggestedHashtags": parsed.get("suggestedHashtags", ["#business", "#marketing", "#growth", "#startup", "#entrepreneur"]),
             "brandColors": parsed.get("brandColors", ["#8B5CF6", "#3B82F6"]),
+            # Deliberately conservative: a wrong offer is worse than a soft one,
+            # because it promises something the business has to honour.
+            "primaryOffer": (parsed.get("primaryOffer") or "See how it works")[:120],
         }
     except Exception as e:
         logger.warning(f"Brand context generation failed, using defaults: {e}")
@@ -179,6 +190,7 @@ Ensure suggestedHashtags are 5 highly relevant, trending hashtags WITH the # pre
             "contentPillars": ["Industry Insights", "Tips & Guides", "Behind the Scenes", "Success Stories"],
             "suggestedHashtags": ["#business", "#marketing", "#growth", "#startup", "#entrepreneur"],
             "brandColors": ["#8B5CF6", "#3B82F6"],
+            "primaryOffer": "See how it works",
         }
 
 
@@ -325,6 +337,10 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
             profile.contentPillars = brand_ctx["contentPillars"]
             profile.suggestedHashtags = brand_ctx["suggestedHashtags"]
             profile.brandColors = brand_ctx["brandColors"]
+            # Only set the offer when the business has not written its own —
+            # a re-analysis must never overwrite a CTA the owner chose.
+            if not (profile.primaryOffer or "").strip():
+                profile.primaryOffer = brand_ctx.get("primaryOffer")
             profile.brandAnalysisComplete = True
             await session.commit()
             await session.refresh(profile)
@@ -458,6 +474,10 @@ async def auto_generate_creative_batch(workspace_id: str, count: int = 3) -> Dic
                 profile.contentPillars = brand_ctx["contentPillars"]
                 profile.suggestedHashtags = brand_ctx["suggestedHashtags"]
                 profile.brandColors = brand_ctx["brandColors"]
+                # Only set the offer when the business has not written its own —
+                # a re-analysis must never overwrite a CTA the owner chose.
+                if not (profile.primaryOffer or "").strip():
+                    profile.primaryOffer = brand_ctx.get("primaryOffer")
                 profile.brandAnalysisComplete = True
                 await session.commit()
                 await session.refresh(profile)

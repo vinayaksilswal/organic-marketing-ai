@@ -141,7 +141,18 @@ async def marketing_intelligence_synthesis(product_name: str, scrape_content: st
     """Synthesize data into a marketing JSON profile."""
     brand_context = ""
     if profile:
-        brand_context = f"\nBusiness Profile Data:\n- Industry: {profile.industry}\n- Audience: {profile.targetAudience}\n- Tone: {profile.toneOfVoice}\n- Content Pillars: {profile.contentPillars}\n"
+        brand_context = (
+            f"\nBusiness Profile Data:\n"
+            f"- Brand name: {profile.name}\n"
+            f"- What it does: {profile.description or 'unknown'}\n"
+            f"- Industry: {profile.industry}\n"
+            f"- Audience: {profile.targetAudience}\n"
+            f"- Tone: {profile.toneOfVoice}\n"
+            f"- Content Pillars: {profile.contentPillars}\n"
+        )
+        offer = (getattr(profile, "primaryOffer", None) or "").strip()
+        if offer:
+            brand_context += f"- Primary offer / call to action: {offer}\n"
     
     prompt = f"""You are a senior product marketing strategist and brand intelligence engine. Your task is to synthesize all available product data into a comprehensive marketing intelligence profile that will drive AI video creative generation.
 YOU HAVE THREE TIERS OF INPUT — use them in this exact priority order:
@@ -523,6 +534,13 @@ RULE 9 — BRAND IT. The brand's name or product name must be legible on screen
 at least once, in double quotes, on a real surface — a screen, a label, a
 package. A viewer must be able to name the company after watching. Do not open
 on the logo; earn it by second seven.
+
+RULE 10 — THE CALL TO ACTION IS GIVEN, NOT INVENTED. If a primary offer appears
+in the business profile above, that exact wording is the on-screen line — copy
+it verbatim, in double quotes, landing in the final beat. Do not paraphrase it,
+shorten it, or substitute a different offer. If no offer is given, use a soft
+line that promises nothing specific ("See how it works") and never invent a free
+trial, discount, price or guarantee.
 {recent_block}
 Return the JSON object and nothing else.
 """

@@ -170,6 +170,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
       name: bp.name || '', websiteUrl: bp.websiteUrl || '', description: bp.description || '',
       businessModel: bp.businessModel || '', logoUrl: bp.logoUrl || '',
       productCatalogUrl: bp.productCatalogUrl || '', influencerReferenceUrl: bp.influencerReferenceUrl || '',
+      primaryOffer: bp.primaryOffer || '',
       postIntervalHours: bp.postIntervalHours || 2,
       creativeGenerationIntervalHours: bp.creativeGenerationIntervalHours || 12,
       autoGenerateCreatives: bp.autoGenerateCreatives !== false,
@@ -494,6 +495,19 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       <label style={labelStyle}>Brand Description & Voice</label>
                       <textarea rows={3} style={{ ...inputStyle, resize: 'vertical' }} placeholder="Describe your brand, products, target audience..."
                         value={editData.description} onChange={e => setEditData({...editData, description: e.target.value})} />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Primary Offer / Call to Action</label>
+                      <input style={inputStyle} type="text" maxLength={120}
+                        placeholder="Start free — no credit card required"
+                        value={editData.primaryOffer}
+                        onChange={e => setEditData({...editData, primaryOffer: e.target.value})} />
+                      <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        The one action every post and video should drive. Used word for word as
+                        the on-screen line in videos and the closing CTA in captions. Leave blank
+                        and the AI keeps it soft rather than inventing an offer you'd have to honour.
+                      </p>
                     </div>
 
                     {editData.businessModel === 'E-commerce' && (

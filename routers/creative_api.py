@@ -370,6 +370,10 @@ async def generate_creatives(
             profile.contentPillars = brand_ctx["contentPillars"]
             profile.suggestedHashtags = brand_ctx["suggestedHashtags"]
             profile.brandColors = brand_ctx["brandColors"]
+            # Only set the offer when the business has not written its own —
+            # a re-analysis must never overwrite a CTA the owner chose.
+            if not (profile.primaryOffer or "").strip():
+                profile.primaryOffer = brand_ctx.get("primaryOffer")
             profile.brandAnalysisComplete = True
             await session.commit()
             await session.refresh(profile)
@@ -530,6 +534,10 @@ async def re_analyze_brand(
         profile.contentPillars = brand_ctx["contentPillars"]
         profile.suggestedHashtags = brand_ctx["suggestedHashtags"]
         profile.brandColors = brand_ctx["brandColors"]
+        # Only set the offer when the business has not written its own —
+        # a re-analysis must never overwrite a CTA the owner chose.
+        if not (profile.primaryOffer or "").strip():
+            profile.primaryOffer = brand_ctx.get("primaryOffer")
         profile.brandAnalysisComplete = True
         await session.commit()
 

@@ -108,6 +108,11 @@ class BusinessProfile(Base):
     toneOfVoice = Column(String, nullable=True)
     contentPillars = Column(JSON, default=list, nullable=False)
     suggestedHashtags = Column(JSON, default=list, nullable=False)
+    # The single action every creative should drive toward, in the words the
+    # business would use — "Start free — no credit card", "Book a demo",
+    # "Shop the drop". Without it the AI invented a CTA per post, so offers
+    # drifted and nothing was consistent enough to convert against.
+    primaryOffer = Column(Text, nullable=True)
     brandAnalysisComplete = Column(Boolean, default=False, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

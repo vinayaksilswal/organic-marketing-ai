@@ -44,6 +44,7 @@ class BusinessProfileUpdate(BaseModel):
     productCatalogUrl: Optional[str] = None
     influencerReferenceUrl: Optional[str] = None
     niche: Optional[str] = None
+    primaryOffer: Optional[str] = None
     postIntervalHours: Optional[int] = None
     creativeGenerationIntervalHours: Optional[int] = None
     autoGenerateCreatives: Optional[bool] = None
@@ -348,6 +349,7 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
                 "productCatalogUrl": bp.productCatalogUrl,
                 "influencerReferenceUrl": bp.influencerReferenceUrl,
                 "niche": bp.niche,
+                "primaryOffer": bp.primaryOffer,
                 "postIntervalHours": bp.postIntervalHours,
                 "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": bp.autoGenerateCreatives,

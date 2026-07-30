@@ -322,6 +322,8 @@ async def _generate_post_caption(profile, media) -> str:
     asset_tags = ", ".join(getattr(media, "tags", None) or [])
     is_video = (getattr(media, "mimeType", "") or "").startswith("video/")
 
+    offer = (getattr(profile, "primaryOffer", None) or "").strip()
+
     known = [f"Business name: {brand_name}"]
     if description: known.append(f"What it does (from their own site): {description}")
     if website:     known.append(f"Website: {website}")
@@ -330,6 +332,7 @@ async def _generate_post_caption(profile, media) -> str:
     if audience:    known.append(f"Target audience: {audience}")
     if pillars:     known.append(f"Content themes: {', '.join(pillars)}")
     known.append(f"Tone of voice: {tone}")
+    if offer:       known.append(f"The one action to drive (use this exact offer): {offer}")
 
     asset_lines = []
     if asset_caption:
@@ -360,8 +363,16 @@ async def _generate_post_caption(profile, media) -> str:
         "2. Hook the reader immediately with a scroll-stopping first line. Never open with the brand name.\n"
         "3. Connect the message to the visual seamlessly, providing clear value.\n"
         "4. Keep it punchy, professional, yet approachable. Avoid overused buzzwords ('unlock', 'elevate', 'game-changer', 'revolutionize').\n"
-        "5. Conclude with a singular, strong, and actionable Call-To-Action (CTA).\n"
-        "6. Never put a URL in the caption — use 'link in bio' or similar if necessary.\n"
+        + (
+            f'5. End with this exact call to action, word for word: "{offer}". '
+            "Do not reword it, shorten it, or swap in your own.\n"
+            if offer else
+            "5. Conclude with a singular, strong, actionable Call-To-Action. No "
+            "specific offer was provided, so keep it soft — invite them to look, "
+            "do not promise a trial, discount or result.\n"
+        )
+        + "6. Never put a URL in the caption — Instagram does not linkify them, so "
+        "a raw link reads as spam and wastes the strongest line. Say 'link in bio'.\n"
         "7. Invent nothing: no fake statistics, customer counts, or discounts.\n"
         "8. Final line: include 3-5 hyper-relevant industry hashtags. Do NOT use generic tags like #love or #instagood.\n\n"
         "Output ONLY the caption. No preamble, no quotes, no explanation."
@@ -376,6 +387,10 @@ async def _generate_post_caption(profile, media) -> str:
         for lead in ("Caption:", "Here's the caption:", "Here is the caption:"):
             if caption.lower().startswith(lead.lower()):
                 caption = caption[len(lead):].strip()
+        # Enforce the no-links rule rather than trusting the model to obey it.
+        # The prompt forbids URLs, but models slip, and a raw link in an
+        # Instagram caption is unclickable text that reads as spam.
+        caption = _strip_urls(caption)
         if caption:
             return caption[:2200]  # Instagram's caption limit
         logger.warning(f"Caption generation returned empty for workspace {getattr(profile, 'id', '?')}")
@@ -383,11 +398,16 @@ async def _generate_post_caption(profile, media) -> str:
         logger.warning(f"Caption generation failed, using brand template: {e}")
 
     # Fallback still says something true about the business rather than filler.
+    # It used to end "More at {website}", which put a URL in every fallback
+    # caption — the exact thing the generated path is forbidden from doing.
     tags = " ".join(hashtags[:5]) if hashtags else "#b2b #technology"
+    cta = offer or "Link in bio."
     if description:
         first = description.split(".")[0].strip()
-        return f"{first}.\n\nMore at {website or brand_name}.\n\n{tags}"
-    return f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{tags}"
+        return _strip_urls(f"{first}.\n\n{cta}\n\n{tags}")
+    return _strip_urls(
+        f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{cta}\n\n{tags}"
+    )
 
 
 async def _generate_email_campaign(profile, media) -> dict[str, str] | None:
