@@ -263,6 +263,34 @@ _BANNED_OPENER_RE = re.compile(
 )
 
 
+# Camera and edit language. A caption containing these is retelling the shot
+# list instead of writing copy — "watch the terminal light up with FIPS badges,
+# then pan to a CycloneDX CBOM export" was a real generated caption.
+_SHOT_NARRATION_RE = re.compile(
+    r"\b(pan(s|ning)? (to|across)|cut(s|ting)? to|zoom(s|ing)? (in|out)"
+    r"|the (shot|camera|frame)|close-up|watch (the|it) \w+ light up"
+    r"|then (we )?(see|reveal)|slow motion shot)\b",
+    re.IGNORECASE,
+)
+
+# Reviewer voice. The brand sells the product; it does not rate it.
+_REVIEWER_VOICE_RE = re.compile(
+    r"\b(our team (tested|tried|reviewed)|we tested|solid pick"
+    r"|great (option|choice) for|worth (a look|considering)"
+    r"|(highly )?recommend(ed)? for|top pick|our verdict)\b",
+    re.IGNORECASE,
+)
+
+# Naming the audience segment instead of speaking to it. The qualifier is
+# often separated from "for" by a noun — "solid PICK for entrepreneur parents".
+_SEGMENT_LABEL_RE = re.compile(
+    r"\b(perfect|ideal|great|solid|top|best|made|built|designed)\s+"
+    r"(pick|choice|option|fit|match|tool)?\s*for\s+"
+    r"(entrepreneur|business|busy|modern|savvy|aspiring|budding|ambitious)\b",
+    re.IGNORECASE,
+)
+
+
 def _caption_quality_issues(caption: str) -> list[str]:
     """Return the reasons a caption should be rejected, empty if it passes.
 
@@ -280,6 +308,20 @@ def _caption_quality_issues(caption: str) -> list[str]:
 
     if _BANNED_OPENER_RE.search(caption):
         issues.append("opens with an exhausted LinkedIn formula")
+
+    if _SHOT_NARRATION_RE.search(caption):
+        issues.append(
+            "retells the camera work instead of writing copy — the reader can "
+            "already see the visual"
+        )
+
+    if _REVIEWER_VOICE_RE.search(caption):
+        issues.append(
+            "reviews the product from outside instead of speaking as the brand"
+        )
+
+    if _SEGMENT_LABEL_RE.search(caption):
+        issues.append("labels the audience as a market segment instead of addressing them")
 
     body = re.sub(r"#\w+", "", caption)
     words = len(body.split())
@@ -428,11 +470,20 @@ async def _generate_post_caption(profile, media, product=None) -> str:
         if p_price: known.append(f"Price: {p_price} (state it only if it reads naturally)")
 
     asset_lines = []
-    if asset_caption:
-        asset_lines.append(f"The visual shows: {asset_caption[:900]}")
-    if asset_prompt and asset_prompt != asset_caption:
-        asset_lines.append(f"It was generated from this brief: {asset_prompt[:600]}")
-    if not asset_caption and not asset_prompt:
+    if asset_caption or asset_prompt:
+        # This is a SHOT LIST, not source material. Handing the cinematic
+        # prompt over unlabelled made the writer paraphrase it — camera
+        # directions and all — so captions opened with lines like
+        # "watch the terminal light up, then pan to a CBOM export".
+        asset_lines.append(
+            "Below is the DIRECTOR'S BRIEF for the attached "
+            f"{'video' if is_video else 'image'}. It is camera and lighting "
+            "instructions. Read it ONLY to know what the viewer will be "
+            "looking at. NEVER retell it, never mention shots, pans, cuts, "
+            "screens, terminals or what 'lights up'."
+        )
+        asset_lines.append(f"--- brief (do not paraphrase) ---\n{(asset_caption or asset_prompt)[:900]}")
+    else:
         # Be explicit rather than letting the model invent a scene.
         asset_lines.append(
             "No description of the visual is available — write about the "
@@ -442,7 +493,9 @@ async def _generate_post_caption(profile, media, product=None) -> str:
     asset_lines.append(f"Format: {'short video / reel' if is_video else 'single image'}")
 
     system_prompt = (
-        "You write social captions for real companies. Your defining trait is "
+        "You are the in-house copywriter for this company. You write AS the "
+        "brand, to a customer — never about the brand, and never as a reviewer "
+        "assessing someone else's product. Your defining trait is "
         "concreteness: a reader must finish the caption knowing what this "
         "specific company does, in plain words. You have contempt for "
         "LinkedIn thought-leadership voice — the abstract problem/insight essay "
@@ -461,27 +514,45 @@ async def _generate_post_caption(profile, media, product=None) -> str:
         "Never describe the product as 'the layer', 'the framework', 'the "
         "system', 'the platform', 'the solution' or 'the engine' — say what it "
         "literally does.\n"
-        "2. HOOK IN UNDER 10 WORDS. Instagram truncates after roughly one line, "
-        "so the first line must carry the point on its own. Never open with the "
-        "brand name.\n"
-        "3. REFERENCE THE VISUAL. Say something only someone who watched this "
-        "specific video or saw this specific image could write. Do not describe "
-        "it literally — react to it, or pick up the moment it shows.\n"
-        "4. SHORT. 40-90 words total, excluding hashtags. Three short "
+        "2. HOOK IN UNDER 10 WORDS, AND IT MUST COST THE READER SOMETHING TO "
+        "IGNORE. A feature statement is not a hook. Open on the stake, the "
+        "cost, the deadline, or a concrete surprising detail. Never open with "
+        "the brand name.\n"
+        "   Weak: \"curl command returns NIST-compliant PQC scan in seconds\"\n"
+        "   Strong: \"Your TLS certificates have an expiry date nobody printed.\"\n"
+        "3. NEVER NARRATE THE VISUAL. The brief above is camera direction for "
+        "whoever shot the asset — it is not material to retell. Writing "
+        "\"watch the terminal light up, then pan to the export\" turns a "
+        "caption into a shot list. The reader can already see the picture; "
+        "your job is to say what it MEANS for them.\n"
+        "4. WRITE AS THE BRAND, TO A CUSTOMER. First person (\"we\", \"our\") "
+        "or direct address (\"you\", \"your\"). Never review the product from "
+        "outside it: no \"our team tested\", no \"solid pick\", no \"great "
+        "option for\". You sell this, you do not rate it.\n"
+        "5. SPEAK TO THE AUDIENCE, NEVER LABEL IT. The audience description is "
+        "for your targeting, not for the copy. Writing \"perfect for "
+        "entrepreneur parents\" or \"ideal for security engineers\" tells the "
+        "reader they are a market segment. Address them directly instead.\n"
+        "6. SHORT. 40-90 words total, excluding hashtags. Three short "
         "paragraphs maximum. Cut every sentence that is only setting up the "
         "next one.\n"
+        "7. AT MOST TWO PIECES OF JARGON. Acronyms and product-internal terms "
+        "cost the reader effort. Keep the two that carry real meaning for this "
+        "audience and cut the rest — five acronyms in one sentence reads as "
+        "noise even to an expert.\n"
         + (
-            f'5. End with this exact call to action, word for word: "{offer}". '
+            f'8. End with this exact call to action, word for word: "{offer}". '
             "Do not reword it, shorten it, or swap in your own.\n"
             if offer else
-            "5. Conclude with a singular, strong, actionable Call-To-Action. No "
+            "8. Conclude with a singular, strong, actionable Call-To-Action. No "
             "specific offer was provided, so keep it soft — invite them to look, "
-            "do not promise a trial, discount or result.\n"
+            "do not promise a trial, discount or result. Avoid the dead phrases "
+            "\"check it out\" and \"see it in action\"; say what they will get.\n"
         )
-        + "6. Never put a URL in the caption — Instagram does not linkify them, so "
+        + "9. Never put a URL in the caption — Instagram does not linkify them, so "
         "a raw link reads as spam and wastes the strongest line. Say 'link in bio'.\n"
-        "7. Invent nothing: no fake statistics, customer counts, or discounts.\n"
-        "8. Final line: 3-5 hashtags specific to this industry. No #love, no "
+        "10. Invent nothing: no fake statistics, customer counts, or discounts.\n"
+        "11. Final line: 3-5 hashtags specific to this industry. No #love, no "
         "#instagood, no #business.\n\n"
         "=== BANNED OPENERS ===\n"
         "These formulas are exhausted. Using any of them fails the brief:\n"
@@ -492,11 +563,14 @@ async def _generate_post_caption(profile, media, product=None) -> str:
         "- \"In today's fast-paced world\" / \"In a world where...\"\n"
         "- Any opener that states a generic industry problem before naming what "
         "this company does.\n\n"
-        "=== BANNED WORDS ===\n"
+        "=== BANNED WORDS AND PHRASES ===\n"
         "unlock, elevate, game-changer, revolutionise, revolutionize, "
         "seamless, cutting-edge, leverage, synergy, robust, empower, "
         "supercharge, transform your, take it to the next level, needle, "
-        "signal vs noise, black box.\n\n"
+        "signal vs noise, black box.\n"
+        "Also banned as calls to action, because they ask for nothing and "
+        "promise nothing: \"check it out\", \"see it in action\", "
+        "\"learn more\", \"discover more\", \"don't miss out\".\n\n"
         + (
             ""
             if len(description) >= 40 else
@@ -512,7 +586,10 @@ async def _generate_post_caption(profile, media, product=None) -> str:
         "- Could a reader say what this company sells, in one sentence?\n"
         "- Would the caption break if a competitor's name replaced this one?\n"
         "  (It should.)\n"
-        "- Does it react to THIS visual rather than the category in general?\n"
+        "- Does it sound like the company talking, not someone reviewing it?\n"
+        "- Have you avoided retelling the shot — no pans, cuts, screens or\n"
+        "  'watch it light up'?\n"
+        "- Does the first line cost something to ignore?\n"
         "- Is it under 90 words before hashtags?\n\n"
         "Output ONLY the caption. No preamble, no quotes, no explanation."
     )
