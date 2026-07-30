@@ -584,10 +584,17 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   const open = expandedId === item.id;
                   const text = item.prompt || item.caption || '';
                   // A row with no prompt used to render as an empty card with
-                  // buttons and no explanation.
+                  // buttons and no explanation. "Writing" is only honest for a
+                  // little while — past that the run is gone (a restart, or a
+                  // task that died) and saying otherwise leaves the user
+                  // waiting on something that will never arrive.
                   const gen = item.generationStatus;
-                  const isGenerating = gen === 'PENDING' || (!text && gen !== 'FAILED');
-                  const genFailed = gen === 'FAILED';
+                  const ageMins = item.createdAt
+                    ? (Date.now() - new Date(item.createdAt).getTime()) / 60000
+                    : 0;
+                  const stalled = !text && gen !== 'FAILED' && ageMins > 12;
+                  const isGenerating = !stalled && !text && gen !== 'FAILED';
+                  const genFailed = gen === 'FAILED' || stalled;
                   return (
                     <div key={item.id} style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
@@ -629,7 +636,10 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             </div>
                           ) : genFailed ? (
                             <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: 1.55, color: '#fca5a5' }}>
-                              {item.generationError || 'Generation failed. Try generating again.'}
+                              {item.generationError
+                                || (stalled
+                                  ? 'This run never finished — it was interrupted. Generate again.'
+                                  : 'Generation failed. Try generating again.')}
                             </p>
                           ) : (
                             <p style={{
