@@ -837,6 +837,12 @@ async def get_social_posts(request: Request) -> Any:
                 "mediaUrls": p.mediaUrls,
                 "scheduledAt": p.scheduledAt.isoformat() if p.scheduledAt else None,
                 "postedAt": p.postedAt.isoformat() if p.postedAt else None,
+                # A FAILED row with no reason attached is undebuggable for the
+                # user and for support. The reason was always recorded; it just
+                # was never returned.
+                "errorLog": p.errorLog,
+                "fbPostId": p.fbPostId,
+                "igPostId": p.igPostId,
             }
             for p in posts
         ]
@@ -913,13 +919,32 @@ async def edit_social_post(
         base_url_str = str(request.base_url).rstrip("/")
         for url in existing_media:
             parsed = urllib.parse.urlparse(url)
-            if parsed.netloc:
+            # Re-host ONLY our own media route, which exists to repoint URLs
+            # saved under a stale backend hostname. This previously rewrote
+            # EVERY absolute URL, so a Cloudinary link like
+            #   https://res.cloudinary.com/<cloud>/video/upload/.../reel.mp4
+            # became
+            #   https://<this-backend>/video/upload/.../reel.mp4
+            # which 404s. Instagram and Facebook fetch the media themselves, so
+            # publishing failed with an unfetchable-media error while the
+            # automation path — which uses the stored URL untouched — worked.
+            is_own_media_route = parsed.path.startswith("/api/v1/media/")
+
+            if parsed.netloc and is_own_media_route:
                 url = f"{base_url_str}{parsed.path}"
                 if parsed.query:
                     url += f"?{parsed.query}"
-            
-            # Ensure it has ?type=video if it's a video
-            if url.lower().split("?")[0].endswith((".mp4", ".mov", ".webm", ".avi", ".mkv")):
+            elif not parsed.netloc:
+                # A stored relative path. Meta fetches media itself, so it must
+                # be absolute or the publish fails.
+                url = f"{base_url_str}{url if url.startswith('/') else '/' + url}"
+
+            # ?type=video only means anything to our own media route — it tells
+            # that endpoint which content type to serve. Appending it to a CDN
+            # URL is at best noise and at worst breaks a signed link.
+            if is_own_media_route and url.lower().split("?")[0].endswith(
+                (".mp4", ".mov", ".webm", ".avi", ".mkv")
+            ):
                 if "type=video" not in url.lower():
                     url += "&type=video" if "?" in url else "?type=video"
             cleaned_existing_media.append(url)

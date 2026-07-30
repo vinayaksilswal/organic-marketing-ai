@@ -310,18 +310,52 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               ) : (
                 posts.map(post => (
                   <tr key={post.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <span style={{ 
-                        fontSize: '0.75rem', fontWeight: '700', padding: '0.3rem 0.7rem', 
-                        borderRadius: '30px', 
-                        background: post.status === 'POSTED' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', 
-                        color: post.status === 'POSTED' ? 'var(--success)' : '#f59e0b' 
+                    <td style={{ padding: '1rem 1.5rem', verticalAlign: 'top' }}>
+                      {/* Never invent a status. This used to render POSTED for
+                          any row with no status, which read as a success that
+                          had not happened. */}
+                      <span style={{
+                        fontSize: '0.75rem', fontWeight: '700', padding: '0.3rem 0.7rem',
+                        borderRadius: '30px',
+                        background: post.status === 'POSTED' ? 'rgba(16,185,129,0.15)'
+                          : post.status === 'FAILED' ? 'rgba(239,68,68,0.15)'
+                          : 'rgba(245,158,11,0.15)',
+                        color: post.status === 'POSTED' ? 'var(--success)'
+                          : post.status === 'FAILED' ? '#f87171'
+                          : '#f59e0b',
                       }}>
-                        {post.status || 'POSTED'}
+                        {post.status || 'UNKNOWN'}
                       </span>
+
+                      {/* The reason a delivery failed. Recorded all along,
+                          never shown — so every failure looked identical. */}
+                      {post.status === 'FAILED' && post.errorLog && (
+                        <div style={{
+                          marginTop: '0.55rem', maxWidth: 340, padding: '0.5rem 0.65rem',
+                          borderRadius: 7, background: 'rgba(239,68,68,0.07)',
+                          border: '1px solid rgba(239,68,68,0.2)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem' }}>
+                            <AlertTriangle size={12} color="#f87171" style={{ flexShrink: 0, marginTop: 2 }} />
+                            <p style={{ margin: 0, fontSize: '0.72rem', lineHeight: 1.5, color: '#fca5a5', wordBreak: 'break-word' }}>
+                              {post.errorLog}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {post.status === 'FAILED' && !post.errorLog && (
+                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 300, lineHeight: 1.5 }}>
+                          No reason was recorded for this failure.
+                        </p>
+                      )}
                     </td>
-                    <td style={{ padding: '1rem 1.5rem', fontWeight: '600', fontSize: '0.9rem' }}>
-                      {post.platform || 'INSTAGRAM'}
+                    <td style={{ padding: '1rem 1.5rem', fontWeight: '600', fontSize: '0.9rem', verticalAlign: 'top' }}>
+                      {post.platform || '—'}
+                      {(post.fbPostId || post.igPostId) && (
+                        <div style={{ marginTop: '0.3rem', fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+                          {post.fbPostId ? 'FB ✓' : ''} {post.igPostId ? 'IG ✓' : ''}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '1rem 1.5rem', fontSize: '0.9rem' }}>
                       {post.scheduledAt ? new Date(post.scheduledAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
