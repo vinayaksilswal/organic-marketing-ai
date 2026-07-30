@@ -210,6 +210,15 @@ async def auto_video(
         if not profile:
             raise HTTPException(status_code=404, detail="Add a business first, then generate a video.")
 
+    # Metered: every prompt is a paid AI call. Checked before any work starts.
+    from services import billing_service as billing
+    allowed, why = await billing.check_quota(user_id, "prompts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, profile.id)
+
         # Choose the subject: an explicit product, else any product in the
         # catalog, else the business itself.
         product = None
@@ -286,6 +295,12 @@ async def auto_video(
             render_key = decrypt_token(video_cfg.apiKey)
         except Exception:
             logger.warning(f"Could not decrypt video API key for workspace {profile_id}")
+
+    # Counted at dispatch, not on success: the AI call is billed by the
+    # provider whether or not it returns something usable, and counting on
+    # success would let a retry loop run free.
+    from services import billing_service as billing
+    await billing.record_usage(user_id, "prompts")
 
     _spawn_background(
         _run_video_generation(

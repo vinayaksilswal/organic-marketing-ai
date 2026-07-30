@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users } from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard } from 'lucide-react';
 
 const Sidebar = ({ user, activeWorkspaceId, onWorkspaceChange }) => {
   const workspaces = user?.businessProfiles || [];
@@ -127,6 +127,9 @@ const Sidebar = ({ user, activeWorkspaceId, onWorkspaceChange }) => {
 
         <NavLink to="/dashboard/team" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Users size={18} /> Team & Roles
+        </NavLink>
+        <NavLink to="/dashboard/billing" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <CreditCard size={18} /> Plan & Billing
         </NavLink>
       </nav>
 

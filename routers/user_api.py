@@ -374,6 +374,19 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
 @businesses_router.post("/")
 async def create_user_business(data: BusinessProfileUpdate, request: Request, user_id: str = Depends(verify_user)):
     """Create a new business workspace entity."""
+    # Businesses are a standing total rather than a monthly meter, so count
+    # what exists rather than reading a usage counter.
+    from services import billing_service as billing
+    from sqlalchemy import func as sa_func
+
+    async with AsyncSessionLocal() as session:
+        owned = (await session.execute(
+            select(sa_func.count(BusinessProfile.id)).where(BusinessProfile.userId == user_id)
+        )).scalar() or 0
+    allowed, why = await billing.check_business_quota(user_id, owned)
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
     try:
         profile = await OnboardingService.create_business_profile(user_id, data.model_dump(exclude_unset=True))
 

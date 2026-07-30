@@ -395,7 +395,7 @@ templates = Jinja2Templates(directory="templates")
 # =============================================================================
 # Router Registration
 # =============================================================================
-from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, team, meta_oauth  # noqa: E402
+from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, team, meta_oauth, billing  # noqa: E402
 from routers.auth import verify_user  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -427,6 +427,7 @@ app.include_router(api.public_router)
 app.include_router(user_api.router)
 app.include_router(user_api.businesses_router)
 app.include_router(paypal_webhook.router)
+app.include_router(billing.router)
 app.include_router(video.router)
 app.include_router(ecommerce.router)
 app.include_router(creative_api.router)

@@ -145,6 +145,70 @@ class VideoApiConfig(Base):
     businessProfile = relationship('BusinessProfile', back_populates='videoapiconfigs')
 
 
+class Subscription(Base):
+    """A user's recurring PayPal subscription.
+
+    Separate from User.subscriptionStatus, which only ever recorded a boolean
+    "did someone pay once". Recurring billing needs the plan, the PayPal
+    subscription id, and the period end — without the period end an expired
+    or failed subscription looks identical to a healthy one.
+    """
+
+    __tablename__ = "Subscription"
+    __table_args__ = (
+        UniqueConstraint("paypalSubscriptionId", name="uniq_paypal_subscription_id"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False, index=True)
+    planCode = Column(String, nullable=False, default="starter")
+    paypalSubscriptionId = Column(String, nullable=True)
+    paypalPlanId = Column(String, nullable=True)
+    # APPROVAL_PENDING | ACTIVE | SUSPENDED | CANCELLED | EXPIRED
+    status = Column(String, nullable=False, default="APPROVAL_PENDING")
+    currentPeriodEnd = Column(DateTime(timezone=True), nullable=True)
+    cancelAtPeriodEnd = Column(Boolean, default=False, nullable=False)
+    lastPaymentAt = Column(DateTime(timezone=True), nullable=True)
+    lastError = Column(Text, nullable=True)
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class UsageCounter(Base):
+    """Metered usage for one user, one metric, one billing month.
+
+    Counting rows in the domain tables would be wrong: deleting a post must
+    not refund the AI call that produced it, and a plan change must not
+    retroactively rewrite history.
+    """
+
+    __tablename__ = "UsageCounter"
+    __table_args__ = (
+        UniqueConstraint("userId", "metric", "periodStart", name="uniq_usage_user_metric_period"),
+    )
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False, index=True)
+    metric = Column(String, nullable=False)      # posts | prompts | emails | media
+    periodStart = Column(String, nullable=False)  # "YYYY-MM", the billing month
+    count = Column(Integer, default=0, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+
+class ProcessedWebhookEvent(Base):
+    """Every PayPal event id we have already applied.
+
+    PayPal retries deliveries, so without this a repeated
+    PAYMENT.SALE.COMPLETED would extend a subscription twice.
+    """
+
+    __tablename__ = "ProcessedWebhookEvent"
+
+    id = Column(String, primary_key=True)     # PayPal's own event id
+    eventType = Column(String, nullable=True)
+    processedAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class EmailConfig(Base):
     """Per-workspace email sending credentials.
 

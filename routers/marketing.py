@@ -726,9 +726,20 @@ async def _generate_email_campaign(profile, media) -> dict[str, str] | None:
 
 
 @router.post("/run-automation")
-async def run_automation_manually(request: Request) -> dict[str, Any]:
+async def run_automation_manually(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
     """Manually run automation to generate a social post synchronously based on settings."""
     workspace_id = request.headers.get("x-workspace-id")
+
+    # A run writes a caption with a paid AI call and may publish. Both are
+    # metered, so check before doing any of the work.
+    from services import billing_service as billing
+    allowed, why = await billing.check_quota(user_id, "posts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
     try:
         async with get_tenant_session(workspace_id) as session:
             # 1. Read the automation state through the one deterministic path,
@@ -829,6 +840,7 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
                 errorLog=" | ".join(errors) if errors else None,
             )
             session.add(new_post)
+            await billing.record_usage(user_id, "posts")
 
             # 5. Log what actually happened, not what was intended
             if not auto_approve:
@@ -1529,16 +1541,36 @@ async def get_email_campaigns(request: Request) -> Any:
 
 @router.put("/emails/{campaign_id}")
 async def edit_email_campaign(
-    campaign_id: str, data: EmailCampaignUpdate, request: Request
+    campaign_id: str,
+    data: EmailCampaignUpdate,
+    request: Request,
+    user_id: str = Depends(verify_user),
 ) -> Any:
     """Edit an existing email campaign record (SQLAlchemy). If publishing a draft, send the email."""
+    from services import billing_service as billing
+
     workspace_id = request.headers.get('x-workspace-id')
     async with get_tenant_session(workspace_id) as session:
         existing = await session.get(EmailCampaign, campaign_id)
         if not existing:
             raise HTTPException(status_code=404, detail="Campaign not found")
+        if workspace_id and existing.businessProfileId and existing.businessProfileId != workspace_id:
+            raise HTTPException(status_code=403, detail="That campaign belongs to another business")
 
         publishing_draft = existing.status in ("DRAFT", "FAILED") and data.status == "SENT"
+
+        if publishing_draft:
+            # Emails are metered per recipient, so reserve against the size of
+            # the list rather than counting the campaign as one send.
+            recipients = (await session.execute(
+                select(func.count(Audience.id)).where(
+                    Audience.businessProfileId == workspace_id,
+                    Audience.unsubscribed == False,  # noqa: E712
+                )
+            )).scalar() or 0
+            allowed, why = await billing.check_quota(user_id, "emails", max(recipients, 1))
+            if not allowed:
+                raise HTTPException(status_code=402, detail=why)
 
         if data.subject is not None:
             existing.subject = data.subject
@@ -1578,6 +1610,10 @@ async def edit_email_campaign(
                 existing.sentAt = datetime.now() if is_success else None
                 existing.recipientCount = recipient_count
                 existing.errorLog = error_log
+
+                # Charge for what actually left, not what was attempted.
+                if recipient_count:
+                    await billing.record_usage(user_id, "emails", recipient_count)
             except Exception as e:
                 existing.status = "FAILED"
                 existing.errorLog = str(e)

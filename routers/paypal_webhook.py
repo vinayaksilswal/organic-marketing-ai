@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Request, HTTPException
 from loguru import logger
 from sqlalchemy import select
@@ -5,7 +7,12 @@ from sqlalchemy import select
 import httpx
 
 from config import settings
-from database import AsyncSessionLocal, User
+from database import (
+    AsyncSessionLocal,
+    ProcessedWebhookEvent,
+    Subscription,
+    User,
+)
 
 router = APIRouter(
     prefix="/api/v1/paypal",
@@ -82,30 +89,126 @@ async def paypal_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
     event_type = payload.get("event_type")
+    event_id = payload.get("id")
+    resource = payload.get("resource", {}) or {}
 
-    if event_type in ["BILLING.SUBSCRIPTION.ACTIVATED", "PAYMENT.SALE.COMPLETED"]:
-        resource = payload.get("resource", {})
-        custom_id = resource.get("custom_id")
-
-        if not custom_id:
-            logger.warning(f"PayPal webhook {event_type} received but no custom_id found.")
-            return {"status": "ignored", "reason": "no custom_id"}
-
+    # PayPal retries deliveries. Without this, a repeated PAYMENT.SALE.COMPLETED
+    # would extend the same subscription twice.
+    if event_id:
         async with AsyncSessionLocal() as session:
-            stmt = select(User).where(User.id == custom_id).with_for_update()
-            res = await session.execute(stmt)
-            user = res.scalar_one_or_none()
+            if await session.get(ProcessedWebhookEvent, event_id):
+                logger.info(f"PayPal event {event_id} already processed; ignoring replay")
+                return {"status": "duplicate"}
 
+    handled = await _apply_event(event_type, resource)
+
+    if event_id:
+        try:
+            async with AsyncSessionLocal() as session:
+                session.add(ProcessedWebhookEvent(id=event_id, eventType=event_type))
+                await session.commit()
+        except Exception:
+            # A racing duplicate lost the insert; the work was still done once.
+            logger.debug(f"Could not record PayPal event {event_id} (likely a race)")
+
+    return {"status": "success" if handled else "ignored", "event": event_type}
+
+
+def _subscription_id_of(resource: dict) -> str | None:
+    """PayPal names this differently per event type."""
+    return (
+        resource.get("id")
+        if resource.get("plan_id") else
+        resource.get("billing_agreement_id") or resource.get("subscription_id")
+    )
+
+
+async def _find_subscription(session, resource: dict) -> Subscription | None:
+    sub_id = _subscription_id_of(resource)
+    if sub_id:
+        row = (await session.execute(
+            select(Subscription).where(Subscription.paypalSubscriptionId == sub_id)
+        )).scalars().first()
+        if row:
+            return row
+    # Fall back to custom_id, which we set to our user id at creation.
+    custom_id = resource.get("custom_id")
+    if custom_id:
+        return (await session.execute(
+            select(Subscription)
+            .where(Subscription.userId == custom_id)
+            .order_by(Subscription.createdAt.desc())
+        )).scalars().first()
+    return None
+
+
+async def _apply_event(event_type: str | None, resource: dict) -> bool:
+    """Move local state to match what PayPal just told us."""
+    ACTIVATING = {"BILLING.SUBSCRIPTION.ACTIVATED", "BILLING.SUBSCRIPTION.RE-ACTIVATED"}
+    ENDING = {
+        "BILLING.SUBSCRIPTION.CANCELLED": "CANCELLED",
+        "BILLING.SUBSCRIPTION.EXPIRED": "EXPIRED",
+        "BILLING.SUBSCRIPTION.SUSPENDED": "SUSPENDED",
+    }
+
+    if event_type not in (
+        ACTIVATING
+        | set(ENDING)
+        | {"PAYMENT.SALE.COMPLETED", "BILLING.SUBSCRIPTION.PAYMENT.FAILED"}
+    ):
+        return False
+
+    async with AsyncSessionLocal() as session:
+        sub = await _find_subscription(session, resource)
+        if not sub:
+            logger.warning(f"PayPal {event_type}: no local subscription matched")
+            return False
+
+        user = await session.get(User, sub.userId)
+
+        if event_type in ACTIVATING:
+            sub.status = "ACTIVE"
+            sub.lastError = None
+            sub.cancelAtPeriodEnd = False
+            next_billing = (resource.get("billing_info") or {}).get("next_billing_time")
+            if next_billing:
+                try:
+                    sub.currentPeriodEnd = datetime.fromisoformat(
+                        next_billing.replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    pass
             if user:
-                if user.subscriptionStatus != "ACTIVE":
-                    user.subscriptionStatus = "ACTIVE"
-                    await session.commit()
-                    logger.info(f"Subscription activated for user {custom_id} via PayPal webhook")
-                else:
-                    logger.info(f"Subscription already ACTIVE for user {custom_id} (idempotent)")
-                return {"status": "success"}
-            else:
-                logger.error(f"User not found for custom_id {custom_id}")
-                return {"status": "error", "reason": "user not found"}
+                user.subscriptionStatus = "ACTIVE"
+            logger.info(f"Subscription ACTIVE for user {sub.userId} ({sub.planCode})")
 
-    return {"status": "ignored"}
+        elif event_type == "PAYMENT.SALE.COMPLETED":
+            # A renewal cleared. Extend by a month from now unless PayPal told
+            # us the exact next billing date.
+            sub.status = "ACTIVE"
+            sub.lastPaymentAt = datetime.now(timezone.utc)
+            sub.lastError = None
+            sub.currentPeriodEnd = datetime.now(timezone.utc) + timedelta(days=32)
+            if user:
+                user.subscriptionStatus = "ACTIVE"
+            logger.info(f"Renewal payment recorded for user {sub.userId}")
+
+        elif event_type == "BILLING.SUBSCRIPTION.PAYMENT.FAILED":
+            # Not a cancellation: PayPal retries. Keep access until the period
+            # ends, but surface the problem so the customer can fix their card.
+            sub.lastError = (
+                "Your last payment did not go through. PayPal will retry; "
+                "update your payment method to avoid losing access."
+            )
+            logger.warning(f"Payment failed for user {sub.userId}")
+
+        else:
+            sub.status = ENDING[event_type]
+            if event_type != "BILLING.SUBSCRIPTION.SUSPENDED":
+                sub.cancelAtPeriodEnd = True
+            if user:
+                user.subscriptionStatus = "INACTIVE"
+            logger.info(f"Subscription {sub.status} for user {sub.userId}")
+
+        await session.commit()
+        return True
