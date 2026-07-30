@@ -391,15 +391,24 @@ async def auto_populate_workspace(user_id: str, workspace_id: str) -> Dict[str, 
                 session.add(campaign)
                 result["campaigns_created"] += 1
 
-            # Step 4: Ensure MarketingState exists with auto-approve
+            # Step 4: Ensure MarketingState exists.
+            # autoApprove stays FALSE. Publishing to a customer's real audience
+            # is theirs to authorise — defaulting it to True here meant a brand
+            # new workspace started posting to Facebook and Instagram before
+            # the owner had ever seen the toggle, and the dashboard showed
+            # "off" because that is the column default they expected.
             from sqlalchemy import select
-            ms_stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+            ms_stmt = (
+                select(MarketingState)
+                .where(MarketingState.businessProfileId == workspace_id)
+                .order_by(MarketingState.createdAt.asc())
+            )
             ms = (await session.execute(ms_stmt)).scalars().first()
             if not ms:
                 ms = MarketingState(
                     userId=user_id,
                     businessProfileId=workspace_id,
-                    autoApprove=True,
+                    autoApprove=False,
                     postIntervalHours=2,
                 )
                 session.add(ms)

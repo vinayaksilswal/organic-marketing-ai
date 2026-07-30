@@ -17,8 +17,10 @@ All endpoints are authenticated via JWT.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import urllib.parse
+import uuid
 from datetime import datetime
 from typing import Any, List, Optional
 
@@ -43,6 +45,7 @@ from database import (
     EmailCampaign,
     MarketingLog,
     Media,
+    utc_now,
 )
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -127,71 +130,139 @@ async def marketing_dashboard(request: Request) -> Any:
         context={"title": "Marketing Automation", "audiences": audiences, "autoApprove": auto_approve},
     )
 
+async def get_automation_state(session, workspace_id: str | None, user_id: str | None = None):
+    """Return THE automation state row for a workspace, creating it if absent.
+
+    Every reader used to do .first() with no ORDER BY against a table that had
+    no uniqueness on businessProfileId, and three code paths created rows. So
+    the auto-approve toggle could write one row while the publisher read
+    another — the dashboard showed "off" and posts still went out.
+
+    Ordering by createdAt makes the choice deterministic even on a database
+    that still holds pre-migration duplicates. New rows are never created
+    auto-approving: publishing to a real audience is the owner's call.
+    """
+    if not workspace_id:
+        return None
+
+    stmt = (
+        select(MarketingState)
+        .where(MarketingState.businessProfileId == workspace_id)
+        .order_by(MarketingState.createdAt.asc())
+    )
+    state = (await session.execute(stmt)).scalars().first()
+    if state:
+        return state
+
+    owner_id = user_id
+    if not owner_id:
+        profile = await session.get(BusinessProfile, workspace_id)
+        owner_id = getattr(profile, "userId", None)
+    if not owner_id:
+        # Previously this fell back to "the first User in the table", which
+        # attached one tenant's automation state to an unrelated account.
+        return None
+
+    state = MarketingState(
+        userId=owner_id,
+        businessProfileId=workspace_id,
+        autoApprove=False,
+        postIntervalHours=2,
+    )
+    session.add(state)
+    await session.flush()
+    return state
+
+
 @router.get("/settings")
 async def get_marketing_settings(request: Request) -> dict[str, Any]:
     workspace_id = request.headers.get("x-workspace-id")
     async with get_tenant_session(workspace_id) as session:
-        stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+        stmt = (
+            select(MarketingState)
+            .where(MarketingState.businessProfileId == workspace_id)
+            .order_by(MarketingState.createdAt.asc())
+        )
         state = (await session.execute(stmt)).scalars().first()
         if state:
             return {
-                "success": True, 
-                "autoApprove": state.autoApprove, 
-                "intervalHours": state.postIntervalHours
+                "success": True,
+                "autoApprove": state.autoApprove,
+                "intervalHours": state.postIntervalHours,
             }
         return {"success": True, "autoApprove": False, "intervalHours": 2}
 
+
 @router.post("/settings/auto-approve")
 async def toggle_auto_approve(
-    data: AutoApproveUpdate, request: Request
+    data: AutoApproveUpdate,
+    request: Request,
+    user_id: str = Depends(verify_user),
 ) -> dict[str, Any]:
-    try:
-        workspace_id = request.headers.get('x-workspace-id')
-        async with get_tenant_session(workspace_id) as session:
-            stmt = select(MarketingState).where(MarketingState.businessProfileId == request.headers.get("x-workspace-id"))
-            state = (await session.execute(stmt)).scalars().first()
-            if state:
-                state.autoApprove = data.autoApprove
-            else:
-                user_stmt = select(User)
-                first_user = (await session.execute(user_stmt)).scalars().first()
-                if first_user:
-                    workspace_id = request.headers.get("x-workspace-id")
-                    state = MarketingState(userId=first_user.id, businessProfileId=workspace_id, autoApprove=data.autoApprove)
-                    session.add(state)
-            if state:
-                await session.commit()
-                await session.refresh(state)
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="Select a business first.")
 
-            return {"success": True, "autoApprove": state.autoApprove if state else False}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    async with get_tenant_session(workspace_id) as session:
+        state = await get_automation_state(session, workspace_id, user_id)
+        if not state:
+            raise HTTPException(status_code=404, detail="That business could not be found.")
+
+        state.autoApprove = data.autoApprove
+        await session.commit()
+        await session.refresh(state)
+
+        logger.info(
+            f"Auto-approve set to {state.autoApprove} for workspace {workspace_id} by user {user_id}"
+        )
+        return {"success": True, "autoApprove": state.autoApprove}
+
 
 class IntervalUpdate(BaseModel):
     intervalHours: int
 
-@router.post("/settings/interval")
-async def update_interval(data: IntervalUpdate, request: Request) -> dict[str, Any]:
-    try:
-        workspace_id = request.headers.get("x-workspace-id")
-        async with get_tenant_session(workspace_id) as session:
 
-            stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
-            state = (await session.execute(stmt)).scalars().first()
-            if state:
-                state.postIntervalHours = data.intervalHours
-            else:
-                user_stmt = select(User)
-                first_user = (await session.execute(user_stmt)).scalars().first()
-                if first_user:
-                    state = MarketingState(userId=first_user.id, businessProfileId=workspace_id, postIntervalHours=data.intervalHours)
-                    session.add(state)
-            if state:
-                await session.commit()
-                return {"success": True, "intervalHours": state.postIntervalHours}
-            return {"success": False, "message": "Could not update interval"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/settings/interval")
+async def update_interval(
+    data: IntervalUpdate,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="Select a business first.")
+    if data.intervalHours < 1 or data.intervalHours > 168:
+        raise HTTPException(status_code=400, detail="Interval must be between 1 and 168 hours.")
+
+    async with get_tenant_session(workspace_id) as session:
+        state = await get_automation_state(session, workspace_id, user_id)
+        if not state:
+            raise HTTPException(status_code=404, detail="That business could not be found.")
+
+        state.postIntervalHours = data.intervalHours
+        await session.commit()
+        await session.refresh(state)
+        return {"success": True, "intervalHours": state.postIntervalHours}
+
+_URL_RE = re.compile(r"\bhttps?://\S+|\bwww\.\S+", re.IGNORECASE)
+
+
+def _strip_urls(text: str | None) -> str:
+    """Remove URLs from a caption.
+
+    Instagram does not linkify caption URLs, so a raw link is dead text that
+    reads as spam. Copy should say "link in bio" instead. Applied as a
+    backstop even though the prompts forbid links — models slip.
+    """
+    if not text:
+        return ""
+    cleaned = _URL_RE.sub("", text)
+    # Collapse the double spaces and orphaned punctuation a removal leaves.
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = re.sub(r"[ \t]+([,.!?])", r"\1", cleaned)
+    return cleaned.strip()
+
 
 def _is_postable(media) -> bool:
     """True when this row is an actual publishable asset.
@@ -385,12 +456,16 @@ async def run_automation_manually(request: Request) -> dict[str, Any]:
     workspace_id = request.headers.get("x-workspace-id")
     try:
         async with get_tenant_session(workspace_id) as session:
-            # 1. Check autoApprove setting
-            state_stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+            # 1. Read the automation state through the one deterministic path,
+            #    so this agrees with what the dashboard toggle wrote.
+            state_stmt = (
+                select(MarketingState)
+                .where(MarketingState.businessProfileId == workspace_id)
+                .order_by(MarketingState.createdAt.asc())
+            )
             state = (await session.execute(state_stmt)).scalars().first()
-            auto_approve = state.autoApprove if state else False
-            interval_hours = state.postIntervalHours if state else 2
-            
+            auto_approve = bool(state.autoApprove) if state else False
+
             # 2. Pick a media asset from this workspace's catalog. Prefer the
             #    least-recently-created so the rotation does not repeat one
             #    asset by chance the way random selection did.
@@ -762,26 +837,90 @@ async def api_generate_caption(
     request: Request,
     product_id: str = Form(...),
 ) -> dict[str, Any]:
-    """Generates an AI caption for a given product ID without creating a post."""
-    workspace_id = request.headers.get('x-workspace-id')
+    """Generate an AI caption for a campaign without creating a post."""
+    workspace_id = request.headers.get("x-workspace-id")
     async with get_tenant_session(workspace_id) as session:
-                        media_urls.append(f"{base_url}{final_url}{url_suffix}")
+        campaign = await session.get(SocialCampaign, product_id)
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if workspace_id and campaign.businessProfileId and campaign.businessProfileId != workspace_id:
+            raise HTTPException(status_code=403, detail="That campaign belongs to another business")
 
-        # 2. Setup Campaign and Caption
+        caption = await generate_campaign_variation(campaign.baseCaption)
+        return {"success": True, "caption": _strip_urls(caption)}
+
+
+@router.post("/posts/manual")
+async def create_manual_social_post(
+    request: Request,
+    platform: str = Form("BOTH"),
+    generate_ai_caption: str = Form("false"),
+    product_id: Optional[str] = Form(None),
+    manual_caption: Optional[str] = Form(""),
+    status: str = Form("DRAFT"),
+    files: List[UploadFile] = File(None),
+) -> dict[str, Any]:
+    """Manual override: create — and optionally publish — a social post.
+
+    Media goes to Cloudinary so the URL is publicly fetchable; Instagram
+    rejects anything it cannot download, and the previous local-disk path
+    produced URLs that died with the container.
+    """
+    workspace_id = request.headers.get("x-workspace-id")
+
+    # 1. Upload any attached media.
+    media_urls: list[str] = []
+    if files:
+        for file in files:
+            if not file or not file.filename:
+                continue
+            content = await file.read()
+            if not content:
+                continue
+            media_id = str(uuid.uuid4())
+            uploaded = await upload_media_to_cloudinary(
+                workspace_id=workspace_id or "default",
+                media_id=media_id,
+                filename=file.filename,
+                source=content,
+                resource_type="auto",
+            )
+            if uploaded:
+                media_urls.append(uploaded["secure_url"])
+            else:
+                # No Cloudinary configured — fall back to local disk so the
+                # post still carries media rather than silently losing it.
+                os.makedirs(UPLOAD_DIR, exist_ok=True)
+                safe_name = os.path.basename(file.filename)
+                path = os.path.join(UPLOAD_DIR, f"{media_id}_{safe_name}")
+                with open(path, "wb") as buffer:
+                    buffer.write(content)
+                base_url = str(request.base_url).rstrip("/")
+                url = f"{base_url}/uploads/{media_id}_{safe_name}"
+                is_video_ext = safe_name.lower().endswith((".mp4", ".mov", ".webm", ".avi", ".mkv"))
+                if (file.content_type or "").startswith("video/") or is_video_ext:
+                    url += "?type=video"
+                media_urls.append(url)
+
+    async with get_tenant_session(workspace_id) as session:
+        # 2. Resolve the campaign and settle on a caption.
         campaign = None
         if product_id:
             campaign = await session.get(SocialCampaign, product_id)
+            if campaign and workspace_id and campaign.businessProfileId \
+                    and campaign.businessProfileId != workspace_id:
+                raise HTTPException(status_code=403, detail="That campaign belongs to another business")
             if campaign and not media_urls and campaign.mediaUrl:
                 media_urls.append(campaign.mediaUrl)
 
         caption = manual_caption or ""
         if generate_ai_caption.lower() == "true" and campaign:
             caption = await generate_campaign_variation(campaign.baseCaption)
-        
-        import re
-        caption = re.sub(r"http\S+", "", caption).strip()
 
-        # 3. Create Record
+        # Captions never carry links — Instagram does not make them clickable.
+        caption = _strip_urls(caption)
+
+        # 3. Record the post.
         post = SocialPost(
             businessProfileId=workspace_id,
             campaignId=campaign.id if campaign else None,
@@ -789,7 +928,7 @@ async def api_generate_caption(
             type="MANUAL",
             caption=caption,
             mediaUrls=media_urls,
-            scheduledAt=datetime.now(),
+            scheduledAt=utc_now(),
             status=status,
         )
         session.add(post)
@@ -809,25 +948,30 @@ async def api_generate_caption(
         if status == "DRAFT":
             return {"success": True, "post": post_data, "errors": []}
 
+        # 4. Publish.
+        errors: list[str] = []
+        fb_post_id = ig_post_id = None
 
         if platform in ("FACEBOOK", "BOTH"):
             try:
                 fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=media_urls)
                 if not fb_post_id:
-                    errors.append("FB: Post returned None")
+                    errors.append("FB: publish returned no post id")
             except Exception as e:
-                errors.append(f"FB: {str(e)}")
+                errors.append(f"FB: {e}")
 
         if platform in ("INSTAGRAM", "BOTH"):
             try:
                 ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=media_urls)
                 if not ig_post_id:
-                    errors.append("IG: Post returned None")
+                    errors.append("IG: publish returned no post id")
             except Exception as e:
-                errors.append(f"IG: {str(e)}")
+                errors.append(f"IG: {e}")
 
         if platform == "BOTH":
-            is_success = fb_post_id is not None and ig_post_id is not None
+            # Either platform succeeding is a real delivery; requiring both
+            # marked half-delivered posts FAILED and hid the one that worked.
+            is_success = fb_post_id is not None or ig_post_id is not None
         elif platform == "FACEBOOK":
             is_success = fb_post_id is not None
         elif platform == "INSTAGRAM":
@@ -835,15 +979,15 @@ async def api_generate_caption(
         else:
             is_success = False
 
-        # Update post record with results
         post.status = "POSTED" if is_success else "FAILED"
-        post.postedAt = datetime.now() if is_success else None
+        post.postedAt = utc_now() if is_success else None
         post.errorLog = " | ".join(errors) if errors else None
         post.fbPostId = fb_post_id
         post.igPostId = ig_post_id
         await session.commit()
 
         post_data["status"] = post.status
+        post_data["postedAt"] = post.postedAt.isoformat() if post.postedAt else None
         return {"success": is_success, "post": post_data, "errors": errors}
 
 class PostFromMediaRequest(BaseModel):

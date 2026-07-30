@@ -219,9 +219,17 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 logger.error(f"Workspace {workspace_id} not found.")
                 return "error_workspace_not_found"
 
-            state_stmt = select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+            # Deterministic pick: duplicates used to make this a coin flip
+            # against whichever row the settings toggle had written.
+            state_stmt = (
+                select(MarketingState)
+                .where(MarketingState.businessProfileId == workspace_id)
+                .order_by(MarketingState.createdAt.asc())
+            )
             state = (await session.execute(state_stmt)).scalars().first()
-            auto_approve = state.autoApprove if state else False
+            # No state row means the owner has never enabled anything. Default
+            # to drafting, never to publishing.
+            auto_approve = bool(state.autoApprove) if state else False
 
             if profile.businessModel == "E-commerce" and getattr(profile, "productCatalogUrl", None):
                 # E-commerce Flow: Pick a product and generate a post
@@ -272,10 +280,11 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                         "1. Hook the reader with a relevant problem or strong desire.\n"
                         "2. Highlight how this product solves it flawlessly.\n"
                         "3. End with an urgent and clear Call-To-Action to buy now.\n"
-                        f"Include the purchase link precisely at the end: {product.url or profile.websiteUrl or ''}\n"
+                        "Never write a URL in the caption — Instagram does not make them "
+                        "clickable, so a raw link reads as spam. Say 'link in bio' instead.\n"
                         f"Include 3-5 relevant hashtags from: {', '.join(profile.suggestedHashtags or ['#ecommerce', '#musthave'])}."
                     )
-                    fallback_caption = f"Check out our amazing {product.title}! Get it here: {product.url or profile.websiteUrl or ''}"
+                    fallback_caption = f"Check out our {product.title} — link in bio."
                     # Use a dummy campaign ID or the first active one if required by DB schema
                     dummy_campaign = await _get_next_campaign_for_workspace(session, profile)
                     if dummy_campaign:
@@ -372,6 +381,11 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             if not final_caption or len(final_caption) < 10:
                 final_caption = fallback_caption
 
+            # Backstop the no-links rule. The prompts forbid URLs, but models
+            # slip, and a raw link in an Instagram caption is dead text.
+            from routers.marketing import _strip_urls
+            final_caption = _strip_urls(final_caption) or fallback_caption
+
             # 4. Post to all platforms
             fb_post_id = None
             ig_post_id = None
@@ -456,7 +470,11 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 id=str(uuid.uuid4()),
                 userId=profile.userId,
                 businessProfileId=profile.id,
-                campaignId=campaign.id,           # Fixed: was 'socialCampaignId'
+                # Every branch above sets campaign_id; only some set `campaign`.
+                # The e-commerce product branch does not, so dereferencing
+                # `campaign` here raised UnboundLocalError and killed the whole
+                # run for any workspace with a product catalog.
+                campaignId=campaign_id,
                 platform="ALL",
                 type="AUTO",
                 caption=final_caption,              # Fixed: was 'content'

@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from database import AsyncSessionLocal, VideoApiConfig, Media, BusinessProfile
 from routers.auth import verify_user, get_workspace_id
 from sqlalchemy import select, and_
+from loguru import logger
 from services.crypto_service import encrypt_token, decrypt_token
 
 router = APIRouter(

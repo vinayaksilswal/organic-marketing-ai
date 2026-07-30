@@ -221,6 +221,14 @@ class MarketingState(Base):
     businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
     businessProfile = relationship('BusinessProfile', back_populates='marketingstates')
 
+    # Exactly one automation state per workspace. Without this, duplicate rows
+    # accumulated and every reader used .first() with no ordering — so the
+    # auto-approve toggle could update one row while the publisher read
+    # another, and posts went out with the dashboard showing "off".
+    __table_args__ = (
+        UniqueConstraint("businessProfileId", name="uniq_marketing_state_workspace"),
+    )
+
 
 class SocialCampaign(Base):
     __tablename__ = "SocialCampaign"

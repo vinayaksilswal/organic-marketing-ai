@@ -191,12 +191,12 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Base Caption
+              Base Caption — describe what the file shows
             </label>
-            <input 
-              type="text" 
-              className="input" 
-              placeholder="Enter base caption for AI to rewrite..." 
+            <input
+              type="text"
+              className="input"
+              placeholder="e.g. Founder demos the scanner on a laptop in a dark office"
               value={baseCaption}
               onChange={(e) => setBaseCaption(e.target.value)}
               style={{ width: '100%', padding: '0.6rem 1rem', height: '42px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '8px' }}
@@ -308,12 +308,26 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                           )}
                         </td>
                         <td style={{ padding: '1rem 1.5rem' }}>
-                          <span style={{ 
-                            fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.6rem', 
-                            borderRadius: '4px', background: 'rgba(16,185,129,0.15)', color: 'var(--success)' 
+                          {/* Reflects the real isActive column and whether the
+                              asset is something automation can actually post.
+                              This used to be a hardcoded ACTIVE badge. */}
+                          <span style={{
+                            fontSize: '0.75rem', fontWeight: '700', padding: '0.2rem 0.6rem',
+                            borderRadius: '4px',
+                            background: inactive ? 'rgba(148,163,184,0.15)'
+                              : item.postable === false ? 'rgba(251,191,36,0.15)'
+                              : 'rgba(16,185,129,0.15)',
+                            color: inactive ? '#94a3b8'
+                              : item.postable === false ? '#fbbf24'
+                              : 'var(--success)',
                           }}>
-                            ACTIVE
+                            {inactive ? 'PAUSED' : item.postable === false ? 'PROMPT ONLY' : 'ACTIVE'}
                           </span>
+                          {item.postable === false && !inactive && (
+                            <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.68rem', color: 'var(--text-muted)', maxWidth: 150, lineHeight: 1.4 }}>
+                              A saved prompt, not a file. Automation skips it.
+                            </p>
+                          )}
                         </td>
                         <td style={{ padding: '1rem 1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                           {item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : '2026-07-20'}
@@ -322,7 +336,9 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => setPreviewMedia(item)}>PREVIEW</button>
                             <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => handleEditMedia(item)}>EDIT</button>
-                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => handleDeactivate(item.id)}>DEACTIVATE</button>
+                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => handleToggleActive(item)}>
+                              {inactive ? 'ACTIVATE' : 'DEACTIVATE'}
+                            </button>
                             <button className="btn btn-secondary" style={{ padding: '0.4rem', color: 'var(--error)' }} onClick={() => handleDeleteMedia(item.id)}>
                               <Trash2 size={16} />
                             </button>
@@ -341,15 +357,24 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         {editingMedia && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div className="glass-panel" style={{ maxWidth: '500px', width: '100%', padding: '2rem', position: 'relative', borderRadius: '16px' }}>
-              <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1.25rem' }}>Edit Campaign</h3>
-              
+              <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1.25rem' }}>Edit asset</h3>
+              <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {editingMedia.filename}
+              </p>
+
               <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>Base Caption</label>
-                <textarea 
-                  rows="4" 
-                  value={editCaption} 
-                  onChange={(e) => setEditCaption(e.target.value)} 
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', resize: 'none' }}
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>Base Caption — what this shows</label>
+                <p style={{ margin: '0 0 0.6rem 0', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  This is the only description the AI has of this file. Describe what
+                  is actually on screen and why it matters — the caption writer builds
+                  every post from it, alongside your business profile.
+                </p>
+                <textarea
+                  rows="7"
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  placeholder="e.g. Developer runs a post-quantum scan from a terminal; the result returns compliant in under a second."
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', resize: 'vertical', fontSize: '0.85rem', lineHeight: 1.5 }}
                 />
               </div>
 
@@ -362,8 +387,10 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                <button className="btn btn-secondary" onClick={() => setEditingMedia(null)}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleSaveEdit}>Save</button>
+                <button className="btn btn-secondary" onClick={() => setEditingMedia(null)} disabled={saving}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleSaveEdit} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </div>
           </div>
