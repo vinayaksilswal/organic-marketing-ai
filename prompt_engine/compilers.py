@@ -54,10 +54,15 @@ def _enforce_background_text_suppression(text: str) -> str:
     # "free of text" clause contradicts it in the same prompt and the model has
     # to pick a winner. Suppress only the incidental text — background signage
     # and product labels — which is the part that renders as scribble anyway.
+    # Phrased positively on purpose. Runway has no negative parsing, and its
+    # own guidance is that negative wording pulls attention onto the suppressed
+    # term — check_model_negative_syntax rejects "no ", "do not" and "without"
+    # in a Runway positive prompt for exactly that reason. An earlier wording
+    # here, "No other text: ...", tripped that gate on every generation.
     has_intentional_text = re.search(r'the words? "[^"]+" appear', text, re.IGNORECASE)
     if has_intentional_text:
         return text.rstrip(".") + (
-            ". No other text: background signage and product labels stay blank."
+            ". Background signage and product labels remain blank."
         )
     return text.rstrip(".") + ". Clean surfaces free of text, signage, and labels."
 
