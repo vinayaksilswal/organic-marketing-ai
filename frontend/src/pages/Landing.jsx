@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, TrendingUp, Sparkles, Zap, PlayCircle, Users, 
-  ShieldCheck, ChevronDown, ArrowRight, Star,
+  ShieldCheck, ChevronDown, ArrowRight,
   BarChart3, Link, Target, Clock, Bot, Eye, DollarSign,
   Layers, Cpu, Globe, Lock, RefreshCw, Frown, AlertCircle, ThumbsUp, XCircle, LayoutDashboard,
   Instagram, Facebook, Linkedin, Twitter, Film, Image as ImageIcon, Send, CheckCheck, Building2
@@ -68,6 +68,39 @@ const Landing = () => {
   // Self promotion data
   const [selfPromoData, setSelfPromoData] = useState(null);
 
+  // The plan catalogue comes from the billing service, never from hardcoded
+  // markup. Prices and limits shown here are then always what is actually
+  // charged and enforced — a landing page that drifts from the biller is how
+  // customers end up buying something they do not receive.
+  //
+  // The fallback mirrors services/billing_service.PLANS. It exists because a
+  // pricing section that renders a spinner when the API is unreachable sells
+  // nothing at all — the one part of this page that must never fail to draw is
+  // the price. Keep the two in step when plans change.
+  const FALLBACK_PLANS = [
+    { code: 'free', name: 'Free', price: 0, tagline: 'Try the whole pipeline before you pay.',
+      features: ['1 business', '5 published posts a month', '3 AI creative prompts a month', 'Facebook + Instagram publishing'] },
+    { code: 'starter', name: 'Starter', price: 17, tagline: 'One business, running itself.',
+      features: ['1 business', '60 published posts a month', '30 AI creative prompts a month', '1,000 marketing emails a month', 'Automated posting every 2 hours'] },
+    { code: 'growth', name: 'Growth', price: 49, tagline: 'Several brands, one operator.',
+      features: ['5 businesses', '300 published posts a month', '150 AI creative prompts a month', '10,000 marketing emails a month', 'Your own email sending domain'] },
+    { code: 'agency', name: 'Agency', price: 149, tagline: 'Run marketing for clients.',
+      features: ['25 businesses', 'Unlimited published posts', '600 AI creative prompts a month', '50,000 marketing emails a month', 'Team seats and roles'] },
+  ];
+
+  const [plans, setPlans] = useState(FALLBACK_PLANS);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/billing/plans`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d?.plans) && d.plans.length) setPlans(d.plans); })
+      .catch(() => { /* the fallback above is already showing */ });
+  }, []);
+
+  const paidPlans = plans.filter(p => p.price > 0);
+  const freePlan = plans.find(p => p.price <= 0);
+  const entryPrice = paidPlans.length ? Math.min(...paidPlans.map(p => p.price)) : 17;
+
   // Fetch live platform stats & self promotion data
   useEffect(() => {
     fetch(`${PUBLIC_API}/api/public/stats`)
@@ -94,7 +127,7 @@ const Landing = () => {
     setActiveFaq(activeFaq === index ? null : index);
   };
 
-  const monthlySavings = ((hoursPerWeek * 4) * hourlyRate) - 17;
+  const monthlySavings = ((hoursPerWeek * 4) * hourlyRate) - entryPrice;
   const yearlySavings = monthlySavings * 12;
 
   const faqs = [
@@ -108,7 +141,10 @@ const Landing = () => {
     },
     {
       question: "Which platforms do you currently support?",
-      answer: "We currently support direct integrations with Facebook, Instagram, X (Twitter), and LinkedIn. Content is generated and optimized for each platform's format and audience."
+      // Meta is the only one-click flow. X and LinkedIn publish, but you must
+      // supply your own API token — saying "direct integration" for all four
+      // would be selling a connect button that does not exist.
+      answer: "Facebook and Instagram connect in one click through Meta — that is the flow we support end to end, including Reels. X (Twitter) and LinkedIn can publish too, but you supply your own API token for those rather than clicking Connect."
     },
     {
       question: "Is there a long-term contract?",
@@ -129,7 +165,7 @@ const Landing = () => {
       <style>{premiumStyles}</style>
       <Helmet>
         <title>OrganicAI — The Autonomous Marketing Employee</title>
-        <meta name="description" content="AI auto-generates brand-matched social media posts with images and publishes them on autopilot. Starting at $17/mo." />
+        <meta name="description" content="AI writes brand-matched social posts and publishes them to Facebook and Instagram on autopilot. Free plan, no card required." />
         <meta name="keywords" content="AI marketing, social media automation, organic growth, content generation, automated posting" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
@@ -150,7 +186,7 @@ const Landing = () => {
           </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <button className="btn btn-secondary" style={{ border: 'none', background: 'transparent' }} onClick={() => navigate('/auth')}>Log in</button>
-            <button className="btn btn-primary" style={{ boxShadow: '0 4px 14px rgba(168, 85, 247, 0.4)' }} onClick={() => navigate('/auth')}>Start for $17</button>
+            <button className="btn btn-primary" style={{ boxShadow: '0 4px 14px rgba(168, 85, 247, 0.4)' }} onClick={() => navigate('/auth')}>Start free</button>
           </div>
         </div>
       </nav>
@@ -166,19 +202,25 @@ const Landing = () => {
               Scale Your Audience<br />on <span className="accent-gradient">Autopilot</span>.
             </h1>
             <p style={{ fontSize: '1.25rem', maxWidth: '700px', margin: '0 auto 2.5rem', color: '#a1a1aa', lineHeight: 1.6 }}>
-              The first AI employee that learns your brand DNA, designs stunning visuals, writes high-converting copy, and publishes daily to <strong>Facebook, Instagram, X, and LinkedIn</strong>.
+              An AI marketing employee that learns your brand, writes the copy and the
+              creative brief, and publishes it to your <strong>Facebook Page and Instagram</strong> on
+              the schedule you set.
             </p>
             <div className="hero-cta" style={{ display: 'flex', gap: '1rem', justifyContent: 'center', margin: '2rem auto 1rem', flexDirection: 'column', alignItems: 'center' }}>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <button className="btn btn-primary btn-large pulse" onClick={() => navigate('/auth')} style={{ fontSize: '1.1rem', padding: '1rem 2rem', boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)' }}>
-                  Get Started for $17 <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
+                  Start free — no card <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
                 </button>
                 <button className="btn btn-secondary btn-large glass-card" onClick={scrollToPricing} style={{ fontSize: '1.1rem', padding: '1rem 2rem', color: '#fff' }}>
                   See How It Works
                 </button>
               </div>
               <p style={{ fontSize: '0.85rem', color: '#71717a', marginTop: '0.5rem' }}>
-                <ShieldCheck size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem', color: '#10b981' }} /> 14-Day Money-Back Guarantee. Cancel Anytime.
+                {/* Was "14-Day Money-Back Guarantee" — a refund promise with no
+                    refund process behind it. The free plan is a stronger offer
+                    anyway: there is nothing to get back. Put the guarantee back
+                    if you decide to honour one. */}
+                <ShieldCheck size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem', color: '#10b981' }} /> Free plan, no card. Cancel any time.
               </p>
             </div>
             <div style={{ marginTop: '2rem', color: '#71717a', fontSize: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
@@ -250,7 +292,10 @@ const Landing = () => {
       {/* Real integrations — the platforms we actually publish to */}
       <div className="integration-bar">
         <div className="container">
-          <p className="integration-bar-label">Publishes directly to the platforms you already use</p>
+          {/* Meta is one click; X and LinkedIn need the customer's own API
+              token. Listing all four as equals promised a connect button that
+              does not exist for two of them. */}
+          <p className="integration-bar-label">One-click publishing to Facebook and Instagram · X and LinkedIn with your own API token</p>
           <div className="integration-logos">
             {[
               { name: 'Instagram', icon: <Instagram size={22} />, color: '#e1306c' },
@@ -338,7 +383,7 @@ const Landing = () => {
 
           <div style={{ textAlign: 'center', marginTop: '3rem' }}>
             <button className="btn btn-primary" onClick={() => navigate('/auth')} style={{ fontSize: '1.05rem', padding: '0.9rem 2rem' }}>
-              Start for $17/mo <ArrowRight size={17} style={{ marginLeft: '0.5rem' }} />
+              Start free — no card <ArrowRight size={17} style={{ marginLeft: '0.5rem' }} />
             </button>
             <p style={{ fontSize: '0.85rem', color: '#71717a', marginTop: '0.85rem' }}>Cancel anytime · No contract · Secure PayPal checkout</p>
           </div>
@@ -389,16 +434,16 @@ const Landing = () => {
               <span className="ticker-label">Posts Generated (Live)</span>
             </div>
             <div className="ticker-item">
-              <span className="ticker-value">4</span>
-              <span className="ticker-label">Platforms Supported</span>
+              <span className="ticker-value">1-click</span>
+              <span className="ticker-label">Facebook + Instagram</span>
             </div>
             <div className="ticker-item">
               <span className="ticker-value">&lt;2 min</span>
               <span className="ticker-label">Setup Time</span>
             </div>
             <div className="ticker-item">
-              <span className="ticker-value">$17</span>
-              <span className="ticker-label">Flat Monthly Rate</span>
+              <span className="ticker-value">${entryPrice}</span>
+              <span className="ticker-label">Starts At</span>
             </div>
             <div className="ticker-item">
               <span className="ticker-value">{liveStats?.users || '—'}</span>
@@ -410,8 +455,8 @@ const Landing = () => {
               <span className="ticker-label">Posts Generated (Live)</span>
             </div>
             <div className="ticker-item">
-              <span className="ticker-value">4</span>
-              <span className="ticker-label">Platforms Supported</span>
+              <span className="ticker-value">1-click</span>
+              <span className="ticker-label">Facebook + Instagram</span>
             </div>
             <div className="ticker-item">
               <span className="ticker-value">&lt;2 min</span>
@@ -600,7 +645,7 @@ const Landing = () => {
               <div style={{ background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2rem 1.5rem', borderRadius: '16px', position: 'relative' }}>
                 <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#a855f7', color: '#fff', padding: '0.2rem 0.8rem', borderRadius: '999px', fontSize: '0.7rem', fontWeight: 700 }}>OUR PRICE</div>
                 <p style={{ fontSize: '0.85rem', color: '#a1a1aa', margin: '0 0 0.5rem 0' }}>OrganicAI Cost</p>
-                <p style={{ fontSize: '2.5rem', fontWeight: 800, color: '#c084fc', margin: 0 }}>$17</p>
+                <p style={{ fontSize: '2.5rem', fontWeight: 800, color: '#c084fc', margin: 0 }}>${entryPrice}</p>
               </div>
               <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '2rem 1.5rem', borderRadius: '16px' }}>
                 <p style={{ fontSize: '0.85rem', color: '#a1a1aa', margin: '0 0 0.5rem 0' }}>You Save / Year</p>
@@ -665,98 +710,166 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Wall of Love (Testimonials) */}
+      {/*
+        This section previously held three invented testimonials — fictional
+        people, fictional job titles, and fabricated results ("engagement is up
+        300%"). Fake reviews on a page that takes payment are prohibited by the
+        FTC and carry per-violation penalties, quite apart from what they do to
+        a brand when a customer notices.
+
+        Removing unverifiable praise costs nothing in conversion. What actually
+        removes hesitation is telling people exactly what happens next, so that
+        is what this section does now. Replace it with real testimonials the
+        moment you have customers who will put their name to one.
+      */}
       <section className="testimonials-section">
         <div className="container">
           <div style={{ textAlign: 'center' }}>
-            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Wall of Love</h4>
-            <h2>Loved by founders and marketers</h2>
-            <p style={{ maxWidth: '600px', margin: '0 auto' }}>Don't just take our word for it. See what our early adopters are saying about reclaiming their time.</p>
+            <h4 style={{ color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>No guesswork</h4>
+            <h2>Your first ten minutes</h2>
+            <p style={{ maxWidth: '620px', margin: '0 auto' }}>
+              Free to start, no card. Here is exactly what happens, in order.
+            </p>
           </div>
-          
-          <div className="testimonial-grid">
-            <div className="testimonial-card">
-              <div className="stars">
-                <Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" />
-              </div>
-              <p className="testimonial-text">"I run a small SaaS and simply didn't have time for social media. OrganicAI literally took over my entire Twitter and LinkedIn presence overnight. The generated images are incredibly high quality."</p>
-              <div className="testimonial-author">
-                <div className="author-avatar">JD</div>
-                <div className="author-info">
-                  <h4>James D.</h4>
-                  <p>SaaS Founder</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="testimonial-card">
-              <div className="stars">
-                <Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" />
-              </div>
-              <p className="testimonial-text">"We were paying an agency $1,500/mo for 12 posts. Now I pay $17 and OrganicAI posts highly engaging content every 4 hours. It's an absolute no-brainer for any e-commerce store."</p>
-              <div className="testimonial-author">
-                <div className="author-avatar">ST</div>
-                <div className="author-info">
-                  <h4>Sarah T.</h4>
-                  <p>E-commerce Owner</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="testimonial-card">
-              <div className="stars">
-                <Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" /><Star fill="currentColor" />
-              </div>
-              <p className="testimonial-text">"The Brand Context Engine is what sold me. It actually sounds like us. I put it on auto-approve 3 weeks ago and haven't logged in since, but our engagement is up 300%."</p>
-              <div className="testimonial-author">
-                <div className="author-avatar">MK</div>
-                <div className="author-info">
-                  <h4>Marcus K.</h4>
-                  <p>Marketing Agency Director</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '3rem' }}>
+            {[
+              {
+                n: '01',
+                t: 'Paste your website',
+                b: 'We read it and build a brand profile — what you sell, who buys it, the words you use. About a minute.',
+              },
+              {
+                n: '02',
+                t: 'Connect Facebook & Instagram',
+                b: 'One Meta login. Pick the Page and the Instagram account you want posts to land on.',
+              },
+              {
+                n: '03',
+                t: 'Review the first post',
+                b: 'A caption written from your brand profile and the media you uploaded. Edit it, or approve it.',
+              },
+              {
+                n: '04',
+                t: 'Switch on auto-approve',
+                b: 'From then on it publishes on your schedule. Every post stays in the log with its delivery result.',
+              },
+            ].map(s => (
+              <div key={s.n} className="glass-card" style={{ padding: '1.75rem', borderRadius: 16 }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary-color)', letterSpacing: '0.1em', marginBottom: '0.6rem' }}>
+                  {s.n}
                 </div>
+                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem' }}>{s.t}</h3>
+                <p style={{ margin: 0, fontSize: '0.88rem', lineHeight: 1.6, color: 'var(--text-muted)' }}>{s.b}</p>
               </div>
-            </div>
+            ))}
           </div>
+
+          <p style={{ textAlign: 'center', marginTop: '2.5rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+            Nothing publishes until you allow it. Auto-approve is off by default.
+          </p>
         </div>
       </section>
 
       {/* Pricing Section */}
+      {/*
+        Rendered from GET /billing/plans — the same catalogue the biller
+        charges against and the quota checks enforce. The previous markup was
+        hardcoded and claimed "no tiers, no hidden limits" and "unlimited brand
+        workspaces", which stopped being true the moment metered plans shipped.
+        Selling against copy the product does not honour is how refunds and
+        chargebacks start.
+      */}
       <section id="pricing" className="pricing-section">
         <div className="container">
           <div className="pricing-header">
-            <h2>One plan. Everything included.</h2>
-            <p style={{ maxWidth: '600px', margin: '0 auto', fontSize: '1.125rem' }}>No tiers, no hidden limits, no upsells. Every feature is available for one flat rate.</p>
-          </div>
-          
-          <div className="pricing-card">
-            <div className="pricing-card-header">
-              <h3 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>PRO PLAN</h3>
-              <div className="price">
-                <span className="currency">$</span>17<span className="period">/mo</span>
-              </div>
-              <p style={{ marginTop: '1rem', color: 'var(--text-main)' }}>Full access to the entire OrganicAI platform.</p>
-            </div>
-            
-            <ul className="pricing-features">
-              <li><CheckCircle2 size={20} /> <span><strong>AI Brand Context Engine</strong> — auto-analyzes your business</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>AI Creative Generation</strong> — posts + images on demand</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>4 Platform Publishing</strong> — FB, IG, X, LinkedIn</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>Autopilot Scheduling</strong> — 2hr, 4hr, 8hr, or custom</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>Multi-Workspace</strong> — unlimited brand workspaces</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>E-Commerce Catalog Sync</strong> — import products</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>Email Marketing Drips</strong> — automated email campaigns</span></li>
-              <li><CheckCircle2 size={20} /> <span><strong>AI Video Studio</strong> — promotional video generation</span></li>
-            </ul>
-            
-            <button className="btn btn-primary pulse" style={{ width: '100%', padding: '1.25rem', fontSize: '1.125rem', fontWeight: 700 }} onClick={() => navigate('/auth')}>
-              Start Your Automation Engine <Sparkles size={20} style={{ marginLeft: '0.5rem' }} />
-            </button>
-            <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
-                <ShieldCheck size={16} /> 14-Day Money-Back Guarantee
-              </span>
-              <span>Cancel anytime. No lock-in. No setup fees.</span>
+            <h2>Start free. Pay when it earns its keep.</h2>
+            <p style={{ maxWidth: '640px', margin: '0 auto', fontSize: '1.125rem' }}>
+              Run the whole pipeline on the free plan first — no card. Upgrade when you
+              want it posting every day.
             </p>
+          </div>
+
+          {plans.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--text-muted)' }}>
+              <span className="spinner" style={{ width: 20, height: 20 }} />
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1.5rem',
+              alignItems: 'stretch',
+              maxWidth: 1150,
+              margin: '0 auto',
+            }}>
+              {plans.map(p => {
+                const isFree = p.price <= 0;
+                const featured = p.code === 'starter';
+                return (
+                  <div key={p.code} className="glass-card" style={{
+                    padding: '2rem 1.75rem',
+                    borderRadius: 18,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    border: featured ? '1px solid var(--primary-color)' : '1px solid rgba(255,255,255,0.08)',
+                    boxShadow: featured ? '0 0 40px rgba(168,85,247,0.18)' : undefined,
+                  }}>
+                    {featured && (
+                      <div style={{
+                        position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
+                        background: 'linear-gradient(135deg, #a855f7, #3b82f6)', color: '#fff',
+                        padding: '0.2rem 0.85rem', borderRadius: 999, fontSize: '0.68rem', fontWeight: 800,
+                        letterSpacing: '0.06em', whiteSpace: 'nowrap',
+                      }}>
+                        MOST POPULAR
+                      </div>
+                    )}
+
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', color: featured ? 'var(--primary-color)' : undefined }}>
+                      {p.name}
+                    </h3>
+                    <div style={{ margin: '0.7rem 0 0.2rem', fontSize: '2.4rem', fontWeight: 800, lineHeight: 1 }}>
+                      {isFree ? 'Free' : <>
+                        <span style={{ fontSize: '1.3rem', verticalAlign: 'super' }}>$</span>{p.price}
+                        <span style={{ fontSize: '0.95rem', fontWeight: 400, color: 'var(--text-muted)' }}>/mo</span>
+                      </>}
+                    </div>
+                    <p style={{ margin: '0.5rem 0 1.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.55, minHeight: 40 }}>
+                      {p.tagline}
+                    </p>
+
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.75rem', display: 'grid', gap: '0.6rem', flex: 1 }}>
+                      {p.features.map(f => (
+                        <li key={f} style={{ display: 'flex', gap: '0.5rem', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                          <CheckCircle2 size={15} style={{ color: 'var(--success)', flexShrink: 0, marginTop: 2 }} />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      className={`btn ${featured ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => navigate('/auth')}
+                      style={{ width: '100%', padding: '0.9rem', fontWeight: 700, fontSize: '0.95rem' }}
+                    >
+                      {isFree ? 'Start free' : `Choose ${p.name}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ textAlign: 'center', marginTop: '2.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', fontSize: '0.9rem' }}>
+              <ShieldCheck size={16} /> Billed monthly through PayPal. Cancel any time from your dashboard.
+            </span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Cancelling keeps your access until the end of the period you have already paid for.
+              We never see or store your card details.
+            </span>
           </div>
         </div>
       </section>
@@ -793,7 +906,7 @@ const Landing = () => {
             Join the businesses saving hundreds of hours every month. Let OrganicAI handle the content, design, and scheduling so you can focus on closing deals.
           </p>
           <button className="btn btn-primary btn-large" onClick={() => navigate('/auth')} style={{ fontSize: '1.2rem', padding: '1.25rem 2.5rem' }}>
-            Start Automating for $17 <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
+            Start free — no card <ArrowRight size={20} style={{ marginLeft: '0.5rem' }} />
           </button>
         </div>
       </section>
