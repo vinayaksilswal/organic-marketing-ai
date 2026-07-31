@@ -398,6 +398,54 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* THE PROBLEM */}
+      <section style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.045), rgba(139,92,246,0.04))' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="eyebrow" style={{ color: 'var(--pink)', background: 'rgba(219,39,119,0.09)', borderColor: 'rgba(219,39,119,0.2)' }}>
+              The problem
+            </span>
+            <h2 className="h2" style={{ margin: '1.1rem auto .9rem', maxWidth: 760 }}>
+              Every business now needs a media team it cannot afford.
+            </h2>
+            <p className="lede" style={{ maxWidth: 660, margin: '0 auto' }}>
+              Reach used to come from paying for it. Now it comes from posting constantly,
+              on platforms that reward volume and punish gaps. That is a full-time job
+              nobody hired for.
+            </p>
+          </div>
+
+          <div className="grid g3">
+            {[
+              ['The output nobody has time for',
+               'Short video is what actually reaches people, and it needs a concept, a script, an edit and a caption. Every post. Forever. Most owners manage two weeks and stop.'],
+              ['The gap that costs you',
+               'Miss a week and reach collapses, and it does not come back when you return. Consistency is the whole mechanic, and consistency is exactly what a busy operator cannot give it.'],
+              ['The help that does not fit',
+               'An agency is $2,000 a month and still needs briefing. Generic AI tools write copy that could belong to any competitor, because they were never told what you actually sell.'],
+            ].map(([t, b]) => (
+              <div key={t} className="glass" style={{ padding: '1.9rem' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(219,39,119,0.09)', border: '1px solid rgba(219,39,119,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                  <AlertCircle size={17} color="var(--pink)" />
+                </div>
+                <h3 style={{ fontSize: '1.03rem', marginBottom: '.55rem', fontWeight: 690 }}>{t}</h3>
+                <p style={{ fontSize: '.89rem', lineHeight: 1.65 }}>{b}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="glass" style={{ marginTop: '2rem', padding: '1.6rem 1.9rem', display: 'flex', gap: '1rem', alignItems: 'flex-start', background: 'rgba(255,255,255,0.85)' }}>
+            <CheckCircle2 size={20} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
+            <p style={{ fontSize: '.97rem', lineHeight: 1.65, color: 'var(--ink)' }}>
+              <strong>What we built instead:</strong> a system that learns one business properly
+              — what it sells, who buys it, the words it uses — and then does the whole loop
+              on its own. Brief, creative, caption, publish, log. You review what you want to
+              review and ignore the rest.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* HOW */}
       <section>
         <div className="wrap">
@@ -429,6 +477,91 @@ const Landing = () => {
               <strong style={{ color: 'var(--ink)' }}>{stats.posts.toLocaleString()}</strong> posts generated on the platform so far
             </p>
           )}
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section style={{ background: 'linear-gradient(180deg, rgba(37,99,235,0.045), rgba(139,92,246,0.04))' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="eyebrow">What you get</span>
+            <h2 className="h2" style={{ margin: '1.1rem auto .9rem', maxWidth: 700 }}>
+              The whole loop, not just the writing part
+            </h2>
+            <p className="lede" style={{ maxWidth: 600, margin: '0 auto' }}>
+              Most tools hand you a draft and leave the rest to you. This one carries it
+              all the way to a published post and tells you what happened.
+            </p>
+          </div>
+
+          <div className="grid g3">
+            {[
+              [<Sparkles size={17} />, 'Brand profile from your site',
+               'It reads your website and builds what it needs: what you sell, who buys it, your tone, your content themes, your offer. Every asset after that is written from it.', 'var(--violet)'],
+              [<Wand2 size={17} />, 'Creative briefs a model can render',
+               'Ten-second vertical shots built for what video models actually produce — one subject, one camera move, no unreadable interface text. Copy the brief into Veo, Flow, Runway or Kling.', 'var(--blue)'],
+              [<Eye size={17} />, 'Captions that know the visual',
+               'Each caption is written from your brand profile plus a description of the specific asset attached, so it speaks to what is on screen instead of the category in general.', 'var(--pink)'],
+              [<Send size={17} />, 'Publishing with a real delivery log',
+               'Facebook Pages and Instagram, including Reels. Every attempt is recorded per platform with the reason if it failed — no post that silently went nowhere.', 'var(--green)'],
+              [<Clock size={17} />, 'Runs on your schedule',
+               'Every two hours, or whatever interval you choose. Auto-approve is off until you switch it on, so nothing reaches an audience you have not approved.', 'var(--violet)'],
+              [<CheckCircle2 size={17} />, 'Email campaigns from the same brain',
+               'Drafts written from the same profile, sent from your own domain, to your own subscriber list — with edit and preview before anything goes out.', 'var(--blue)'],
+            ].map(([icon, t, b, c]) => (
+              <div key={t} className="glass glass-lift" style={{ padding: '1.85rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${c}14`, border: `1px solid ${c}2e`, color: c, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                  {icon}
+                </div>
+                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 690 }}>{t}</h3>
+                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{b}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* BUSINESS TYPES */}
+      <section>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="eyebrow">Built for how you sell</span>
+            <h2 className="h2" style={{ margin: '1.1rem auto .9rem', maxWidth: 720 }}>
+              A SaaS and a skincare brand should not post the same way
+            </h2>
+            <p className="lede" style={{ maxWidth: 620, margin: '0 auto' }}>
+              Pick your model at setup and the pipeline changes behind it — the creative
+              direction, the framework the copy uses, and where the subject comes from.
+            </p>
+          </div>
+
+          <div className="grid g3">
+            {[
+              ['💻', 'SaaS & Data', 'var(--blue)',
+               'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.'],
+              ['🛒', 'E-commerce', 'var(--violet)',
+               'Point it at your product feed and it rotates through your catalog, one product at a time, writing problem-solution copy against that product\'s own details rather than your brand blurb.'],
+              ['🤖', 'AI Influencer', 'var(--pink)',
+               'Writes in first person as the persona, not as a company. Keep a character reference on file and the visuals stay recognisably the same face across posts.'],
+              ['🎨', 'Creators & Agencies', 'var(--green)',
+               'Run several brands from one login, each with its own profile, media library, connected accounts and schedule. Nothing bleeds between them.'],
+              ['🏪', 'Local Business', 'var(--violet)',
+               'Real places and real hands rather than stock polish. The creative direction leans on materials, light and the moment a customer reacts — which is what these models render best.'],
+              ['📚', 'Education & Coaching', 'var(--blue)',
+               'The strongest shot is the face at the moment of understanding, not a graduation stock photo. Copy leads with the specific thing someone will be able to do.'],
+            ].map(([emoji, t, c, b]) => (
+              <div key={t} className="glass glass-lift" style={{ padding: '1.85rem' }}>
+                <div style={{ fontSize: '1.7rem', marginBottom: '.85rem', lineHeight: 1 }}>{emoji}</div>
+                <h3 style={{ fontSize: '1.04rem', marginBottom: '.55rem', fontWeight: 690, color: c }}>{t}</h3>
+                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{b}</p>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ textAlign: 'center', marginTop: '2.2rem', fontSize: '.88rem', color: 'var(--ink-faint)' }}>
+            Not on the list? The general pipeline handles any business with a website — the
+            profile is built from your own words either way.
+          </p>
         </div>
       </section>
 
