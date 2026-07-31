@@ -128,6 +128,7 @@ class BusinessProfile(Base):
     medias = relationship('Media', back_populates='businessProfile', cascade='all, delete-orphan')
     marketinglogs = relationship('MarketingLog', back_populates='businessProfile', cascade='all, delete-orphan')
     socialconnections = relationship('SocialConnection', back_populates='businessProfile', cascade='all, delete-orphan')
+    prompt_versions = relationship('PromptVersion', back_populates='business_profile', cascade='all, delete-orphan')
 
 class VideoApiConfig(Base):
     __tablename__ = "VideoApiConfig"

@@ -401,6 +401,8 @@ from routers.auth import verify_user  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+# Prompt Engine router import
+from prompt_engine.router import router as prompt_engine_router  # noqa: E402
 
 
 def _get_rate_limit_key(request: Request) -> str:
@@ -434,6 +436,8 @@ app.include_router(ecommerce.router)
 app.include_router(creative_api.router)
 app.include_router(team.router)
 app.include_router(meta_oauth.router)
+# Prompt Engine router inclusion
+app.include_router(prompt_engine_router)
 
 
 # =============================================================================
