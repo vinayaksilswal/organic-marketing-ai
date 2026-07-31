@@ -28,6 +28,7 @@ from prompt_engine.db_models import PromptVersion, PromptValidationLog, ModelRou
 from prompt_engine.compilers import compile_video_prompt
 from prompt_engine.validator import validate_video_prompt, validate_caption
 from prompt_engine.caption_generator import generate_caption_via_llm
+from prompt_engine.scene_writer import write_scene
 
 from database import BusinessProfile, SocialPost, get_tenant_session
 
@@ -119,6 +120,27 @@ async def generate_video_prompt(
         target_model = (payload.model_name or "runway").lower().strip()
 
         # Compile brief using model-specific compiler
+        # Let the model write the shot before the compiler formats it. Without
+        # this the compilers fill f-string templates — "a single subject in an
+        # isolated setting" — which is structurally valid and creatively dead.
+        # Previous prompts are passed so successive ads for one brand differ.
+        recent = (await session.execute(
+            select(PromptVersion.positive_prompt)
+            .where(PromptVersion.businessProfileId == bp.id)
+            .order_by(PromptVersion.createdAt.desc())
+            .limit(5)
+        )).scalars().all()
+
+        scene_fields = await write_scene(
+            intent=payload.intent,
+            business_name=bp.name,
+            what_it_does=bp.description,
+            audience_motivator=payload.customer_motivator or bp.targetAudience,
+            brand_aesthetic=payload.brand_aesthetic or bp.toneOfVoice,
+            primary_offer=bp.primaryOffer,
+            recent_scenes=[r for r in recent if r],
+        )
+
         compiled_payload = compile_video_prompt(
             model_name=target_model,
             intent=payload.intent,
@@ -127,6 +149,7 @@ async def generate_video_prompt(
             primary_offer=bp.primaryOffer,
             product_image_base64=payload.product_image_base64,
             seed=payload.seed,
+            scene_fields=scene_fields,
         )
 
         # Determine next version number for this BusinessProfile

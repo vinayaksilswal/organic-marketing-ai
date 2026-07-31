@@ -25,6 +25,14 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 
 from database import Base
 
+# database.py deliberately does not import prompt_engine — a forward reference
+# from the data layer to an application package pulled the FastAPI router into
+# the Alembic migration process and broke deploys. The consequence here is that
+# the prompt-engine tables are only in Base.metadata once their module is
+# imported, so create_all() below would silently omit them. Production gets
+# them from migration 016; tests import them explicitly.
+from prompt_engine import db_models  # noqa: E402,F401
+
 
 @pytest_asyncio.fixture
 async def db_engine():

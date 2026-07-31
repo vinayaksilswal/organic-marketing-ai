@@ -98,6 +98,7 @@ def compile_runway_prompt(
     brand_aesthetic: Optional[str] = None,
     camera_vector: Optional[str] = None,
     primary_offer: Optional[str] = None,
+    scene_fields: Optional[dict] = None,
 ) -> ModelPromptPayload:
     """Compile brief for Runway Gen-3/Gen-4.
 
@@ -113,9 +114,26 @@ def compile_runway_prompt(
     aesthetic = brand_aesthetic or "Warm cinematic lighting, professional 8k photography, high contrast"
     offer = primary_offer or "Modern premium aesthetic"
 
-    scene = f"A single subject in an isolated setting illustrating {intent}. {aesthetic}."
-    action = f"The subject performs one smooth, continuous linear motion highlighting {offer}."
-    detail = "Ultra-detailed textures, ambient atmosphere, sharp focus, continuous vertical 9:16 frame."
+    if scene_fields:
+        # Written content: a specific person, a specific action, a specific
+        # room. The template branch below is the degraded fallback.
+        camera = scene_fields.get("camera") or camera
+        subject = scene_fields.get("subject") or "a single subject"
+        scene = f"{subject} in {scene_fields.get('environment') or 'an isolated setting'}."
+        action = f"{scene_fields.get('action') or ''}."
+        quoted = scene_fields.get("onscreen_text")
+        detail_bits = [scene_fields.get("mood") or aesthetic]
+        if quoted:
+            detail_bits.append(f'the words "{quoted}" appear once')
+        detail_bits.append("shallow depth of field, vertical 9:16 frame")
+        detail = ", ".join(b for b in detail_bits if b) + "."
+    else:
+        # Placeholder text — "a single subject in an isolated setting" names
+        # nobody and nowhere, so it renders as generic mush. Only reached when
+        # the scene writer is unavailable.
+        scene = f"A single subject in an isolated setting illustrating {intent}. {aesthetic}."
+        action = f"The subject performs one smooth, continuous linear motion highlighting {offer}."
+        detail = "Ultra-detailed textures, ambient atmosphere, sharp focus, continuous vertical 9:16 frame."
 
     # Combine into strict linear format
     raw_positive = f"{camera}: {scene} {action} {detail}"
@@ -392,14 +410,22 @@ def compile_video_prompt(
     product_image_base64: Optional[str] = None,
     seed: Optional[int] = None,
     audio_descriptor: Optional[str] = None,
+    scene_fields: Optional[dict] = None,
 ) -> ModelPromptPayload:
-    """Main routing entry point for compiling target model video briefs."""
+    """Main routing entry point for compiling target model video briefs.
+
+    scene_fields carries LLM-written creative content (camera, subject, action,
+    environment, mood, on-screen text). When absent the compilers fall back to
+    templates, which are structurally valid but generic — see
+    prompt_engine/scene_writer.py for why that matters.
+    """
     normalized_model = (model_name or "runway").lower().strip()
 
     if normalized_model in ("runway", "gen3", "gen4", "runwayml"):
-        return compile_runway_prompt(intent, brand_aesthetic, camera_vector, primary_offer)
+        return compile_runway_prompt(intent, brand_aesthetic, camera_vector, primary_offer, scene_fields)
     elif normalized_model in ("kling", "kling_ai", "omni"):
-        return compile_kling_prompt(intent, brand_aesthetic, camera_vector, product_image_base64, seed, audio_descriptor)
+        return compile_kling_prompt(intent, brand_aesthetic, camera_vector, product_image_base64, seed,
+                                    audio_descriptor or (scene_fields or {}).get('audio'))
     elif normalized_model in ("veo", "veo3", "veo3.1", "google_veo"):
         return compile_veo_prompt(intent, brand_aesthetic, camera_vector)
     elif normalized_model in ("sora", "sora2", "openai_sora"):
@@ -408,4 +434,4 @@ def compile_video_prompt(
         return compile_pika_prompt(intent, brand_aesthetic, camera_vector)
     else:
         # Fallback to Runway linear format
-        return compile_runway_prompt(intent, brand_aesthetic, camera_vector, primary_offer)
+        return compile_runway_prompt(intent, brand_aesthetic, camera_vector, primary_offer, scene_fields)
