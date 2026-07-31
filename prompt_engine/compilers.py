@@ -371,7 +371,7 @@ Product Feature: {product_feature}
 "Are you looking for the perfect solution? Look no further!" (Fails: Rhetorical question, generic closer).
 
 [OUTPUT RULES]
-LENGTH: Maximum 3 sentences. Use line breaks between each sentence.
+LENGTH: Maximum 3 sentences. Total character count must be under 250 characters. Use line breaks between each sentence.
 HOOK: The first sentence must directly address the "{customer_motivator}" using a concrete scenario, without naming the demographic label.
 SPECIFICITY: You must use at least one specific entity (number, proprietary feature, or location) derived strictly from the Brand Language Anchor.
 TONE: Write from the perspective of the brand itself, not a third-party reviewer.

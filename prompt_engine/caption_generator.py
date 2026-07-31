@@ -82,6 +82,15 @@ def _clean_llm_output(raw: str) -> str:
        (text.startswith("'") and text.endswith("'")):
         text = text[1:-1].strip()
 
+    # Truncate to 300 characters at sentence boundary if LLM was too verbose
+    if len(text) > 300:
+        truncated = text[:300]
+        last_period = max(truncated.rfind('.'), truncated.rfind('!'), truncated.rfind('?'))
+        if last_period > 100:
+            text = truncated[:last_period + 1].strip()
+        else:
+            text = truncated.strip()
+
     return text
 
 
