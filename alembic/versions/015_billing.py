@@ -78,12 +78,39 @@ def upgrade() -> None:
         )
     """)
 
+    # The CREATE TABLE above only runs on a database that does not already have
+    # these tables. Production's schema is built by create_all at application
+    # startup, and SQLAlchemy's `Column(..., default=False)` is a PYTHON-side
+    # default — it emits NOT NULL with no DEFAULT clause. So the deployed table
+    # can have NOT NULL columns that no database default will fill.
+    #
+    # Align them, so the schema matches what this migration declares and any
+    # future raw INSERT behaves the same on both paths.
+    # Separate blocks: a PL/pgSQL exception handler rolls back everything in
+    # its block, so pairing these would let one failure undo the other.
+    op.execute("""
+        DO $$ BEGIN
+            ALTER TABLE "Subscription" ALTER COLUMN "cancelAtPeriodEnd" SET DEFAULT FALSE;
+        EXCEPTION WHEN undefined_column OR undefined_table THEN NULL;
+        END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            ALTER TABLE "UsageCounter" ALTER COLUMN count SET DEFAULT 0;
+        EXCEPTION WHEN undefined_column OR undefined_table THEN NULL;
+        END $$
+    """)
+
     # Anyone already marked ACTIVE paid for something. Grandfather them onto
     # the starter plan rather than cutting off access at deploy time.
+    #
+    # Every NOT NULL column is listed explicitly rather than left to a default,
+    # because as above the deployed table may not carry one.
     op.execute("""
-        INSERT INTO "Subscription" (id, "userId", "planCode", status, "createdAt", "updatedAt")
+        INSERT INTO "Subscription"
+            (id, "userId", "planCode", status, "cancelAtPeriodEnd", "createdAt", "updatedAt")
         SELECT
-            'grandfathered-' || u.id, u.id, 'starter', 'ACTIVE', NOW(), NOW()
+            'grandfathered-' || u.id, u.id, 'starter', 'ACTIVE', FALSE, NOW(), NOW()
           FROM "User" u
          WHERE u."subscriptionStatus" = 'ACTIVE'
            AND NOT EXISTS (SELECT 1 FROM "Subscription" s WHERE s."userId" = u.id)
