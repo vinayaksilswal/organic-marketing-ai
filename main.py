@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -540,6 +541,75 @@ async def get_public_stats() -> dict:
             "platforms": 4,
             "setupMinutes": 2,
         }
+
+
+# The landing page demo used to be a setTimeout over a hardcoded template
+# string, presented as "see what our AI can generate for your brand". This runs
+# the real caption writer so the demo is the product.
+#
+# Rate limited per IP because it is unauthenticated and every call costs an AI
+# request. In-memory is adequate: the service runs one worker, and the worst
+# case of a reset is a visitor getting a few extra tries.
+_DEMO_CALLS: dict[str, list[float]] = {}
+_DEMO_LIMIT = 3
+_DEMO_WINDOW_SECONDS = 3600
+
+
+class DemoCaptionRequest(BaseModel):
+    businessName: str
+    businessModel: str = "SaaS"
+    description: str = ""
+
+
+@app.post("/api/public/demo-caption", tags=["Public"])
+async def public_demo_caption(data: DemoCaptionRequest, request: Request) -> dict:
+    """Write one real caption for an unregistered visitor's business."""
+    import time
+
+    name = (data.businessName or "").strip()[:80]
+    if not name:
+        raise HTTPException(status_code=400, detail="Enter your business name.")
+
+    client_ip = (
+        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+    now = time.time()
+    hits = [t for t in _DEMO_CALLS.get(client_ip, []) if now - t < _DEMO_WINDOW_SECONDS]
+    if len(hits) >= _DEMO_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="You have used the free preview a few times. Create an account to keep going — it is free.",
+        )
+    hits.append(now)
+    _DEMO_CALLS[client_ip] = hits
+
+    # A throwaway profile so the real writer runs against real inputs.
+    class _DemoProfile:
+        id = None
+        name = data.businessName.strip()[:80]
+        description = (data.description or "").strip()[:400]
+        websiteUrl = ""
+        industry = (data.businessModel or "SaaS")[:60]
+        businessModel = (data.businessModel or "SaaS")[:60]
+        niche = ""
+        targetAudience = ""
+        toneOfVoice = "clear, specific, no hype"
+        contentPillars = []
+        suggestedHashtags = []
+        primaryOffer = None
+
+    try:
+        from routers.marketing import _generate_post_caption
+
+        caption = await _generate_post_caption(_DemoProfile(), None)
+        return {"success": True, "caption": caption, "remaining": _DEMO_LIMIT - len(hits)}
+    except Exception:
+        logger.exception("Public demo caption failed")
+        raise HTTPException(
+            status_code=503,
+            detail="The AI is busy right now. Please try again in a moment.",
+        )
 
 
 @app.get("/api/public/recent-activity", tags=["Public"])
