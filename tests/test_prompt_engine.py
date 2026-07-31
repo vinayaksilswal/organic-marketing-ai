@@ -134,7 +134,7 @@ def test_compile_veo_prompt():
 def test_compile_veo_prompt_no_text_in_context():
     """Veo context field should suppress background text."""
     payload = compile_veo_prompt(intent="Show product")
-    assert "no visible text" in payload.model_specific_payload["ingredients"]["context"].lower() or \
+    assert "free of text" in payload.model_specific_payload["ingredients"]["context"].lower() or \
            "no text" in payload.model_specific_payload["ingredients"]["context"].lower()
 
 

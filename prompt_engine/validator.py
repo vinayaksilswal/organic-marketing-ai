@@ -66,7 +66,7 @@ MULTI_SUBJECT_PATTERNS = [
 BACKGROUND_TEXT_REQUEST_PATTERNS = [
     r"\bshow text\b", r"\bdisplay text\b", r"\btext overlay\b",
     r"\bon-screen text\b", r"\bshow signage\b", r"\bdisplay signage\b",
-    r"\bbillboard\b", r"\bbanner text\b", r"\bproduct label\b", r"\bvisible text\b",
+    r"\bbillboard\b", r"\bbanner text\b", r"\bproduct label\b",
 ]
 
 

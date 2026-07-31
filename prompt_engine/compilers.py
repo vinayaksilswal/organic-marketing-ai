@@ -223,7 +223,7 @@ def compile_veo_prompt(
     - Explicit background text suppression in context (Finding 4).
     """
     subject = f"One human subject engaged in {intent}"
-    context = "Clean, modern, uncluttered interior environment with no visible text or signage"
+    context = "Clean, modern, uncluttered interior environment free of text and signage"
     action = f"Continuous linear physical interaction under {camera_vector or 'static tripod shot'}"
     style = brand_aesthetic or "Photorealistic 8k, cinematic vertical 9:16 aspect ratio"
 
