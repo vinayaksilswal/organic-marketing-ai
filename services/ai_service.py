@@ -123,7 +123,42 @@ async def _call_openrouter_once(
         response = await client.post(OPENROUTER_URL, headers=headers, json=payload)
         response.raise_for_status()
         result = response.json()
-        content = result["choices"][0]["message"]["content"].strip()
+
+        # OpenRouter answers 200 with an {"error": {...}} body when a model
+        # rejects the request — an unsupported response_format, a moderation
+        # block, an upstream provider being down. Indexing straight into
+        # ["choices"] turned all of those into a bare KeyError, so the log said
+        # only "unavailable (KeyError)" and the actual reason was lost. The
+        # 550B model at the head of the chain failed this way on every call and
+        # nobody could see why.
+        if "choices" not in result:
+            err = result.get("error")
+            if isinstance(err, dict):
+                detail = err.get("message") or str(err)
+                code = err.get("code")
+                raise RuntimeError(
+                    f"{model} rejected the request"
+                    + (f" [{code}]" if code else "")
+                    + f": {str(detail)[:300]}"
+                )
+            raise RuntimeError(
+                f"{model} returned no choices: {str(result)[:300]}"
+            )
+
+        choices = result["choices"]
+        if not choices:
+            raise RuntimeError(f"{model} returned an empty choices list")
+
+        message = choices[0].get("message") or {}
+        content = (message.get("content") or "").strip()
+        if not content:
+            # Some models put the text under a reasoning field, or return an
+            # empty assistant turn when they refuse.
+            finish = choices[0].get("finish_reason")
+            raise RuntimeError(
+                f"{model} returned empty content"
+                + (f" (finish_reason={finish})" if finish else "")
+            )
         return content
 
 
@@ -251,6 +286,27 @@ async def _call_openrouter(
                     logger.info(f"LLM succeeded on fallback model {candidate} after {tried} failed")
                 return result
         except Exception as e:
+            # Not every free model supports response_format. Skipping the model
+            # outright costs us the strongest option in the chain for every
+            # JSON call, so retry it once in plain text — the callers already
+            # tolerate a bare JSON object without the response_format hint.
+            if json_response and "response_format" in str(e).lower():
+                try:
+                    result = await _call_openrouter_once(
+                        prompt,
+                        model=candidate,
+                        json_response=False,
+                        system_prompt=system_prompt,
+                    )
+                    if result:
+                        logger.info(
+                            f"LLM model {candidate} does not support response_format; "
+                            "succeeded without it"
+                        )
+                        return result
+                except Exception as retry_exc:
+                    e = retry_exc
+
             tried.append(candidate)
             status = getattr(getattr(e, "response", None), "status_code", None)
             # 429/5xx are capacity problems worth retrying elsewhere; a 401 or
@@ -258,7 +314,12 @@ async def _call_openrouter(
             if status in (400, 401, 403):
                 logger.error(f"LLM request rejected ({status}) — not retrying other models")
                 break
-            logger.warning(f"LLM model {candidate} unavailable ({status or type(e).__name__}); trying next")
+            # Log the reason, not just the exception class. "unavailable
+            # (KeyError)" told us nothing across dozens of production calls.
+            logger.warning(
+                f"LLM model {candidate} unavailable "
+                f"({status or type(e).__name__}): {str(e)[:250]}; trying next"
+            )
 
     try:
         gemini = await _call_gemini(prompt, json_response=json_response, system_prompt=system_prompt)
