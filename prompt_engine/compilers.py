@@ -49,6 +49,16 @@ def _enforce_background_text_suppression(text: str) -> str:
     lowered = text.lower()
     if any(phrase in lowered for phrase in suppression_phrases):
         return text
+
+    # When the brief deliberately asks for one short line on screen, a blanket
+    # "free of text" clause contradicts it in the same prompt and the model has
+    # to pick a winner. Suppress only the incidental text — background signage
+    # and product labels — which is the part that renders as scribble anyway.
+    has_intentional_text = re.search(r'the words? "[^"]+" appear', text, re.IGNORECASE)
+    if has_intentional_text:
+        return text.rstrip(".") + (
+            ". No other text: background signage and product labels stay blank."
+        )
     return text.rstrip(".") + ". Clean surfaces free of text, signage, and labels."
 
 
