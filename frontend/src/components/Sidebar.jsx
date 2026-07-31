@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LogOut } from 'lucide-react';
+import { API_BASE, authFetch } from '../config';
 
-const Sidebar = ({ user, activeWorkspaceId, onWorkspaceChange }) => {
+const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }) => {
   const workspaces = user?.businessProfiles || [];
   const navigate = useNavigate();
   const currentWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
+
+  // The badge here read "Enterprise Plan" for every account, including free
+  // ones. Now that plans are real and metered, show the plan the user is
+  // actually on — a made-up tier is both a lie and a lost upgrade prompt.
+  const [planName, setPlanName] = useState(null);
+  useEffect(() => {
+    if (!token) return;
+    authFetch(`${API_BASE}/billing/me`, {}, token)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.plan?.name) setPlanName(d.plan.name); })
+      .catch(() => {});
+  }, [token]);
 
   return (
     <aside className="sidebar" style={{
@@ -138,12 +151,35 @@ const Sidebar = ({ user, activeWorkspaceId, onWorkspaceChange }) => {
         <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-color), #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>
           {user?.email?.[0].toUpperCase() || 'U'}
         </div>
-        <div style={{ overflow: 'hidden', flex: 1 }}>
+        <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user?.email}</p>
-          <span style={{ fontSize: '0.7rem', color: 'var(--success)', background: 'rgba(16, 185, 129, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-block', fontWeight: '600' }}>
-            Enterprise Plan
+          <span
+            onClick={() => navigate('/dashboard/billing')}
+            title="View plan and usage"
+            style={{ fontSize: '0.7rem', color: 'var(--success)', background: 'rgba(16, 185, 129, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', display: 'inline-block', fontWeight: '600', cursor: 'pointer' }}
+          >
+            {planName ? `${planName} plan` : 'View plan'}
           </span>
         </div>
+
+        {/* There was no way to sign out anywhere in the product. onLogout was
+            passed down and never wired to anything, which on a shared machine
+            means the next person is already logged in as you. */}
+        <button
+          onClick={() => {
+            if (window.confirm('Sign out of OrganicAI?')) onLogout?.();
+          }}
+          title="Sign out"
+          aria-label="Sign out"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer', padding: '0.45rem',
+            borderRadius: 8, color: 'var(--text-muted)', display: 'flex', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--error)'; e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none'; }}
+        >
+          <LogOut size={17} />
+        </button>
       </div>
     </aside>
   );

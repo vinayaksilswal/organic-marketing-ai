@@ -23,10 +23,12 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-dark)' }}>
-      <Sidebar 
-        user={userWithWorkspaces} 
-        activeWorkspaceId={activeWorkspaceId} 
-        onWorkspaceChange={setActiveWorkspace} 
+      <Sidebar
+        user={userWithWorkspaces}
+        token={token}
+        activeWorkspaceId={activeWorkspaceId}
+        onWorkspaceChange={setActiveWorkspace}
+        onLogout={onLogout}
       />
       
       <div style={{ flex: 1, marginLeft: '260px', overflowY: 'auto' }}>
