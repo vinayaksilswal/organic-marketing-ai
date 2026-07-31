@@ -600,3 +600,29 @@ async def get_tenant_session(workspace_id: str) -> AsyncSession:
                 {"ws": workspace_id},
             )
         yield session
+
+
+# =============================================================================
+# Late model registration
+# =============================================================================
+# BusinessProfile declares relationship('PromptVersion', ...) but that class is
+# defined in prompt_engine/db_models.py. SQLAlchemy resolves relationship
+# targets by name at mapper-configuration time, so the module must have been
+# imported by then or configuration fails with:
+#
+#   InvalidRequestError: expression 'PromptVersion' failed to locate a name
+#
+# The FastAPI app happened to survive because main.py imports the prompt engine
+# router, but the ARQ worker imports only `database` — so the scheduled
+# automation process crashed the first time it touched a BusinessProfile.
+#
+# Importing here, at the end of the module, makes the mapping resolvable from
+# every entry point. The import is circular by design and safe: db_models needs
+# only Base, generate_uuid and utc_now, all defined above.
+try:  # pragma: no cover - exercised by every process that imports database
+    from prompt_engine import db_models as _prompt_engine_models  # noqa: E402,F401
+except Exception:  # pragma: no cover
+    logger.warning(
+        "prompt_engine.db_models could not be imported; PromptVersion-backed "
+        "relationships will be unavailable"
+    )

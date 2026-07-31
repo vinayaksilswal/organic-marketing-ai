@@ -551,7 +551,9 @@ async def test_caption_generator_llm_failure_falls_back(mock_business_profile):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_api_prompt_video_and_retrieval(client, db_session):
+async def test_api_prompt_video_and_retrieval(authed_client, db_session):
+    client, login = authed_client
+    login('ws_api_test')
     # Setup BusinessProfile
     bp = BusinessProfile(
         id="bp_api_test",
@@ -564,7 +566,7 @@ async def test_api_prompt_video_and_retrieval(client, db_session):
     db_session.add(bp)
     await db_session.commit()
 
-    headers = {"X-Workspace-Id": "ws_api_test"}
+    headers = {"X-Workspace-Id": "bp_api_test"}
     payload = {
         "business_profile_id": "bp_api_test",
         "intent": "Demonstrate face oil application",
@@ -572,7 +574,7 @@ async def test_api_prompt_video_and_retrieval(client, db_session):
         "brand_aesthetic": "Warm daylight",
     }
 
-    resp = await client.post("/prompt/video", json=payload, headers=headers)
+    resp = await client.post("/api/v1/prompt/video", json=payload, headers=headers)
     if resp.status_code != 200:
         print("VIDEO 422 DETAIL:", resp.json())
     assert resp.status_code == 200
@@ -582,18 +584,20 @@ async def test_api_prompt_video_and_retrieval(client, db_session):
     prompt_id = data["id"]
 
     # Retrieve prompt by ID
-    get_resp = await client.get(f"/prompt/{prompt_id}", headers=headers)
+    get_resp = await client.get(f"/api/v1/prompt/{prompt_id}", headers=headers)
     assert get_resp.status_code == 200
     assert get_resp.json()["id"] == prompt_id
 
     # Retrieve prompt validation log by ID
-    val_resp = await client.get(f"/prompt/{prompt_id}/validation", headers=headers)
+    val_resp = await client.get(f"/api/v1/prompt/{prompt_id}/validation", headers=headers)
     assert val_resp.status_code == 200
     assert val_resp.json()["is_valid"] is True
 
 
 @pytest.mark.asyncio
-async def test_api_prompt_caption(client, db_session):
+async def test_api_prompt_caption(authed_client, db_session):
+    client, login = authed_client
+    login('ws_cap_test')
     bp = BusinessProfile(
         id="bp_cap_test",
         userId="ws_cap_test",
@@ -605,7 +609,7 @@ async def test_api_prompt_caption(client, db_session):
     db_session.add(bp)
     await db_session.commit()
 
-    headers = {"X-Workspace-Id": "ws_cap_test"}
+    headers = {"X-Workspace-Id": "bp_cap_test"}
     payload = {
         "business_profile_id": "bp_cap_test",
         "product_feature": "100% Organic Vitamin C Serum",
@@ -614,7 +618,7 @@ async def test_api_prompt_caption(client, db_session):
         "website_rag_context": ["100% Organic Vitamin C Serum"],
     }
 
-    resp = await client.post("/prompt/caption", json=payload, headers=headers)
+    resp = await client.post("/api/v1/prompt/caption", json=payload, headers=headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["is_valid"] is True
@@ -623,7 +627,9 @@ async def test_api_prompt_caption(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_api_caption_validate_standalone(client, db_session):
+async def test_api_caption_validate_standalone(authed_client, db_session):
+    client, login = authed_client
+    login('ws_val_test')
     bp = BusinessProfile(
         id="bp_val_test",
         userId="ws_val_test",
@@ -635,25 +641,27 @@ async def test_api_caption_validate_standalone(client, db_session):
     db_session.add(bp)
     await db_session.commit()
 
-    headers = {"X-Workspace-Id": "ws_val_test"}
+    headers = {"X-Workspace-Id": "bp_val_test"}
     payload = {
         "business_profile_id": "bp_val_test",
         "caption": "Our Analytics Platform delivers real-time insights.\n\nBuilt for scale.",
         "website_rag_context": ["Analytics Platform"],
     }
 
-    resp = await client.post("/prompt/caption/validate", json=payload, headers=headers)
+    resp = await client.post("/api/v1/prompt/caption/validate", json=payload, headers=headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["is_valid"] is True
 
 
 @pytest.mark.asyncio
-async def test_api_ci_golden_dataset_eval(client):
-    headers = {"X-Workspace-Id": "ws_ci_test"}
+async def test_api_ci_golden_dataset_eval(authed_client):
+    client, login = authed_client
+    login('ws_ci_test')
+    headers = {}
     payload = {"dataset_name": "default_golden_dataset"}
 
-    resp = await client.post("/prompt/eval/ci", json=payload, headers=headers)
+    resp = await client.post("/api/v1/prompt/eval/ci", json=payload, headers=headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_samples"] > 0

@@ -7,9 +7,12 @@ FTC claim substantiation gates, validation retrieval, and CI/CD golden dataset e
 from __future__ import annotations
 
 from typing import Dict, Any, List
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from routers.auth import verify_user
 
 from prompt_engine.models import (
     PromptCreateRequest,
@@ -28,7 +31,19 @@ from prompt_engine.caption_generator import generate_caption_via_llm
 
 from database import BusinessProfile, SocialPost, get_tenant_session
 
-router = APIRouter(prefix="/prompt", tags=["PromptEngine"])
+# These endpoints run paid LLM calls and write rows against a workspace taken
+# from a request header. Without authentication anyone could burn AI credit and
+# write into another tenant's data by guessing a workspace id, so the whole
+# router requires a valid session and every handler verifies ownership against
+# the authenticated user rather than trusting the header alone.
+#
+# Mounted under /api/v1 to match every other authenticated surface; the bare
+# /prompt prefix sat outside the versioned API.
+router = APIRouter(
+    prefix="/api/v1/prompt",
+    tags=["PromptEngine"],
+    dependencies=[Depends(verify_user)],
+)
 
 
 async def _get_business_profile(session: AsyncSession, business_profile_id: str) -> BusinessProfile:
@@ -40,25 +55,43 @@ async def _get_business_profile(session: AsyncSession, business_profile_id: str)
     return bp
 
 
+async def _assert_owns_workspace(session: AsyncSession, workspace_id: str, user_id: str) -> BusinessProfile:
+    """Confirm the caller owns the workspace they named in the header.
+
+    The header is client-supplied, so on its own it is a claim, not proof.
+    """
+    bp = await _get_business_profile(session, workspace_id)
+    if bp.userId != user_id:
+        raise HTTPException(status_code=403, detail="That workspace is not yours")
+    return bp
+
+
 async def _get_recent_captions(session: AsyncSession, business_profile_id: str, limit: int = 50) -> List[str]:
     """Retrieve the last N published captions for near-duplicate detection.
 
     Queries the SocialPost table for the most recent posts belonging to this
     business profile and extracts their caption text.
     """
+    # SocialPost stores the text in `caption`; there is no `content` column, so
+    # this query raised AttributeError and the except swallowed it — meaning
+    # near-duplicate detection silently compared every caption against an empty
+    # list and never fired. Ordering is by scheduledAt because SocialPost has no
+    # createdAt either.
     try:
         stmt = (
-            select(SocialPost.content)
+            select(SocialPost.caption)
             .where(SocialPost.businessProfileId == business_profile_id)
-            .where(SocialPost.content.isnot(None))
-            .order_by(SocialPost.createdAt.desc())
+            .where(SocialPost.caption.isnot(None))
+            .order_by(SocialPost.scheduledAt.desc())
             .limit(limit)
         )
         result = await session.execute(stmt)
-        captions = [row[0] for row in result.all() if row[0]]
-        return captions
+        return [row[0] for row in result.all() if row[0]]
     except Exception:
-        # If the table doesn't have the expected columns, return empty
+        logger.exception(
+            "Could not load recent captions for near-duplicate detection; "
+            "the check will pass by default this run"
+        )
         return []
 
 
@@ -66,6 +99,7 @@ async def _get_recent_captions(session: AsyncSession, business_profile_id: str, 
 async def generate_video_prompt(
     payload: PromptCreateRequest,
     request: Request,
+    user_id: str = Depends(verify_user),
 ) -> PromptCreateResponse:
     """Create a deterministic model-compiled video brief for a BusinessProfile.
 
@@ -77,6 +111,7 @@ async def generate_video_prompt(
         raise HTTPException(status_code=400, detail="Workspace ID header missing")
 
     async with get_tenant_session(workspace_id) as session:
+        await _assert_owns_workspace(session, workspace_id, user_id)
         bp = await _get_business_profile(session, payload.business_profile_id)
         if bp.id != workspace_id and bp.userId != workspace_id:
             raise HTTPException(status_code=403, detail="BusinessProfile does not belong to workspace")
@@ -155,6 +190,7 @@ async def generate_video_prompt(
 async def generate_caption(
     payload: CaptionCreateRequest,
     request: Request,
+    user_id: str = Depends(verify_user),
 ) -> CaptionCreateResponse:
     """Generate a direct-response motivator-based caption for a BusinessProfile.
 
@@ -168,6 +204,7 @@ async def generate_caption(
         raise HTTPException(status_code=400, detail="Workspace ID header missing")
 
     async with get_tenant_session(workspace_id) as session:
+        await _assert_owns_workspace(session, workspace_id, user_id)
         bp = await _get_business_profile(session, payload.business_profile_id)
         if bp.id != workspace_id and bp.userId != workspace_id:
             raise HTTPException(status_code=403, detail="BusinessProfile does not belong to workspace")
@@ -243,6 +280,7 @@ async def generate_caption(
 async def validate_caption_standalone(
     payload: CaptionValidateRequest,
     request: Request,
+    user_id: str = Depends(verify_user),
 ) -> PromptValidationResult:
     """Validate an already-written caption without generating one.
 
@@ -254,6 +292,7 @@ async def validate_caption_standalone(
         raise HTTPException(status_code=400, detail="Workspace ID header missing")
 
     async with get_tenant_session(workspace_id) as session:
+        await _assert_owns_workspace(session, workspace_id, user_id)
         bp = await _get_business_profile(session, payload.business_profile_id)
         if bp.id != workspace_id and bp.userId != workspace_id:
             raise HTTPException(status_code=403, detail="BusinessProfile does not belong to workspace")
@@ -276,6 +315,7 @@ async def validate_caption_standalone(
 async def get_prompt(
     prompt_id: str,
     request: Request,
+    user_id: str = Depends(verify_user),
 ) -> PromptCreateResponse:
     """Retrieve a stored PromptVersion by ID."""
     workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
@@ -283,6 +323,7 @@ async def get_prompt(
         raise HTTPException(status_code=400, detail="Workspace ID header missing")
 
     async with get_tenant_session(workspace_id) as session:
+        await _assert_owns_workspace(session, workspace_id, user_id)
         stmt = select(PromptVersion).where(PromptVersion.id == prompt_id)
         pv = (await session.execute(stmt)).scalar_one_or_none()
         if not pv:
@@ -319,6 +360,7 @@ async def get_prompt(
 async def get_prompt_validation(
     prompt_id: str,
     request: Request,
+    user_id: str = Depends(verify_user),
 ) -> PromptValidationResult:
     """Return the most recent validation result for a PromptVersion."""
     workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
@@ -326,6 +368,7 @@ async def get_prompt_validation(
         raise HTTPException(status_code=400, detail="Workspace ID header missing")
 
     async with get_tenant_session(workspace_id) as session:
+        await _assert_owns_workspace(session, workspace_id, user_id)
         stmt = select(PromptVersion).where(PromptVersion.id == prompt_id)
         pv = (await session.execute(stmt)).scalar_one_or_none()
         if not pv:
@@ -362,6 +405,7 @@ async def get_prompt_validation(
 async def run_ci_golden_dataset_evaluation(
     request: Request,
     payload: GoldenDatasetEvalRequest = GoldenDatasetEvalRequest(),
+    user_id: str = Depends(verify_user),
 ) -> GoldenDatasetEvalResponse:
     """CI/CD release gate endpoint running evaluations against the Golden Dataset.
 
@@ -379,6 +423,7 @@ async def run_ci_golden_dataset_evaluation(
     if workspace_id:
         try:
             async with get_tenant_session(workspace_id) as session:
+                await _assert_owns_workspace(session, workspace_id, user_id)
                 stmt = select(GoldenDatasetSample).where(
                     GoldenDatasetSample.dataset_name == (payload.dataset_name or "default_golden_dataset")
                 )

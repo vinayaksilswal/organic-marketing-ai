@@ -77,3 +77,46 @@ async def client(db_engine):
 
     database._sessionmaker = original_sessionmaker
     database.engine = original_engine
+
+
+@pytest_asyncio.fixture
+async def authed_client(db_engine):
+    """A client whose requests are already authenticated.
+
+    Yields (client, login) where login(user_id) sets which user the API sees.
+    Endpoints that verify workspace ownership need the caller identity to match
+    the BusinessProfile.userId under test, so the identity has to be settable
+    per test rather than fixed.
+    """
+    import database
+    from routers.auth import verify_user
+
+    session_factory = async_sessionmaker(
+        bind=db_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    original_sessionmaker = database._sessionmaker
+    original_engine = database.engine
+    database._sessionmaker = session_factory
+    database.engine = db_engine
+
+    state = {"user_id": "test-user"}
+
+    with patch("services.scheduler.create_scheduler") as mock_sched:
+        mock_scheduler = AsyncMock()
+        mock_scheduler.start = lambda: None
+        mock_scheduler.running = False
+        mock_sched.return_value = mock_scheduler
+
+        from main import app
+
+        app.dependency_overrides[verify_user] = lambda: state["user_id"]
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac, (lambda uid: state.__setitem__("user_id", uid))
+        app.dependency_overrides.pop(verify_user, None)
+
+    database._sessionmaker = original_sessionmaker
+    database.engine = original_engine
