@@ -62,11 +62,54 @@ MULTI_SUBJECT_PATTERNS = [
     r"\bbackground extras\b",
 ]
 
+# Props that each pull the model's attention. Finding 3 is about fidelity being
+# divided, and that happens with objects just as much as with extra faces — a
+# phone AND a laptop AND server racks AND an LED strip is four things competing
+# even though only one human is named.
+COMPETING_PROP_PATTERNS = [
+    r"\bphone\b", r"\blaptop\b", r"\bmonitor\b", r"\bscreen\b", r"\btablet\b",
+    r"\bterminal\b", r"\bdashboard\b", r"\bkeyboard\b", r"\bserver rack\b",
+    r"\bled\b", r"\bheadphones\b", r"\bcoffee\b", r"\bnotebook\b", r"\bmug\b",
+]
+MAX_COMPETING_PROPS = 3
+
 # Background text request patterns (Finding 4)
 BACKGROUND_TEXT_REQUEST_PATTERNS = [
     r"\bshow text\b", r"\bdisplay text\b", r"\btext overlay\b",
     r"\bon-screen text\b", r"\bshow signage\b", r"\bdisplay signage\b",
     r"\bbillboard\b", r"\bbanner text\b", r"\bproduct label\b",
+]
+
+# The real failure mode is not the word "text" — it is describing legible
+# screen content without ever using that word. These catch the shape of it:
+# a surface that renders glyphs, plus content described as readable.
+LEGIBLE_SCREEN_PATTERNS = [
+    # A quoted string sitting on a screen-like surface.
+    (r'"[^"]{1,60}"[^.]{0,40}\b(dashboard|screen|monitor|display|app|ui|phone|terminal|badge)\b',
+     'a quoted string rendered on a screen'),
+    (r'\b(dashboard|screen|monitor|display|app|ui|terminal)\b[^.]{0,40}"[^"]{1,60}"',
+     'a screen rendering a quoted string'),
+    # Content described as readable output.
+    (r"\b(tailing|scrolling|streaming|showing|displaying)\b[^.]{0,30}\b(logs?|output|code|json|readout|results?)\b",
+     'readable log or code output'),
+    (r"\b(compliance|status|verified|certified|approved|compliant)\s+badge\b",
+     'a badge whose meaning depends on legible words'),
+    (r"\b(terminal|console|ide|spreadsheet|chart|graph)\b[^.]{0,25}\b(logs?|lines?|rows?|data|code)\b",
+     'legible interface content'),
+]
+
+# Negative payloads embedded in the positive prompt. Finding 8: this belongs in
+# a separate field (Kling, Veo) or nowhere at all (Runway). Inline it is at best
+# ignored and at worst focuses attention on the very thing being suppressed.
+INLINE_NEGATIVE_PATTERNS = [
+    r"\s-v\s", r"\s--no\s", r"\bnegative prompt:", r"\bnegative:",
+]
+
+# Clichés the brief bans but nothing enforced.
+BANNED_VISUAL_CLICHES = [
+    "bloomberg-terminal", "bloomberg terminal", "futuristic holographic",
+    "neon-lit trading floor", "dynamic and vibrant", "flying data particles",
+    "glowing orbs", "neon cityscape", "fish-eye", "holographic dashboard",
 ]
 
 
@@ -235,6 +278,20 @@ def check_model_negative_syntax(
     """Verify negative prompt syntax stratification per model."""
     norm_model = (model_name or "runway").lower().strip()
 
+    # An inline negative payload is wrong for every model: Runway has no
+    # negative parsing at all, and Kling/Veo expect it in a separate field.
+    # This fires regardless of target because the fix is the same — move it out
+    # of the positive prompt. The previous check only looked at the dedicated
+    # negative_prompt argument, so a "-v oversaturated, plastic" suffix sitting
+    # inside the positive string passed silently.
+    for pattern in INLINE_NEGATIVE_PATTERNS:
+        if re.search(pattern, positive_prompt, re.IGNORECASE):
+            return False, (
+                "Negative terms are embedded in the positive prompt. Runway has no "
+                "negative parsing; Kling and Veo expect a separate negative field. "
+                "Move them out of the positive text."
+            )
+
     if norm_model in ("runway", "gen3", "gen4"):
         # Runway rejects negative prompts completely
         if negative_prompt:
@@ -284,7 +341,22 @@ def check_background_text_suppression(positive_prompt: str) -> Tuple[bool, Optio
     lowered = positive_prompt.lower()
     for pattern in BACKGROUND_TEXT_REQUEST_PATTERNS:
         if re.search(pattern, lowered):
-            return False, f"Prompt requests on-screen text/signage which causes rendering artifacts. Remove text requests or use a dedicated text-rendering sub-model."
+            return False, "Prompt requests on-screen text/signage which causes rendering artifacts. Remove text requests or use a dedicated text-rendering sub-model."
+
+    # The explicit list above only fires when the prompt uses the word "text".
+    # The failure that actually reaches production looks like
+    #   thumb taps "Start Free Scan" on the quantcai mobile dashboard
+    # which never says "text" and renders as smeared glyphs regardless.
+    for pattern, what in LEGIBLE_SCREEN_PATTERNS:
+        if re.search(pattern, lowered):
+            return False, (
+                f"Prompt describes {what}. Video models render interface content as "
+                "smeared pseudo-text. Describe screens as light and colour only."
+            )
+
+    hits = [c for c in BANNED_VISUAL_CLICHES if c in lowered]
+    if hits:
+        return False, f"Prompt uses banned visual cliches: {', '.join(hits[:3])}."
 
     return True, None
 
@@ -299,7 +371,22 @@ def check_subject_count(positive_prompt: str) -> Tuple[bool, Optional[str]]:
     lowered = positive_prompt.lower()
     for pattern in MULTI_SUBJECT_PATTERNS:
         if re.search(pattern, lowered):
-            return False, f"Prompt specifies multiple human subjects which causes facial collapse and identity drift. Restrict to a single isolated subject."
+            return False, "Prompt specifies multiple human subjects which causes facial collapse and identity drift. Restrict to a single isolated subject."
+
+    # Fidelity is divided by props as well as by faces. One human surrounded by
+    # a phone, a laptop, server racks and an LED strip is still five things
+    # competing for the same attention budget.
+    props = sorted({
+        re.sub(r"\\b", "", p).strip()
+        for p in COMPETING_PROP_PATTERNS
+        if re.search(p, lowered)
+    })
+    if len(props) > MAX_COMPETING_PROPS:
+        return False, (
+            f"Prompt names {len(props)} competing objects ({', '.join(props[:5])}). "
+            f"Keep to one subject and at most {MAX_COMPETING_PROPS} props, or every "
+            "element loses definition."
+        )
 
     return True, None
 
