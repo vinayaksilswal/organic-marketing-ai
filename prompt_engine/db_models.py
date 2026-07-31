@@ -8,7 +8,7 @@ These models extend the existing Base defined in `database.py` and provide:
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, JSON, ForeignKey, UniqueConstraint, Text, Float
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 from datetime import datetime
 from database import Base, generate_uuid, utc_now
 
@@ -28,7 +28,15 @@ class PromptVersion(Base):
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
-    business_profile = relationship('BusinessProfile', back_populates='prompt_versions')
+    # backref, not back_populates: this side owns the relationship so that
+    # database.py needs no reference to PromptVersion. A forward reference from
+    # there forced database.py to import this package, which pulled the router
+    # and its FastAPI/httpx dependencies into every process that touches the
+    # database — including Alembic, where it broke migrations outright.
+    business_profile = relationship(
+        'BusinessProfile',
+        backref=backref('prompt_versions', cascade='all, delete-orphan'),
+    )
     validations = relationship('PromptValidationLog', back_populates='prompt_version', cascade='all, delete-orphan')
 
     __table_args__ = (UniqueConstraint('businessProfileId', 'version', name='uniq_prompt_version_per_workspace'),)

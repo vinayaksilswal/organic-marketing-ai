@@ -128,7 +128,11 @@ class BusinessProfile(Base):
     medias = relationship('Media', back_populates='businessProfile', cascade='all, delete-orphan')
     marketinglogs = relationship('MarketingLog', back_populates='businessProfile', cascade='all, delete-orphan')
     socialconnections = relationship('SocialConnection', back_populates='businessProfile', cascade='all, delete-orphan')
-    prompt_versions = relationship('PromptVersion', back_populates='business_profile', cascade='all, delete-orphan')
+    # NOTE: prompt_versions is NOT declared here. It is contributed by
+    # prompt_engine/db_models.py via backref, so this module needs no knowledge
+    # of a class it does not own. Declaring it here made database.py depend on
+    # prompt_engine, which dragged the whole FastAPI router stack into the
+    # Alembic migration process and broke the deploy.
 
 class VideoApiConfig(Base):
     __tablename__ = "VideoApiConfig"
@@ -603,26 +607,22 @@ async def get_tenant_session(workspace_id: str) -> AsyncSession:
 
 
 # =============================================================================
-# Late model registration
+# A note on prompt_engine
 # =============================================================================
-# BusinessProfile declares relationship('PromptVersion', ...) but that class is
-# defined in prompt_engine/db_models.py. SQLAlchemy resolves relationship
-# targets by name at mapper-configuration time, so the module must have been
-# imported by then or configuration fails with:
+# This module deliberately does NOT import prompt_engine.
 #
-#   InvalidRequestError: expression 'PromptVersion' failed to locate a name
+# It previously did, because BusinessProfile declared
+# relationship('PromptVersion', ...) and SQLAlchemy resolves that name at
+# mapper-configuration time. That forward reference made the core data layer
+# depend on an application package, and importing any prompt_engine submodule
+# executed its __init__, which imported the FastAPI router and with it
+# routers.*, services.*, fastapi and httpx.
 #
-# The FastAPI app happened to survive because main.py imports the prompt engine
-# router, but the ARQ worker imports only `database` — so the scheduled
-# automation process crashed the first time it touched a BusinessProfile.
+# The consequence was a failed deploy: Alembic's env.py imports `database`, so
+# `alembic upgrade head` dragged the entire web stack into the migration
+# runner and died with SQLAlchemy MissingGreenlet — sync migration code
+# attempting async IO. Render kept serving the previous build.
 #
-# Importing here, at the end of the module, makes the mapping resolvable from
-# every entry point. The import is circular by design and safe: db_models needs
-# only Base, generate_uuid and utc_now, all defined above.
-try:  # pragma: no cover - exercised by every process that imports database
-    from prompt_engine import db_models as _prompt_engine_models  # noqa: E402,F401
-except Exception:  # pragma: no cover
-    logger.warning(
-        "prompt_engine.db_models could not be imported; PromptVersion-backed "
-        "relationships will be unavailable"
-    )
+# PromptVersion now contributes the relationship from its own side via
+# backref, so this module needs no knowledge of it and migrations import
+# nothing but the ORM.
