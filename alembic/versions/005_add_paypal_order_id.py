@@ -27,8 +27,7 @@ def upgrade() -> None:
     op.execute("""
         DO $$ BEGIN
             ALTER TABLE "User" ADD CONSTRAINT uniq_user_paypal_order UNIQUE ("paypalOrderId");
-        EXCEPTION WHEN duplicate_table THEN NULL;
-                  WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 

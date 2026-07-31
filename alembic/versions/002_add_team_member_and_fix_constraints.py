@@ -52,15 +52,15 @@ def upgrade() -> None:
     """)
 
     # Add composite unique constraint (userId + businessProfileId).
-    # Re-adding an existing constraint raises duplicate_object (42710), not
-    # duplicate_table — the previous handler did not catch it.
+    # Re-adding an existing constraint can raise either duplicate_object
+    # (42710, the constraint name) or duplicate_table (42P07, the index the
+    # constraint builds behind it), depending on which name collides first.
+    # Both must be caught or the migration aborts on a replay.
     op.execute("""
         DO $$ BEGIN
             ALTER TABLE "SocialConnection"
                 ADD CONSTRAINT uniq_user_workspace_social UNIQUE ("userId", "businessProfileId");
-        EXCEPTION
-            WHEN duplicate_object THEN NULL;
-            WHEN duplicate_table THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 

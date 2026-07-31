@@ -46,7 +46,7 @@ def upgrade() -> None:
         DO $$ BEGIN
             ALTER TABLE "Subscription"
               ADD CONSTRAINT uniq_paypal_subscription_id UNIQUE ("paypalSubscriptionId");
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 
@@ -66,7 +66,7 @@ def upgrade() -> None:
             ALTER TABLE "UsageCounter"
               ADD CONSTRAINT uniq_usage_user_metric_period
               UNIQUE ("userId", metric, "periodStart");
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 

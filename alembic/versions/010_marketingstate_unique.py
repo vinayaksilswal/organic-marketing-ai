@@ -65,7 +65,7 @@ def upgrade() -> None:
             ALTER TABLE "MarketingState"
               ADD CONSTRAINT uniq_marketing_state_workspace
               UNIQUE ("businessProfileId");
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 

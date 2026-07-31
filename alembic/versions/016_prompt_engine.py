@@ -44,7 +44,7 @@ def upgrade() -> None:
             ALTER TABLE "PromptVersion"
               ADD CONSTRAINT uniq_prompt_version_per_workspace
               UNIQUE ("businessProfileId", version);
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
     op.execute(
@@ -66,7 +66,7 @@ def upgrade() -> None:
         DO $$ BEGIN
             ALTER TABLE "PromptValidationLog"
               ADD CONSTRAINT uniq_validation_per_prompt UNIQUE ("promptVersionId");
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 
@@ -85,7 +85,7 @@ def upgrade() -> None:
         DO $$ BEGIN
             ALTER TABLE "ModelRoutingRule"
               ADD CONSTRAINT uniq_model_name UNIQUE (model_name);
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 
@@ -124,7 +124,7 @@ def upgrade() -> None:
             ALTER TABLE "CaptionVersion"
               ADD CONSTRAINT uniq_caption_version_per_workspace
               UNIQUE ("businessProfileId", version);
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
     op.execute(

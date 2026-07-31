@@ -42,7 +42,7 @@ def upgrade() -> None:
         DO $$ BEGIN
             ALTER TABLE "EmailConfig"
               ADD CONSTRAINT uniq_email_config_workspace UNIQUE ("businessProfileId");
-        EXCEPTION WHEN duplicate_object THEN NULL;
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
         END $$
     """)
 
