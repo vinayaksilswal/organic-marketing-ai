@@ -521,6 +521,16 @@ Every bad render traces back to one of these. Avoid them absolutely.
    abstract mood — "an atmosphere of quiet concern" — sells nothing, because
    the viewer never learns what the product does.
 
+   THE BRAND WATERMARK — ON EVERY CLIP, WITHOUT EXCEPTION.
+   Close every prompt with the business name as a soft semi-transparent white
+   wordmark centred along the BOTTOM EDGE, holding for the whole clip. One
+   word. A render confirmed this comes back clean and legible.
+
+   It must persist, not appear only at the end: a viewer who scrolls at eight
+   seconds should still know whose video it was. Write it as:
+     'the word "QuantCAI" as a soft semi-transparent white wordmark centred
+      along the bottom edge, holding for the whole clip'
+
 2. MORE THAN ONE COMPETING STRING.
    You get ONE hero string of 2-6 words, plus the brand name in the closing
    frame. Two headline strings and both degrade.
@@ -568,8 +578,9 @@ you cut the subject, the hero string, or the line.
 STRUCTURE (in this order):
 [One camera move] + [One subject, front-loaded] + [One physical action] +
 [Room and light] + [The camera framing that puts the text in view, and the
-text itself] + [Brand word in the closing frame] + [One audio clause] + [The
-spoken line, verbatim, starting at frame one]
+text itself] + [The brand wordmark, bottom-centre, whole clip] + [One audio
+clause] + [The spoken line, verbatim, starting at frame one] + [The spoken
+closing call to action]
 
 Do NOT end with a list of negatives. These models have no negative parsing —
 "no holograms" raises the odds of a hologram by putting the word in the
@@ -629,7 +640,7 @@ OUTPUT — valid JSON only. First character { and last character }. No markdown,
   "creative_format_used": "<assigned format name>",
   "variation_modifier_applied": "<assigned modifier name>",
   "product_type": "<product type from marketing intel>",
-  "prompt": "<one 10-second vertical shot, 90-130 words, ONE camera move, ONE subject, ONE action, one short line of 2-6 words rendered large on a named surface with everything else defocused, the brand name in the closing frame, one audio clause, and the spoken words verbatim in double quotes. No list of negatives.>"
+  "prompt": "<one 10-second vertical shot, 90-130 words, ONE camera move, ONE subject, ONE action, one short line of 2-6 words rendered large on a named surface with everything else defocused, the business name as a semi-transparent wordmark centred on the bottom edge for the whole clip, one audio clause, and the spoken words verbatim in double quotes. No list of negatives.>"
 }
 
 VOCABULARY WARNING — the prompt is read by a RENDERER, not by you. It must

@@ -702,20 +702,33 @@ def test_brand_endframe_reduces_to_one_rememberable_word(raw, expected):
     assert _brand_endframe(raw) == expected
 
 
-def test_brand_word_reaches_the_compiled_prompt():
+def test_brand_watermark_reaches_the_compiled_prompt():
+    """A render confirmed a bottom-centre semi-transparent wordmark comes back
+    clean, so it replaced the old 'etched onto a physical surface' treatment —
+    that only branded the final beat and needed the scene to contain a surface
+    worth etching, which most businesses' scenes do not."""
     from prompt_engine.compilers import compile_video_prompt
     p = compile_video_prompt("runway", "post-quantum readiness",
                              scene_fields=_brand_scene())
     assert '"quantcai"' in p.positive_prompt
-    assert "etched into the rack door" in p.positive_prompt
+    assert "wordmark centred along the bottom edge" in p.positive_prompt
+    assert "holding for the whole clip" in p.positive_prompt
 
 
-def test_brand_word_is_never_placed_on_a_screen():
-    """A brand on a monitor renders as mush, and the validator rejects it.
+@pytest.mark.parametrize("brand", ["quantcai", "Northwind", "Ridgeline"])
+def test_every_business_gets_the_watermark(brand):
+    """It has to be unconditional — no business should ship an unattributed ad."""
+    from prompt_engine.compilers import compile_video_prompt
+    p = compile_video_prompt(
+        "runway", "x", scene_fields=_brand_scene(onscreen_text=brand)
+    )
+    assert f'the word "{brand}" as a soft semi-transparent' in p.positive_prompt
 
-    The surface is dropped rather than the brand, so the clip still closes on
-    the business name.
-    """
+
+def test_watermark_ignores_whatever_surface_the_model_suggested():
+    """brand_moment is no longer consulted: the wordmark is composited at the
+    bottom edge regardless, which is why it works for every business rather
+    than only ones whose scenes contain something engravable."""
     from prompt_engine.compilers import compile_video_prompt
     from prompt_engine import validator
 
@@ -723,8 +736,8 @@ def test_brand_word_is_never_placed_on_a_screen():
         "runway", "post-quantum readiness",
         scene_fields=_brand_scene(brand_moment="the monitor bezel display"),
     )
-    assert '"quantcai"' in p.positive_prompt
-    assert "monitor" not in p.positive_prompt.lower().split('"quantcai"')[1]
+    assert "wordmark centred along the bottom edge" in p.positive_prompt
+    assert "monitor bezel" not in p.positive_prompt
     ok, msg = validator.check_background_text_suppression(p.positive_prompt)
     assert ok, msg
 

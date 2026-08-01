@@ -110,7 +110,10 @@ def _enforce_background_text_suppression(text: str) -> str:
     # in a Runway positive prompt for exactly that reason. An earlier wording
     # here, "No other text: ...", tripped that gate on every generation.
     has_intentional_text = re.search(
-        r'(?:the words? "[^"]+" appear|holds the single word "[^"]+")',
+        r'(?:the words? "[^"]+" appear'
+        r'|holds the single word "[^"]+"'
+        r'|the word "[^"]+" as a soft semi-transparent'
+        r'|reads "[^"]+" in large high-contrast)',
         text,
         re.IGNORECASE,
     )
@@ -244,13 +247,25 @@ def compile_runway_prompt(
                 clause += ", surrounding interface copy soft and out of focus"
             detail_bits.append(clause)
 
-        # The brand word closes the clip. Anchoring it to a physical surface
-        # renders far more cleanly than a floating overlay.
+        # A persistent bottom-centre wordmark, on every clip for every
+        # business. This replaced "final frame holds the single word X on
+        # <some physical surface>", which was wrong twice over:
+        #
+        #   It only branded the last beat, so anyone who scrolled at 8s saw an
+        #   unattributed video.
+        #   It depended on the scene happening to contain a plausible surface
+        #   to etch a logo into, which for most businesses it does not.
+        #
+        # A render confirmed a semi-transparent wordmark along the bottom edge
+        # comes back clean and legible — correcting an earlier assumption here
+        # that overlays and lower-thirds always garble. They garble when they
+        # carry a sentence; one word holds.
         brand = scene_fields.get("onscreen_text")
         if brand:
-            surface = _physical_brand_surface(scene_fields.get("brand_moment"), brand)
-            where = f" on {surface}" if surface else ""
-            detail_bits.append(f'final frame holds the single word "{brand}"{where}')
+            detail_bits.append(
+                f'the word "{brand}" as a soft semi-transparent white wordmark '
+                "centred along the bottom edge, holding for the whole clip"
+            )
         detail_bits.append("shallow depth of field, vertical 9:16 frame")
 
         # Spoken aloud, not rendered. Kept as its own trailing clause so the
