@@ -22,6 +22,7 @@ be described still uploads, with an empty caption the user can fill in.
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import subprocess
 import tempfile
@@ -36,19 +37,27 @@ from loguru import logger
 # in flight rather than queueing.
 MAX_CONCURRENT = 4
 
-# Free variants cap at roughly twenty requests a minute regardless of account
-# standing, so a 242-file library hits that wall repeatedly and comes back with
-# empty captions. The paid fallback is not a workaround for the limit — it is
-# the tier the account already pays for, and the free model was simply
-# hardcoded everywhere.
+# FREE MODELS ONLY, by choice.
 #
-# Ordered cheapest-capable first. At ~1.3k tokens per image, describing a
-# 242-file folder on the fallback costs around a penny, so correctness is worth
-# far more than the saving.
+# The cost of that choice, measured rather than assumed: on a sample of six
+# real files the first free model returned 504 on every one. A single free
+# model is not reliable enough to describe a library, so several are chained
+# and the first that answers wins.
+#
+# `openrouter/free` is deliberately NOT in this list. It routes across whatever
+# free capacity is up, which included nemotron-3.5-content-safety — a safety
+# classifier that answered "User Safety: safe" instead of describing the frame.
+# Three of six test files came back with that. A wrong description is worse than
+# none, because it silently poisons every caption written from the asset.
+#
+# If a whole pass comes back with empty captions, that is the free tier being
+# down rather than a fault in this code, and the assets are still uploaded and
+# editable. Adding a paid model to this list is a one-line change.
 VISION_MODELS = [
+    "google/gemma-4-31b-it:free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
-    "qwen/qwen3.7-flash",
-    "google/gemma-3-12b-it",
+    "google/gemma-4-26b-a4b-it:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
 ]
 
 # Files past this are almost certainly not social assets, and a folder often
@@ -105,6 +114,26 @@ def extract_poster_frame(video_bytes: bytes) -> Optional[bytes]:
         return None
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+# Answers that are not descriptions. A safety classifier reached through a
+# routing model replied "User Safety: safe" for half a test batch, and a
+# refusal or an empty acknowledgement reads as success to a status check.
+# Storing any of them is worse than storing nothing: the caption writer treats
+# the base caption as fact.
+_NOT_A_DESCRIPTION = re.compile(
+    r"^\s*(user safety|response safety|safety:|unsafe|safe|i can(?:'|no)t|"
+    r"i'm sorry|sorry,|as an ai|unable to|no image|cannot see)",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_a_description(text: str) -> bool:
+    """Whether this reads as a description of a frame rather than a verdict."""
+    if _NOT_A_DESCRIPTION.match(text):
+        return False
+    # A real description of a scene runs to a sentence. Four words is a label.
+    return len(text.split()) >= 5
 
 
 async def describe_asset(
@@ -210,6 +239,12 @@ async def describe_asset(
                     raise RuntimeError(str(data["error"])[:160])
                 text = data["choices"][0]["message"]["content"]
                 described = " ".join(str(text).strip().split())[:300]
+                if described and not _looks_like_a_description(described):
+                    logger.warning(
+                        f"{model} returned a non-description for {filename}: "
+                        f"{described[:60]!r}"
+                    )
+                    described = ""
                 if described:
                     if index:
                         logger.info(f"Described {filename} via fallback {model}")
