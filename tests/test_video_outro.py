@@ -162,3 +162,87 @@ def test_silent_source_does_not_break(tmp_path):
 
     out = Path(append_outro(src, "QuantCAI"))
     assert out.exists() and out.stat().st_size > 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Watermark and delivery quality
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_watermark_is_drawn_and_transparent():
+    """It composites over footage, so everything but the text must be clear."""
+    from PIL import Image
+    from services.video_outro import build_watermark_png
+
+    path = build_watermark_png("Billionaire Goal", 1080, 1920)
+    assert path and path.exists()
+    with Image.open(path) as im:
+        assert im.mode == "RGBA"
+        assert im.size == (1080, 1920)
+        ink = im.getbbox()
+        assert ink, "watermark drew nothing"
+        # Corners must be fully transparent or it would tint the whole frame.
+        assert im.getpixel((5, 5))[3] == 0
+
+
+def test_watermark_clears_the_platform_ui():
+    """Instagram overlays the bottom of a Reel with caption and buttons, so a
+    mark sitting flush to the edge is covered."""
+    from PIL import Image
+    from services.video_outro import build_watermark_png
+
+    with Image.open(build_watermark_png("Acme", 1080, 1920)) as im:
+        top, bottom = im.getbbox()[1], im.getbbox()[3]
+    assert bottom < 1920 * 0.93, "watermark sits under the platform UI"
+    assert top > 1920 * 0.5, "watermark drifted into the middle of the frame"
+
+
+@pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg not available")
+def test_output_is_delivered_at_the_platform_spec(tmp_path):
+    """A 720p source should leave at 1080x1920 rather than letting the
+    platform upscale it with its own cheap scaler."""
+    import re
+
+    ff = _ffmpeg()
+    src = tmp_path / "small.mp4"
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=720x1280:rate=24:duration=2",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=120)
+
+    out = Path(append_outro(src, "Acme", "Book now", "acme.com"))
+    assert out != src
+
+    probe = subprocess.run([ff, "-hide_banner", "-i", str(out)],
+                           capture_output=True, text=True, errors="ignore",
+                           timeout=60).stderr
+    assert "1080x1920" in probe, probe[:300]
+
+
+@pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg not available")
+def test_bitrate_is_capped(tmp_path):
+    """Upscaling then sharpening manufactures detail that CRF spends bits on —
+    a 1.8MB source came back at 44.8MB before the cap, for footage the platform
+    re-encodes to about 4 Mbps anyway."""
+    import re
+
+    ff = _ffmpeg()
+    src = tmp_path / "noisy.mp4"
+    # Noise is the worst case for bitrate: nothing compresses.
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "nullsrc=size=720x1280:rate=24:duration=3",
+        "-vf", "geq=random(1)*255:128:128",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=180)
+    if not src.exists() or src.stat().st_size == 0:
+        pytest.skip("could not synthesise a noise clip")
+
+    out = Path(append_outro(src, "Acme"))
+    probe = subprocess.run([ff, "-hide_banner", "-i", str(out)],
+                           capture_output=True, text=True, errors="ignore",
+                           timeout=60).stderr
+    m = re.search(r"bitrate:\s*(\d+)\s*kb/s", probe)
+    assert m, probe[:300]
+    # 7M cap plus audio and container overhead.
+    assert int(m.group(1)) < 9000, f"bitrate cap not applied: {m.group(1)} kb/s"
