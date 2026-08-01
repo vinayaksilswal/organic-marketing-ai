@@ -90,10 +90,41 @@ PLANS: dict[str, dict[str, Any]] = {
         ],
         "limits": {"businesses": 25, "posts": None, "prompts": 600, "emails": 50000, "media": None},
     },
+    # Everything uncapped. Two uses: a negotiated contract that does not fit a
+    # self-serve tier, and the operator's own account — running the platform
+    # should not mean paying yourself through PayPal to use it.
+    #
+    # Deliberately not in PAID_PLANS, so it never appears in the public pricing
+    # table and cannot be self-selected at checkout. It is granted, not bought.
+    "enterprise": {
+        "code": "enterprise",
+        "name": "Enterprise",
+        "price": 0.0,
+        "tagline": "Unlimited, by arrangement.",
+        "features": [
+            "Unlimited businesses",
+            "Unlimited published posts",
+            "Unlimited AI creative prompts",
+            "Unlimited marketing emails",
+            "Team seats and roles",
+            "Priority support",
+        ],
+        "limits": {
+            "businesses": None, "posts": None, "prompts": None,
+            "emails": None, "media": None,
+        },
+        "hidden": True,
+    },
 }
 
 DEFAULT_PLAN = "free"
-PAID_PLANS = [c for c in PLANS if PLANS[c]["price"] > 0]
+# Purchasable tiers. Enterprise is excluded by price and by the hidden flag —
+# it is granted, never checked out.
+PAID_PLANS = [
+    c for c in PLANS
+    if PLANS[c]["price"] > 0 and not PLANS[c].get("hidden")
+]
+PUBLIC_PLANS = [c for c in PLANS if not PLANS[c].get("hidden")]
 
 METRIC_LABELS = {
     "posts": "published posts",
@@ -384,8 +415,31 @@ async def record_usage(user_id: str, metric: str, amount: int = 1) -> None:
         logger.warning(f"Could not record usage {metric} for {user_id}: {e}")
 
 
+async def _is_unlimited(user_id: str) -> bool:
+    """Whether this account bypasses metering entirely.
+
+    User.isSuperAdmin has existed since the first schema and nothing ever read
+    it. Honouring it here means the operator can run their own businesses on
+    the platform without buying a subscription from themselves, and support can
+    lift a cap during an incident without touching PayPal.
+    """
+    from database import AsyncSessionLocal, User
+
+    try:
+        async with AsyncSessionLocal() as session:
+            user = await session.get(User, user_id)
+            return bool(user and getattr(user, "isSuperAdmin", False))
+    except Exception as e:
+        # Metering must not be the thing that takes the product down. A failed
+        # lookup falls through to the normal plan check rather than raising.
+        logger.warning(f"Could not read super-admin flag for {user_id}: {e}")
+        return False
+
+
 async def check_quota(user_id: str, metric: str, amount: int = 1) -> tuple[bool, str]:
     """(allowed, message). Message is user-facing when not allowed."""
+    if await _is_unlimited(user_id):
+        return True, ""
     plan = plan_for(await active_plan_code(user_id))
     limit = plan["limits"].get(metric)
     if limit is None:
@@ -404,6 +458,8 @@ async def check_quota(user_id: str, metric: str, amount: int = 1) -> tuple[bool,
 
 async def check_business_quota(user_id: str, current_count: int) -> tuple[bool, str]:
     """Businesses are a standing total, not a monthly meter."""
+    if await _is_unlimited(user_id):
+        return True, ""
     plan = plan_for(await active_plan_code(user_id))
     limit = plan["limits"].get("businesses")
     if limit is None or current_count < limit:

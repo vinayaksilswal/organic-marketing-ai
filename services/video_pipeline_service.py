@@ -705,6 +705,22 @@ DIGITAL_SAAS / DATA_API
   Never: small readable menus, tables or log output, holographic panels,
   flying data particles, glowing blue "AI" mist, "Bloomberg terminal".
 
+SOCIAL_PAGE (a themed Instagram or Facebook page — the audience IS the product)
+  There is nothing to sell and no founder to film. The page earns attention by
+  being the best version of a feeling: aspiration, calm, awe, nostalgia. Every
+  clip has to be worth a save or a share on its own.
+  Subject: the SUBJECT MATTER itself, shot like the object of desire it is —
+  the car, the watch face, the wake behind the yacht, the city at altitude.
+  Never a person addressing camera, and never the page's operator.
+  Camera: macro detail and slow reveals. Let one object fill the frame and hold.
+  Hero string: a short line the viewer would repost, not a sales claim. Two to
+  five words. "Six years of saying no." beats "Luxury lifestyle".
+  Spoken line: optional, and often better absent — these pages are watched
+  muted. If present, keep it a single observation, never a pitch.
+  Closing ask: FOLLOW, never buy. There is no purchase to make.
+  Never: stock-photo wealth cliches (cash fans, private-jet stairs in a suit),
+  and never a claim about what the viewer will earn or achieve.
+
 PHYSICAL_GOODS
   World: controlled studio light, or the aspirational place the thing gets used.
   Subject: the product is the hero — material, finish, weight, craftsmanship.

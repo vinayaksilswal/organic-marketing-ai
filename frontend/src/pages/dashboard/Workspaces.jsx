@@ -397,7 +397,12 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                   {[
                     { name: 'AI Influencer', icon: '🤖' }, { name: 'SaaS', icon: '💻' },
                     { name: 'E-commerce', icon: '🛒' }, { name: 'Creator', icon: '🎨' },
-                    { name: 'Local Business', icon: '🏪' }, { name: 'Agency', icon: '🤝' }
+                    { name: 'Local Business', icon: '🏪' }, { name: 'Agency', icon: '🤝' },
+                    /* A page IS the product: no thing to sell, the audience is
+                       the asset. Creator is a person building a personal brand;
+                       this is a themed account where the operator never
+                       appears. They need different creative entirely. */
+                    { name: 'Social Page', icon: '📱' }
                   ].map(m => (
                     <div key={m.name} className={`selection-card ${businessModel === m.name ? 'selected' : ''}`}
                       onClick={() => setBusinessModel(m.name)} style={{ padding: '1rem', cursor: 'pointer' }}>
@@ -471,7 +476,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <label style={labelStyle}>Business Model</label>
                         <select value={editData.businessModel} onChange={e => setEditData({...editData, businessModel: e.target.value})}
                           style={{ ...inputStyle, appearance: 'auto' }}>
-                          {['SaaS', 'E-commerce', 'Creator', 'AI Influencer', 'Local Business', 'Agency', 'General'].map(m => (
+                          {['SaaS', 'E-commerce', 'Creator', 'AI Influencer', 'Social Page', 'Local Business', 'Agency', 'General'].map(m => (
                             <option key={m} value={m}>{m}</option>
                           ))}
                         </select>

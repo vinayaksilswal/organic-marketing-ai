@@ -74,6 +74,49 @@ class CampaignUpdate(BaseModel):
 # =============================================================================
 # Upload Media Endpoint
 # =============================================================================
+async def _brand_video_bytes(
+    content: bytes, workspace_id: Optional[str], session, filename: str
+) -> bytes:
+    """Composite the branded end card onto an uploaded clip.
+
+    Returns the original bytes unchanged on any failure. A clip that posts
+    without its outro is a cosmetic loss; an upload that 500s because ffmpeg
+    was unhappy loses the asset entirely.
+    """
+    import tempfile
+    from pathlib import Path as _Path
+
+    if not workspace_id:
+        return content
+
+    try:
+        from services.video_outro import append_outro, outro_text_for
+
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            return content
+
+        brand, cta, url = outro_text_for(profile)
+        if not brand:
+            return content
+
+        work = _Path(tempfile.mkdtemp(prefix="upload_outro_"))
+        try:
+            src = work / "source.mp4"
+            src.write_bytes(content)
+            branded = _Path(append_outro(src, brand, cta, url))
+            if branded != src and branded.exists():
+                logger.info(f"Outro composited onto {filename} for {brand}")
+                return branded.read_bytes()
+        finally:
+            import shutil
+
+            shutil.rmtree(work, ignore_errors=True)
+    except Exception:
+        logger.exception("Outro failed on upload; storing the original clip")
+    return content
+
+
 @router.post("/upload-media", response_model=StandardResponse)
 async def upload_media(
     request: Request,
@@ -100,6 +143,19 @@ async def upload_media(
                 bp = (await session.execute(bp_stmt)).scalars().first()
                 if bp:
                     workspace_id = bp.id
+
+            # Brand the clip before it is stored, not on request afterwards.
+            # The end card was previously only reachable through an endpoint
+            # nobody called, so every video attached to the posting cycle went
+            # out unbranded — the capability existed and did nothing.
+            #
+            # Done here rather than at post time so the branded version is what
+            # the catalog holds: the same asset can be published repeatedly by
+            # the rotation, and compositing once beats compositing per post.
+            if mime_type.startswith("video/"):
+                file_content = await _brand_video_bytes(
+                    file_content, workspace_id, session, file.filename or "clip.mp4"
+                )
 
             # Attempt to upload to Cloudinary
             cloudinary_res = await upload_media_to_cloudinary(

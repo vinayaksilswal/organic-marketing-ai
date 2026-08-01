@@ -255,7 +255,11 @@ _LEGAL_SUFFIX = re.compile(
 )
 
 
-def _fallback_cta(business_name: Optional[str], primary_offer: Optional[str]) -> str:
+def _fallback_cta(
+    business_name: Optional[str],
+    primary_offer: Optional[str],
+    business_model: Optional[str] = None,
+) -> str:
     """A spoken closing line, built from the brand and its offer.
 
     Used when the writer omits one. Ending on the bare brand name — "QuantCAI."
@@ -266,6 +270,13 @@ def _fallback_cta(business_name: Optional[str], primary_offer: Optional[str]) ->
     brand = (business_name or "").strip()
     if not brand:
         return ""
+
+    # A themed page has nothing to sell. Its whole economy is the follow, so
+    # "Start a subscription at Billionaire Goal" is not merely off-tone, it
+    # describes a transaction that does not exist.
+    if (business_model or "").strip().lower() in {"social page", "social_page", "page"}:
+        handle = re.sub(r"[^a-z0-9]", "", brand.lower())
+        return f"Follow @{handle}." if handle else f"Follow {brand}."
 
     offer = re.sub(r"\s+", " ", (primary_offer or "").strip().rstrip("."))
     if offer:
@@ -329,6 +340,7 @@ async def write_scene(
     recent_scenes: Optional[list] = None,
     transformation: Optional[str] = None,
     avoid_visual_world: Optional[str] = None,
+    business_model: Optional[str] = None,
 ) -> Optional[Dict[str, str]]:
     """Write the creative content of one shot. Returns None if the LLM fails.
 
@@ -454,7 +466,9 @@ async def write_scene(
         # the watermark is: an ad that forgets its call to action is a wasted
         # impression, and the model omits it often enough to matter.
         if not scene["spoken_cta"]:
-            scene["spoken_cta"] = _fallback_cta(business_name, primary_offer)
+            scene["spoken_cta"] = _fallback_cta(
+                business_name, primary_offer, business_model
+            )
 
         # The placement field tends to continue the business name rather than
         # start a fresh phrase: with "Halden Dental" the end frame is "Halden"
