@@ -76,9 +76,27 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
     let stored = 0, failed = 0, described = 0, lastError = null;
     try {
-      for (let i = 0; i < media.length; i += BULK_BATCH) {
-        const batch = media.slice(i, i + BULK_BATCH);
-        const done = Math.min(i + batch.length, media.length);
+      // Batched by SIZE, not by count. Three clips sounds small until three
+      // of the large ones land together: this folder's biggest three are 33MB
+      // in a single POST, which the host reset mid-body every time
+      // (ERR_HTTP2_PROTOCOL_ERROR, identically on all four retries — a limit,
+      // not load). Capping the payload keeps every request comfortably under
+      // it regardless of which files happen to be adjacent.
+      const MAX_BATCH_BYTES = 6 * 1024 * 1024;
+
+      let i = 0;
+      while (i < media.length) {
+        const batch = [];
+        let bytes = 0;
+        while (i < media.length && batch.length < BULK_BATCH) {
+          const size = media[i].size || 0;
+          // Always take at least one, or a file above the cap never uploads.
+          if (batch.length && bytes + size > MAX_BATCH_BYTES) break;
+          batch.push(media[i]);
+          bytes += size;
+          i += 1;
+        }
+        const done = i;
         setBulkProgress(`${done} / ${media.length}`);
 
         const form = new FormData();
