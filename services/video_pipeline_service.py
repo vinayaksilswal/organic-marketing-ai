@@ -13,6 +13,7 @@ Executes the complex creative video pipeline (formerly n8n automation).
 
 import json
 import random
+import re
 
 import httpx
 from typing import Dict, Any, Optional
@@ -848,7 +849,7 @@ Return the JSON object and nothing else.
             "The AI returned an empty prompt after two attempts."
         )
 
-    return _strip_brief_vocabulary(generated)
+    return _enforce_speech_starts_immediately(_strip_brief_vocabulary(generated))
 
 
 # Names for the PARTS of a brief. The renderer has no idea these are labels and
@@ -964,3 +965,49 @@ product_placement: 'center'
 
 
 
+
+
+# The spoken line has to begin at frame one. A rendered test of a prompt from
+# this path came back near-silent until 3.5 seconds — room tone over a man
+# closing a notebook — which threw away the verbal third of Meta's tripartite
+# hook and, in a feed, the whole ad.
+#
+# The brief asks for it, but a brief is a request. Enforced here because the
+# failure is silent: the prompt reads perfectly and only the render shows it.
+_DIALOGUE_START = re.compile(
+    r'(?<![\w"])"([^"]{25,})"',   # a quoted string long enough to be a sentence
+)
+
+# Wording that already pins the start. Matching any of these means leave it be.
+_ALREADY_TIMED = re.compile(
+    r"\b(from the (?:very )?first frame|speaking immediately|starts? speaking "
+    r"at once|already (?:speaking|mid-sentence)|first word lands)\b",
+    re.IGNORECASE,
+)
+
+
+def _enforce_speech_starts_immediately(text: str) -> str:
+    """Pin the spoken line to frame one if the prompt left it floating."""
+    if _ALREADY_TIMED.search(text):
+        return text
+
+    match = _DIALOGUE_START.search(text)
+    if not match:
+        return text
+
+    line = match.group(1)
+    # A CTA is short and trails the clip; the opening line is the one that has
+    # to land at zero, so prefer the first long quote.
+    if len(line.split()) < 6:
+        return text
+
+    # Phrased positively: "no pause before the first word" reads naturally but
+    # the leading "no " trips check_model_negative_syntax, which rejects
+    # negative wording in a Runway positive prompt.
+    prefixed = (
+        text[: match.start()]
+        + f'already speaking as the first frame begins: "{line}"'
+        + text[match.end():]
+    )
+    logger.info("Pinned the spoken line to the first frame")
+    return prefixed

@@ -836,3 +836,51 @@ def test_cta_is_spoken_not_rendered():
     assert ok, msg
     ok, msg = validator.check_model_negative_syntax("runway", p.positive_prompt, p.negative_prompt)
     assert ok, msg
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The live pipeline path. A render from it came back silent until 3.5 seconds,
+# which threw away the verbal third of the three-second hook.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_LIVE = ('Slow push-in on a matte-black smartphone. The screen occupies the frame, '
+         'reading "RSA-2048 Vulnerable" in large white monospace. Low room tone. '
+         '"I found our RSA keys are quantum vulnerable. One scan gave us the CBOM." '
+         'Run your free scan at QuantCAI.')
+
+
+def test_speech_is_pinned_to_the_first_frame():
+    from services.video_pipeline_service import _enforce_speech_starts_immediately as f
+    out = f(_LIVE)
+    assert "already speaking as the first frame begins" in out
+    assert "I found our RSA keys" in out
+
+
+def test_speech_pinning_is_idempotent():
+    from services.video_pipeline_service import _enforce_speech_starts_immediately as f
+    assert f(f(_LIVE)) == f(_LIVE)
+
+
+def test_speech_pinning_leaves_short_quotes_alone():
+    """A hero string is not dialogue and must not be prefixed as speech."""
+    from services.video_pipeline_service import _enforce_speech_starts_immediately as f
+    short = 'A mug on a bench, the tag reads "Roasted This Week".'
+    assert f(short) == short
+
+
+def test_speech_pinning_survives_the_runway_negative_gate():
+    """The natural phrasing, "no pause before the first word", trips
+    check_model_negative_syntax on the leading "no "."""
+    from prompt_engine.validator import check_model_negative_syntax
+    from services.video_pipeline_service import _enforce_speech_starts_immediately as f
+    ok, msg = check_model_negative_syntax("runway", f(_LIVE), None)
+    assert ok, msg
+
+
+def test_brief_vocabulary_never_reaches_a_render():
+    """Live output once asked the renderer to draw the words "hero string"."""
+    from services.video_pipeline_service import _strip_brief_vocabulary as f
+    bad = 'the laptop where the QuantCAI screen displays the hero string "Scan Complete"'
+    out = f(bad)
+    assert "hero string" not in out
+    assert '"Scan Complete"' in out
