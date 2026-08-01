@@ -1956,56 +1956,74 @@ async def bulk_upload_media(
     if not files:
         raise HTTPException(status_code=400, detail="No files supplied")
 
-    async with AsyncSessionLocal() as session:
-        profile = await session.get(BusinessProfile, workspace_id)
-        if not profile or profile.userId != user_id:
-            raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        async with AsyncSessionLocal() as session:
+            profile = await session.get(BusinessProfile, workspace_id)
+            if not profile or profile.userId != user_id:
+                raise HTTPException(status_code=404, detail="Workspace not found")
 
-        # Read every file before the request body is closed.
-        payload = [(f.filename or "upload", await f.read()) for f in files]
+            # Read every file before the request body is closed.
+            payload = [(f.filename or "upload", await f.read()) for f in files]
 
-        result = await ingest_folder(
-            payload, profile, user_id, workspace_id, write_captions=False
-        )
+            result = await ingest_folder(
+                payload, profile, user_id, workspace_id, write_captions=False
+            )
 
-        # Persist the ones that made it. Written in one transaction so a
-        # storage success is never left without its catalog row.
-        for item in result["items"]:
-            if not item.get("ok"):
-                continue
-            session.add(Media(
-                id=item["mediaId"],
-                userId=user_id,
-                businessProfileId=workspace_id,
-                filename=item["filename"],
-                mimeType=item["mimeType"],
-                url=item["url"],
-                caption=item.get("caption") or None,
-                isActive=True,
-            ))
-        await session.commit()
+            # Persist the ones that made it. Written in one transaction so a
+            # storage success is never left without its catalog row.
+            for item in result["items"]:
+                if not item.get("ok"):
+                    continue
+                session.add(Media(
+                    id=item["mediaId"],
+                    userId=user_id,
+                    businessProfileId=workspace_id,
+                    filename=item["filename"],
+                    mimeType=item["mimeType"],
+                    url=item["url"],
+                    caption=item.get("caption") or None,
+                    isActive=True,
+                ))
+            await session.commit()
 
-    # Captioning runs AFTER the response. A frame extract plus a vision call
-    # costs tens of seconds per asset and gunicorn kills the worker at
-    # --timeout 120, so doing it inline made every batch of videos return 500.
-    # The catalog is usable immediately and descriptions fill in behind it.
-    stored_ids = [i["mediaId"] for i in result["items"] if i.get("ok")]
-    if write_captions and stored_ids:
-        from services.bulk_ingest import describe_pending_media
-        from services.task_utils import spawn_background
+        # Captioning runs AFTER the response. A frame extract plus a vision call
+        # costs tens of seconds per asset and gunicorn kills the worker at
+        # --timeout 120, so doing it inline made every batch of videos return 500.
+        # The catalog is usable immediately and descriptions fill in behind it.
+        stored_ids = [i["mediaId"] for i in result["items"] if i.get("ok")]
+        if stored_ids:
+            from services.bulk_ingest import finish_pending_media
+            from services.task_utils import spawn_background
 
-        spawn_background(
-            describe_pending_media(workspace_id, stored_ids, profile),
-            f"describe_pending_media({workspace_id}, {len(stored_ids)})",
-        )
+            spawn_background(
+                finish_pending_media(workspace_id, stored_ids, profile),
+                f"finish_pending_media({workspace_id}, {len(stored_ids)})",
+            )
 
-    return {
-        "success": True,
-        "captioning": bool(write_captions and stored_ids),
-        "message": (
-            f"{result['stored']} of {result['total']} added"
-            + (" — descriptions are being written now"
-               if write_captions and stored_ids else "")
-        ),
-        **result,
-    }
+        return {
+            "success": True,
+            "processing": bool(stored_ids),
+            "message": (
+                f"{result['stored']} of {result['total']} added"
+                + (" — branding and descriptions are running now"
+                   if stored_ids else "")
+            ),
+            **result,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # A bare 500 tells the browser nothing and told me nothing for three
+        # rounds of guessing. Whatever fails here, the caller gets the reason
+        # and the batch is reported as skipped rather than as a mystery.
+        logger.exception(f"Bulk upload failed for workspace {workspace_id}")
+        return {
+            "success": False,
+            "total": len(files),
+            "stored": 0,
+            "failed": len(files),
+            "described": 0,
+            "items": [],
+            "message": f"Batch failed: {type(e).__name__}: {str(e)[:200]}",
+        }

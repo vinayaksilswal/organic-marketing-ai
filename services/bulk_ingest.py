@@ -290,26 +290,13 @@ async def ingest_one(
     # describe_pending_media and fill in progressively.
     caption = ""
 
-    # Same branding the single-file upload applies, so a bulk-added clip is not
-    # the odd one out in the feed.
-    if mime.startswith("video/"):
-        try:
-            from services.video_outro import append_outro, outro_text_for
-
-            brand, cta, url = outro_text_for(profile)
-            if brand:
-                work = Path(tempfile.mkdtemp(prefix="bulk_outro_"))
-                try:
-                    src = work / "clip.mp4"
-                    src.write_bytes(content)
-                    branded = Path(append_outro(src, brand, cta, url))
-                    if branded != src and branded.exists():
-                        content = branded.read_bytes()
-                finally:
-                    shutil.rmtree(work, ignore_errors=True)
-        except Exception:
-            logger.exception(f"Outro failed for {filename}; storing the original")
-
+    # Branding does NOT happen here either. Scaling to 1080p, compositing a
+    # watermark and concatenating an end card is ~15s per clip on a laptop and
+    # several times that on a shared container — three of them exceeded the
+    # 120s request timeout on Render even though they fit locally.
+    #
+    # The asset is stored raw and branded by the background pass, which also
+    # writes the caption. One trip through ffmpeg, off the request path.
     media_id = str(uuid.uuid4())
     try:
         uploaded = await upload_media_to_cloudinary(
@@ -373,10 +360,10 @@ async def ingest_folder(
     }
 
 
-async def describe_pending_media(
+async def finish_pending_media(
     workspace_id: str, media_ids: List[str], profile: Any
 ) -> None:
-    """Write base captions for already-stored assets, out of band.
+    """Brand and describe already-stored assets, out of band.
 
     Runs after the upload request has returned. Each asset is fetched from
     storage, a frame is described, and the row is updated — so the catalog is
@@ -388,6 +375,7 @@ async def describe_pending_media(
     import httpx
 
     from database import AsyncSessionLocal, Media
+    from services.video_outro import brand_video_at_url
 
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
@@ -415,6 +403,21 @@ async def describe_pending_media(
                         media.caption = caption
                         await session.commit()
                         logger.info(f"Described {media.filename}: {caption[:70]}")
+
+                # Brand it after describing: the description should come from
+                # the original footage, not from a frame that now carries our
+                # own watermark.
+                if (media.mimeType or "").startswith("video/"):
+                    branded = await brand_video_at_url(
+                        media.url, profile, workspace_id, media_id
+                    )
+                    if branded and branded != media.url:
+                        async with AsyncSessionLocal() as s2:
+                            row = await s2.get(Media, media_id)
+                            if row:
+                                row.url = branded
+                                await s2.commit()
+                        logger.info(f"Branded {media.filename}")
             except Exception:
                 logger.exception(f"Could not describe media {media_id}")
 

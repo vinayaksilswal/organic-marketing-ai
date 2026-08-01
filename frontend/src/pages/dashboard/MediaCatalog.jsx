@@ -72,7 +72,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
       return;
     }
 
-    let stored = 0, failed = 0, described = 0;
+    let stored = 0, failed = 0, described = 0, lastError = null;
     try {
       for (let i = 0; i < media.length; i += BULK_BATCH) {
         const batch = media.slice(i, i + BULK_BATCH);
@@ -88,11 +88,18 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
             { method: 'POST', body: form },
             token
           );
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const d = await res.json();
+          // Surface WHAT failed, not just that something did. A bare
+          // "HTTP 500" in the console cost several rounds of guessing.
+          const body = await res.text();
+          if (!res.ok) {
+            lastError = `HTTP ${res.status}: ${body.slice(0, 300)}`;
+            throw new Error(lastError);
+          }
+          const d = JSON.parse(body);
           stored += d.stored || 0;
           failed += d.failed || 0;
           described += d.described || 0;
+          if (d.message && d.success === false) lastError = d.message;
         } catch (err) {
           // One failed batch must not abandon the rest of the folder.
           failed += batch.length;
@@ -104,6 +111,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         message: `${stored} of ${media.length} added` +
                  (described ? `, ${described} described automatically` : ''),
         failed,
+        error: stored === 0 ? lastError : null,
       });
       setBulkFiles([]);
       await fetchMedia();
@@ -342,6 +350,11 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
             <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: bulkResult.failed ? 'var(--warning, #e0a800)' : 'var(--text-muted)' }}>
               {bulkResult.message}
               {bulkResult.failed > 0 && ` — ${bulkResult.failed} skipped`}
+              {bulkResult.error && (
+                <span style={{ display: 'block', marginTop: '0.4rem', opacity: 0.85 }}>
+                  {bulkResult.error}
+                </span>
+              )}
             </p>
           )}
         </div>
