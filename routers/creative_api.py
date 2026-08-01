@@ -115,13 +115,33 @@ async def generate_video_campaign(
             raise HTTPException(status_code=404, detail="No workspace found")
 
     
-    result = await execute_video_pipeline(
-        product_name=data.product_name,
-        product_url=data.product_url,
-        image_url=data.image_url,
-        goal=data.goal,
-        profile=profile
-    )
+    # What this workspace has already been given. Without it the pipeline
+    # started from the same brand profile every run and produced the same
+    # scene, which is what made a feed of these look like one video reposted.
+    from services.prompt_history import generate_unique, recent_prompts
+
+    async with AsyncSessionLocal() as session:
+        history = await recent_prompts(session, profile.id)
+
+    async def _attempt(prior: list) -> str:
+        out = await execute_video_pipeline(
+            product_name=data.product_name,
+            product_url=data.product_url,
+            image_url=data.image_url,
+            goal=data.goal,
+            profile=profile,
+            recent_prompts=prior,
+        )
+        _attempt.last = out
+        return out.get("veo_prompt") or ""
+
+    _attempt.last = {}
+    unique_prompt, uniqueness = await generate_unique(_attempt, history)
+    result = _attempt.last or {}
+    if unique_prompt:
+        result["veo_prompt"] = unique_prompt
+    result["uniqueness"] = uniqueness
+    result["prompts_seen_before"] = len(history)
 
     # Persist the generated prompt into the workspace media library so the user
     # can find it later next to the asset it describes.
@@ -750,3 +770,60 @@ async def edit_creative(
             campaign.mediaUrl = media_url
         await session.commit()
         return {"success": True, "message": "Creative updated successfully"}
+
+
+@router.get("/prompt-history")
+async def prompt_history(
+    request: Request,
+    limit: int = 25,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Every video prompt this workspace has generated, newest first.
+
+    Each entry carries how similar it is to the one before it, so a run of
+    near-identical creatives is visible rather than something you only notice
+    once the feed looks repetitive.
+    """
+    from services.prompt_history import DUPLICATE_THRESHOLD, similarity
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        stmt = (
+            select(Media)
+            .where(
+                Media.businessProfileId == workspace_id,
+                Media.promptType == "video",
+                Media.prompt.isnot(None),
+            )
+            .order_by(Media.createdAt.desc())
+            .limit(max(1, min(limit, 100)))
+        )
+        rows = (await session.execute(stmt)).scalars().all()
+
+    items = []
+    for i, m in enumerate(rows):
+        prior = rows[i + 1].prompt if i + 1 < len(rows) else None
+        overlap = similarity(m.prompt, prior) if prior else 0.0
+        items.append({
+            "id": m.id,
+            "prompt": m.prompt,
+            "createdAt": m.createdAt.isoformat() if m.createdAt else None,
+            "imageUrl": m.url or None,
+            "similarityToPrevious": round(overlap, 3),
+            "tooSimilar": overlap >= DUPLICATE_THRESHOLD,
+        })
+
+    repeats = sum(1 for i in items if i["tooSimilar"])
+    return {
+        "total": len(items),
+        "nearDuplicates": repeats,
+        "threshold": DUPLICATE_THRESHOLD,
+        "items": items,
+    }

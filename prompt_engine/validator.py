@@ -461,6 +461,12 @@ def check_subject_count(positive_prompt: str) -> Tuple[bool, Optional[str]]:
     countable = re.sub(
         r'\b[^.,]{0,60}\breads\s+"[^"]{1,60}"[^.]{0,80}', " ", lowered
     )
+    # A screen named in the scene and again as the hero surface is one object,
+    # not two. Collapse the whole family so "dashboard on the monitor, screen
+    # glass reflecting" counts once rather than three times.
+    countable = re.sub(
+        r"\b(dashboard|monitor|screen|display|laptop screen)\b", "screen", countable
+    )
     props = sorted({
         re.sub(r"\\b", "", p).strip()
         for p in COMPETING_PROP_PATTERNS

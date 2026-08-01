@@ -162,7 +162,16 @@ def compile_runway_prompt(
         camera = scene_fields.get("camera") or camera
         subject = scene_fields.get("subject") or "a single subject"
         scene = f"{subject} in {scene_fields.get('environment') or 'an isolated setting'}."
-        action = f"{scene_fields.get('action') or ''}."
+
+        # The opening three seconds carry the whole ad, so the hook is enforced
+        # by ORDER, not by an extra sentence. An earlier attempt emitted a
+        # separate hook_beat clause; it restated the hero string and the spoken
+        # line, which pushed the prompt past budget, truncated the dialogue,
+        # and double-counted the screen as a competing prop.
+        #
+        # Stating "opens mid-motion" and placing the hero string before the
+        # action gets the same result in three words.
+        action = f"opens mid-motion, {scene_fields.get('action') or ''}."
         detail_bits = [scene_fields.get("mood") or aesthetic]
 
         # The hero string is the message. Reference material confirms current
@@ -217,13 +226,20 @@ def compile_runway_prompt(
     #
     # Truncation also has to land outside a quoted string — cutting one in half
     # leaves an unterminated quote that the model reads as running text.
-    budget = 120 if (scene_fields or {}).get("voiceover") else 90
+    budget = 130 if (scene_fields or {}).get("voiceover") else 90
     words = positive_prompt.split()
     if len(words) > budget:
         truncated = " ".join(words[:budget])
         if truncated.count('"') % 2:
             truncated = truncated.rsplit('"', 1)[0].rstrip(" ,;:")
-        positive_prompt = truncated.rstrip(" ,;:").rstrip(".") + "."
+        # Cutting mid-clause left trailing scaffolding like "... , spoken." —
+        # a dangling lead-in to dialogue that never arrives, which reads as an
+        # instruction the model cannot satisfy. Drop the partial clause.
+        truncated = truncated.rstrip(" ,;:.")
+        parts = [p.strip() for p in truncated.split(",")]
+        if parts and len(parts[-1].split()) < 4:
+            parts = parts[:-1]
+        positive_prompt = ", ".join(p for p in parts if p).rstrip(" ,;:.") + "."
 
     return ModelPromptPayload(
         model_name="runway",
