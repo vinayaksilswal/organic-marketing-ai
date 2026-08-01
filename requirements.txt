@@ -64,3 +64,10 @@ sentry-sdk[fastapi]==2.22.0
 # pytest==8.3.5
 # pytest-asyncio==0.25.3
 # httpx  # already installed
+
+# Video post-processing: a branded end card composited onto each clip before
+# posting. A diffusion model cannot render a legible sentence or URL — ffmpeg
+# draws real text, identically every time. imageio-ffmpeg ships a static
+# binary so the container does not depend on a system ffmpeg being present.
+imageio-ffmpeg==0.6.0
+Pillow==12.3.0

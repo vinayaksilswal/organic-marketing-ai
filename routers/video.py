@@ -244,3 +244,75 @@ async def render_video(data: RenderVideoRequest, request: Request, user_id: str 
         logger.error(f"Render failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Rendering failed: {str(e)}")
 
+
+
+class BrandVideoRequest(BaseModel):
+    media_id: Optional[str] = None
+    video_url: Optional[str] = None
+    seconds: float = 1.8
+
+
+@router.post("/add-outro")
+async def add_outro(
+    data: BrandVideoRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+    workspace_id: Optional[str] = Depends(get_workspace_id),
+):
+    """Append the branded end card to a finished clip.
+
+    The video model cannot render a legible sentence or URL, which is why the
+    call to action is spoken rather than burned in. This composites the written
+    version with ffmpeg, where the text is real and correct every time.
+
+    Falls back to the original URL on any failure — a clip that posts without
+    its outro beats a scheduled slot that goes out empty.
+    """
+    from services.video_outro import brand_video_at_url
+
+    async with AsyncSessionLocal() as session:
+        if not workspace_id:
+            bp = (await session.execute(
+                select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            )).scalars().first()
+            workspace_id = bp.id if bp else None
+        if not workspace_id:
+            raise HTTPException(status_code=400, detail="No workspace found")
+
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        media = None
+        source_url = data.video_url
+        if data.media_id:
+            media = await session.get(Media, data.media_id)
+            if not media or media.businessProfileId != workspace_id:
+                raise HTTPException(status_code=404, detail="Media not found in this workspace")
+            source_url = media.url
+
+        if not source_url:
+            raise HTTPException(status_code=400, detail="Provide media_id or video_url")
+
+        branded_url = await brand_video_at_url(
+            video_url=source_url,
+            profile=profile,
+            workspace_id=workspace_id,
+            media_id=data.media_id or str(uuid.uuid4()),
+            seconds=max(1.0, min(data.seconds, 4.0)),
+        )
+
+        changed = branded_url != source_url
+        if media and changed:
+            media.url = branded_url
+            await session.commit()
+
+    return {
+        "success": True,
+        "branded": changed,
+        "videoUrl": branded_url,
+        "message": (
+            "Outro added." if changed
+            else "Could not add the outro; the original clip is unchanged and still postable."
+        ),
+    }
