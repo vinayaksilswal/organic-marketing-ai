@@ -1794,6 +1794,20 @@ async def get_marketing_logs(request: Request) -> Any:
             for l in logs
         ]
 
+
+def _is_branded(media) -> bool:
+    """Whether the stored file is the watermarked, 1080x1920 version.
+
+    brand_video_at_url re-uploads under a "<id>_branded" public id, so the URL
+    is the record of whether the pass completed. It frequently did not: the
+    background job ran ffmpeg on the event loop and was starved or cancelled by
+    a restart, leaving the raw upload in place.
+    """
+    if not (media.mimeType or "").startswith("video/"):
+        return True          # nothing to brand
+    return "_branded" in (media.url or "")
+
+
 @router.get("/media")
 async def get_workspace_media(request: Request) -> Any:
     """List media assets (uploaded and AI rendered) for the active workspace."""
@@ -1821,6 +1835,11 @@ async def get_workspace_media(request: Request) -> Any:
                 "postable": _is_postable(m),
                 "generationStatus": m.generationStatus,
                 "generationError": m.generationError,
+                # Two things a bulk import can silently leave undone, so the
+                # catalog can show them rather than the user discovering it in
+                # a published post.
+                "needsCaption": not (m.caption or m.prompt),
+                "branded": _is_branded(m),
                 "createdAt": m.createdAt.isoformat() if m.createdAt else None,
             }
             for m in media_list
@@ -1962,8 +1981,37 @@ async def bulk_upload_media(
             if not profile or profile.userId != user_id:
                 raise HTTPException(status_code=404, detail="Workspace not found")
 
-            # Read every file before the request body is closed.
-            payload = [(f.filename or "upload", await f.read()) for f in files]
+            # Re-running a folder is the normal way to finish an import that
+            # was interrupted, so already-imported files are skipped rather
+            # than duplicated. Matched on filename within the workspace, which
+            # is what the user actually re-selects.
+            existing = set((await session.execute(
+                select(Media.filename).where(
+                    Media.businessProfileId == workspace_id,
+                    Media.filename.isnot(None),
+                )
+            )).scalars().all())
+
+            payload = []
+            duplicates = 0
+            for f in files:
+                name = f.filename or "upload"
+                if name in existing:
+                    duplicates += 1
+                    continue
+                payload.append((name, await f.read()))
+
+            if not payload:
+                return {
+                    "success": True,
+                    "total": len(files),
+                    "stored": 0,
+                    "failed": 0,
+                    "skipped": duplicates,
+                    "described": 0,
+                    "items": [],
+                    "message": f"{duplicates} already imported",
+                }
 
             result = await ingest_folder(
                 payload, profile, user_id, workspace_id, write_captions=False
@@ -2004,7 +2052,8 @@ async def bulk_upload_media(
             "success": True,
             "processing": bool(stored_ids),
             "message": (
-                f"{result['stored']} of {result['total']} added"
+                f"{result['stored']} of {len(files)} added"
+            + (f", {duplicates} already imported" if duplicates else "")
                 + (" — branding and descriptions are running now"
                    if stored_ids else "")
             ),
@@ -2027,3 +2076,74 @@ async def bulk_upload_media(
             "items": [],
             "message": f"Batch failed: {type(e).__name__}: {str(e)[:200]}",
         }
+
+
+@router.post("/media/backfill")
+async def backfill_media(
+    request: Request,
+    limit: int = 40,
+    user_id: str = Depends(verify_user),
+) -> Any:
+    """Describe and brand assets that a previous run left undone.
+
+    A bulk import does both in the background, and background work does not
+    survive a restart — the branding pass in particular used to block the event
+    loop, get starved, and leave the raw upload in place. Rather than making
+    the user re-upload a library to repair it, this finds what is missing and
+    finishes it.
+
+    Bounded per call. The work is minutes per batch and the caller should be
+    able to run it again rather than hold a request open for an hour.
+    """
+    from services.bulk_ingest import finish_pending_media
+    from services.task_utils import spawn_background
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with get_tenant_session(workspace_id) as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        rows = (await session.execute(
+            select(Media)
+            .where(Media.businessProfileId == workspace_id, Media.url != "")
+            .order_by(Media.createdAt.desc())
+        )).scalars().all()
+
+        pending = [
+            m.id for m in rows
+            if _is_postable(m) and (not (m.caption or m.prompt) or not _is_branded(m))
+        ][: max(1, min(limit, 100))]
+
+        remaining = sum(
+            1 for m in rows
+            if _is_postable(m) and (not (m.caption or m.prompt) or not _is_branded(m))
+        )
+
+    if not pending:
+        return {
+            "success": True,
+            "queued": 0,
+            "remaining": 0,
+            "message": "Every asset already has a description and is branded.",
+        }
+
+    spawn_background(
+        finish_pending_media(workspace_id, pending, profile),
+        f"backfill({workspace_id}, {len(pending)})",
+    )
+
+    return {
+        "success": True,
+        "queued": len(pending),
+        "remaining": remaining,
+        "message": (
+            f"Repairing {len(pending)} asset{'s' if len(pending) != 1 else ''} in the "
+            f"background."
+            + (f" {remaining - len(pending)} still queued after this — run it again."
+               if remaining > len(pending) else "")
+        ),
+    }

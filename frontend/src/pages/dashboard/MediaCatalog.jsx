@@ -12,6 +12,8 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [bulkProgress, setBulkProgress] = useState('');
   const [bulkResult, setBulkResult] = useState(null);
   const [autoCaption, setAutoCaption] = useState(true);
+  const [showOnlyUnfinished, setShowOnlyUnfinished] = useState(false);
+  const [fixing, setFixing] = useState(false);
   
   // Modals
   const [previewMedia, setPreviewMedia] = useState(null);
@@ -60,6 +62,34 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const BULK_BATCH = 3;
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  // A bulk import does captioning and branding in the background, and
+  // background work does not survive a restart. Rather than making the user
+  // re-upload a library to repair it, this finishes whatever was left.
+  const unfinished = mediaList.filter(
+    m => (m.mimeType || '').startsWith('video/') && (m.needsCaption || m.branded === false)
+  );
+
+  const handleFixUnfinished = async () => {
+    setFixing(true);
+    try {
+      const res = await authFetch(
+        `${API_BASE}/marketing/media/backfill`,
+        { method: 'POST' },
+        token
+      );
+      const d = await res.json();
+      showToast(d.message || 'Repair started', res.ok ? 'success' : 'error');
+      // The work runs in the background, so give it a moment before the list
+      // is refetched or nothing will look different and the user will click
+      // again.
+      setTimeout(fetchMedia, 4000);
+    } catch (err) {
+      showToast('Could not start the repair. Try again in a moment.', 'error');
+    } finally {
+      setFixing(false);
+    }
+  };
 
   const handleBulkUpload = async () => {
     if (!bulkFiles.length) return;
@@ -401,6 +431,34 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
           )}
         </div>
 
+        {/* Two things a bulk import can silently leave undone. Surfacing the
+            count means the user finds out here rather than in a published
+            post. */}
+        {unfinished.length > 0 && (
+          <div className="glass-panel" style={{
+            marginBottom: '1rem', padding: '0.9rem 1.25rem', display: 'flex',
+            flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem',
+            border: '1px solid rgba(224,168,0,0.35)',
+          }}>
+            <AlertTriangle size={17} color="#e0a800" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '0.88rem' }}>
+              <strong>{unfinished.length}</strong> video{unfinished.length === 1 ? '' : 's'} not finished
+              {' — '}
+              {unfinished.filter(m => m.needsCaption).length} without a description,
+              {' '}
+              {unfinished.filter(m => m.branded === false).length} without the watermark.
+            </span>
+            <button className="btn btn-secondary" style={{ height: 36 }}
+              onClick={() => setShowOnlyUnfinished(v => !v)}>
+              {showOnlyUnfinished ? 'Show all' : 'Show only these'}
+            </button>
+            <button className="btn btn-primary" style={{ height: 36, marginLeft: 'auto' }}
+              onClick={handleFixUnfinished} disabled={fixing}>
+              {fixing ? <span className="spinner"></span> : <><RefreshCw size={15} /> Describe & brand them</>}
+            </button>
+          </div>
+        )}
+
         {/* TABLE SECTION */}
         <div className="glass-panel" style={{ overflowX: 'auto', border: 'none', background: 'transparent', boxShadow: 'none' }}>
           <div className="glass-panel" style={{ overflow: 'hidden' }}>
@@ -443,7 +501,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                     </td>
                   </tr>
                 ) : (
-                  mediaList.map(item => {
+                  (showOnlyUnfinished ? unfinished : mediaList).map(item => {
                     const isVideo = item.mimeType?.startsWith('video/') || item.filename?.endsWith('.mp4');
                     const caption = item.caption || item.prompt || '';
                     const inactive = item.isActive === false;
@@ -471,6 +529,11 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                           )}
                           <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                             {item.filename}
+                            {item.branded === false && (
+                              <span style={{ marginLeft: '0.5rem', color: '#fbbf24' }}>
+                                &middot; no watermark yet
+                              </span>
+                            )}
                           </p>
                           {item.prompt && (
                             <details style={{ marginTop: '0.5rem' }}>
