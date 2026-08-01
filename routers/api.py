@@ -104,7 +104,12 @@ async def _brand_video_bytes(
         try:
             src = work / "source.mp4"
             src.write_bytes(content)
-            branded = _Path(append_outro(src, brand, cta, url))
+            # Blocking subprocess — must not run on the event loop.
+            import asyncio as _asyncio
+
+            branded = _Path(
+                await _asyncio.to_thread(append_outro, src, brand, cta, url)
+            )
             if branded != src and branded.exists():
                 logger.info(f"Outro composited onto {filename} for {brand}")
                 return branded.read_bytes()

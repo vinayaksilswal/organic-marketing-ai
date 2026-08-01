@@ -37,6 +37,14 @@ from loguru import logger
 # in flight rather than queueing.
 MAX_CONCURRENT = 4
 
+# ffmpeg is CPU-bound, not IO-bound. Four concurrent 1080p encodes saturate a
+# shared container even from worker threads, and the web server is competing
+# for the same core — a backlog of branding made the API unreachable and
+# uploads failed while it churned. One at a time: the pass takes longer and
+# the service stays up, which is the correct trade for background work.
+MAX_ENCODES = 1
+_encode_slot = asyncio.Semaphore(MAX_ENCODES)
+
 # FREE MODELS ONLY, by choice.
 #
 # The cost of that choice, measured rather than assumed: on a sample of six
@@ -150,7 +158,11 @@ async def describe_asset(
     from config import settings
 
     mime = _mime_for(filename) or ""
-    image_bytes = content if mime.startswith("image/") else extract_poster_frame(content)
+    # Blocking subprocess; keep it off the event loop.
+    image_bytes = (
+        content if mime.startswith("image/")
+        else await asyncio.to_thread(extract_poster_frame, content)
+    )
     if not image_bytes:
         return ""
 
@@ -408,9 +420,10 @@ async def finish_pending_media(
                 # the original footage, not from a frame that now carries our
                 # own watermark.
                 if (media.mimeType or "").startswith("video/"):
-                    branded = await brand_video_at_url(
-                        media.url, profile, workspace_id, media_id
-                    )
+                    async with _encode_slot:
+                        branded = await brand_video_at_url(
+                            media.url, profile, workspace_id, media_id
+                        )
                     if branded and branded != media.url:
                         async with AsyncSessionLocal() as s2:
                             row = await s2.get(Media, media_id)

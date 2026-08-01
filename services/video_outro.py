@@ -433,7 +433,16 @@ async def brand_video_at_url(
             logger.error(f"Outro: could not download {video_url}: {e}")
             return video_url
 
-        branded = Path(append_outro(source, brand, cta, url, seconds=seconds))
+        # append_outro shells out to ffmpeg with a blocking subprocess call.
+        # Awaiting it directly on the event loop froze the entire server for
+        # the duration — this runs on a single uvicorn worker, so branding a
+        # backlog of clips made the API unreachable and uploads failed while
+        # it churned. Off to a thread.
+        branded = Path(
+            await asyncio.to_thread(
+                append_outro, source, brand, cta, url, seconds
+            )
+        )
         if branded == source:
             # append_outro already logged why; the clip is still postable.
             return video_url
