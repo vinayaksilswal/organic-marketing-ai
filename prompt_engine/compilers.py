@@ -40,17 +40,44 @@ _SCREEN_SURFACE = re.compile(
 )
 
 
-def _physical_brand_surface(surface: Optional[str]) -> str:
+def _physical_brand_surface(surface: Optional[str], brand: str = "") -> str:
     """Keep the brand's placement only when it is something physical.
 
     An etched plate, a painted wall or a stamped label holds a word steadily
     across frames. A screen does not, and neither does a compositing overlay,
     which these models approximate rather than draw.
+
+    The result is inserted after "on", so it has to read as a noun phrase.
+    Live output produced 'on etched into the wooden reception desk' and 'on
+    Ridgeline etched into the head badge' — a dangling participle and a
+    duplicated brand word, because the model answers this field with a phrase
+    that already assumes a subject.
     """
     text = (surface or "").strip().strip(".")
     if not text or _SCREEN_SURFACE.search(text):
         return ""
-    return text
+
+    # The brand word is already stated by the clause this feeds, so repeating
+    # it reads as an echo: 'the single word "Northwind" on the word Northwind
+    # etched into the mug'. Both the bare and the introduced form appear.
+    if brand:
+        text = re.sub(
+            rf"^(?:the\s+(?:word|name|logo|mark)\s+)?{re.escape(brand)}\b",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        ).lstrip(" ,-:")
+
+    # A leading participle needs something to attach to.
+    if re.match(
+        r"^(etched|stamped|embossed|painted|engraved|printed|carved|woven|"
+        r"debossed|screen.?printed|branded)\b",
+        text,
+        re.IGNORECASE,
+    ):
+        text = f"the mark {text}"
+
+    return text.strip(" ,-:")
 
 
 def _enforce_background_text_suppression(text: str) -> str:
@@ -182,16 +209,46 @@ def compile_runway_prompt(
         if hero:
             surface = (scene_fields.get("hero_surface") or "").strip().strip(".")
             on_what = surface or "the screen"
-            detail_bits.append(
-                f'{on_what} reads "{hero}" in large high-contrast type, '
-                "surrounding interface copy soft and out of focus"
+            # A rendered test proved describing what a screen "displays" is not
+            # enough. The prompt said the laptop screen displayed "Scan
+            # Complete"; across all ten seconds the laptop stayed edge-on,
+            # facing away, and the string never appeared. The model composes
+            # around the PERSON and puts a laptop where a laptop naturally
+            # sits, so the message was simply lost.
+            #
+            # The camera has to be told to SEE it. Every reference clip that
+            # rendered text successfully framed the screen square-on or over
+            # the shoulder.
+            # The brief also asks for framing, so add it only when the surface
+            # did not already describe one — otherwise the clause reads
+            # "over the shoulder ..., the laptop screen angled toward the
+            # camera and filling the upper half ..." and says it twice.
+            framing = ""
+            already_framed = re.search(
+                r"\b(angled|facing|square to|toward the camera|over the shoulder|"
+                r"filling|fills|head-on|to camera|in frame)\b",
+                on_what,
+                re.IGNORECASE,
             )
+            if _SCREEN_SURFACE.search(on_what) and not already_framed:
+                framing = (
+                    "camera over the shoulder with the screen square to frame "
+                    "and filling the upper half, "
+                )
+            clause = f'{framing}{on_what} reads "{hero}" in large high-contrast type'
+            # The defocus instruction only means something when there IS an
+            # interface. It was appended unconditionally, so a chalk mark on
+            # steel and a tag on a coffee bag both asked the model to blur
+            # surrounding "interface copy" that does not exist in the shot.
+            if _SCREEN_SURFACE.search(on_what):
+                clause += ", surrounding interface copy soft and out of focus"
+            detail_bits.append(clause)
 
         # The brand word closes the clip. Anchoring it to a physical surface
         # renders far more cleanly than a floating overlay.
         brand = scene_fields.get("onscreen_text")
         if brand:
-            surface = _physical_brand_surface(scene_fields.get("brand_moment"))
+            surface = _physical_brand_surface(scene_fields.get("brand_moment"), brand)
             where = f" on {surface}" if surface else ""
             detail_bits.append(f'final frame holds the single word "{brand}"{where}')
         detail_bits.append("shallow depth of field, vertical 9:16 frame")
@@ -201,7 +258,28 @@ def compile_runway_prompt(
         # they look identical to a naive quote count.
         vo = (scene_fields.get("voiceover") or "").strip()
         if vo:
-            detail_bits.append(f'spoken aloud, natural unhurried delivery: "{vo}"')
+            # A rendered test came back silent until 3.5 seconds — room tone
+            # over a man closing a notebook, while the line waited. In a feed
+            # that is the whole ad gone. "Natural unhurried delivery" invited
+            # exactly that pause, so the start point is now explicit.
+            # Phrased positively. "no pause before the first word" reads
+            # naturally but the leading "no " trips
+            # check_model_negative_syntax, which rejects negative wording in a
+            # Runway positive prompt because the attention mechanism latches
+            # onto the suppressed term. Same trap as the earlier "No other
+            # text:" regression.
+            detail_bits.append(
+                f'already speaking as the first frame begins, the first word '
+                f'lands immediately: "{vo}"'
+            )
+
+        # The ad has to ask for something. Burned on screen a CTA renders as
+        # smeared glyphs, so it is SPOKEN over the closing frame while the
+        # screen holds only the one-word brand. Naming the brand aloud is also
+        # what makes the viewer able to search for it afterwards.
+        cta = (scene_fields.get("spoken_cta") or "").strip()
+        if cta:
+            detail_bits.append(f'then over the closing frame, spoken: "{cta}"')
         detail = ", ".join(b for b in detail_bits if b)
         # The spoken line keeps its own sentence punctuation inside the quotes,
         # so a blanket full stop here produces `scan."."`.
@@ -226,7 +304,9 @@ def compile_runway_prompt(
     #
     # Truncation also has to land outside a quoted string — cutting one in half
     # leaves an unterminated quote that the model reads as running text.
-    budget = 130 if (scene_fields or {}).get("voiceover") else 90
+    budget = 145 if (scene_fields or {}).get("spoken_cta") else (
+        130 if (scene_fields or {}).get("voiceover") else 90
+    )
     words = positive_prompt.split()
     if len(words) > budget:
         truncated = " ".join(words[:budget])

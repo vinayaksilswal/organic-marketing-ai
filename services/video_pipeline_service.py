@@ -567,17 +567,40 @@ you cut the subject, the hero string, or the line.
 
 STRUCTURE (in this order):
 [One camera move] + [One subject, front-loaded] + [One physical action] +
-[Room and light] + [The hero string and where it renders] + [Brand word in
-the closing frame] + [One audio clause] + [The spoken line, verbatim]
+[Room and light] + [The camera framing that puts the text in view, and the
+text itself] + [Brand word in the closing frame] + [One audio clause] + [The
+spoken line, verbatim, starting at frame one]
 
 Do NOT end with a list of negatives. These models have no negative parsing —
 "no holograms" raises the odds of a hologram by putting the word in the
 prompt at all. Describe only what IS in frame.
 
 TEN SECONDS:
-  0-1s   something is already happening. No fade in, no logo card.
-  1-7s   the single action plays out and the hero string lands.
+  0-1s   something is already happening, the line is ALREADY BEING SPOKEN, and
+         the text is ALREADY on screen. No fade in, no logo card, no pause.
+  1-7s   the single action plays out.
   7-10s  the reaction, and the brand word in the closing frame.
+
+THREE THINGS A RENDERED TEST PROVED, learn from them:
+
+  ONE VERB, NOT TWO. The prompt said "closes a paper notebook and turns to
+  their laptop". The render spent its first three and a half seconds on the
+  notebook. The product never got its moment. Write the action already in
+  progress: not "closes the notebook and turns to the laptop" but "leans in,
+  reading".
+
+  THE CAMERA MUST SEE THE SCREEN. The same prompt said the laptop screen
+  displayed "Scan Complete". Across all ten seconds the laptop sat edge-on,
+  facing away, and the words never appeared — the whole message was lost.
+  Saying a screen "displays" something is not enough; the model puts a laptop
+  where a laptop naturally goes. State the framing:
+    GOOD: "camera over her shoulder, the screen square to frame and filling
+           the upper half, showing 'Scan Complete' in large white text"
+    BAD:  "turns to their laptop where the screen displays 'Scan Complete'"
+
+  THE VOICE STARTS AT FRAME ONE. That render was near-silent until 3.5
+  seconds. Say the line begins immediately, with no pause before the first
+  word.
 
 AUDIO — one short clause of ambience plus one punctuating sound:
 "low room tone, a single keyboard click".
@@ -606,8 +629,19 @@ OUTPUT — valid JSON only. First character { and last character }. No markdown,
   "creative_format_used": "<assigned format name>",
   "variation_modifier_applied": "<assigned modifier name>",
   "product_type": "<product type from marketing intel>",
-  "prompt": "<one 10-second vertical shot, 90-130 words, ONE camera move, ONE subject, ONE action, ONE hero string of 2-6 words rendered large with everything else defocused, the brand name in the closing frame, one audio clause, and the spoken line verbatim in double quotes. No list of negatives.>"
+  "prompt": "<one 10-second vertical shot, 90-130 words, ONE camera move, ONE subject, ONE action, one short line of 2-6 words rendered large on a named surface with everything else defocused, the brand name in the closing frame, one audio clause, and the spoken words verbatim in double quotes. No list of negatives.>"
 }
+
+VOCABULARY WARNING — the prompt is read by a RENDERER, not by you. It must
+describe only what a camera would see. Never carry a word from these
+instructions into the prompt itself. Live output once read:
+
+  BAD:  the laptop where the QuantCAI screen displays the hero string "Scan Complete"
+  GOOD: the laptop screen showing "Scan Complete" in large white text
+
+"hero string", "hero text", "voiceover", "brand moment", "on-screen text",
+"camera move" and "call to action" are names for parts of a brief. A renderer
+will attempt to draw them. Write the thing, never its label.
 """
 
     prompt = f"""Translate the product intelligence and assigned creative format below into ONE production-ready 10-second vertical video prompt.
@@ -791,7 +825,44 @@ Return the JSON object and nothing else.
             "The AI returned an empty prompt after two attempts."
         )
 
-    return generated
+    return _strip_brief_vocabulary(generated)
+
+
+# Names for the PARTS of a brief. The renderer has no idea these are labels and
+# will attempt to draw them. Live output reached the dashboard reading "the
+# QuantCAI screen displays the hero string "Scan Complete"" — the words "hero
+# string" would have been rendered onto the laptop.
+#
+# The instruction not to do this lives in the brief, but an instruction is a
+# request and this is a correctness property, so it is also enforced here.
+_BRIEF_VOCABULARY = [
+    (r"\bdisplays the hero[ _-]?(?:string|text)\b", "displays"),
+    (r"\bshows the hero[ _-]?(?:string|text)\b", "shows"),
+    (r"\breads the hero[ _-]?(?:string|text)\b", "reads"),
+    (r"\bthe hero[ _-]?(?:string|text)\b", "the text"),
+    (r"\bhero[ _-]?(?:string|text)\b", "text"),
+    (r"\bon[ _-]?screen[ _-]?text:\s*", ""),
+    (r"\bvoice[ _-]?over:\s*", ""),
+    (r"\bvoiceover\b", "spoken line"),
+    (r"\bbrand[ _-]?moment\b", "brand mark"),
+    (r"\bcall[ _-]to[ _-]action\b", "closing line"),
+    (r"\bcamera[ _-]?vector\b", "camera move"),
+    (r"\bhero[ _-]?surface\b", "surface"),
+]
+
+
+def _strip_brief_vocabulary(text: str) -> str:
+    """Remove schema words a video model would try to render."""
+    import re as _re
+
+    cleaned = text
+    for pattern, replacement in _BRIEF_VOCABULARY:
+        cleaned, n = _re.subn(pattern, replacement, cleaned, flags=_re.IGNORECASE)
+        if n:
+            logger.info(f"Stripped brief vocabulary from prompt: {pattern}")
+    # Collapse the double spaces a removal can leave behind.
+    cleaned = _re.sub(r"\s{2,}", " ", cleaned)
+    return _re.sub(r"\s+([,.])", r"\1", cleaned).strip()
 
 
 async def execute_video_pipeline(

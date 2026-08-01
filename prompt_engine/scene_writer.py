@@ -55,8 +55,11 @@ SIMULTANEOUSLY inside the first three seconds, not in sequence.
 All three at once, from frame one. This is a constraint on the fields below,
 not a field of its own:
 
-  `action` must START mid-movement. Never "she sits down and then opens the
-  laptop" — the laptop is already open and the scan is already running.
+  `action` must START mid-movement, and must be ONE verb. Never "closes the
+  notebook and turns to the laptop" — a rendered test spent its first three
+  and a half seconds on the notebook while the product waited off-frame, and
+  the ad was over before it began. The laptop is already open, the scan is
+  already running, and the first frame is the reaction to it.
   `hero_text` must be on screen from the first frame. Never save it for a
   reveal at the end; the viewer who was going to scroll has already scrolled.
   `voiceover` must open on the PROBLEM, not on a greeting or the brand name.
@@ -129,8 +132,9 @@ OUTPUT — valid JSON only, no markdown, no preamble:
   "mood": "<the feeling, in three or four words>",
   "audio": "<ambience plus one punctuating sound, 12 words maximum>",
   "hero_text": "<the ONE string the viewer must read: the problem, the result, or the offer. 2-6 words. Empty only if the shot has no screen>",
-  "hero_surface": "<where it renders: a red alert banner, a chat box mid-typing, a notification card sliding in, the dashboard header>",
-  "voiceover": "<the exact words spoken aloud, verbatim, 10-20 words. See below>",
+  "hero_surface": "<where it renders AND how the camera sees it — the screen must face the lens. 'the laptop screen, angled to camera and filling the upper half of frame' renders; 'their laptop' does not, because the model turns it away>",
+  "voiceover": "<the exact opening words spoken aloud, verbatim, 10-16 words. See below>",
+  "spoken_cta": "<the closing call to action, SPOKEN not written, 5-9 words, naming the brand. See below>",
   "brand_moment": "<where the brand word sits in the closing beat, on a physical surface>"
 }
 
@@ -159,8 +163,37 @@ slogan cadence. It should land the same beat the visual lands, then hand off.
         (nobody says this out loud; it is a banner, not a sentence)
   BAD:  "The founder explains the security benefit." (a description, not a line)
 
-Keep it to 10-20 words. Past that the delivery outruns ten seconds and the
-model clips it mid-word.
+Keep the opening line to 10-16 words, and the closing CTA to 5-9. Together
+they have to fit ten seconds at a natural pace.
+
+THE CLOSING CTA — SPOKEN, NEVER WRITTEN
+The ad has to ask for something or the reach buys nothing. But a call to
+action BURNED ON SCREEN comes back as smeared glyphs: "Visit quantcai.info and
+start your journey" is nine words of text and renders as noise.
+
+Spoken, the same words are perfect. These models synthesise speech cleanly, so
+the CTA is heard while the screen holds only the one-word brand.
+
+  GOOD: "Run your free scan at quantcai."
+  GOOD: "Start at quantcai. Takes one minute."
+  GOOD: "Book a fitting at Ridgeline this week."
+  BAD:  "Click the link in bio to learn more!"  (nobody says this aloud)
+  BAD:  putting any of these on screen instead of saying them
+
+Name the brand here — this is the one place it belongs in the dialogue, and it
+is what makes the viewer able to search for you afterwards.
+
+The line must NOT repeat the hero string. The viewer reads that and hears this
+at the same moment; saying the same words twice wastes half the ad. The screen
+shows the state, the line says why it matters.
+
+  hero "Roasted This Week" + line "Supermarket beans sit for months. Ours ships
+  two days after roasting."          <- different information, works
+  hero "Putting it off another year" + line "Putting it off another year feels
+  heavy..."                          <- the same words twice, wasted
+
+Do not name the brand in the line either, and never write a semicolon — nobody
+speaks one. Two short sentences beat one long clause.
 
 Every other field is a fragment, not a sentence. No trailing full stops."""
 
@@ -336,6 +369,7 @@ async def write_scene(
             "hero_text": _clean_fragment(data.get("hero_text"), 60),
             "hero_surface": _clean_fragment(data.get("hero_surface"), 120),
             "voiceover": _clean_voiceover(data.get("voiceover")),
+            "spoken_cta": _clean_voiceover(data.get("spoken_cta")),
             "brand_moment": _clean_fragment(data.get("brand_moment"), 120),
         }
 
@@ -345,6 +379,27 @@ async def write_scene(
         hero_words = scene["hero_text"].split()
         if len(hero_words) > 6:
             scene["hero_text"] = " ".join(hero_words[:6])
+
+        # The viewer reads the hero string and hears the line at the same
+        # moment, so saying the same words twice spends half the ad on one
+        # idea. Live output produced hero "Putting it off another year" against
+        # a line opening "Putting it off another year feels heavy". Drop the
+        # echo from the spoken line rather than the screen — the screen is the
+        # part that survives a muted autoplay.
+        hero_l = scene["hero_text"].lower().strip()
+        vo_l = scene["voiceover"].lower()
+        if hero_l and len(hero_l) > 8 and vo_l.startswith(hero_l):
+            remainder = scene["voiceover"][len(hero_l):].lstrip(" ,;:-")
+            if len(remainder.split()) >= 5:
+                scene["voiceover"] = remainder[0].upper() + remainder[1:]
+            else:
+                logger.info("Spoken line only echoed the hero string; dropping it")
+                scene["voiceover"] = ""
+
+        # Nobody speaks a semicolon; it makes the delivery read as one long
+        # clause and the model runs out of time mid-sentence.
+        scene["voiceover"] = re.sub(r"\s*;\s*", ". ", scene["voiceover"])
+
         if not scene["subject"] or not scene["action"]:
             logger.warning("Scene writer omitted subject or action")
             return None
@@ -356,6 +411,20 @@ async def write_scene(
         # retains. The model's suggestion is only a fallback for when we have
         # no business name to use.
         scene["onscreen_text"] = _brand_endframe(business_name)
+
+        # The placement field tends to continue the business name rather than
+        # start a fresh phrase: with "Halden Dental" the end frame is "Halden"
+        # and brand_moment came back "Dental etched into the frosted glass
+        # door", compiling to `holds the single word "Halden" on Dental etched
+        # into...`. Strip any leading fragment of the name so the placement
+        # reads as a location on its own.
+        moment = scene.get("brand_moment", "")
+        if moment and business_name:
+            name_words = [w.lower() for w in re.findall(r"\w+", business_name)]
+            words = moment.split()
+            while words and re.sub(r"\W", "", words[0]).lower() in name_words:
+                words.pop(0)
+            scene["brand_moment"] = " ".join(words).lstrip(" ,-:")
         return scene
     except Exception as e:
         logger.warning(f"Scene writer failed, caller will fall back: {e}")

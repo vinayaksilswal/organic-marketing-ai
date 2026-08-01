@@ -17,11 +17,11 @@ from database import BusinessProfile
 CAPTION_MAX_LENGTH = 300
 CAPTION_MAX_SENTENCES = 3
 # 85 was set when a prompt carried only scene description. It now also carries
-# a hero string and a verbatim spoken line, both load-bearing, so the old
-# ceiling rejected every prompt that included dialogue. Kept as a real ceiling
-# rather than removed: past ~130 words these models start dropping elements
-# silently, which is worse than a hard failure.
-PROMPT_MAX_WORDS = 130
+# a hero string, an opening spoken line and a closing spoken CTA, all
+# load-bearing, so the old ceiling rejected every prompt that included
+# dialogue. Kept as a real ceiling rather than removed: past ~150 words these
+# models start dropping elements silently, which is worse than a hard failure.
+PROMPT_MAX_WORDS = 150
 PROMPT_MAX_ENTITIES = 10
 AUDIO_MAX_WORDS = 15
 
