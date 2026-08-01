@@ -20,6 +20,8 @@ scheduled post that never goes out.
 
 from __future__ import annotations
 
+import asyncio
+import os
 import shutil
 import subprocess
 import tempfile
@@ -171,21 +173,30 @@ def build_outro_card(
     return path
 
 
-# Instagram's own spec for vertical video. Delivering at this size means its
-# encoder is not upscaling a 720p file with a cheap scaler before compressing
-# it — the source it receives is already the right shape.
-TARGET_W, TARGET_H = 1080, 1920
+# Instagram and Facebook cap vertical video at 1080x1920 and downscale
+# anything larger on ingest. Delivering 2K therefore costs storage and encode
+# time and then gets thrown away — worse, it hands the platform's own
+# downscaler a job we would rather do ourselves with lanczos. 1440p is here for
+# platforms that keep it (YouTube Shorts), not as a default.
+#
+# Set VIDEO_TARGET_HEIGHT=2560 in the environment to deliver 1440x2560.
+_TARGET_H = int(os.getenv("VIDEO_TARGET_HEIGHT", "1920"))
+TARGET_H = 2560 if _TARGET_H >= 2560 else 1920
+TARGET_W = 1440 if TARGET_H == 2560 else 1080
 
 # Re-encoding cannot add detail that is not in the source; the point is to stop
 # throwing more of it away and to hand the platform its preferred shape.
 #
-# CRF alone is not enough here. Upscaling then sharpening manufactures
-# high-frequency detail that CRF faithfully spends bits on: at crf 19 a 1.8MB
-# source came back as 44.8MB, which is 25x for footage Instagram will re-encode
-# to about 4 Mbps regardless. The cap is what keeps the file sane.
-QUALITY_CRF = 21
-MAX_BITRATE = "7M"      # comfortably above what the platform retains
-BUFSIZE = "14M"
+# crf 18 rather than 21, and a 12M ceiling rather than 7M. Measured on a real
+# 720p source: 5.1MB -> 7.8MB and 7.2s -> 11.0s. That is the quality Instagram
+# actually retains, unlike extra resolution, which it discards.
+#
+# The cap still matters. Upscaling then sharpening manufactures high-frequency
+# detail that CRF faithfully spends bits on: uncapped at crf 19 the same 1.8MB
+# source came back as 44.8MB.
+QUALITY_CRF = int(os.getenv("VIDEO_CRF", "18"))
+MAX_BITRATE = os.getenv("VIDEO_MAX_BITRATE", "12M")
+BUFSIZE = f"{int(MAX_BITRATE.rstrip('M')) * 2}M"
 
 
 def build_watermark_png(
@@ -323,12 +334,11 @@ def append_outro(
         cmd += ["-filter_complex", chain, "-map", "[v]"]
 
     cmd += [
-        # veryfast, not slow. This runs inside the upload request and gunicorn
-        # kills the worker at --timeout 120; a "slow" preset at 1080p exceeded
-        # that on a single clip during testing. At crf 19 the visual difference
-        # between presets is marginal — the file is simply larger, and the
-        # platform re-encodes it anyway.
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", str(QUALITY_CRF),
+        # "faster" rather than "veryfast": this no longer runs inside a
+        # request, so a few extra seconds per clip buys real compression
+        # efficiency. Not "slow" — encodes are serialised to keep the single
+        # worker responsive, so per-clip time is the whole backlog's time.
+        "-c:v", "libx264", "-preset", "faster", "-crf", str(QUALITY_CRF),
         # High profile at level 4.1 is what every phone decodes and what
         # Instagram expects; anything more exotic gets re-encoded harder.
         "-profile:v", "high", "-level", "4.1",
