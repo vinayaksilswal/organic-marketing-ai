@@ -301,6 +301,24 @@ async def health_check(request: Request) -> JSONResponse:
     except Exception:
         integrations = {}
 
+    # Video branding needs ~310MB free and refuses to start without it, which
+    # looks identical from the dashboard to "branding is broken" — the count
+    # simply never drops. Reporting the number here turns that into something
+    # readable instead of something inferred from crash events.
+    try:
+        from services.video_outro import ENCODE_HEADROOM_MB, container_memory
+
+        reading = container_memory()
+        memory = None if reading is None else {
+            "usedMb": round(reading[0]),
+            "limitMb": round(reading[1]),
+            "freeMb": round(reading[1] - reading[0]),
+            "encodeNeedsMb": ENCODE_HEADROOM_MB,
+            "canEncode": (reading[1] - reading[0]) >= ENCODE_HEADROOM_MB,
+        }
+    except Exception:
+        memory = None
+
     return JSONResponse(
         status_code=200,
         content={
@@ -309,6 +327,7 @@ async def health_check(request: Request) -> JSONResponse:
             "version": app.version,
             "commit": os.getenv("RENDER_GIT_COMMIT", os.getenv("GIT_COMMIT", "unknown"))[:12],
             "integrations": integrations,
+            "memory": memory,
         },
     )
 
