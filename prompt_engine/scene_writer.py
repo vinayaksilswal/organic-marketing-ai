@@ -255,6 +255,42 @@ _LEGAL_SUFFIX = re.compile(
 )
 
 
+def _fallback_cta(business_name: Optional[str], primary_offer: Optional[str]) -> str:
+    """A spoken closing line, built from the brand and its offer.
+
+    Used when the writer omits one. Ending on the bare brand name — "QuantCAI."
+    — leaves the viewer with nothing to do, which is the difference between an
+    ad and a clip. The brand is always named because that is what a viewer
+    types into a search box afterwards.
+    """
+    brand = (business_name or "").strip()
+    if not brand:
+        return ""
+
+    offer = re.sub(r"\s+", " ", (primary_offer or "").strip().rstrip("."))
+    if offer:
+        # "Run a free scan" -> "Run a free scan at quantcai."
+        # Already-directed offers ("Visit us", "Book at X") keep their shape.
+        if re.search(rf"\b{re.escape(brand)}\b", offer, re.IGNORECASE):
+            line = offer
+        elif re.match(r"^(visit|go to|head to|find)\s+(us|our site)\b", offer, re.IGNORECASE):
+            # "Visit us" already has a verb and an object — swapping the vague
+            # object for the brand beats bolting the brand on the end.
+            line = re.sub(
+                r"^(visit|go to|head to|find)\s+(us|our site)\b",
+                rf"\1 {brand}",
+                offer,
+                flags=re.IGNORECASE,
+            )
+        else:
+            line = f"{offer} at {brand}"
+        # Keep it inside the closing beat; a long offer outruns the frame.
+        if len(line.split()) <= 9:
+            return line.rstrip(".") + "."
+
+    return f"Visit {brand} to get started."
+
+
 def _brand_endframe(business_name: Optional[str]) -> str:
     """The word the final frame holds.
 
@@ -411,6 +447,14 @@ async def write_scene(
         # retains. The model's suggestion is only a fallback for when we have
         # no business name to use.
         scene["onscreen_text"] = _brand_endframe(business_name)
+
+        # Every clip has to ASK for something. Ending on the bare brand name
+        # sounds unfinished — the viewer hears "QuantCAI" and is given nothing
+        # to do with it. Guaranteed rather than requested, for the same reason
+        # the watermark is: an ad that forgets its call to action is a wasted
+        # impression, and the model omits it often enough to matter.
+        if not scene["spoken_cta"]:
+            scene["spoken_cta"] = _fallback_cta(business_name, primary_offer)
 
         # The placement field tends to continue the business name rather than
         # start a fresh phrase: with "Halden Dental" the end frame is "Halden"

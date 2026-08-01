@@ -521,6 +521,18 @@ Every bad render traces back to one of these. Avoid them absolutely.
    abstract mood — "an atmosphere of quiet concern" — sells nothing, because
    the viewer never learns what the product does.
 
+   THE SPOKEN CLOSING LINE — ON EVERY CLIP, WITHOUT EXCEPTION.
+   Ending on the bare brand name sounds unfinished: the viewer hears
+   "QuantCAI" and is given nothing to do with it. Every prompt closes with a
+   SPOKEN call to action naming the brand. Spoken, never written — burned on
+   screen it renders as smeared glyphs; as speech it is perfect.
+     GOOD: "Run your free scan at QuantCAI."
+     GOOD: "Get secure with QuantCAI."
+     GOOD: "Book a fitting at Ridgeline this week."
+     BAD:  ending on "QuantCAI" alone
+     BAD:  "Click the link in bio!"  (nobody says this aloud)
+   Build it from the business's own offer. Five to nine words.
+
    THE BRAND WATERMARK — ON EVERY CLIP, WITHOUT EXCEPTION.
    Close every prompt with the business name as a soft semi-transparent white
    wordmark centred along the BOTTOM EDGE, holding for the whole clip. One

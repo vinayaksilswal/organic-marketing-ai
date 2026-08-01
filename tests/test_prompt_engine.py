@@ -777,3 +777,62 @@ def test_suppression_clause_does_not_contradict_the_brand_word():
     without = compile_video_prompt("runway", "x",
                                    scene_fields=_brand_scene(onscreen_text=""))
     assert "free of text" in without.positive_prompt.lower()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Every clip has to ask for something. Ending on the bare brand name leaves the
+# viewer with nothing to do, which is the difference between an ad and a clip.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("brand,offer,expected", [
+    ("quantcai", "Run a free scan", "Run a free scan at quantcai."),
+    ("Ridgeline", "Book a fitting", "Book a fitting at Ridgeline."),
+    ("Northwind Coffee", "Start a subscription", "Start a subscription at Northwind Coffee."),
+    # A vague object is replaced by the brand rather than having it bolted on.
+    ("Acme", "Visit us", "Visit Acme."),
+    ("Acme", "Visit our site", "Visit Acme."),
+    # No offer at all still yields a usable line.
+    ("Acme", "", "Visit Acme to get started."),
+])
+def test_fallback_cta_always_names_the_brand(brand, offer, expected):
+    from prompt_engine.scene_writer import _fallback_cta
+    assert _fallback_cta(brand, offer) == expected
+
+
+def test_fallback_cta_rejects_an_offer_too_long_to_speak():
+    """A long offer outruns the closing beat and the model clips it mid-word."""
+    from prompt_engine.scene_writer import _fallback_cta
+    out = _fallback_cta("Acme", "Head over to our website today and browse the entire spring collection now")
+    assert len(out.split()) <= 9
+    assert "Acme" in out
+
+
+def test_fallback_cta_needs_a_brand():
+    from prompt_engine.scene_writer import _fallback_cta
+    assert _fallback_cta("", "Run a scan") == ""
+
+
+def test_spoken_cta_reaches_the_compiled_prompt():
+    from prompt_engine.compilers import compile_video_prompt
+    p = compile_video_prompt(
+        "runway", "x",
+        scene_fields=_brand_scene(spoken_cta="Run your free scan at quantcai"),
+    )
+    assert 'over the closing frame, spoken: "Run your free scan at quantcai"' in p.positive_prompt
+
+
+def test_cta_is_spoken_not_rendered():
+    """Burned on screen a CTA sentence renders as smeared glyphs. The only
+    rendered text stays the hero string plus the one-word watermark."""
+    from prompt_engine.compilers import compile_video_prompt
+    from prompt_engine import validator
+
+    p = compile_video_prompt(
+        "runway", "x",
+        scene_fields=_brand_scene(spoken_cta="Run your free scan at quantcai"),
+    )
+    assert "spoken" in p.positive_prompt
+    ok, msg = validator.check_background_text_suppression(p.positive_prompt)
+    assert ok, msg
+    ok, msg = validator.check_model_negative_syntax("runway", p.positive_prompt, p.negative_prompt)
+    assert ok, msg
