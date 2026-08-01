@@ -354,7 +354,7 @@ def test_background_text_suppression_clean():
 def test_background_text_suppression_violation():
     ok, msg = check_background_text_suppression("Show text overlay with product name and billboard in background.")
     assert ok is False
-    assert "text" in msg.lower() or "rendering" in msg.lower()
+    assert "render" in msg.lower() or "hero string" in msg.lower()
 
 
 def test_subject_count_valid():
@@ -667,3 +667,100 @@ async def test_api_ci_golden_dataset_eval(authed_client):
     assert data["total_samples"] > 0
     assert data["safety_pass_rate"] == 1.0
     assert data["passed_ci_gate"] is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Brand end-frame: every clip closes on the business name so the reach
+# compounds into recall. One word, because that is the only length these models
+# render legibly and the only length a scrolling viewer retains.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _brand_scene(**overrides):
+    scene = dict(
+        camera="slow push-in 35mm",
+        subject="compliance lead in wrinkled button-down, lanyard askew",
+        action="watches terminal, shoulders drop into slow exhale",
+        environment="sterile ops room, blue bias lighting",
+        mood="audit relief validated",
+        brand_moment="the plate etched into the rack door",
+        onscreen_text="quantcai",
+    )
+    scene.update(overrides)
+    return scene
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("quantcai", "quantcai"),
+    ("Northwind Coffee Co.", "Northwind"),      # too long as a pair
+    ("The Ridgeline Bikes Ltd", "Ridgeline"),   # filler and suffix stripped
+    ("Blue Bottle", "Blue Bottle"),             # short pair: "Blue" recalls nothing
+    ("ACME, Inc.", "ACME"),
+    ("", ""),
+])
+def test_brand_endframe_reduces_to_one_rememberable_word(raw, expected):
+    from prompt_engine.scene_writer import _brand_endframe
+    assert _brand_endframe(raw) == expected
+
+
+def test_brand_word_reaches_the_compiled_prompt():
+    from prompt_engine.compilers import compile_video_prompt
+    p = compile_video_prompt("runway", "post-quantum readiness",
+                             scene_fields=_brand_scene())
+    assert '"quantcai"' in p.positive_prompt
+    assert "etched into the rack door" in p.positive_prompt
+
+
+def test_brand_word_is_never_placed_on_a_screen():
+    """A brand on a monitor renders as mush, and the validator rejects it.
+
+    The surface is dropped rather than the brand, so the clip still closes on
+    the business name.
+    """
+    from prompt_engine.compilers import compile_video_prompt
+    from prompt_engine import validator
+
+    p = compile_video_prompt(
+        "runway", "post-quantum readiness",
+        scene_fields=_brand_scene(brand_moment="the monitor bezel display"),
+    )
+    assert '"quantcai"' in p.positive_prompt
+    assert "monitor" not in p.positive_prompt.lower().split('"quantcai"')[1]
+    ok, msg = validator.check_background_text_suppression(p.positive_prompt)
+    assert ok, msg
+
+
+@pytest.mark.parametrize("surface", [
+    "the plate etched into the rack door",
+    "the monitor bezel display",
+    "",
+])
+def test_brand_end_frame_passes_every_gate(surface):
+    """The regression that shipped once: the suppression clause contradicted
+    the brand word, or its wording tripped Runway's negative-syntax gate."""
+    from prompt_engine.compilers import compile_video_prompt
+    from prompt_engine import validator
+
+    p = compile_video_prompt("runway", "post-quantum readiness",
+                             scene_fields=_brand_scene(brand_moment=surface))
+    for name, res in [
+        ("background text", validator.check_background_text_suppression(p.positive_prompt)),
+        ("runway negatives", validator.check_model_negative_syntax(
+            "runway", p.positive_prompt, p.negative_prompt)),
+        ("subject count", validator.check_subject_count(p.positive_prompt)),
+    ]:
+        ok, msg = res if isinstance(res, tuple) else (res, None)
+        assert ok, f"{name} gate failed: {msg}"
+
+
+def test_suppression_clause_does_not_contradict_the_brand_word():
+    """"Free of text" and a requested brand word in one prompt makes the model
+    pick a winner. Only incidental text is suppressed when a brand is present."""
+    from prompt_engine.compilers import compile_video_prompt
+
+    with_brand = compile_video_prompt("runway", "x", scene_fields=_brand_scene())
+    assert "free of text" not in with_brand.positive_prompt.lower()
+    assert "remain blank" in with_brand.positive_prompt.lower()
+
+    without = compile_video_prompt("runway", "x",
+                                   scene_fields=_brand_scene(onscreen_text=""))
+    assert "free of text" in without.positive_prompt.lower()

@@ -752,9 +752,9 @@ async def run_automation_manually(
             state = (await session.execute(state_stmt)).scalars().first()
             auto_approve = bool(state.autoApprove) if state else False
 
-            # 2. Pick a media asset from this workspace's catalog. Prefer the
-            #    least-recently-created so the rotation does not repeat one
-            #    asset by chance the way random selection did.
+            # 2. Pick a media asset from this workspace's catalog, least
+            #    recently used first, so every asset is published before any
+            #    asset repeats.
             media_stmt = (
                 select(Media)
                 .where(Media.businessProfileId == workspace_id)
@@ -780,8 +780,14 @@ async def run_automation_manually(
                     "message": "No media in this business's catalog yet. Upload something, or generate a creative first.",
                 }
 
-            import random
-            chosen = random.choice(postable)
+            # Random selection repeated assets by birthday collision — with a
+            # six-asset catalog, better than even odds of a repeat within four
+            # posts, which is what the timeline was showing.
+            from services.media_rotation import select_next_media
+
+            chosen = await select_next_media(session, workspace_id)
+            if chosen is None:
+                chosen = postable[0]
             media_url = chosen.url
 
             # 3. Write a real caption from the brand profile and this asset.

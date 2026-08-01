@@ -19,7 +19,7 @@ from typing import Any
 
 from arq.connections import RedisSettings
 from loguru import logger
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 
 from config import settings
 from database import (
@@ -27,7 +27,6 @@ from database import (
     BusinessProfile,
     MarketingLog,
     MarketingState,
-    Media,
     Product,
     SocialCampaign,
     SocialPost,
@@ -148,57 +147,17 @@ async def _select_media_object_for_post(
     Returns the Media row, not just its URL: the caption writer needs the
     asset's description to write about what is actually on screen.
     """
-    # Only rows that are actually publishable. The catalog also holds
-    # prompt-only notes (text/plain, empty url) from the Video Studio; those
-    # used to be eligible, producing posts with no media attached. Filtered in
-    # SQL rather than in Python so the LIMIT counts real assets.
-    postable = and_(
-        Media.businessProfileId == profile.id,
-        Media.isActive == True,  # noqa: E712 — SQL boolean, not Python identity
-        Media.url != "",
-        Media.url.isnot(None),
-        or_(Media.mimeType.startswith("image/"), Media.mimeType.startswith("video/")),
+    # This used to cap candidates at the 20 newest and compare them against the
+    # 20 most recent posts, then fall back to `all_media[0]` when everything in
+    # that window looked used. That fallback is not a rotation: index 0 is the
+    # newest asset, so once the window filled, every subsequent run published
+    # the same asset indefinitely. Anything older than the 20th asset was also
+    # permanently unreachable.
+    from services.media_rotation import select_next_media
+
+    return await select_next_media(
+        session, profile.id, prefer_ai_generated=True
     )
-
-    # Try to find AI-generated media that hasn't been used in a post yet
-    media_stmt = (
-        select(Media)
-        .where(postable, Media.aiGenerated == True)
-        .order_by(Media.createdAt.desc())
-        .limit(20)
-    )
-    all_media = (await session.execute(media_stmt)).scalars().all()
-
-    if not all_media:
-        # Fall back to any media in the catalog
-        fallback_stmt = (
-            select(Media).where(postable).order_by(Media.createdAt.desc()).limit(10)
-        )
-        all_media = (await session.execute(fallback_stmt)).scalars().all()
-
-    if not all_media:
-        return None
-
-    # Get list of media URLs already used in recent posts
-    recent_posts_stmt = (
-        select(SocialPost.mediaUrls)
-        .where(SocialPost.businessProfileId == profile.id)
-        .order_by(SocialPost.scheduledAt.desc())
-        .limit(20)
-    )
-    recent_posts = (await session.execute(recent_posts_stmt)).scalars().all()
-    used_urls = set()
-    for urls in recent_posts:
-        if urls:
-            used_urls.update(urls)
-
-    # Pick first unused media
-    for media in all_media:
-        if media.url not in used_urls:
-            return media
-
-    # If all used, just pick the first one (rotate)
-    return all_media[0] if all_media else None
 
 
 async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:

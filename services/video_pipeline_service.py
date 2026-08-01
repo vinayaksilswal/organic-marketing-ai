@@ -12,6 +12,8 @@ Executes the complex creative video pipeline (formerly n8n automation).
 """
 
 import json
+import random
+
 import httpx
 from typing import Dict, Any, Optional
 from loguru import logger
@@ -291,19 +293,25 @@ def run_creative_engine(intelligence_json: Dict[str, Any], goal: str) -> Dict[st
         "cinematic_showcase": 50,
         "ugc_testimonial": 50,
         "fast_cut_features": 50,
-        "lifestyle_integration": 50
+        "lifestyle_integration": 50,
+        "problem_agitation_solution": 50,
+        "challenger_comparison": 50,
     }
-    
+
     if "physical" in ptype.lower() or "apparel" in ptype.lower():
         weights["cinematic_showcase"] += 30
         weights["lifestyle_integration"] += 30
     else:
         weights["fast_cut_features"] += 30
         weights["ugc_testimonial"] += 20
-        
+        weights["problem_agitation_solution"] += 30
+        weights["challenger_comparison"] += 25
+
     if goal == "conversion":
         weights["ugc_testimonial"] += 40
         weights["fast_cut_features"] += 20
+        weights["problem_agitation_solution"] += 50
+        weights["challenger_comparison"] += 45
     elif goal == "brand_awareness":
         weights["cinematic_showcase"] += 40
         weights["lifestyle_integration"] += 20
@@ -337,6 +345,27 @@ def run_creative_engine(intelligence_json: Dict[str, Any], goal: str) -> Dict[st
             "text_treatment": "Callout labels on key features. Clean sans-serif.",
             "avoid": ["cluttered interfaces", "unexplained UI jumps", "too many features at once"]
         },
+        # The two highest-converting formats in the reference library, both
+        # missing here. Their absence is why every creative was a showcase or a
+        # demo and none of them opened on a problem the viewer recognises.
+        "problem_agitation_solution": {
+            "name": "Problem-Agitation-Solution",
+            "description": "Opens on acute pain, holds it, resolves with the product as the hero.",
+            "visual_world": "Opens cold, cluttered, overwhelming. Resolves calm, ordered, confident.",
+            "camera_direction": "One continuous move — start tight on the problem, ease back as it resolves",
+            "pacing": "Tense hold, then release",
+            "text_treatment": "The hero string names the problem, not the product",
+            "avoid": ["starting with the product", "a happy face before the problem lands", "generic office stock"]
+        },
+        "challenger_comparison": {
+            "name": "Challenger Comparison",
+            "description": "Old way versus new way — a category upgrade, without naming competitors.",
+            "visual_world": "The old way is manual, slow, paper-heavy. The new way is one clean screen.",
+            "camera_direction": "Locked-off static, the change happening within the frame",
+            "pacing": "Slow frustration, confident resolution",
+            "text_treatment": "One hero string carrying the new state",
+            "avoid": ["naming competitors", "split screen", "generic 'vs' graphics"]
+        },
         "lifestyle_integration": {
             "name": "Lifestyle Aspiration",
             "description": "Product embedded in a desirable lifestyle — buyer sees themselves in the scene.",
@@ -348,16 +377,65 @@ def run_creative_engine(intelligence_json: Dict[str, Any], goal: str) -> Dict[st
         }
     }
     
+    # "Bloomberg-terminal darkness" used to be the note on dark_institutional.
+    # It is also in validator.BANNED_VISUAL_CLICHES, so the modifier injected a
+    # banned phrase into every prompt it touched.
     modifiers = [
-        {"modifier": "golden_hour", "note": "Warm late afternoon sunlight, long shadows, amber tones"},
-        {"modifier": "dark_institutional", "note": "Bloomberg-terminal darkness, cold precision, authority"},
-        {"modifier": "clean_daylight", "note": "Soft natural diffused light, bright airy environment"},
-        {"modifier": "studio_dramatic", "note": "Controlled studio lighting with dramatic shadows and rim light"}
+        {"modifier": "golden_hour", "note": "Warm late afternoon sunlight, long shadows, amber tones", "weight": 1.2},
+        {"modifier": "clean_daylight", "note": "Soft natural diffused light, bright airy environment", "weight": 1.0},
+        {"modifier": "studio_dramatic", "note": "Controlled studio lighting, dramatic shadows and rim light", "weight": 0.9},
+        {"modifier": "dark_institutional", "note": "Cold precision lighting, low ambient, quiet authority", "weight": 0.8},
+        {"modifier": "urban_gritty", "note": "Raw city texture, candid feel, authentic locations", "weight": 0.7},
+        {"modifier": "luxury_minimal", "note": "Negative space, precise lighting, premium material focus", "weight": 0.8},
+        {"modifier": "macro_precision", "note": "Extreme close-up detail, texture and material as hero", "weight": 0.7},
     ]
-    
-    recommended_format = max(weights.items(), key=lambda x: x[1])[0]
-    variation_modifier = modifiers[0] if "physical" in ptype.lower() else modifiers[1]
-    
+
+    # Which lighting suits which vertical. Without this, every software product
+    # took the dark branch and produced the same dim room every time.
+    INDUSTRY_AFFINITY = {
+        "fintech": ["dark_institutional", "clean_daylight", "studio_dramatic"],
+        "developer_tools": ["dark_institutional", "clean_daylight"],
+        "wellness": ["golden_hour", "clean_daylight", "macro_precision"],
+        "fashion": ["golden_hour", "studio_dramatic", "luxury_minimal"],
+        "food_beverage": ["macro_precision", "golden_hour", "clean_daylight"],
+        "fitness": ["urban_gritty", "golden_hour"],
+        "enterprise_saas": ["clean_daylight", "studio_dramatic", "dark_institutional"],
+        "quantum_computing": ["studio_dramatic", "clean_daylight", "dark_institutional"],
+        "edtech": ["clean_daylight", "golden_hour", "studio_dramatic"],
+        "ecommerce": ["studio_dramatic", "clean_daylight", "macro_precision"],
+        "luxury": ["luxury_minimal", "studio_dramatic", "golden_hour"],
+    }
+
+    def _weighted_pick(items, weight_of):
+        total = sum(max(weight_of(i), 0.0) for i in items)
+        if total <= 0:
+            return random.choice(items)
+        r = random.uniform(0, total)
+        for item in items:
+            r -= max(weight_of(item), 0.0)
+            if r <= 0:
+                return item
+        return items[-1]
+
+    # Weighted random, not argmax. `max()` is deterministic, so one business
+    # received the identical format on every single run — which is why
+    # consecutive prompts opened on the same camera move in the same room.
+    format_keys = list(creative_formats.keys())
+    recommended_format = _weighted_pick(format_keys, lambda k: weights[k])
+
+    vertical = (
+        intelligence_json.get("industry_visual_language", {}).get("vertical")
+        or intelligence_json.get("product_intelligence", {}).get("product_category")
+        or ""
+    ).lower().replace(" ", "_")
+    affinity = next(
+        (v for k, v in INDUSTRY_AFFINITY.items() if k in vertical), []
+    )
+    variation_modifier = _weighted_pick(
+        modifiers,
+        lambda m: m["weight"] * (2.5 if m["modifier"] in affinity else 1.0),
+    )
+
     return {
         "recommended_format": recommended_format,
         "format_weights": weights,
@@ -427,25 +505,29 @@ THE FOUR THINGS THAT RUIN AI VIDEO
 Every bad render traces back to one of these. Avoid them absolutely.
 ════════════════════════════════════════
 
-1. LEGIBLE SCREEN CONTENT — THE #1 KILLER.
-   These models CANNOT render readable interfaces. Asking for a "GitHub
-   Actions workflow", "a dashboard showing statevector probabilities",
-   "terminal logs scrolling", "a compliance score resolving", or any named
-   UI produces smeared pseudo-text and warped glyphs every single time.
-   NEVER describe what is legible on a screen.
-   If a screen is in frame, describe it ONLY as light and colour:
-     GOOD: "a monitor throws cyan light across his face, content out of focus"
-     GOOD: "screen glow reflected in his glasses, shallow depth of field"
-     BAD:  "the monitor shows a passing QuantCAI step emitting a CBOM hash"
-     BAD:  "live probabilities resolve on the circuit builder"
+1. BULK INTERFACE COPY — small labels, menus, body text, tables.
+   These collapse into scribble every time. Never ask for "menus", "rows of
+   data", "scrolling logs", "a sidebar of entries" or any readable small type.
+   Describe that material as soft and out of focus and it reads as texture.
+     GOOD: "surrounding interface copy soft and out of focus"
+     BAD:  "terminal logs scrolling", "a sidebar listing recent scans"
 
-2. ON-SCREEN TEXT LONGER THAN FOUR WORDS.
-   Text is rendered glyph by glyph and degrades fast. A sentence becomes
-   gibberish. You get ONE text element, 1-4 words, or none at all.
-     GOOD: "Start free"  /  "QuantCAI"  /  no text at all
+   ONE LARGE STRING, HOWEVER, RENDERS ACCURATELY — and it is usually the
+   whole point of the ad. A red alert banner reading "RSA-2048 Encryption
+   Vulnerable". A chat box mid-typing reading "why is my circuit failing?".
+   A notification card sliding in reading "$27 Pro Tier Sale". Ask for exactly
+   one of these, large, central, high contrast.
+   Show the PROBLEM or the RESULT as something the viewer can read. An
+   abstract mood — "an atmosphere of quiet concern" — sells nothing, because
+   the viewer never learns what the product does.
+
+2. MORE THAN ONE COMPETING STRING.
+   You get ONE hero string of 2-6 words, plus the brand name in the closing
+   frame. Two headline strings and both degrade.
+     GOOD: hero "Scan Complete" + closing "QuantCAI"
      BAD:  "Start free simulation -> Scan your domain -> Upgrade at 10 runs"
-   The full call to action belongs in the post caption, not burned into the
-   video. Do not try to fit an offer sentence on screen.
+   The full call to action still belongs in the caption — the hero string is
+   the problem or the result, not the offer sentence.
 
 3. COMPLEX CAMERA MOVES.
    A camera that rotates, flips, or changes its mind mid-shot produces
@@ -468,29 +550,46 @@ WHAT RENDERS BEAUTIFULLY — BUILD FROM THIS
 Physical, tactile, real-world things:
   - human faces and hands in natural light, one person only
   - objects with real material — glass, metal, fabric, paper, liquid
-  - motion with physics: pouring, steam, dust in light, fabric settling
   - shallow depth of field, single hard or soft key light, real rooms
-Prefer a HUMAN REACTION over a screen. A person's face registering a result
-sells software far better than the software's interface ever will.
+  - ONE large high-contrast string on a screen, banner, or notification card
+A shot can be pure product with no person in it at all — a phone held in
+frame running the app, the hero string legible, everything else defocused.
+For software that is often the strongest option, because it shows what the
+thing actually does.
 
 ════════════════════════════════════════
-LENGTH: 55-85 WORDS. Never more.
+LENGTH: 90-130 WORDS.
 ════════════════════════════════════════
-Shorter is stronger. Under 85 words the model holds everything you asked
-for; past that it silently drops whatever it likes. Cut atmosphere before
-you cut the subject or the action.
+The prompt now carries a hero string and a spoken line as well as the scene,
+and both are load-bearing. Under 90 words something essential is missing;
+past 130 the model starts dropping elements silently. Cut atmosphere before
+you cut the subject, the hero string, or the line.
 
 STRUCTURE (in this order):
 [One camera move] + [One subject, front-loaded] + [One physical action] +
-[Room and light] + [Mood] + [One audio clause] + [Negatives]
+[Room and light] + [The hero string and where it renders] + [Brand word in
+the closing frame] + [One audio clause] + [The spoken line, verbatim]
+
+Do NOT end with a list of negatives. These models have no negative parsing —
+"no holograms" raises the odds of a hologram by putting the word in the
+prompt at all. Describe only what IS in frame.
 
 TEN SECONDS:
   0-1s   something is already happening. No fade in, no logo card.
-  1-7s   the single action plays out.
-  7-10s  the reaction, or the result landing on a face.
+  1-7s   the single action plays out and the hero string lands.
+  7-10s  the reaction, and the brand word in the closing frame.
 
-AUDIO — one short clause. Ambience plus one punctuating sound:
-"low room tone, a single keyboard click". No music essays, no dialogue.
+AUDIO — one short clause of ambience plus one punctuating sound:
+"low room tone, a single keyboard click".
+
+THE SPOKEN LINE — write the ACTUAL WORDS, verbatim, 10-20 words. These models
+generate synchronised speech, so a description produces nothing; only the
+words do. Write how a person actually talks: contractions, one idea, no
+slogan cadence.
+  GOOD: "I found out our encryption breaks in four years. Took one scan."
+  BAD:  "Discover the power of enterprise-grade quantum readiness today."
+        (nobody says this aloud — it is a banner, not a sentence)
+  BAD:  "The founder explains the benefit." (a description, not a line)
 
 TRUTH:
 Never invent claims, statistics, prices, ratings or customer counts. Never
@@ -507,7 +606,7 @@ OUTPUT — valid JSON only. First character { and last character }. No markdown,
   "creative_format_used": "<assigned format name>",
   "variation_modifier_applied": "<assigned modifier name>",
   "product_type": "<product type from marketing intel>",
-  "prompt": "<one 10-second vertical shot, 55-85 words, ONE camera move, ONE subject, ONE action, no legible screen content, at most four words of on-screen text, one audio clause, negatives at the end>"
+  "prompt": "<one 10-second vertical shot, 90-130 words, ONE camera move, ONE subject, ONE action, ONE hero string of 2-6 words rendered large with everything else defocused, the brand name in the closing frame, one audio clause, and the spoken line verbatim in double quotes. No list of negatives.>"
 }
 """
 
@@ -533,16 +632,20 @@ Modifier Note: {vm.get('note', '')}
 PRODUCT TYPE VISUAL RULEBOOK — apply the row matching product_type
 ═══════════════════════════════════════════════════════════
 DIGITAL_SAAS / DATA_API
-  Software is the hardest thing to film, because the interface is exactly
-  what the model cannot draw. So do not film the interface. Film the PERSON.
-  Subject: one developer, analyst or founder — a face, hands, a posture.
-  The moment: the second the result lands. Shoulders drop. A slow nod. A
-  breath let out. Leaning back from the desk.
-  Screens: present only as coloured light on skin and walls, always out of
-  focus. Never describe what is on them.
+  FILM THE INTERFACE. For software the screen is the product, and one large
+  string on it renders accurately — that is what tells the viewer what this
+  thing does. A shot with no readable product is a mood piece that could
+  advertise anything.
+  Subject: the screen itself, or one developer, analyst or founder with the
+  screen clearly in frame.
+  The hero string: the problem or the result, 2-6 words, large and central —
+  a red alert banner, a chat box mid-typing, a notification card sliding in.
+  Everything else on that screen is soft and out of focus.
+  The moment: the result landing, and the reaction to it. Shoulders drop. A
+  slow nod. A breath let out.
   Props: a mechanical keyboard, a cold coffee, a notebook — at most two.
-  Never: readable dashboards or terminals, holographic panels, flying data
-  particles, glowing blue "AI" mist, "Bloomberg terminal".
+  Never: small readable menus, tables or log output, holographic panels,
+  flying data particles, glowing blue "AI" mist, "Bloomberg terminal".
 
 PHYSICAL_GOODS
   World: controlled studio light, or the aspirational place the thing gets used.

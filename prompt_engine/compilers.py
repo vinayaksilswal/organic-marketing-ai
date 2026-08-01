@@ -30,6 +30,29 @@ def _strip_temporal_and_physics_stressors(text: str) -> str:
     return _clean_text(result)
 
 
+# Surfaces that render glyphs rather than hold them. A brand word on a monitor
+# comes back as mush for exactly the reason validator.LEGIBLE_SCREEN_PATTERNS
+# rejects it, so the surface is dropped rather than the brand.
+_SCREEN_SURFACE = re.compile(
+    r"\b(dashboard|screen|monitor|display|app|ui|phone|terminal|console|"
+    r"tablet|laptop|overlay|title card|lower.third)\b",
+    re.IGNORECASE,
+)
+
+
+def _physical_brand_surface(surface: Optional[str]) -> str:
+    """Keep the brand's placement only when it is something physical.
+
+    An etched plate, a painted wall or a stamped label holds a word steadily
+    across frames. A screen does not, and neither does a compositing overlay,
+    which these models approximate rather than draw.
+    """
+    text = (surface or "").strip().strip(".")
+    if not text or _SCREEN_SURFACE.search(text):
+        return ""
+    return text
+
+
 def _enforce_background_text_suppression(text: str) -> str:
     """Appends background text suppression clause if not already present.
 
@@ -59,7 +82,11 @@ def _enforce_background_text_suppression(text: str) -> str:
     # term — check_model_negative_syntax rejects "no ", "do not" and "without"
     # in a Runway positive prompt for exactly that reason. An earlier wording
     # here, "No other text: ...", tripped that gate on every generation.
-    has_intentional_text = re.search(r'the words? "[^"]+" appear', text, re.IGNORECASE)
+    has_intentional_text = re.search(
+        r'(?:the words? "[^"]+" appear|holds the single word "[^"]+")',
+        text,
+        re.IGNORECASE,
+    )
     if has_intentional_text:
         return text.rstrip(".") + (
             ". Background signage and product labels remain blank."
@@ -136,12 +163,40 @@ def compile_runway_prompt(
         subject = scene_fields.get("subject") or "a single subject"
         scene = f"{subject} in {scene_fields.get('environment') or 'an isolated setting'}."
         action = f"{scene_fields.get('action') or ''}."
-        quoted = scene_fields.get("onscreen_text")
         detail_bits = [scene_fields.get("mood") or aesthetic]
-        if quoted:
-            detail_bits.append(f'the words "{quoted}" appear once')
+
+        # The hero string is the message. Reference material confirms current
+        # models render one large, central, high-contrast string accurately —
+        # it is the small surrounding copy that collapses, so that is described
+        # as out of focus rather than requested.
+        hero = scene_fields.get("hero_text")
+        if hero:
+            surface = (scene_fields.get("hero_surface") or "").strip().strip(".")
+            on_what = surface or "the screen"
+            detail_bits.append(
+                f'{on_what} reads "{hero}" in large high-contrast type, '
+                "surrounding interface copy soft and out of focus"
+            )
+
+        # The brand word closes the clip. Anchoring it to a physical surface
+        # renders far more cleanly than a floating overlay.
+        brand = scene_fields.get("onscreen_text")
+        if brand:
+            surface = _physical_brand_surface(scene_fields.get("brand_moment"))
+            where = f" on {surface}" if surface else ""
+            detail_bits.append(f'final frame holds the single word "{brand}"{where}')
         detail_bits.append("shallow depth of field, vertical 9:16 frame")
-        detail = ", ".join(b for b in detail_bits if b) + "."
+
+        # Spoken aloud, not rendered. Kept as its own trailing clause so the
+        # validator can tell a line of dialogue from a string on a screen —
+        # they look identical to a naive quote count.
+        vo = (scene_fields.get("voiceover") or "").strip()
+        if vo:
+            detail_bits.append(f'spoken aloud, natural unhurried delivery: "{vo}"')
+        detail = ", ".join(b for b in detail_bits if b)
+        # The spoken line keeps its own sentence punctuation inside the quotes,
+        # so a blanket full stop here produces `scan."."`.
+        detail = detail if detail.endswith(('.', '!', '?', '"')) else detail + "."
     else:
         # Placeholder text — "a single subject in an isolated setting" names
         # nobody and nowhere, so it renders as generic mush. Only reached when
@@ -155,10 +210,20 @@ def compile_runway_prompt(
     raw_positive = _enforce_background_text_suppression(raw_positive)
     positive_prompt = _strip_temporal_and_physics_stressors(raw_positive)
 
-    # Word budget check / truncation if necessary (max 85 words)
+    # Word budget. The old ceiling of 85 was set when the prompt carried only
+    # scene description; it now also carries a hero string and a spoken line,
+    # both of which are load-bearing. Truncating at 85 amputated the dialogue,
+    # which sits last.
+    #
+    # Truncation also has to land outside a quoted string — cutting one in half
+    # leaves an unterminated quote that the model reads as running text.
+    budget = 120 if (scene_fields or {}).get("voiceover") else 90
     words = positive_prompt.split()
-    if len(words) > 85:
-        positive_prompt = " ".join(words[:85])
+    if len(words) > budget:
+        truncated = " ".join(words[:budget])
+        if truncated.count('"') % 2:
+            truncated = truncated.rsplit('"', 1)[0].rstrip(" ,;:")
+        positive_prompt = truncated.rstrip(" ,;:").rstrip(".") + "."
 
     return ModelPromptPayload(
         model_name="runway",

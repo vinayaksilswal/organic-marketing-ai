@@ -16,7 +16,12 @@ from database import BusinessProfile
 
 CAPTION_MAX_LENGTH = 300
 CAPTION_MAX_SENTENCES = 3
-PROMPT_MAX_WORDS = 85
+# 85 was set when a prompt carried only scene description. It now also carries
+# a hero string and a verbatim spoken line, both load-bearing, so the old
+# ceiling rejected every prompt that included dialogue. Kept as a real ceiling
+# rather than removed: past ~130 words these models start dropping elements
+# silently, which is worse than a hard failure.
+PROMPT_MAX_WORDS = 130
 PROMPT_MAX_ENTITIES = 10
 AUDIO_MAX_WORDS = 15
 
@@ -83,19 +88,38 @@ BACKGROUND_TEXT_REQUEST_PATTERNS = [
 # The real failure mode is not the word "text" — it is describing legible
 # screen content without ever using that word. These catch the shape of it:
 # a surface that renders glyphs, plus content described as readable.
+# What actually fails is BULK legible copy, not a hero string. Reference
+# footage from current models shows a large central string rendering accurately
+# — a red alert banner reading "RSA-2048 Encryption Vulnerable", a chat box
+# reading "why is my circuit failing?", a notification card reading "$27 Pro
+# Tier Sale". An earlier version of this list rejected all of those, which
+# stripped the product out of every ad and left abstract mood pieces.
+#
+# So these patterns now target only the things that still collapse: many small
+# labels, and body copy asked for as readable.
 LEGIBLE_SCREEN_PATTERNS = [
-    # A quoted string sitting on a screen-like surface.
-    (r'"[^"]{1,60}"[^.]{0,40}\b(dashboard|screen|monitor|display|app|ui|phone|terminal|badge)\b',
-     'a quoted string rendered on a screen'),
-    (r'\b(dashboard|screen|monitor|display|app|ui|terminal)\b[^.]{0,40}"[^"]{1,60}"',
-     'a screen rendering a quoted string'),
-    # Content described as readable output.
-    (r"\b(tailing|scrolling|streaming|showing|displaying)\b[^.]{0,30}\b(logs?|output|code|json|readout|results?)\b",
-     'readable log or code output'),
-    (r"\b(compliance|status|verified|certified|approved|compliant)\s+badge\b",
-     'a badge whose meaning depends on legible words'),
-    (r"\b(terminal|console|ide|spreadsheet|chart|graph)\b[^.]{0,25}\b(logs?|lines?|rows?|data|code)\b",
-     'legible interface content'),
+    # Bulk running copy, as opposed to one headline string.
+    (r"\b(tailing|scrolling|streaming)\b[^.]{0,30}\b(logs?|output|code|json)\b",
+     'streaming log or code output, which renders as scribble'),
+    (r"\b(paragraphs?|body copy|full sentences?|blocks? of text|walls? of text)\b",
+     'running body copy'),
+    (r"\b(legible|readable|crisp|sharp|detailed)\b[^.]{0,25}\b(menus?|labels?|captions?|sidebar|toolbar|spreadsheet|table)\b",
+     'small interface labels asked for as legible'),
+    (r"\b(rows? of|columns? of|list of)\b[^.]{0,20}\b(data|numbers|entries|records|logs?)\b",
+     'tabular detail, which the model fills with noise'),
+]
+
+# More than one competing string and both degrade. Counted separately from the
+# patterns above because the failure is arithmetic, not phrasing.
+MAX_HERO_STRINGS = 2
+
+# The model cannot resolve a named typeface or a brand colour name to anything,
+# so these silently waste prompt budget and displace real description.
+UNRENDERABLE_SPEC_PATTERNS = [
+    (r"#[0-9a-fA-F]{6}\b", 'a hex colour'),
+    (r"\b(space grotesk|helvetica|inter|roboto|montserrat|futura|gotham|arial|poppins)\b",
+     'a named typeface'),
+    (r"\bin [A-Z][a-z]+ [A-Z][a-z]+ (?:font|type|typeface)\b", 'a named typeface'),
 ]
 
 # Negative payloads embedded in the positive prompt. Finding 8: this belongs in
@@ -333,31 +357,84 @@ def check_audio_word_budget(audio_tags: Optional[str]) -> Tuple[bool, Optional[s
 
 
 def check_background_text_suppression(positive_prompt: str) -> Tuple[bool, Optional[str]]:
-    """Check that the video prompt does not request on-screen text rendering.
+    """Reject bulk legible copy, and anything the model cannot resolve.
 
-    Research Finding 4: incidental text rendering collapses into graffiti-like
-    artifacts. Prompts requesting text, signage, or labels will degrade output.
+    One hero string on screen is fine and is usually the point of the ad — see
+    LEGIBLE_SCREEN_PATTERNS for why this check no longer rejects those.
     """
     lowered = positive_prompt.lower()
     for pattern in BACKGROUND_TEXT_REQUEST_PATTERNS:
         if re.search(pattern, lowered):
-            return False, "Prompt requests on-screen text/signage which causes rendering artifacts. Remove text requests or use a dedicated text-rendering sub-model."
+            return False, "Prompt requests background signage or product labels, which render as scribble. Put the message in one hero string instead."
 
-    # The explicit list above only fires when the prompt uses the word "text".
-    # The failure that actually reaches production looks like
-    #   thumb taps "Start Free Scan" on the quantcai mobile dashboard
-    # which never says "text" and renders as smeared glyphs regardless.
     for pattern, what in LEGIBLE_SCREEN_PATTERNS:
         if re.search(pattern, lowered):
             return False, (
-                f"Prompt describes {what}. Video models render interface content as "
-                "smeared pseudo-text. Describe screens as light and colour only."
+                f"Prompt describes {what}. Keep one large hero string and let the "
+                "surrounding interface fall out of focus."
+            )
+
+    # Only strings the model has to DRAW count here. A spoken line is also
+    # quoted but costs the renderer nothing, so it is excluded by requiring a
+    # rendering verb in front of the quote.
+    rendered = re.findall(
+        r'\b(?:reads?|displays?|shows?|holds the single word|the words?)\s+"[^"]{1,60}"',
+        positive_prompt,
+        re.IGNORECASE,
+    )
+    if len(rendered) > MAX_HERO_STRINGS:
+        return False, (
+            f"Prompt asks for {len(rendered)} separate rendered strings. "
+            "Competing text degrades all of it — keep one hero string plus the "
+            "brand word."
+        )
+
+    for pattern, what in UNRENDERABLE_SPEC_PATTERNS:
+        if re.search(pattern, positive_prompt, re.IGNORECASE):
+            return False, (
+                f"Prompt specifies {what}, which the model cannot resolve. "
+                "Describe the look in plain words instead."
             )
 
     hits = [c for c in BANNED_VISUAL_CLICHES if c in lowered]
     if hits:
         return False, f"Prompt uses banned visual cliches: {', '.join(hits[:3])}."
 
+    return True, None
+
+
+def check_rendered_claims(
+    positive_prompt: str, substantiated: Optional[str] = None
+) -> Tuple[bool, Optional[str]]:
+    """Reject invented figures burned into the video.
+
+    A hero string is an advertising claim with the same standing as the
+    caption, and captions already pass check_claim_substantiation. Live runs
+    produced "12 RSA-2048 Keys Exposed" and "47 keys exposed to quantum" —
+    plausible, specific, and entirely fabricated, which is exactly the
+    unsubstantiated-claim exposure the caption gate exists to prevent.
+
+    A figure is allowed only when it appears in the substantiating source,
+    which is the business profile text the scene was written from.
+    """
+    source = (substantiated or "").lower()
+    for match in re.finditer(r'"([^"]{1,80})"', positive_prompt):
+        phrase = match.group(1)
+        for figure in re.findall(
+            r"\b\d[\d,.]*\s*(?:%|percent|x|k\b|m\b|bn\b)?", phrase
+        ):
+            token = figure.strip()
+            # Bare years and version numbers are naming, not claims —
+            # "RSA-2048" and "FIPS 205" are the names of the things.
+            if re.fullmatch(r"\d{3,4}", token) and token in phrase.replace(" ", ""):
+                if re.search(rf"[A-Za-z-]\s*{re.escape(token)}", phrase):
+                    continue
+            if token and token.lower() not in source:
+                return False, (
+                    f'Rendered string "{phrase}" states a figure ({token}) that is '
+                    "not in the business profile. Name the state instead — "
+                    '"Vulnerable Keys Found", not "47 Vulnerable Keys Found".'
+                )
     return True, None
 
 
@@ -376,10 +453,18 @@ def check_subject_count(positive_prompt: str) -> Tuple[bool, Optional[str]]:
     # Fidelity is divided by props as well as by faces. One human surrounded by
     # a phone, a laptop, server racks and an LED strip is still five things
     # competing for the same attention budget.
+    #
+    # The hero-string clause is excluded first. It has to name the surface the
+    # string renders on ("the dashboard header reads ..."), and that surface is
+    # the same physical object already counted in the scene — counting it again
+    # failed prompts for owning one laptop.
+    countable = re.sub(
+        r'\b[^.,]{0,60}\breads\s+"[^"]{1,60}"[^.]{0,80}', " ", lowered
+    )
     props = sorted({
         re.sub(r"\\b", "", p).strip()
         for p in COMPETING_PROP_PATTERNS
-        if re.search(p, lowered)
+        if re.search(p, countable)
     })
     if len(props) > MAX_COMPETING_PROPS:
         return False, (
@@ -474,6 +559,17 @@ def validate_video_prompt(
     background_text_suppression_valid = bg_ok
     if not bg_ok:
         errors.append(bg_err or "Prompt requests background text rendering.")
+
+    # Gate 6b: Figures rendered into the frame are advertising claims, and get
+    # the same substantiation treatment as the caption. The business profile is
+    # the source of truth, same as check_claim_substantiation uses.
+    claim_source = " ".join(
+        str(getattr(business_profile, f, "") or "")
+        for f in ("description", "primaryOffer", "toneOfVoice", "name")
+    )
+    claim_ok, claim_err = check_rendered_claims(positive_prompt, claim_source)
+    if not claim_ok:
+        errors.append(claim_err or "Prompt renders an unsubstantiated figure.")
 
     # Gate 7: Subject count (single isolated subject)
     subj_ok, subj_err = check_subject_count(positive_prompt)
