@@ -118,6 +118,31 @@ def memory_headroom_mb() -> Optional[float]:
     return None if reading is None else reading[1] - reading[0]
 
 
+def release_memory() -> None:
+    """Hand freed memory back to the OS.
+
+    Python releasing an 8MB video buffer does not shrink the process: glibc
+    keeps the arena for reuse, and it fragments badly when large blocks are
+    allocated across the worker threads ffmpeg is driven from. Measured on
+    this service, the working set sat at ~530MB of a 537MB limit between
+    encodes with only 2MB of it page cache — so the headroom guard refused
+    every clip after the first, and exactly one got branded.
+
+    malloc_trim releases the tops of those arenas. Cheap, and a no-op on
+    platforms without it.
+    """
+    import gc
+
+    gc.collect()
+    try:
+        import ctypes
+
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        # Not glibc (macOS, musl, Windows). Nothing to do.
+        pass
+
+
 def _ffmpeg() -> Optional[str]:
     """The ffmpeg binary, preferring the pinned wheel over whatever is on PATH.
 
@@ -564,9 +589,15 @@ def append_outro(
     finally:
         _cleanup()
 
+    before = memory_headroom_mb()
+    release_memory()
+    after = memory_headroom_mb()
+    reclaimed = "" if (before is None or after is None) else         f", freed {after - before:.0f}MB (now {after:.0f}MB free)"
+
     logger.info(
         f"Branded {src.name}: watermark + {seconds}s card, {tw}x{th} "
-        f"crf{QUALITY_CRF} capped {MAX_BITRATE} -> {dest.stat().st_size / 1e6:.1f}MB"
+        f"crf{QUALITY_CRF} capped {MAX_BITRATE} -> "
+        f"{dest.stat().st_size / 1e6:.1f}MB{reclaimed}"
     )
     return str(dest)
 

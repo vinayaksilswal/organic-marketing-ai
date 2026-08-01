@@ -52,6 +52,22 @@ CAPTION_FETCH_BYTES = 3 * 1024 * 1024
 MAX_ENCODES = 1
 _encode_slot = asyncio.Semaphore(MAX_ENCODES)
 
+# One repair pass per workspace at a time.
+#
+# The dashboard button spawns a background pass on every click, and a pass
+# takes half an hour. Clicking it eight times while waiting -- which is the
+# natural thing to do when the count is not moving -- left eight passes alive
+# at once, each holding video buffers and vision request bodies. That is
+# hundreds of megabytes of an instance that has 512, and it is why the working
+# set never fell back far enough for the next encode to be allowed.
+#
+# Extra clicks now return immediately and say the pass is already running.
+_running_passes: set = set()
+
+
+def repair_in_progress(workspace_id: str) -> bool:
+    return workspace_id in _running_passes
+
 # FREE MODELS ONLY, by choice.
 #
 # The cost of that choice, measured rather than assumed: on a sample of six
@@ -407,6 +423,14 @@ async def finish_pending_media(
     from database import AsyncSessionLocal, Media
     from services.video_outro import brand_video_at_url
 
+    if workspace_id in _running_passes:
+        logger.info(
+            f"A repair pass is already running for {workspace_id}; "
+            f"skipping this one rather than stacking another"
+        )
+        return
+    _running_passes.add(workspace_id)
+
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
     async def _one(media_id: str):
@@ -498,5 +522,13 @@ async def finish_pending_media(
             except Exception:
                 logger.exception(f"Could not describe media {media_id}")
 
-    await asyncio.gather(*(_one(mid) for mid in media_ids))
+    try:
+        await asyncio.gather(*(_one(mid) for mid in media_ids))
+    finally:
+        _running_passes.discard(workspace_id)
+        # Hand the buffers this pass accumulated back to the OS, or the next
+        # pass starts against an inflated baseline and its encodes are refused.
+        from services.video_outro import release_memory
+
+        release_memory()
     logger.info(f"Caption pass finished for {len(media_ids)} assets in {workspace_id}")

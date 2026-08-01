@@ -1949,6 +1949,105 @@ async def delete_workspace_media(media_id: str, request: Request) -> Any:
         return {"success": True, "message": "Media asset deleted successfully"}
 
 
+def _dedupe_key(media) -> str:
+    """What counts as "the same file".
+
+    Folder uploads send a path ("Billionare Goal/clip.mp4") and file uploads
+    send a bare name ("clip.mp4"), so the same clip picked twice arrives under
+    two different filenames. Comparing on the basename is what catches those —
+    matching on the full string is why nine got through.
+    """
+    name = (media.filename or "").strip().lower()
+    return name.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+
+
+def _dedupe_rank(media) -> tuple:
+    """Which copy to keep: the one carrying the most finished work.
+
+    Deleting the branded copy and keeping a raw one would throw away a 311MB
+    encode and put the clip straight back in the repair queue.
+    """
+    return (
+        0 if _is_branded(media) else 1,
+        0 if (media.caption or media.prompt) else 1,
+        # Oldest wins the tie: it is the one already referenced by any post.
+        media.createdAt.timestamp() if media.createdAt else 0,
+    )
+
+
+@router.post("/media/dedupe")
+async def dedupe_workspace_media(
+    request: Request,
+    confirm: bool = False,
+    user_id: str = Depends(verify_user),
+) -> Any:
+    """Find catalog rows that are the same file uploaded twice.
+
+    Without `confirm` this only reports. Deleting rows is not reversible from
+    the dashboard, so the caller sees the list first.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with get_tenant_session(workspace_id) as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        rows = (await session.execute(
+            select(Media).where(Media.businessProfileId == workspace_id)
+        )).scalars().all()
+
+        groups: dict = {}
+        for m in rows:
+            key = _dedupe_key(m)
+            if key:
+                groups.setdefault(key, []).append(m)
+
+        doomed = []
+        for key, members in groups.items():
+            if len(members) < 2:
+                continue
+            members.sort(key=_dedupe_rank)
+            doomed.extend(members[1:])   # keep members[0]
+
+        if not doomed:
+            return {
+                "success": True, "duplicates": 0, "removed": 0,
+                "message": "No duplicates — every file appears once.",
+            }
+
+        preview = [
+            {"id": m.id, "filename": m.filename, "branded": _is_branded(m)}
+            for m in doomed[:20]
+        ]
+        if not confirm:
+            return {
+                "success": True,
+                "duplicates": len(doomed),
+                "removed": 0,
+                "items": preview,
+                "message": (
+                    f"{len(doomed)} duplicate row{'s' if len(doomed) != 1 else ''} "
+                    f"found. The copy with a description and watermark is kept."
+                ),
+            }
+
+        for m in doomed:
+            await session.delete(m)
+        await session.commit()
+        logger.info(f"Removed {len(doomed)} duplicate media rows from {workspace_id}")
+
+        return {
+            "success": True,
+            "duplicates": len(doomed),
+            "removed": len(doomed),
+            "items": preview,
+            "message": f"Removed {len(doomed)} duplicate row{'s' if len(doomed) != 1 else ''}.",
+        }
+
+
 @router.post("/media/bulk-upload")
 async def bulk_upload_media(
     request: Request,
@@ -1985,20 +2084,34 @@ async def bulk_upload_media(
             # was interrupted, so already-imported files are skipped rather
             # than duplicated. Matched on filename within the workspace, which
             # is what the user actually re-selects.
-            existing = set((await session.execute(
-                select(Media.filename).where(
-                    Media.businessProfileId == workspace_id,
-                    Media.filename.isnot(None),
-                )
-            )).scalars().all())
+            # Compared on the basename, not the whole string. "Choose folder"
+            # sends "Billionare Goal/clip.mp4" and "Choose files" sends
+            # "clip.mp4", so the same clip picked both ways looked like two
+            # different files — nine got imported twice that way.
+            def _basename(name: str) -> str:
+                return (name or "").strip().lower().rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+
+            existing = {
+                _basename(n) for n in (await session.execute(
+                    select(Media.filename).where(
+                        Media.businessProfileId == workspace_id,
+                        Media.filename.isnot(None),
+                    )
+                )).scalars().all()
+            }
 
             payload = []
             duplicates = 0
+            seen_in_batch = set()
             for f in files:
                 name = f.filename or "upload"
-                if name in existing:
+                key = _basename(name)
+                # A file already taken earlier in this same request counts too,
+                # or a folder containing two copies imports both.
+                if key in existing or key in seen_in_batch:
                     duplicates += 1
                     continue
+                seen_in_batch.add(key)
                 payload.append((name, await f.read()))
 
             if not payload:
@@ -2129,6 +2242,23 @@ async def backfill_media(
             "queued": 0,
             "remaining": 0,
             "message": "Every asset already has a description and is branded.",
+        }
+
+    # Clicking again while a pass runs used to stack another one. Eight live
+    # passes each holding video buffers is what pinned this 512MB instance and
+    # made every subsequent encode be refused for lack of headroom.
+    from services.bulk_ingest import repair_in_progress
+
+    if repair_in_progress(workspace_id):
+        return {
+            "success": True,
+            "queued": 0,
+            "remaining": remaining,
+            "message": (
+                f"A repair is already running — {remaining} still to go. "
+                f"It works through them one at a time; clicking again does not "
+                f"speed it up."
+            ),
         }
 
     spawn_background(
