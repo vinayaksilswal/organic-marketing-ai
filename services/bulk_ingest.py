@@ -68,6 +68,22 @@ _running_passes: set = set()
 def repair_in_progress(workspace_id: str) -> bool:
     return workspace_id in _running_passes
 
+
+def acquire_pass(workspace_id: str) -> bool:
+    """Claim the right to run a repair for this workspace. False if taken.
+
+    Held by the caller across every batch of a run, not per batch, or a second
+    click could slip in between batches and the stacking starts again.
+    """
+    if workspace_id in _running_passes:
+        return False
+    _running_passes.add(workspace_id)
+    return True
+
+
+def release_pass(workspace_id: str) -> None:
+    _running_passes.discard(workspace_id)
+
 # FREE MODELS ONLY, by choice.
 #
 # The cost of that choice, measured rather than assumed: on a sample of six
@@ -423,14 +439,6 @@ async def finish_pending_media(
     from database import AsyncSessionLocal, Media
     from services.video_outro import brand_video_at_url
 
-    if workspace_id in _running_passes:
-        logger.info(
-            f"A repair pass is already running for {workspace_id}; "
-            f"skipping this one rather than stacking another"
-        )
-        return
-    _running_passes.add(workspace_id)
-
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
     async def _one(media_id: str):
@@ -525,9 +533,8 @@ async def finish_pending_media(
     try:
         await asyncio.gather(*(_one(mid) for mid in media_ids))
     finally:
-        _running_passes.discard(workspace_id)
-        # Hand the buffers this pass accumulated back to the OS, or the next
-        # pass starts against an inflated baseline and its encodes are refused.
+        # Hand the buffers this batch accumulated back to the OS, or the next
+        # batch starts against an inflated baseline and its encodes are refused.
         from services.video_outro import release_memory
 
         release_memory()

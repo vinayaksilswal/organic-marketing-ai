@@ -1975,6 +1975,53 @@ def _dedupe_rank(media) -> tuple:
     )
 
 
+
+async def _repair_until_done(workspace_id: str, profile, batch: int = 25) -> None:
+    """Work through the whole backlog on a single click.
+
+    This used to do one batch of 40 and stop, so a 250-clip library meant six
+    clicks half an hour apart -- and clicking early stacked passes, which is
+    what pinned the instance. One run now walks the lot, in batches so the
+    pending list is re-read as it goes and memory is handed back between them.
+
+    The lock is held for the entire run, so a second click reports that one is
+    already going instead of starting another.
+    """
+    from services.bulk_ingest import acquire_pass, finish_pending_media, release_pass
+
+    if not acquire_pass(workspace_id):
+        logger.info(f"Repair already running for {workspace_id}, not starting another")
+        return
+
+    done = 0
+    try:
+        # A bound rather than `while True`: a bug that stops clearing the
+        # pending flag would otherwise spin forever on a paid instance.
+        for _ in range(200):
+            async with get_tenant_session(workspace_id) as session:
+                rows = (await session.execute(
+                    select(Media).where(
+                        Media.businessProfileId == workspace_id, Media.url != ""
+                    ).order_by(Media.createdAt.desc())
+                )).scalars().all()
+                pending = [
+                    m.id for m in rows
+                    if _is_postable(m)
+                    and (not (m.caption or m.prompt) or not _is_branded(m))
+                ][:batch]
+
+            if not pending:
+                break
+            await finish_pending_media(workspace_id, pending, profile)
+            done += len(pending)
+            logger.info(f"Repair progress for {workspace_id}: {done} assets handled")
+    except Exception:
+        logger.exception(f"Repair run failed for {workspace_id} after {done} assets")
+    finally:
+        release_pass(workspace_id)
+        logger.info(f"Repair run finished for {workspace_id}: {done} assets")
+
+
 @router.post("/media/dedupe")
 async def dedupe_workspace_media(
     request: Request,
@@ -2262,8 +2309,8 @@ async def backfill_media(
         }
 
     spawn_background(
-        finish_pending_media(workspace_id, pending, profile),
-        f"backfill({workspace_id}, {len(pending)})",
+        _repair_until_done(workspace_id, profile),
+        f"backfill({workspace_id}, {remaining})",
     )
 
     return {
