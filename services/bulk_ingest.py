@@ -404,25 +404,8 @@ async def finish_pending_media(
     """
     import httpx
 
-    from sqlalchemy import select
-
     from database import AsyncSessionLocal, Media
-    from services.video_outro import brand_video_at_url, stable_choice
-
-    # The workspace's music, read once rather than per clip. Only silent clips
-    # will draw from it, and only if the operator has uploaded anything.
-    async with AsyncSessionLocal() as session:
-        tracks = [
-            (m.id, m.url) for m in (await session.execute(
-                select(Media).where(
-                    Media.businessProfileId == workspace_id,
-                    Media.mimeType.like("audio/%"),
-                    Media.isActive.is_(True),
-                )
-            )).scalars().all() if m.url
-        ]
-    if tracks:
-        logger.info(f"{len(tracks)} music tracks available for silent clips")
+    from services.video_outro import brand_video_at_url
 
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
@@ -487,14 +470,14 @@ async def finish_pending_media(
                 # original footage rather than a frame carrying our own mark.
                 if needs_brand:
                     probe: dict = {}
-                    # Hashed on the clip, so the rotation spreads tracks across
-                    # the library and a repeated repair keeps the same pairing.
-                    chosen = stable_choice(tracks, media_id)
+                    # No music here. Branding records whether the clip is
+                    # silent; the bed is laid at posting time, where muxing
+                    # onto a finished file costs 21MB instead of a re-encode,
+                    # and where tracks added later still reach old clips.
                     async with _encode_slot:
                         branded = await brand_video_at_url(
                             media.url, profile, workspace_id, media_id,
                             probe_out=probe,
-                            bed_url=chosen[1] if chosen else None,
                         )
                     changed = branded and branded != media.url
                     # The probe is worth persisting even when the encode

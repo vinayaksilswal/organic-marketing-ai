@@ -288,6 +288,118 @@ def test_no_tracks_is_not_an_error():
     assert stable_choice([], "clip") is None
 
 
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self._rows
+
+
+class _FakeSession:
+    def __init__(self, rows):
+        self._rows = rows
+        self.committed = False
+
+    async def execute(self, _stmt):
+        return _FakeResult(self._rows)
+
+    async def commit(self):
+        self.committed = True
+
+
+class _Clip:
+    def __init__(self, has_audio, mime="video/mp4"):
+        self.id = "clip-1"
+        self.url = "https://cdn/clip.mp4"
+        self.mimeType = mime
+        self.hasAudio = has_audio
+
+
+class _Track:
+    def __init__(self, i):
+        self.id = f"t{i}"
+        self.url = f"https://cdn/{i}.mp3"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("has_audio,reason", [
+    (True, "clip already has its own sound"),
+    (None, "nobody has probed it, so silence is not established"),
+])
+async def test_posting_leaves_a_clip_alone_unless_it_is_known_silent(
+    has_audio, reason, monkeypatch
+):
+    import worker
+
+    called = []
+    monkeypatch.setattr(
+        "services.video_outro.add_music_at_url",
+        lambda *a, **k: called.append(a),
+    )
+    session = _FakeSession([_Track(0)])
+    await worker._ensure_media_has_sound(session, _Clip(has_audio), "ws")
+    assert not called, f"music was added when {reason}"
+    assert not session.committed
+
+
+@pytest.mark.asyncio
+async def test_posting_skips_music_when_there_are_no_tracks(monkeypatch):
+    """No library means the clip posts silent — not that posting breaks."""
+    import worker
+
+    called = []
+    monkeypatch.setattr(
+        "services.video_outro.add_music_at_url",
+        lambda *a, **k: called.append(a),
+    )
+    session = _FakeSession([])
+    await worker._ensure_media_has_sound(session, _Clip(False), "ws")
+    assert not called
+    assert not session.committed
+
+
+@pytest.mark.asyncio
+async def test_posting_lays_a_bed_on_a_silent_clip(monkeypatch):
+    import worker
+
+    async def _fake_add(video_url, bed_url, workspace_id, media_id):
+        return "https://cdn/clip_branded_scored.mp4"
+
+    monkeypatch.setattr("services.video_outro.add_music_at_url", _fake_add)
+    session = _FakeSession([_Track(0), _Track(1)])
+    clip = _Clip(False)
+    await worker._ensure_media_has_sound(session, clip, "ws")
+
+    assert clip.url.endswith("_branded_scored.mp4")
+    assert clip.hasAudio is True, "the clip must not be scored twice"
+    assert session.committed
+    # The catalog decides whether a clip still needs branding by looking for
+    # "_branded" in its URL. Losing it would send this back through a 311MB
+    # encode it does not need.
+    assert "_branded" in clip.url
+
+
+@pytest.mark.asyncio
+async def test_a_failed_mux_leaves_the_clip_postable(monkeypatch):
+    import worker
+
+    async def _fails(*a, **k):
+        return None
+
+    monkeypatch.setattr("services.video_outro.add_music_at_url", _fails)
+    session = _FakeSession([_Track(0)])
+    clip = _Clip(False)
+    original = clip.url
+    await worker._ensure_media_has_sound(session, clip, "ws")
+
+    assert clip.url == original, "a failed mux must not corrupt the media row"
+    assert not session.committed
+
+
 @pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg not available")
 def test_bed_fills_a_silent_clip(tmp_path):
     ff = _ffmpeg()

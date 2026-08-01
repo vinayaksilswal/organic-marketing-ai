@@ -696,3 +696,103 @@ async def brand_video_at_url(
         return uploaded["secure_url"]
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+async def add_music_at_url(
+    video_url: str,
+    bed_url: str,
+    workspace_id: str,
+    media_id: str,
+) -> Optional[str]:
+    """Lay a music bed under a finished clip. Returns the new URL, or None.
+
+    Done at posting time rather than at branding time, because that is when it
+    is nearly free: the video stream is copied, not re-encoded, so this costs
+    21MB and half a second against the 311MB and thirty-plus seconds a full
+    encode needs. It also means a clip does not have to be re-branded to gain
+    music, and the operator can add tracks whenever they like.
+
+    The caller is responsible for checking the clip is actually silent. Mixing
+    music under existing speech ruins both.
+    """
+    import httpx
+
+    from services.storage_service import upload_media_to_cloudinary
+
+    ff = _ffmpeg()
+    if not ff:
+        return None
+
+    work = Path(tempfile.mkdtemp(prefix="score_"))
+    try:
+        source = work / "clip.mp4"
+        bed = work / f"bed{Path(bed_url.split('?')[0]).suffix or '.mp3'}"
+        try:
+            async with httpx.AsyncClient(timeout=180.0, follow_redirects=True) as client:
+                for url, target in ((video_url, source), (bed_url, bed)):
+                    async with client.stream("GET", url) as resp:
+                        resp.raise_for_status()
+                        with target.open("wb") as fh:
+                            async for chunk in resp.aiter_bytes(1024 * 256):
+                                fh.write(chunk)
+        except Exception as e:
+            logger.warning(f"Music: could not fetch the clip or track: {e}")
+            return None
+
+        probed = _probe(source)
+        if not probed:
+            return None
+        duration = probed[4]
+        if probed[3]:
+            # Belt and braces. The caller checks this, but a clip that gained
+            # audio between the check and here must not have it overwritten.
+            logger.info("Music: clip already has audio, leaving it alone")
+            return None
+
+        dest = work / "scored.mp4"
+        cmd = [
+            ff, "-y", "-hide_banner", "-loglevel", "error",
+            "-i", str(source),
+            # Looped in case the track is shorter than the clip.
+            "-stream_loop", "-1", "-i", str(bed),
+            "-filter_complex",
+            f"[1:a]atrim=duration={duration:.3f},"
+            f"afade=t=in:st=0:d=0.4,"
+            f"afade=t=out:st={max(duration - 0.6, 0):.3f}:d=0.6,"
+            f"volume={BED_VOLUME}[a]",
+            # -c:v copy is the whole point: the picture is untouched, so there
+            # is no generation loss and no encoder to feed.
+            "-map", "0:v", "-map", "[a]",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+            "-movflags", "+faststart", str(dest),
+        ]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               errors="ignore", timeout=300)
+        except subprocess.TimeoutExpired:
+            logger.error("Music: ffmpeg timed out, posting the clip silent")
+            return None
+        if r.returncode != 0 or not dest.exists() or dest.stat().st_size == 0:
+            logger.error(f"Music: ffmpeg failed ({r.returncode}): {r.stderr[:300]}")
+            return None
+
+        uploaded = await upload_media_to_cloudinary(
+            workspace_id=workspace_id,
+            # "_branded" is retained deliberately: the catalog decides whether a
+            # clip still needs branding by looking for it in the URL, and a
+            # name without it would send an already-branded clip back through
+            # a 311MB encode.
+            media_id=f"{media_id}_branded_scored",
+            filename="scored.mp4",
+            source=dest.read_bytes(),
+            resource_type="video",
+            tags=["music", "ai-generated"],
+        )
+        if not uploaded or not uploaded.get("secure_url"):
+            logger.error("Music: upload failed, posting the clip silent")
+            return None
+
+        logger.info(f"Music: bed laid under {media_id}")
+        return uploaded["secure_url"]
+    finally:
+        shutil.rmtree(work, ignore_errors=True)

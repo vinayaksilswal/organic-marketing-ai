@@ -155,9 +155,66 @@ async def _select_media_object_for_post(
     # permanently unreachable.
     from services.media_rotation import select_next_media
 
-    return await select_next_media(
+    media = await select_next_media(
         session, profile.id, prefer_ai_generated=True
     )
+    if media is not None:
+        await _ensure_media_has_sound(session, media, profile.id)
+    return media
+
+
+async def _ensure_media_has_sound(session: Any, media: Any, workspace_id: str) -> None:
+    """Give a silent clip a music bed before it is posted, if one is available.
+
+    Instagram's own music picker exists only inside the app — the Content
+    Publishing API has no field for a track — so a silent clip published
+    automatically stays silent forever. This is the only point where that can
+    be fixed without a human opening their phone.
+
+    Done here rather than during branding because muxing onto a finished clip
+    copies the video stream instead of re-encoding it: 21MB and half a second,
+    against 311MB and thirty seconds. It also means tracks uploaded next month
+    still reach clips branded today.
+    """
+    from sqlalchemy import select
+
+    from database import Media
+    from services.video_outro import add_music_at_url, stable_choice
+
+    if not (media.mimeType or "").startswith("video/"):
+        return
+    # None means nobody has probed it yet, and guessing wrong would either skip
+    # a silent clip or overwrite a clip that has speech. Branding fills this in.
+    if media.hasAudio is not False:
+        return
+
+    tracks = [
+        (m.id, m.url) for m in (await session.execute(
+            select(Media).where(
+                Media.businessProfileId == workspace_id,
+                Media.mimeType.like("audio/%"),
+                Media.isActive.is_(True),
+            )
+        )).scalars().all() if m.url
+    ]
+    if not tracks:
+        logger.info(
+            "Media has no audio and the workspace has no music tracks; "
+            "posting it silent"
+        )
+        return
+
+    # Hashed on the clip so the rotation spreads across the library rather than
+    # putting one song on every post.
+    chosen = stable_choice(tracks, media.id)
+    scored = await add_music_at_url(media.url, chosen[1], workspace_id, media.id)
+    if not scored:
+        return
+
+    # Persisted so the work happens once per clip rather than once per post.
+    media.url = scored
+    media.hasAudio = True
+    await session.commit()
 
 
 async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
