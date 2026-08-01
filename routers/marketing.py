@@ -1928,3 +1928,69 @@ async def delete_workspace_media(media_id: str, request: Request) -> Any:
         await session.delete(media)
         await session.commit()
         return {"success": True, "message": "Media asset deleted successfully"}
+
+
+@router.post("/media/bulk-upload")
+async def bulk_upload_media(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    write_captions: bool = Form(True),
+    user_id: str = Depends(verify_user),
+) -> Any:
+    """Upload a whole folder of assets, each with a base caption.
+
+    The base caption is what the post-caption writer reads to know what an
+    asset shows. Filenames cannot supply it — a real folder is full of
+    `handle_2025-12-23_DSnJoNaklOM_2.mp4` — so each asset is looked at: a frame
+    is pulled from every video and described by the vision model.
+
+    Partial success is normal on a large folder. Every file reports its own
+    outcome rather than one failure aborting the batch.
+    """
+    from services.bulk_ingest import ingest_folder
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files supplied")
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        # Read every file before the request body is closed.
+        payload = [(f.filename or "upload", await f.read()) for f in files]
+
+        result = await ingest_folder(
+            payload, profile, user_id, workspace_id, write_captions=write_captions
+        )
+
+        # Persist the ones that made it. Written in one transaction so a
+        # storage success is never left without its catalog row.
+        for item in result["items"]:
+            if not item.get("ok"):
+                continue
+            session.add(Media(
+                id=item["mediaId"],
+                userId=user_id,
+                businessProfileId=workspace_id,
+                filename=item["filename"],
+                mimeType=item["mimeType"],
+                url=item["url"],
+                caption=item.get("caption") or None,
+                isActive=True,
+            ))
+        await session.commit()
+
+    return {
+        "success": True,
+        "message": (
+            f"{result['stored']} of {result['total']} added"
+            + (f", {result['described']} described automatically"
+               if result["described"] else "")
+        ),
+        **result,
+    }

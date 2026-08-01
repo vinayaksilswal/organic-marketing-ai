@@ -7,6 +7,11 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [uploading, setUploading] = useState(false);
   const [baseCaption, setBaseCaption] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [bulkFiles, setBulkFiles] = useState([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState('');
+  const [bulkResult, setBulkResult] = useState(null);
+  const [autoCaption, setAutoCaption] = useState(true);
   
   // Modals
   const [previewMedia, setPreviewMedia] = useState(null);
@@ -42,6 +47,65 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
       setLoadError('Could not reach the server to load your media.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Sent in batches rather than one 242-file request: a single upload of a
+  // whole library exceeds request size limits and gives no progress, and one
+  // network blip loses the lot. Each batch is independent.
+  const BULK_BATCH = 8;
+
+  const handleBulkUpload = async () => {
+    if (!bulkFiles.length) return;
+    setBulkUploading(true);
+    setBulkResult(null);
+
+    const media = bulkFiles.filter(f =>
+      f.type.startsWith('image/') || f.type.startsWith('video/'));
+    if (!media.length) {
+      setBulkResult({ message: 'That folder had no images or videos in it.', failed: 0 });
+      setBulkUploading(false);
+      return;
+    }
+
+    let stored = 0, failed = 0, described = 0;
+    try {
+      for (let i = 0; i < media.length; i += BULK_BATCH) {
+        const batch = media.slice(i, i + BULK_BATCH);
+        setBulkProgress(`${Math.min(i + batch.length, media.length)} / ${media.length}`);
+
+        const form = new FormData();
+        batch.forEach(f => form.append('files', f));
+        form.append('write_captions', autoCaption ? 'true' : 'false');
+
+        try {
+          const res = await authFetch(
+            `${API_BASE}/marketing/media/bulk-upload`,
+            { method: 'POST', body: form },
+            token
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const d = await res.json();
+          stored += d.stored || 0;
+          failed += d.failed || 0;
+          described += d.described || 0;
+        } catch (err) {
+          // One failed batch must not abandon the rest of the folder.
+          failed += batch.length;
+          console.error('bulk batch failed', err);
+        }
+      }
+
+      setBulkResult({
+        message: `${stored} of ${media.length} added` +
+                 (described ? `, ${described} described automatically` : ''),
+        failed,
+      });
+      setBulkFiles([]);
+      await fetchMedia();
+    } finally {
+      setBulkUploading(false);
+      setBulkProgress('');
     }
   };
 
@@ -211,6 +275,71 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
           >
             {uploading ? <span className="spinner"></span> : <><Upload size={16} /> UPLOAD & CREATE</>}
           </button>
+        </div>
+
+        {/* Bulk folder ingest. A single-file form is unusable for a real
+            content library — this account arrived with 242 clips — and typing
+            a base caption 242 times is worse. The vision model writes each
+            one from a frame of the actual asset. */}
+        <div className="glass-panel" style={{ marginBottom: '1.5rem', padding: '1.25rem 1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Or add a whole folder
+          </label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
+            <input
+              type="file"
+              id="bulk-folder-upload"
+              multiple
+              webkitdirectory=""
+              directory=""
+              onChange={(e) => setBulkFiles(Array.from(e.target.files || []))}
+              style={{ display: 'none' }}
+            />
+            <button className="btn btn-secondary" style={{ height: 42 }}
+              onClick={() => document.getElementById('bulk-folder-upload').click()}
+              disabled={bulkUploading}>
+              Choose folder
+            </button>
+
+            <input
+              type="file"
+              id="bulk-files-upload"
+              multiple
+              onChange={(e) => setBulkFiles(Array.from(e.target.files || []))}
+              style={{ display: 'none' }}
+            />
+            <button className="btn btn-secondary" style={{ height: 42 }}
+              onClick={() => document.getElementById('bulk-files-upload').click()}
+              disabled={bulkUploading}>
+              Choose files
+            </button>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <input type="checkbox" checked={autoCaption}
+                onChange={(e) => setAutoCaption(e.target.checked)} />
+              Write base captions with AI
+            </label>
+
+            {bulkFiles.length > 0 && (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {bulkFiles.length} file{bulkFiles.length === 1 ? '' : 's'} selected
+              </span>
+            )}
+
+            <button className="btn btn-primary" style={{ height: 42, marginLeft: 'auto' }}
+              onClick={handleBulkUpload}
+              disabled={bulkUploading || bulkFiles.length === 0}>
+              {bulkUploading
+                ? <><span className="spinner"></span> {bulkProgress || 'Uploading...'}</>
+                : <><Upload size={16} /> UPLOAD {bulkFiles.length || ''}</>}
+            </button>
+          </div>
+          {bulkResult && (
+            <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: bulkResult.failed ? 'var(--warning, #e0a800)' : 'var(--text-muted)' }}>
+              {bulkResult.message}
+              {bulkResult.failed > 0 && ` — ${bulkResult.failed} skipped`}
+            </p>
+          )}
         </div>
 
         {/* TABLE SECTION */}
