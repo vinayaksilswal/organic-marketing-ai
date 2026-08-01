@@ -53,7 +53,11 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   // Sent in batches rather than one 242-file request: a single upload of a
   // whole library exceeds request size limits and gives no progress, and one
   // network blip loses the lot. Each batch is independent.
-  const BULK_BATCH = 8;
+  //
+  // Three, not eight. Each video is uploaded to storage and has its end card
+  // composited, and the server is killed at a 120s request timeout — eight
+  // videos could not finish, so every batch returned 500.
+  const BULK_BATCH = 3;
 
   const handleBulkUpload = async () => {
     if (!bulkFiles.length) return;

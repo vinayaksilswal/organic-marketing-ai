@@ -214,9 +214,12 @@ async def ingest_one(
         return {"filename": filename, "ok": False,
                 "reason": f"larger than {MAX_BYTES // (1024 * 1024)}MB"}
 
+    # Vision does NOT run here. A frame extract plus a vision call takes tens
+    # of seconds per asset, and gunicorn kills the worker at --timeout 120, so
+    # a batch of eight videos could never finish inside one request — every
+    # batch returned 500. Captions are written afterwards by
+    # describe_pending_media and fill in progressively.
     caption = ""
-    if write_captions:
-        caption = await describe_asset(content, filename, profile)
 
     # Same branding the single-file upload applies, so a bulk-added clip is not
     # the odd one out in the feed.
@@ -299,3 +302,52 @@ async def ingest_folder(
         "described": sum(1 for r in succeeded if r.get("caption")),
         "items": results,
     }
+
+
+async def describe_pending_media(
+    workspace_id: str, media_ids: List[str], profile: Any
+) -> None:
+    """Write base captions for already-stored assets, out of band.
+
+    Runs after the upload request has returned. Each asset is fetched from
+    storage, a frame is described, and the row is updated — so the catalog is
+    usable immediately and the descriptions arrive over the following minutes.
+
+    Per-asset failures are logged and skipped: an empty caption is editable,
+    and one unreadable file must not stop the rest of a 242-file library.
+    """
+    import httpx
+
+    from database import AsyncSessionLocal, Media
+
+    sem = asyncio.Semaphore(MAX_CONCURRENT)
+
+    async def _one(media_id: str):
+        async with sem:
+            try:
+                async with AsyncSessionLocal() as session:
+                    media = await session.get(Media, media_id)
+                    if not media or media.caption or not media.url:
+                        return
+
+                    async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as c:
+                        resp = await c.get(media.url)
+                    if resp.status_code != 200:
+                        logger.warning(
+                            f"Could not fetch {media.filename} to describe it: "
+                            f"{resp.status_code}"
+                        )
+                        return
+
+                    caption = await describe_asset(
+                        resp.content, media.filename or "asset", profile
+                    )
+                    if caption:
+                        media.caption = caption
+                        await session.commit()
+                        logger.info(f"Described {media.filename}: {caption[:70]}")
+            except Exception:
+                logger.exception(f"Could not describe media {media_id}")
+
+    await asyncio.gather(*(_one(mid) for mid in media_ids))
+    logger.info(f"Caption pass finished for {len(media_ids)} assets in {workspace_id}")

@@ -1965,7 +1965,7 @@ async def bulk_upload_media(
         payload = [(f.filename or "upload", await f.read()) for f in files]
 
         result = await ingest_folder(
-            payload, profile, user_id, workspace_id, write_captions=write_captions
+            payload, profile, user_id, workspace_id, write_captions=False
         )
 
         # Persist the ones that made it. Written in one transaction so a
@@ -1985,12 +1985,27 @@ async def bulk_upload_media(
             ))
         await session.commit()
 
+    # Captioning runs AFTER the response. A frame extract plus a vision call
+    # costs tens of seconds per asset and gunicorn kills the worker at
+    # --timeout 120, so doing it inline made every batch of videos return 500.
+    # The catalog is usable immediately and descriptions fill in behind it.
+    stored_ids = [i["mediaId"] for i in result["items"] if i.get("ok")]
+    if write_captions and stored_ids:
+        from services.bulk_ingest import describe_pending_media
+        from services.task_utils import spawn_background
+
+        spawn_background(
+            describe_pending_media(workspace_id, stored_ids, profile),
+            f"describe_pending_media({workspace_id}, {len(stored_ids)})",
+        )
+
     return {
         "success": True,
+        "captioning": bool(write_captions and stored_ids),
         "message": (
             f"{result['stored']} of {result['total']} added"
-            + (f", {result['described']} described automatically"
-               if result["described"] else "")
+            + (" — descriptions are being written now"
+               if write_captions and stored_ids else "")
         ),
         **result,
     }
