@@ -121,7 +121,8 @@ def _serialise_page(page: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def _store_connection(user_id: str, workspace_id: str, page: dict[str, Any]) -> dict[str, Any]:
+async def _store_connection(user_id: str, workspace_id: str, page: dict[str, Any],
+                            fb_user_id: str | None = None) -> dict[str, Any]:
     """Encrypt and persist the chosen Page (and its linked IG account)."""
     ig = page.get("instagram_business_account") or {}
     async with AsyncSessionLocal() as session:
@@ -138,6 +139,8 @@ async def _store_connection(user_id: str, workspace_id: str, page: dict[str, Any
         conn.fbPageId = page["id"]
         conn.fbPageName = page.get("name")
         conn.fbPageCategory = page.get("category")
+        if fb_user_id:
+            conn.fbUserId = fb_user_id
         # Clear any previous IG link so switching Pages cannot leave a stale one
         conn.igAccountId = ig.get("id")
         conn.igAccountName = ig.get("username")
@@ -254,6 +257,20 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
             long_res.raise_for_status()
             long_token = long_res.json()["access_token"]
 
+            # 2b. The app-scoped user id. Meta's Data Deletion Callback sends
+            #     only this to identify whose data to erase, so it has to be
+            #     recorded now — there is no way to look it up afterwards once
+            #     the user has removed the app.
+            fb_user_id = None
+            try:
+                me_res = await client.get(f"{GRAPH_BASE_URL}/me", params={
+                    "access_token": long_token, "fields": "id",
+                })
+                fb_user_id = (me_res.json() or {}).get("id")
+            except Exception as e:
+                # Not fatal to connecting, but it does break deletion mapping.
+                logger.warning(f"Could not read Facebook user id for deletion mapping: {e}")
+
             # 3. Discover Pages. Page tokens derived from a long-lived user token
             #    do not expire, which is what we want for unattended posting.
             pages_res = await client.get(f"{GRAPH_BASE_URL}/me/accounts", params={
@@ -356,6 +373,7 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
                 "workspace_id": workspace_id,
                 "user_id": user_id,
                 "pages": pages,
+                "fb_user_id": fb_user_id,
                 "expires": time.time() + _SELECTION_TTL_SECONDS,
             }
             return RedirectResponse(
@@ -364,7 +382,7 @@ async def meta_callback(request: Request, code: str | None = None, state: str | 
             )
 
         page = pages[0]
-        saved = await _store_connection(user_id, workspace_id, page)
+        saved = await _store_connection(user_id, workspace_id, page, fb_user_id)
         connected = saved["name"]
         if saved.get("instagramUsername"):
             connected += f" + @{saved['instagramUsername']}"
@@ -415,7 +433,7 @@ async def select_page(data: SelectPageRequest, user_id: str = Depends(verify_use
     if not page:
         raise HTTPException(status_code=404, detail="That Page was not part of this connection.")
 
-    saved = await _store_connection(user_id, ctx["workspace_id"], page)
+    saved = await _store_connection(user_id, ctx["workspace_id"], page, ctx.get("fb_user_id"))
     _PENDING_SELECTION.pop(data.token, None)  # single-use; drops the held tokens
 
     return {"success": True, "connected": saved}

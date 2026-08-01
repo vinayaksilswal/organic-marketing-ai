@@ -277,6 +277,10 @@ class SocialConnection(Base):
     # account's niche comes from the platform itself rather than being guessed.
     # This is what keeps two businesses on one login from sounding alike.
     fbPageCategory = Column(String, nullable=True)
+    # The app-scoped Facebook user id of the person who connected. Meta's Data
+    # Deletion Callback identifies the user by this and nothing else, so
+    # without it a deletion request cannot be mapped back to an account.
+    fbUserId = Column(String, nullable=True, index=True)
     igAccountId = Column(String, nullable=True)
     igAccountName = Column(String, nullable=True)
     twitterAccessToken = Column(Text, nullable=True)
