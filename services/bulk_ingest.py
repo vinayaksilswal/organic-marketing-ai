@@ -82,6 +82,15 @@ MAX_BYTES = 200 * 1024 * 1024
 IMAGE_TYPES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic"}
 VIDEO_TYPES = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
 
+# Music the operator supplies. These are never posted on their own — media
+# rotation only picks images and video — they are the pool a silent clip draws
+# a bed from. Meta's Sound Collection is the obvious source: free, and licensed
+# for exactly this use on Instagram and Facebook.
+_AUDIO_MIME = {
+    ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac",
+    ".wav": "audio/wav", ".ogg": "audio/ogg", ".flac": "audio/flac",
+}
+
 
 def _mime_for(filename: str) -> Optional[str]:
     ext = Path(filename).suffix.lower()
@@ -89,6 +98,8 @@ def _mime_for(filename: str) -> Optional[str]:
         return f"image/{'jpeg' if ext in {'.jpg', '.jpeg'} else ext.lstrip('.')}"
     if ext in VIDEO_TYPES:
         return f"video/{'mp4' if ext in {'.mp4', '.m4v'} else ext.lstrip('.')}"
+    if ext in _AUDIO_MIME:
+        return _AUDIO_MIME[ext]
     return None
 
 
@@ -393,8 +404,25 @@ async def finish_pending_media(
     """
     import httpx
 
+    from sqlalchemy import select
+
     from database import AsyncSessionLocal, Media
-    from services.video_outro import brand_video_at_url
+    from services.video_outro import brand_video_at_url, stable_choice
+
+    # The workspace's music, read once rather than per clip. Only silent clips
+    # will draw from it, and only if the operator has uploaded anything.
+    async with AsyncSessionLocal() as session:
+        tracks = [
+            (m.id, m.url) for m in (await session.execute(
+                select(Media).where(
+                    Media.businessProfileId == workspace_id,
+                    Media.mimeType.like("audio/%"),
+                    Media.isActive.is_(True),
+                )
+            )).scalars().all() if m.url
+        ]
+    if tracks:
+        logger.info(f"{len(tracks)} music tracks available for silent clips")
 
     sem = asyncio.Semaphore(MAX_CONCURRENT)
 
@@ -412,7 +440,12 @@ async def finish_pending_media(
                     # description was never branded, and since descriptions are
                     # written first that was almost everything. Descriptions
                     # filled in and watermarks never appeared.
-                    is_video = (media.mimeType or "").startswith("video/")
+                    mime = (media.mimeType or "")
+                    if mime.startswith("audio/"):
+                        # A music track is neither described nor branded — it
+                        # is not content, it is the bed other clips draw from.
+                        return
+                    is_video = mime.startswith("video/")
                     needs_caption = not media.caption
                     needs_brand = is_video and "_branded" not in media.url
                     if not needs_caption and not needs_brand:
@@ -454,10 +487,14 @@ async def finish_pending_media(
                 # original footage rather than a frame carrying our own mark.
                 if needs_brand:
                     probe: dict = {}
+                    # Hashed on the clip, so the rotation spreads tracks across
+                    # the library and a repeated repair keeps the same pairing.
+                    chosen = stable_choice(tracks, media_id)
                     async with _encode_slot:
                         branded = await brand_video_at_url(
                             media.url, profile, workspace_id, media_id,
                             probe_out=probe,
+                            bed_url=chosen[1] if chosen else None,
                         )
                     changed = branded and branded != media.url
                     # The probe is worth persisting even when the encode

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaList, setMediaList] = useState([]);
@@ -70,6 +70,12 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
     m => (m.mimeType || '').startsWith('video/') && (m.needsCaption || m.branded === false)
   );
 
+  // Tracks are catalog rows like anything else, but they are never posted —
+  // they are the pool a silent clip draws a music bed from during branding.
+  const musicTracks = mediaList.filter(
+    m => (m.mimeType || '').startsWith('audio/')
+  );
+
   const handleFixUnfinished = async () => {
     setFixing(true);
     try {
@@ -96,10 +102,14 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
     setBulkUploading(true);
     setBulkResult(null);
 
+    // Audio is accepted too, but it is not content — tracks are the pool a
+    // silent clip draws a music bed from, because Instagram's own music picker
+    // only exists inside the app and cannot be reached from the publishing API.
     const media = bulkFiles.filter(f =>
-      f.type.startsWith('image/') || f.type.startsWith('video/'));
+      f.type.startsWith('image/') || f.type.startsWith('video/') ||
+      f.type.startsWith('audio/'));
     if (!media.length) {
-      setBulkResult({ message: 'That folder had no images or videos in it.', failed: 0 });
+      setBulkResult({ message: 'That folder had no images, videos or audio in it.', failed: 0 });
       setBulkUploading(false);
       return;
     }
@@ -436,6 +446,41 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
           )}
         </div>
 
+        {/* Music for clips that arrived without any.
+            Instagram's own catalogue is reachable only inside the app — the
+            publishing API has no field for a track — so a silent clip posted
+            automatically stays silent. Tracks uploaded here are mixed in
+            during branding, and only under clips that have no audio. */}
+        <div className="glass-panel" style={{ marginBottom: '1.5rem', padding: '1.25rem 1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Music for silent clips
+          </label>
+          <p style={{ margin: '0 0 0.75rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            {musicTracks.length > 0
+              ? <><strong>{musicTracks.length}</strong> track{musicTracks.length === 1 ? '' : 's'} loaded. Clips with no audio get one mixed in automatically, rotated across the library. Clips that already have sound are never touched.</>
+              : <>No tracks yet. Clips with no audio will post silent. Download what you want from{' '}
+                <a href="https://www.facebook.com/sound" target="_blank" rel="noopener noreferrer"
+                   style={{ color: 'var(--accent, #6ea8fe)' }}>Meta Sound Collection</a>
+                {' '}— it is free and licensed specifically for Instagram and Facebook — then add the files here.</>}
+          </p>
+          <input
+            type="file"
+            id="music-upload"
+            multiple
+            accept="audio/*"
+            onChange={(e) => setBulkFiles(Array.from(e.target.files || []))}
+            style={{ display: 'none' }}
+          />
+          <button className="btn btn-secondary" style={{ height: 38 }}
+            onClick={() => document.getElementById('music-upload').click()}
+            disabled={bulkUploading}>
+            <Music size={15} /> Add music tracks
+          </button>
+          <span style={{ marginLeft: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            then press Upload above
+          </span>
+        </div>
+
         {/* Two things a bulk import can silently leave undone. Surfacing the
             count means the user finds out here rather than in a published
             post. */}
@@ -508,13 +553,20 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                 ) : (
                   (showOnlyUnfinished ? unfinished : mediaList).map(item => {
                     const isVideo = item.mimeType?.startsWith('video/') || item.filename?.endsWith('.mp4');
+                    const isAudio = item.mimeType?.startsWith('audio/');
                     const caption = item.caption || item.prompt || '';
                     const inactive = item.isActive === false;
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <td style={{ padding: '1rem 1.5rem', width: '80px' }}>
                           <div style={{ width: '56px', height: '56px', borderRadius: '8px', overflow: 'hidden', background: '#000', position: 'relative' }}>
-                            {isVideo ? (
+                            {isAudio ? (
+                              // A track has no frame to show, and an <img>
+                              // pointed at an mp3 renders as a broken icon.
+                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(110,168,254,0.12)' }}>
+                                <Music size={20} color="#6ea8fe" />
+                              </div>
+                            ) : isVideo ? (
                               <video src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
                               <img src={item.url} alt="media" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

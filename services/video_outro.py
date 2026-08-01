@@ -21,6 +21,8 @@ scheduled post that never goes out.
 from __future__ import annotations
 
 import asyncio
+import functools
+import hashlib
 import os
 import shutil
 import subprocess
@@ -290,34 +292,29 @@ def build_watermark_png(
 # feed does not carry one track on every clip.
 #
 # Deliberately NOT a bundled "trending" library. Chart music is copyrighted;
-# Instagram's Content ID mutes or removes posts that use it, and repeat hits
-# cost the account. Instagram's own licensed catalogue is only attachable
-# inside the app — the Content Publishing API has no field for it — so the
-# in-app music picker cannot be automated at all. What can be automated is
-# applying tracks the operator already licensed.
+# Instagram's Content ID mutes or removes posts that use it. Instagram's own
+# licensed catalogue is only attachable inside the app — the Content Publishing
+# API has no field for it — so the in-app music picker cannot be automated at
+# all. What can be automated is applying tracks the operator already holds,
+# which includes Meta's own Sound Collection: free, and licensed precisely for
+# organic Instagram and Facebook content.
 AUDIO_TYPES = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"}
 
-# Under the voice of a talking clip, over nothing on a silent one. Silent
-# clips get the bed at full strength; this only exists so the constant is
-# named rather than buried in a filter string.
+# A bed under silence, not under a voice. Only ever applied to clips with no
+# audio of their own, so there is nothing for it to compete with.
 BED_VOLUME = 0.85
 
 
-def pick_audio_bed(tracks: list, seed_key: str = "") -> Optional[Path]:
-    """One track from the workspace's library, chosen stably per asset.
+def stable_choice(items: list, seed_key: str = ""):
+    """One item from a list, chosen deterministically from seed_key.
 
-    Hashed on the asset rather than random so re-running a repair does not
-    change which track a clip already went out with.
+    Hashed rather than random so re-running a repair does not swap the track
+    under a clip that already went out with a different one.
     """
-    usable = [Path(t) for t in tracks if Path(t).suffix.lower() in AUDIO_TYPES]
-    usable = [t for t in usable if t.exists()]
-    if not usable:
+    if not items:
         return None
-    usable.sort()
-    import hashlib
-
-    idx = int(hashlib.sha256(seed_key.encode()).hexdigest(), 16) % len(usable)
-    return usable[idx]
+    digest = hashlib.sha256(seed_key.encode("utf-8", "replace")).hexdigest()
+    return items[int(digest, 16) % len(items)]
 
 
 def append_outro(
@@ -604,6 +601,7 @@ async def brand_video_at_url(
     media_id: str,
     seconds: float = DEFAULT_OUTRO_SECONDS,
     probe_out: Optional[dict] = None,
+    bed_url: Optional[str] = None,
 ) -> str:
     """Download a rendered clip, append its outro, and re-upload it.
 
@@ -643,8 +641,27 @@ async def brand_video_at_url(
         # The file is already on disk for ffmpeg, so this costs one probe
         # rather than a second download. Reported through probe_out because
         # the caller owns the database session and this function does not.
+        has_audio = probe_audio(source)
         if probe_out is not None:
-            probe_out["has_audio"] = probe_audio(source)
+            probe_out["has_audio"] = has_audio
+
+        # The track is fetched only once the probe says the clip is silent.
+        # Downloading it for every clip would spend bandwidth on the majority
+        # that already carry their own sound and will never use it.
+        bed_path = None
+        if bed_url and has_audio is False:
+            bed_path = work / f"bed{Path(bed_url.split('?')[0]).suffix or '.mp3'}"
+            try:
+                async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+                    async with client.stream("GET", bed_url) as resp:
+                        resp.raise_for_status()
+                        with bed_path.open("wb") as fh:
+                            async for chunk in resp.aiter_bytes(1024 * 256):
+                                fh.write(chunk)
+            except Exception as e:
+                # A missing track is not a reason to leave the clip unbranded.
+                logger.warning(f"Outro: could not fetch the music bed: {e}")
+                bed_path = None
 
         # append_outro shells out to ffmpeg with a blocking subprocess call.
         # Awaiting it directly on the event loop froze the entire server for
@@ -653,7 +670,10 @@ async def brand_video_at_url(
         # it churned. Off to a thread.
         branded = Path(
             await asyncio.to_thread(
-                append_outro, source, brand, cta, url, seconds
+                functools.partial(
+                    append_outro, source, brand, cta, url, seconds,
+                    audio_bed=bed_path,
+                )
             )
         )
         if branded == source:

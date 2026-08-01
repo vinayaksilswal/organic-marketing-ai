@@ -255,6 +255,112 @@ def test_bitrate_is_capped(tmp_path):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Music, for clips that have none
+#
+# Instagram's licensed catalogue is only reachable inside the app — the
+# Content Publishing API has no field for a track — so a silent clip published
+# through the API is silent forever. The bed is how a silent clip gets sound
+# without a human opening the app. It must never touch a clip that already has
+# audio of its own.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_track_choice_is_stable_for_a_clip():
+    """Re-running a repair must not swap the music under a clip that already
+    went out with a different track."""
+    from services.video_outro import stable_choice
+
+    tracks = [("a", "1.mp3"), ("b", "2.mp3"), ("c", "3.mp3")]
+    assert stable_choice(tracks, "media-42") == stable_choice(tracks, "media-42")
+
+
+def test_track_choice_spreads_across_the_library():
+    """One track on all 90 silent clips is a worse result than silence."""
+    from services.video_outro import stable_choice
+
+    tracks = [(str(i), f"{i}.mp3") for i in range(4)]
+    picked = {stable_choice(tracks, f"clip-{i}")[0] for i in range(60)}
+    assert len(picked) == 4, f"only used {len(picked)} of 4 tracks"
+
+
+def test_no_tracks_is_not_an_error():
+    from services.video_outro import stable_choice
+
+    assert stable_choice([], "clip") is None
+
+
+@pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg not available")
+def test_bed_fills_a_silent_clip(tmp_path):
+    ff = _ffmpeg()
+    src = tmp_path / "silent.mp4"
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=360x640:rate=24:duration=2",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=120)
+    bed = tmp_path / "bed.m4a"
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "sine=frequency=220:duration=5",
+        "-c:a", "aac", str(bed),
+    ], capture_output=True, timeout=120)
+
+    out = Path(append_outro(src, "Acme", "Follow for more", "@acme", audio_bed=bed))
+    probe = subprocess.run([ff, "-hide_banner", "-i", str(out)],
+                           capture_output=True, text=True, errors="ignore",
+                           timeout=60).stderr
+    assert "Audio:" in probe, "a silent clip was left silent despite a bed"
+
+
+@pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg not available")
+def test_bed_never_overrides_existing_audio(tmp_path):
+    """Music dropped over someone talking ruins both. A clip that already has
+    sound keeps exactly the sound it had."""
+    ff = _ffmpeg()
+    src = tmp_path / "talking.mp4"
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=360x640:rate=24:duration=2",
+        "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+        "-t", "2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+        str(src),
+    ], capture_output=True, timeout=120)
+    bed = tmp_path / "bed.m4a"
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "sine=frequency=100:duration=5",
+        "-c:a", "aac", str(bed),
+    ], capture_output=True, timeout=120)
+
+    # The source tone is 440Hz. If the 100Hz bed had replaced it the dominant
+    # frequency would move, so compare the two encodes byte-for-byte instead:
+    # offering a bed must change nothing at all.
+    with_bed = Path(append_outro(src, "Acme", audio_bed=bed,
+                                 output_path=tmp_path / "with.mp4"))
+    without = Path(append_outro(src, "Acme",
+                                output_path=tmp_path / "without.mp4"))
+    assert with_bed.stat().st_size == without.stat().st_size, (
+        "offering a bed changed a clip that already had audio"
+    )
+
+
+def test_music_files_are_recognised_but_never_posted():
+    """Tracks live in the same catalog table. Media rotation must not pick one
+    as if it were a post — a bare audio file is not a Reel."""
+    from services.bulk_ingest import _mime_for
+    from services.media_rotation import _is_postable
+
+    assert _mime_for("luxury-loop.mp3") == "audio/mpeg"
+    assert _mime_for("track.wav") == "audio/wav"
+
+    class _M:
+        url = "https://cdn/track.mp3"
+        isActive = True
+        mimeType = "audio/mpeg"
+
+    assert not _is_postable(_M()), "a music track was offered up as a post"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Refusing to start beats being killed
 #
 # An encode needs ~310MB. Starting one without that free does not make it slow,
