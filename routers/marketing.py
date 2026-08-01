@@ -1957,7 +1957,7 @@ async def bulk_upload_media(
         raise HTTPException(status_code=400, detail="No files supplied")
 
     try:
-        async with AsyncSessionLocal() as session:
+        async with get_tenant_session(workspace_id) as session:
             profile = await session.get(BusinessProfile, workspace_id)
             if not profile or profile.userId != user_id:
                 raise HTTPException(status_code=404, detail="Workspace not found")

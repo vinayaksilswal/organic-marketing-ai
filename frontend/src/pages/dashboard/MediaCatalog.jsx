@@ -59,6 +59,8 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   // videos could not finish, so every batch returned 500.
   const BULK_BATCH = 3;
 
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
   const handleBulkUpload = async () => {
     if (!bulkFiles.length) return;
     setBulkUploading(true);
@@ -76,35 +78,57 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
     try {
       for (let i = 0; i < media.length; i += BULK_BATCH) {
         const batch = media.slice(i, i + BULK_BATCH);
-        setBulkProgress(`${Math.min(i + batch.length, media.length)} / ${media.length}`);
+        const done = Math.min(i + batch.length, media.length);
+        setBulkProgress(`${done} / ${media.length}`);
 
         const form = new FormData();
         batch.forEach(f => form.append('files', f));
         form.append('write_captions', autoCaption ? 'true' : 'false');
 
-        try {
-          const res = await authFetch(
-            `${API_BASE}/marketing/media/bulk-upload`,
-            { method: 'POST', body: form },
-            token
-          );
-          // Surface WHAT failed, not just that something did. A bare
-          // "HTTP 500" in the console cost several rounds of guessing.
-          const body = await res.text();
-          if (!res.ok) {
-            lastError = `HTTP ${res.status}: ${body.slice(0, 300)}`;
-            throw new Error(lastError);
+        // Retried with backoff. Uploading a whole library is dozens of
+        // multi-megabyte POSTs in a few minutes, and the host's edge starts
+        // rejecting them — a 403 with no CORS header, which the browser
+        // reports as a CORS failure because the response never reached the
+        // application at all. Backing off clears it; hammering does not.
+        let ok = false;
+        for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+          if (attempt) {
+            setBulkProgress(`${done} / ${media.length} — retrying`);
+            await sleep(2000 * Math.pow(2, attempt - 1));   // 2s, 4s, 8s
           }
-          const d = JSON.parse(body);
-          stored += d.stored || 0;
-          failed += d.failed || 0;
-          described += d.described || 0;
-          if (d.message && d.success === false) lastError = d.message;
-        } catch (err) {
-          // One failed batch must not abandon the rest of the folder.
-          failed += batch.length;
-          console.error('bulk batch failed', err);
+          try {
+            const res = await authFetch(
+              `${API_BASE}/marketing/media/bulk-upload`,
+              { method: 'POST', body: form },
+              token
+            );
+            // Surface WHAT failed, not just that something did. A bare
+            // "HTTP 500" in the console cost several rounds of guessing.
+            const body = await res.text();
+            if (!res.ok) {
+              lastError = `HTTP ${res.status}: ${body.slice(0, 200)}`;
+              throw new Error(lastError);
+            }
+            const d = JSON.parse(body);
+            stored += d.stored || 0;
+            failed += d.failed || 0;
+            described += d.described || 0;
+            if (d.message && d.success === false) lastError = d.message;
+            ok = true;
+          } catch (err) {
+            console.warn(`batch attempt ${attempt + 1} failed`, err);
+            if (!lastError) lastError = String(err.message || err).slice(0, 200);
+          }
         }
+        if (!ok) {
+          // One exhausted batch must not abandon the rest of the folder.
+          failed += batch.length;
+        }
+
+        // A short gap between batches keeps the upload under whatever rate the
+        // edge is enforcing. It costs a couple of minutes across a library and
+        // is far cheaper than a failed run.
+        await sleep(700);
       }
 
       setBulkResult({
