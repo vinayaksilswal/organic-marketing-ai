@@ -99,8 +99,13 @@ PLANS: dict[str, dict[str, Any]] = {
     "enterprise": {
         "code": "enterprise",
         "name": "Enterprise",
+        # price 0.0 rendered as "Free" on the pricing table, which reads as the
+        # cheapest tier rather than the most expensive one. `custom` tells the
+        # frontend to show "Custom" and a contact button instead of a number.
         "price": 0.0,
-        "tagline": "Unlimited, by arrangement.",
+        "custom": True,
+        "cta": "Contact us",
+        "tagline": "Unlimited, priced to your volume.",
         "features": [
             "Unlimited businesses",
             "Unlimited published posts",

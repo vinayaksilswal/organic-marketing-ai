@@ -198,7 +198,7 @@ const Landing = () => {
       .then(r => r.json()).then(setStats).catch(() => {});
   }, []);
 
-  const entry = Math.min(...plans.filter(p => p.price > 0).map(p => p.price), 17);
+  const entry = Math.min(...plans.filter(p => !p.custom && p.price > 0).map(p => p.price), 17);
 
   const runDemo = async (e) => {
     e.preventDefault();
@@ -603,8 +603,11 @@ const Landing = () => {
           </div>
 
           <div className="grid g4" style={{ alignItems: 'stretch' }}>
-            {plans.map(p => {
-              const free = p.price <= 0;
+            {plans.filter(p => !p.custom).map(p => {
+              // Enterprise is quoted, not listed. Without this it rendered at
+              // $0 as "Free" — reading as the cheapest tier, not the dearest.
+              const custom = !!p.custom;
+              const free = !custom && p.price <= 0;
               const hero = p.code === 'starter';
               return (
                 <div key={p.code} className="glass glass-lift" style={{
@@ -615,7 +618,7 @@ const Landing = () => {
                   {hero && <div className="price-pop">MOST POPULAR</div>}
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: hero ? 'var(--violet)' : 'var(--ink)' }}>{p.name}</h3>
                   <div style={{ margin: '.7rem 0 .3rem', fontSize: '2.3rem', fontWeight: 780, lineHeight: 1 }}>
-                    {free ? 'Free' : <>
+                    {custom ? 'Custom' : free ? 'Free' : <>
                       <span style={{ fontSize: '1.2rem', verticalAlign: 'super', fontWeight: 640 }}>$</span>{p.price}
                       <span style={{ fontSize: '.9rem', fontWeight: 500, color: 'var(--ink-faint)' }}>/mo</span>
                     </>}
@@ -631,13 +634,48 @@ const Landing = () => {
                     ))}
                   </ul>
 
-                  <button className={`b ${hero ? 'b-primary' : 'b-ghost'}`} style={{ width: '100%' }} onClick={() => navigate('/auth')}>
-                    {free ? 'Start free' : `Choose ${p.name}`}
+                  <button className={`b ${hero ? 'b-primary' : 'b-ghost'}`} style={{ width: '100%' }}
+                    onClick={() => custom
+                      ? (window.location.href = 'mailto:vinayaksilswal@gmail.com?subject=Enterprise%20plan%20enquiry')
+                      : navigate('/auth')}>
+                    {custom ? (p.cta || 'Contact us') : free ? 'Start free' : `Choose ${p.name}`}
                   </button>
                 </div>
               );
             })}
           </div>
+
+          {/* A quoted tier as the fifth card left a lonely half-width box on
+              desktop. A full-width band reads as deliberate, and is the
+              conventional place buyers look for "call us" pricing. */}
+          {plans.filter(p => p.custom).map(p => (
+            <div key={p.code} className="glass" style={{
+              marginTop: '1.1rem', padding: '1.6rem 1.8rem', display: 'flex',
+              flexWrap: 'wrap', alignItems: 'center', gap: '1.2rem',
+              justifyContent: 'space-between',
+            }}>
+              <div style={{ minWidth: 220 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>{p.name}</h3>
+                <div style={{ fontSize: '1.6rem', fontWeight: 780, lineHeight: 1.2, margin: '.25rem 0' }}>Custom</div>
+                <p style={{ fontSize: '.85rem', margin: 0 }}>{p.tagline}</p>
+              </div>
+              <ul style={{
+                listStyle: 'none', padding: 0, margin: 0, flex: '1 1 320px',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.5rem',
+              }}>
+                {p.features.map(f => (
+                  <li key={f} style={{ display: 'flex', gap: '.5rem', fontSize: '.85rem' }}>
+                    <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <button className="b b-ghost" style={{ whiteSpace: 'nowrap' }}
+                onClick={() => (window.location.href = 'mailto:vinayaksilswal@gmail.com?subject=Enterprise%20plan%20enquiry')}>
+                {p.cta || 'Contact us'}
+              </button>
+            </div>
+          ))}
 
           <div style={{ textAlign: 'center', marginTop: '2.5rem', display: 'grid', gap: '.5rem' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', color: 'var(--green)', fontSize: '.9rem', fontWeight: 620 }}>

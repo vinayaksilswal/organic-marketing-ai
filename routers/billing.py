@@ -39,6 +39,10 @@ async def list_plans() -> dict[str, Any]:
                 "code": p["code"],
                 "name": p["name"],
                 "price": p["price"],
+                # Enterprise is quoted, not listed. Without these the pricing
+                # table rendered it at $0 as "Free".
+                "custom": p.get("custom", False),
+                "cta": p.get("cta"),
                 "tagline": p["tagline"],
                 "features": p["features"],
                 "limits": p["limits"],
