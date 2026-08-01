@@ -399,17 +399,28 @@ async def finish_pending_media(
                     if not media or media.caption or not media.url:
                         return
 
+                    # Only the first seconds are needed: describe_asset pulls
+                    # a frame at 1s. Downloading the whole clip to memory, four
+                    # at a time, is what pushed this 512MB instance into an
+                    # out-of-memory kill.
+                    body = bytearray()
                     async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as c:
-                        resp = await c.get(media.url)
-                    if resp.status_code != 200:
-                        logger.warning(
-                            f"Could not fetch {media.filename} to describe it: "
-                            f"{resp.status_code}"
-                        )
-                        return
+                        async with c.stream("GET", media.url) as resp:
+                            if resp.status_code != 200:
+                                logger.warning(
+                                    f"Could not fetch {media.filename} to describe "
+                                    f"it: {resp.status_code}"
+                                )
+                                return
+                            async for chunk in resp.aiter_bytes(1024 * 256):
+                                body.extend(chunk)
+                                # A frame at 1s lives well inside the first few
+                                # megabytes for any social-length clip.
+                                if len(body) >= 6 * 1024 * 1024:
+                                    break
 
                     caption = await describe_asset(
-                        resp.content, media.filename or "asset", profile
+                        bytes(body), media.filename or "asset", profile
                     )
                     if caption:
                         media.caption = caption

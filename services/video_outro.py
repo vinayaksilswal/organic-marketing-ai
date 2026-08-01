@@ -453,12 +453,19 @@ async def brand_video_at_url(
 
     work = Path(tempfile.mkdtemp(prefix="brandvid_"))
     try:
+        source = work / "source.mp4"
         try:
+            # Streamed to disk rather than held in memory. This instance has
+            # 512MB and Render killed it twice for exceeding that: several
+            # concurrent tasks each holding a whole video, plus ffmpeg's own
+            # working set, is more than the budget allows. The file has to be
+            # on disk for ffmpeg anyway, so buffering it first bought nothing.
             async with httpx.AsyncClient(timeout=180.0, follow_redirects=True) as client:
-                resp = await client.get(video_url)
-                resp.raise_for_status()
-                source = work / "source.mp4"
-                source.write_bytes(resp.content)
+                async with client.stream("GET", video_url) as resp:
+                    resp.raise_for_status()
+                    with source.open("wb") as fh:
+                        async for chunk in resp.aiter_bytes(1024 * 256):
+                            fh.write(chunk)
         except Exception as e:
             logger.error(f"Outro: could not download {video_url}: {e}")
             return video_url
