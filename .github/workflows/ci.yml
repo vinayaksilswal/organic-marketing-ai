@@ -20,13 +20,49 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      # The gate tests THIS COMMIT. test_live_smoke.py is excluded because it
+      # calls the deployed backend over the network: CI runs on push, Render
+      # redeploys on that same push, and the suite raced the restart. Runs #69
+      # and #71 went red on 502s while all 251 real tests passed — CI was
+      # reporting Render's uptime, not the code.
       - name: Run tests
         env:
           ENVIRONMENT: test
           JWT_SECRET: ci-test-secret-key-minimum-32-chars!!
           ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMmNoYXJzISE=
           DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --ignore=tests/test_live_smoke.py
+
+  # Smoke-tests the DEPLOYMENT, which is a different question from whether the
+  # commit is sound. Runs after the gate, waits for the rollout, and cannot
+  # fail the build — a sleeping free-tier instance is not a broken commit.
+  live-smoke:
+    runs-on: ubuntu-latest
+    needs: backend-test
+    if: github.ref == 'refs/heads/main'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # Render begins redeploying on the same push that triggered this run.
+      - name: Wait for the rollout
+        run: sleep 90
+
+      - name: Smoke-test the deployment
+        env:
+          ENVIRONMENT: test
+          JWT_SECRET: ci-test-secret-key-minimum-32-chars!!
+          ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMmNoYXJzISE=
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        run: pytest tests/test_live_smoke.py -v --tb=short
 
   frontend-build:
     runs-on: ubuntu-latest

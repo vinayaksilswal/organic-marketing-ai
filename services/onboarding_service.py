@@ -152,15 +152,40 @@ class OnboardingService:
             await redis_pool.close()
         except Exception as e:
             logger.warning(f"ARQ queue unavailable. Falling back to inline asyncio execution: {e}")
-            from services.creative_service import auto_populate_workspace
-            from services.catalog_service import sync_workspace_catalog
+            # The workspace is already committed by the time this runs, so a
+            # failure here must not fail the request. It previously did: with
+            # Redis down, the fallback imported catalog_service, which imports
+            # aiohttp at module level, and a missing aiohttp raised straight
+            # through create_business_profile as a 500 — after the workspace
+            # had been created. The user saw an error for a business that
+            # existed.
+            #
+            # Each task is isolated so one unavailable module cannot stop the
+            # other from being scheduled.
+            try:
+                from services.creative_service import auto_populate_workspace
 
-            spawn_background(
-                auto_populate_workspace(user_id, workspace_id),
-                f"auto_populate_workspace({workspace_id})",
-            )
-            if product_catalog_url:
+                spawn_background(
+                    auto_populate_workspace(user_id, workspace_id),
+                    f"auto_populate_workspace({workspace_id})",
+                )
+            except Exception:
+                logger.exception(
+                    f"Could not start creative population for {workspace_id}; "
+                    f"the marketing loop will pick it up"
+                )
+
+            if not product_catalog_url:
+                return
+            try:
+                from services.catalog_service import sync_workspace_catalog
+
                 spawn_background(
                     sync_workspace_catalog(workspace_id),
                     f"sync_workspace_catalog({workspace_id})",
+                )
+            except Exception:
+                logger.exception(
+                    f"Could not start catalog sync for {workspace_id}; "
+                    f"the workspace is usable without it"
                 )

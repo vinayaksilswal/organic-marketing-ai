@@ -71,3 +71,9 @@ sentry-sdk[fastapi]==2.22.0
 # binary so the container does not depend on a system ffmpeg being present.
 imageio-ffmpeg==0.6.0
 Pillow==12.3.0
+
+# Imported at module level by services/catalog_service.py and
+# services/rendering_service.py. It was never declared, so those modules only
+# imported when something else happened to pull aiohttp in. When it was absent
+# the import escaped as a 500 from workspace creation.
+aiohttp==3.11.11
