@@ -827,3 +827,75 @@ async def prompt_history(
         "threshold": DUPLICATE_THRESHOLD,
         "items": items,
     }
+
+
+class RefreshIntelligenceRequest(BaseModel):
+    force: bool = False
+
+
+@router.get("/brand-intelligence")
+async def get_brand_intelligence(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """What the system currently understands about this business.
+
+    This is the profile every prompt is written from, so being able to read it
+    is the difference between "the ads are wrong" and "the ads are wrong
+    because it thinks we sell something else".
+    """
+    from services.brand_intelligence import is_stale, to_scene_context
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        stale, reason = is_stale(profile)
+        intel = profile.brandIntelligence
+        return {
+            "built": bool(intel),
+            "stale": stale,
+            "reason": reason,
+            "builtAt": profile.brandIntelligenceAt.isoformat()
+                       if profile.brandIntelligenceAt else None,
+            # The flattened view is what the writer actually consumes, so it is
+            # the part worth checking for accuracy.
+            "usedForPrompts": to_scene_context(intel),
+            "full": intel,
+        }
+
+
+@router.post("/brand-intelligence/refresh")
+async def refresh_brand_intelligence(
+    data: RefreshIntelligenceRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Rebuild the understanding — after a repositioning, or if it got it wrong."""
+    from services.brand_intelligence import get_or_build, to_scene_context
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        intel, built = await get_or_build(session, profile, force=data.force or True)
+        if not intel:
+            raise HTTPException(
+                status_code=502,
+                detail="Could not analyse this business. Check the website URL on the profile, then try again.",
+            )
+        return {
+            "success": True,
+            "rebuilt": built,
+            "usedForPrompts": to_scene_context(intel),
+        }

@@ -113,6 +113,14 @@ class BusinessProfile(Base):
     # "Shop the drop". Without it the AI invented a CTA per post, so offers
     # drifted and nothing was consistent enough to convert against.
     primaryOffer = Column(Text, nullable=True)
+    # The deep marketing profile — pain point, transformation, objection,
+    # decision driver, competitor visual world. Built once from the website and
+    # the brand's own fields, then reused. It used to be re-synthesised on
+    # every generation (a scrape, a vision call and an LLM call per prompt),
+    # which was slow and non-deterministic: two runs for the same business
+    # could disagree about what that business even sells.
+    brandIntelligence = Column(JSON, nullable=True)
+    brandIntelligenceAt = Column(DateTime(timezone=True), nullable=True)
     brandAnalysisComplete = Column(Boolean, default=False, nullable=False)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)

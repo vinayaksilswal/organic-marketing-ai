@@ -131,14 +131,37 @@ async def generate_video_prompt(
             .limit(5)
         )).scalars().all()
 
+        # The stored understanding of this business, if it has one. It carries
+        # the pain point, the objection and the transformation — none of which
+        # are on the flat profile, and all of which are what separate an ad
+        # that argues something from one that just looks nice.
+        from services.brand_intelligence import get_or_build, to_scene_context
+
+        try:
+            intel, _ = await get_or_build(session, bp)
+        except Exception as e:
+            logger.warning(f"Brand intelligence unavailable for {bp.id}: {e}")
+            intel = None
+        ctx = to_scene_context(intel)
+
         scene_fields = await write_scene(
             intent=payload.intent,
             business_name=bp.name,
-            what_it_does=bp.description,
-            audience_motivator=payload.customer_motivator or bp.targetAudience,
-            brand_aesthetic=payload.brand_aesthetic or bp.toneOfVoice,
+            what_it_does=ctx.get("what_it_does") or bp.description,
+            audience_motivator=(
+                payload.customer_motivator
+                or ctx.get("audience_motivator")
+                or bp.targetAudience
+            ),
+            brand_aesthetic=(
+                payload.brand_aesthetic
+                or ctx.get("brand_aesthetic")
+                or bp.toneOfVoice
+            ),
             primary_offer=bp.primaryOffer,
             recent_scenes=[r for r in recent if r],
+            transformation=ctx.get("transformation"),
+            avoid_visual_world=ctx.get("avoid_visual_world"),
         )
 
         compiled_payload = compile_video_prompt(

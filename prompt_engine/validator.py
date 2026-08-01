@@ -569,9 +569,14 @@ def validate_video_prompt(
     # Gate 6b: Figures rendered into the frame are advertising claims, and get
     # the same substantiation treatment as the caption. The business profile is
     # the source of truth, same as check_claim_substantiation uses.
-    claim_source = " ".join(
-        str(getattr(business_profile, f, "") or "")
-        for f in ("description", "primaryOffer", "toneOfVoice", "name")
+    # The stored brand intelligence is included because it holds what the
+    # website actually said. A figure genuinely published by the business
+    # survives the scrape into there, so this is what lets a real price or a
+    # real customer count through while still blocking an invented one.
+    from services.brand_intelligence import substantiation_source
+
+    claim_source = substantiation_source(
+        getattr(business_profile, "brandIntelligence", None), business_profile
     )
     claim_ok, claim_err = check_rendered_claims(positive_prompt, claim_source)
     if not claim_ok:

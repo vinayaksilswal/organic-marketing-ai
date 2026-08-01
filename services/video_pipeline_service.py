@@ -810,16 +810,35 @@ async def execute_video_pipeline(
     video posted repeatedly.
     """
     logger.info(f"Starting video pipeline for {product_name}")
-    
-    # 1. Scrape
-    scrape_content = await scrape_product_url(product_url)
-    
-    # 2. Vision
-    try:
-        vision_yaml = await image_vision_analysis(image_url)
-    except Exception as e:
-        logger.error(f"Vision analysis failed: {e}")
-        vision_yaml = """
+
+    # 1-3. Understand the business. Reuse the stored understanding when the
+    # workspace already has one — this used to scrape, run vision, and
+    # synthesise on every single prompt, discarding the result each time, so
+    # the same business could be described differently from one run to the
+    # next. See services/brand_intelligence.py.
+    intelligence = None
+    if profile is not None:
+        try:
+            from database import AsyncSessionLocal
+            from services.brand_intelligence import get_or_build
+
+            async with AsyncSessionLocal() as session:
+                fresh = await session.get(type(profile), profile.id)
+                intelligence, built = await get_or_build(
+                    session, fresh or profile, image_url=image_url
+                )
+                if built:
+                    logger.info("Brand intelligence built and stored for reuse")
+        except Exception as e:
+            logger.warning(f"Stored brand intelligence unavailable, deriving inline: {e}")
+
+    if not intelligence:
+        scrape_content = await scrape_product_url(product_url)
+        try:
+            vision_yaml = await image_vision_analysis(image_url)
+        except Exception as e:
+            logger.error(f"Vision analysis failed: {e}")
+            vision_yaml = """
 primary_color: '#000000'
 secondary_color: '#ffffff'
 typography_style: 'modern'
@@ -827,10 +846,10 @@ visual_tone: 'clean'
 key_elements: []
 product_placement: 'center'
 """
-    
-    # 3. Intelligence
-    intelligence = await marketing_intelligence_synthesis(product_name, scrape_content, vision_yaml, profile)
-    
+        intelligence = await marketing_intelligence_synthesis(
+            product_name, scrape_content, vision_yaml, profile
+        )
+
     # 4. Creative Engine
     creative_strategy = run_creative_engine(intelligence, goal)
     

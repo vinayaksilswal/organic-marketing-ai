@@ -258,6 +258,8 @@ async def write_scene(
     brand_aesthetic: Optional[str] = None,
     primary_offer: Optional[str] = None,
     recent_scenes: Optional[list] = None,
+    transformation: Optional[str] = None,
+    avoid_visual_world: Optional[str] = None,
 ) -> Optional[Dict[str, str]]:
     """Write the creative content of one shot. Returns None if the LLM fails.
 
@@ -273,10 +275,24 @@ async def write_scene(
         known.append(f"What the viewer cares about: {audience_motivator}")
     if brand_aesthetic:
         known.append(f"Brand look: {brand_aesthetic}")
+    if transformation:
+        # The before/after is the argument the ad makes. Without it the writer
+        # has a subject and a setting but no reason for the shot to exist, and
+        # produces a mood piece.
+        known.append(
+            f"The change this makes for the viewer: {transformation} "
+            "(the hero string names the BEFORE or the AFTER — pick one)"
+        )
     if primary_offer:
         known.append(
             f"The action it should drive: {primary_offer} "
             "(mood context only — do NOT put this sentence on screen)"
+        )
+    if avoid_visual_world:
+        known.append(
+            f"How every competitor in this category already looks: "
+            f"{avoid_visual_world} (do not shoot that — it is invisible "
+            "precisely because everyone uses it)"
         )
 
     avoid = ""
