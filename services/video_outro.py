@@ -46,6 +46,52 @@ _FONT_CANDIDATES = [
 ]
 
 
+# An encode needs about 310MB of resident memory at 1080x1920, measured. If
+# the container does not have that free, starting one does not produce a slow
+# encode — it produces an OOM kill, which takes the whole web server down and
+# fails every upload in flight along with it. Render restarted this service
+# twice that way.
+#
+# So the encode asks first. Refusing to start leaves the clip unbranded and it
+# is picked up on the next pass, which is a delay rather than an outage.
+ENCODE_HEADROOM_MB = int(os.getenv("VIDEO_ENCODE_HEADROOM_MB", "340"))
+
+
+_CGROUP_FILES = (
+    ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.max"),
+    ("/sys/fs/cgroup/memory/memory.usage_in_bytes",
+     "/sys/fs/cgroup/memory/memory.limit_in_bytes"),
+)
+
+
+def container_memory(pairs=_CGROUP_FILES) -> Optional[Tuple[float, float]]:
+    """(used_mb, limit_mb) for this container, or None when not containerised.
+
+    Read from the cgroup rather than psutil: the host's total memory says
+    nothing about the 512MB this instance is actually allowed, and that ceiling
+    is the one that gets the process killed. cgroup v2 first, then v1.
+    """
+    for used_file, limit_file in pairs:
+        try:
+            used = int(Path(used_file).read_text().strip())
+            raw = Path(limit_file).read_text().strip()
+            if raw == "max":
+                continue
+            limit = int(raw)
+            # An unset v1 limit is a huge sentinel rather than the word "max".
+            if 0 < limit < (1 << 62):
+                return used / 1e6, limit / 1e6
+        except Exception:
+            continue
+    return None
+
+
+def memory_headroom_mb() -> Optional[float]:
+    """How much room is left before the container is killed. None if unknown."""
+    reading = container_memory()
+    return None if reading is None else reading[1] - reading[0]
+
+
 def _ffmpeg() -> Optional[str]:
     """The ffmpeg binary, preferring the pinned wheel over whatever is on PATH.
 
@@ -406,6 +452,25 @@ def append_outro(
                 leftover.unlink(missing_ok=True)
             except Exception:
                 pass
+
+    # Checked here rather than at the top so the log line reports the real
+    # number on every clip, which is how we learn what this instance actually
+    # runs at instead of inferring it from crash events.
+    headroom = memory_headroom_mb()
+    if headroom is not None:
+        reading = container_memory()
+        logger.info(
+            f"Outro: {headroom:.0f}MB free of {reading[1]:.0f}MB before encoding "
+            f"{src.name} (needs ~310MB)"
+        )
+        if headroom < ENCODE_HEADROOM_MB:
+            logger.warning(
+                f"Outro: only {headroom:.0f}MB free, below the {ENCODE_HEADROOM_MB}MB "
+                f"an encode needs. Leaving {src.name} unbranded for the next pass "
+                f"rather than risking an out-of-memory kill."
+            )
+            _cleanup()
+            return str(video_path)
 
     try:
         # ── pass 1: the footage. Scaled, sharpened, watermarked, encoded once.

@@ -255,6 +255,141 @@ def test_bitrate_is_capped(tmp_path):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Refusing to start beats being killed
+#
+# An encode needs ~310MB. Starting one without that free does not make it slow,
+# it makes the container exit — which takes the web server down and fails every
+# upload in flight. Render killed this service twice that way.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_memory_reading_is_none_when_not_containerised():
+    """No cgroup files means no limit to respect, not a limit of zero — a
+    false reading here would refuse every encode on a developer machine."""
+    from services.video_outro import container_memory, memory_headroom_mb
+
+    reading = container_memory()
+    assert reading is None or (reading[0] >= 0 and reading[1] > 0)
+    if reading is None:
+        assert memory_headroom_mb() is None
+
+
+def _cgroup(tmp_path, used, limit, v2=True):
+    """Write a fake cgroup pair and return it in container_memory's form."""
+    names = ("memory.current", "memory.max") if v2 else \
+        ("memory.usage_in_bytes", "memory.limit_in_bytes")
+    (tmp_path / names[0]).write_text(str(used))
+    (tmp_path / names[1]).write_text(str(limit))
+    return ((str(tmp_path / names[0]), str(tmp_path / names[1])),)
+
+
+def test_cgroup_v2_is_parsed(tmp_path):
+    from services.video_outro import container_memory
+
+    used, limit = container_memory(_cgroup(tmp_path, 200_000_000, 512_000_000))
+    assert (used, limit) == pytest.approx((200.0, 512.0))
+
+
+def test_cgroup_v1_is_parsed(tmp_path):
+    from services.video_outro import container_memory
+
+    reading = container_memory(_cgroup(tmp_path, 300_000_000, 512_000_000, v2=False))
+    assert reading == pytest.approx((300.0, 512.0))
+
+
+@pytest.mark.parametrize("limit", ["max", str(1 << 63), "0"])
+def test_unset_limit_is_not_treated_as_a_ceiling(tmp_path, limit):
+    """cgroup v2 writes "max" when uncapped and v1 a huge sentinel. Reading
+    either as a real ceiling would compute a nonsense headroom — and reading
+    it as a *small* one would refuse every encode forever."""
+    from services.video_outro import container_memory
+
+    (tmp_path / "memory.current").write_text("200000000")
+    (tmp_path / "memory.max").write_text(limit)
+    pair = ((str(tmp_path / "memory.current"), str(tmp_path / "memory.max")),)
+    assert container_memory(pair) is None
+
+
+def test_missing_cgroup_files_are_not_an_error(tmp_path):
+    from services.video_outro import container_memory
+
+    pair = ((str(tmp_path / "nope"), str(tmp_path / "alsonope")),)
+    assert container_memory(pair) is None
+
+
+def test_encode_is_skipped_when_memory_is_tight(tmp_path, monkeypatch):
+    """The clip comes back unbranded and postable, to be retried next pass."""
+    import services.video_outro as vo
+
+    if vo._ffmpeg() is None:
+        pytest.skip("ffmpeg not available")
+
+    src = tmp_path / "clip.mp4"
+    subprocess.run([
+        vo._ffmpeg(), "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=360x640:rate=24:duration=1",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=120)
+
+    monkeypatch.setattr(vo, "container_memory", lambda: (480.0, 512.0))
+    monkeypatch.setattr(vo, "memory_headroom_mb", lambda: 32.0)
+
+    ran = []
+    real_run = subprocess.run
+    monkeypatch.setattr(
+        vo.subprocess, "run",
+        lambda *a, **k: (ran.append(a), real_run(*a, **k))[1],
+    )
+
+    out = vo.append_outro(src, "Acme", "Book now", "acme.com")
+    assert out == str(src), "a tight instance must return the clip unbranded"
+    # _probe runs before the check; the encode itself must not have started.
+    assert not any("libx264" in " ".join(map(str, a[0])) for a in ran), (
+        "an encode was started despite there being no room for it"
+    )
+
+
+def test_encode_proceeds_with_room(tmp_path, monkeypatch):
+    import services.video_outro as vo
+
+    if vo._ffmpeg() is None:
+        pytest.skip("ffmpeg not available")
+
+    src = tmp_path / "clip.mp4"
+    subprocess.run([
+        vo._ffmpeg(), "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=360x640:rate=24:duration=1",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=120)
+
+    monkeypatch.setattr(vo, "container_memory", lambda: (100.0, 2048.0))
+    monkeypatch.setattr(vo, "memory_headroom_mb", lambda: 1948.0)
+
+    out = vo.append_outro(src, "Acme", "Book now", "acme.com")
+    assert out != str(src) and Path(out).exists()
+
+
+def test_no_intermediate_files_are_left_behind(tmp_path):
+    """Three passes means two temporary files per clip. Left on disk they
+    accumulate across a 240-file library on an ephemeral disk."""
+    import services.video_outro as vo
+
+    if vo._ffmpeg() is None:
+        pytest.skip("ffmpeg not available")
+
+    src = tmp_path / "clip.mp4"
+    subprocess.run([
+        vo._ffmpeg(), "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=360x640:rate=24:duration=1",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=120)
+
+    vo.append_outro(src, "Acme", "Book now", "acme.com")
+    leftovers = list(tmp_path.glob("*__main.mp4")) + \
+        list(tmp_path.glob("*__card.mp4")) + list(tmp_path.glob("*__join.txt"))
+    assert not leftovers, f"intermediates left on disk: {leftovers}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # A page asks for a follow. It has nothing to sell.
 # ─────────────────────────────────────────────────────────────────────────────
 
