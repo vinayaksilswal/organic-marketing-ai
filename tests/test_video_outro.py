@@ -244,8 +244,14 @@ def test_bitrate_is_capped(tmp_path):
                            timeout=60).stderr
     m = re.search(r"bitrate:\s*(\d+)\s*kb/s", probe)
     assert m, probe[:300]
-    # 7M cap plus audio and container overhead.
-    assert int(m.group(1)) < 9000, f"bitrate cap not applied: {m.group(1)} kb/s"
+    # Derived from the configured cap rather than hardcoded — this assertion
+    # was pinned to 9000 for a 7M ceiling and broke the moment the ceiling
+    # moved, which is a test asserting a constant rather than a behaviour.
+    from services.video_outro import MAX_BITRATE
+    ceiling = int(MAX_BITRATE.rstrip("M")) * 1000 + 2000   # + audio and overhead
+    assert int(m.group(1)) < ceiling, (
+        f"bitrate cap not applied: {m.group(1)} kb/s against a {MAX_BITRATE} cap"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
