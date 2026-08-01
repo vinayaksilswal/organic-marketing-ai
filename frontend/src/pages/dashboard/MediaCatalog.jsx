@@ -104,7 +104,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
       return;
     }
 
-    let stored = 0, failed = 0, described = 0, lastError = null;
+    let stored = 0, failed = 0, described = 0, skipped = 0, lastError = null;
     try {
       // Batched by SIZE, not by count. Three clips sounds small until three
       // of the large ones land together: this folder's biggest three are 33MB
@@ -127,7 +127,9 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
           i += 1;
         }
         const done = i;
-        setBulkProgress(`${done} / ${media.length}`);
+        setBulkProgress(
+          `${done} / ${media.length}` + (skipped ? ` · ${skipped} already here` : '')
+        );
 
         const form = new FormData();
         batch.forEach(f => form.append('files', f));
@@ -180,10 +182,13 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
       }
 
       setBulkResult({
-        message: `${stored} of ${media.length} added` +
-                 (described ? `, ${described} described automatically` : ''),
+        message:
+          `${stored} added` +
+          (skipped ? `, ${skipped} already in the catalog` : '') +
+          (failed ? `, ${failed} failed` : '') +
+          ` — ${media.length} selected`,
         failed,
-        error: stored === 0 ? lastError : null,
+        error: stored === 0 && !skipped ? lastError : null,
       });
       setBulkFiles([]);
       await fetchMedia();

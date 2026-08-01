@@ -338,6 +338,16 @@ def append_outro(
         # request, so a few extra seconds per clip buys real compression
         # efficiency. Not "slow" — encodes are serialised to keep the single
         # worker responsive, so per-clip time is the whole backlog's time.
+        # -threads 1 is the important one. libx264 defaults to every visible
+        # core, and this runs on a starter instance with a fraction of one —
+        # so a background encode starved the web server badly enough that
+        # /health itself stopped answering. Moving it to a thread fixed the
+        # event loop; it did not stop ffmpeg eating the CPU the loop needs.
+        #
+        # One thread makes each encode slower and leaves the service able to
+        # answer requests while a backlog is processed, which is the correct
+        # trade for work that is already asynchronous.
+        "-threads", "1",
         "-c:v", "libx264", "-preset", "faster", "-crf", str(QUALITY_CRF),
         # High profile at level 4.1 is what every phone decodes and what
         # Instagram expects; anything more exotic gets re-encoded harder.
@@ -351,9 +361,19 @@ def append_outro(
         str(dest),
     ]
 
+    def _low_priority():
+        """Let the OS schedule the web server ahead of a background encode."""
+        try:
+            os.nice(19)
+        except Exception:
+            pass
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True,
-                                errors="ignore", timeout=600)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, errors="ignore", timeout=600,
+            # POSIX only; ignored on Windows, where this never runs in prod.
+            preexec_fn=_low_priority if os.name == "posix" else None,
+        )
     except subprocess.TimeoutExpired:
         logger.error("Outro: ffmpeg timed out, posting the clip as-is")
         return str(video_path)
