@@ -60,10 +60,30 @@ ENCODE_HEADROOM_MB = int(os.getenv("VIDEO_ENCODE_HEADROOM_MB", "340"))
 
 
 _CGROUP_FILES = (
-    ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.max"),
+    ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.max",
+     "/sys/fs/cgroup/memory.stat", "inactive_file "),
     ("/sys/fs/cgroup/memory/memory.usage_in_bytes",
-     "/sys/fs/cgroup/memory/memory.limit_in_bytes"),
+     "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+     "/sys/fs/cgroup/memory/memory.stat", "total_inactive_file "),
 )
+
+
+def _inactive_file_bytes(stat_file: str, key: str) -> int:
+    """Page cache the kernel can drop without killing anything.
+
+    Every video this service writes to disk lands in the page cache and is
+    counted by memory.current. Branding a library pushed that reading to 8MB
+    below the limit, which made the headroom guard refuse every encode --
+    while the actual risk was nil, because the kernel reclaims this before it
+    ever OOMs a process. Reading it as real usage is what stalled branding.
+    """
+    try:
+        for line in Path(stat_file).read_text().splitlines():
+            if line.startswith(key):
+                return int(line.split()[1])
+    except Exception:
+        pass
+    return 0
 
 
 def container_memory(pairs=_CGROUP_FILES) -> Optional[Tuple[float, float]]:
@@ -72,8 +92,11 @@ def container_memory(pairs=_CGROUP_FILES) -> Optional[Tuple[float, float]]:
     Read from the cgroup rather than psutil: the host's total memory says
     nothing about the 512MB this instance is actually allowed, and that ceiling
     is the one that gets the process killed. cgroup v2 first, then v1.
+
+    "used" is the working set -- what is actually irreclaimable -- not the raw
+    usage counter, for the reason in _inactive_file_bytes.
     """
-    for used_file, limit_file in pairs:
+    for used_file, limit_file, stat_file, key in pairs:
         try:
             used = int(Path(used_file).read_text().strip())
             raw = Path(limit_file).read_text().strip()
@@ -82,7 +105,8 @@ def container_memory(pairs=_CGROUP_FILES) -> Optional[Tuple[float, float]]:
             limit = int(raw)
             # An unset v1 limit is a huge sentinel rather than the word "max".
             if 0 < limit < (1 << 62):
-                return used / 1e6, limit / 1e6
+                working_set = max(used - _inactive_file_bytes(stat_file, key), 0)
+                return working_set / 1e6, limit / 1e6
         except Exception:
             continue
     return None
