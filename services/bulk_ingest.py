@@ -36,6 +36,21 @@ from loguru import logger
 # in flight rather than queueing.
 MAX_CONCURRENT = 4
 
+# Free variants cap at roughly twenty requests a minute regardless of account
+# standing, so a 242-file library hits that wall repeatedly and comes back with
+# empty captions. The paid fallback is not a workaround for the limit — it is
+# the tier the account already pays for, and the free model was simply
+# hardcoded everywhere.
+#
+# Ordered cheapest-capable first. At ~1.3k tokens per image, describing a
+# 242-file folder on the fallback costs around a penny, so correctness is worth
+# far more than the saving.
+VISION_MODELS = [
+    "nvidia/nemotron-nano-12b-v2-vl:free",
+    "qwen/qwen3.7-flash",
+    "google/gemma-3-12b-it",
+]
+
 # Files past this are almost certainly not social assets, and a folder often
 # contains a stray export or archive.
 MAX_BYTES = 200 * 1024 * 1024
@@ -160,40 +175,59 @@ async def describe_asset(
         "the frame is ambiguous, describe only what is certain."
     )
 
-    try:
-        import httpx
+    import httpx
 
-        from services.ai_service import LLM_TIMEOUT
-        from services.video_pipeline_service import VISION_MODEL
+    from services.ai_service import LLM_TIMEOUT
 
-        b64 = base64.b64encode(image_bytes).decode()
-        async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as client:
-            resp = await client.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.openrouter_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": VISION_MODEL,
-                    "messages": [{
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {"type": "image_url",
-                             "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-                        ],
-                    }],
-                },
-            )
-        if resp.status_code != 200:
+    b64 = base64.b64encode(image_bytes).decode()
+    body = {
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url",
+                 "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            ],
+        }],
+    }
+
+    for index, model in enumerate(VISION_MODELS):
+        try:
+            async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as client:
+                resp = await client.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.openrouter_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={**body, "model": model},
+                )
+            if resp.status_code == 200:
+                data = resp.json()
+                # OpenRouter answers 200 with an error body when a model
+                # rejects a request, so the payload has to be checked too.
+                if data.get("error"):
+                    raise RuntimeError(str(data["error"])[:160])
+                text = data["choices"][0]["message"]["content"]
+                described = " ".join(str(text).strip().split())[:300]
+                if described:
+                    if index:
+                        logger.info(f"Described {filename} via fallback {model}")
+                    return described
+                raise RuntimeError("empty description")
+
+            if resp.status_code in (429, 402, 503):
+                logger.info(
+                    f"{model} unavailable for {filename} ({resp.status_code}); "
+                    f"trying the next model"
+                )
+                continue
             logger.warning(f"Vision failed for {filename}: {resp.status_code}")
-            return ""
-        text = resp.json()["choices"][0]["message"]["content"]
-        return " ".join(str(text).strip().split())[:300]
-    except Exception as e:
-        logger.warning(f"Could not describe {filename}: {e}")
-        return ""
+        except Exception as e:
+            logger.warning(f"{model} failed for {filename}: {e}")
+
+    logger.warning(f"No vision model could describe {filename}")
+    return ""
 
 
 async def ingest_one(
