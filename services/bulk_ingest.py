@@ -396,41 +396,56 @@ async def finish_pending_media(
             try:
                 async with AsyncSessionLocal() as session:
                     media = await session.get(Media, media_id)
-                    if not media or media.caption or not media.url:
+                    if not media or not media.url:
                         return
 
-                    # Only the first seconds are needed: describe_asset pulls
-                    # a frame at 1s. Downloading the whole clip to memory, four
-                    # at a time, is what pushed this 512MB instance into an
-                    # out-of-memory kill.
-                    body = bytearray()
-                    async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as c:
-                        async with c.stream("GET", media.url) as resp:
-                            if resp.status_code != 200:
-                                logger.warning(
-                                    f"Could not fetch {media.filename} to describe "
-                                    f"it: {resp.status_code}"
+                    # These are two independent jobs. The guard used to be
+                    # `if media.caption: return`, which returned before the
+                    # branding block below — so anything that already had a
+                    # description was never branded, and since descriptions are
+                    # written first that was almost everything. Descriptions
+                    # filled in and watermarks never appeared.
+                    is_video = (media.mimeType or "").startswith("video/")
+                    needs_caption = not media.caption
+                    needs_brand = is_video and "_branded" not in media.url
+                    if not needs_caption and not needs_brand:
+                        return
+
+                    if needs_caption:
+                        # Only the first megabytes are needed: describe_asset
+                        # pulls a frame at the one-second mark. Fetching whole
+                        # clips into memory, four at a time, is what pushed
+                        # this 512MB instance into an out-of-memory kill.
+                        body = bytearray()
+                        async with httpx.AsyncClient(
+                            timeout=120.0, follow_redirects=True
+                        ) as c:
+                            async with c.stream("GET", media.url) as resp:
+                                if resp.status_code != 200:
+                                    logger.warning(
+                                        f"Could not fetch {media.filename} to "
+                                        f"describe it: {resp.status_code}"
+                                    )
+                                else:
+                                    async for chunk in resp.aiter_bytes(1024 * 256):
+                                        body.extend(chunk)
+                                        if len(body) >= 6 * 1024 * 1024:
+                                            break
+
+                        if body:
+                            caption = await describe_asset(
+                                bytes(body), media.filename or "asset", profile
+                            )
+                            if caption:
+                                media.caption = caption
+                                await session.commit()
+                                logger.info(
+                                    f"Described {media.filename}: {caption[:70]}"
                                 )
-                                return
-                            async for chunk in resp.aiter_bytes(1024 * 256):
-                                body.extend(chunk)
-                                # A frame at 1s lives well inside the first few
-                                # megabytes for any social-length clip.
-                                if len(body) >= 6 * 1024 * 1024:
-                                    break
 
-                    caption = await describe_asset(
-                        bytes(body), media.filename or "asset", profile
-                    )
-                    if caption:
-                        media.caption = caption
-                        await session.commit()
-                        logger.info(f"Described {media.filename}: {caption[:70]}")
-
-                # Brand it after describing: the description should come from
-                # the original footage, not from a frame that now carries our
-                # own watermark.
-                if (media.mimeType or "").startswith("video/"):
+                # Branded after describing, so the description comes from the
+                # original footage rather than a frame carrying our own mark.
+                if needs_brand:
                     async with _encode_slot:
                         branded = await brand_video_at_url(
                             media.url, profile, workspace_id, media_id
