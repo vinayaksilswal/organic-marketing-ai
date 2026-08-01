@@ -246,3 +246,54 @@ def test_bitrate_is_capped(tmp_path):
     assert m, probe[:300]
     # 7M cap plus audio and container overhead.
     assert int(m.group(1)) < 9000, f"bitrate cap not applied: {m.group(1)} kb/s"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A page asks for a follow. It has nothing to sell.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _Page(_Profile):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.name = kw.get("name", "Billionaire Goal")
+        self.primaryOffer = kw.get("primaryOffer", "")
+        self.websiteUrl = kw.get("websiteUrl", "")
+        self.businessModel = "Social Page"
+
+
+def test_page_asks_for_a_follow_when_no_offer_is_set():
+    brand, cta, url = outro_text_for(_Page())
+    assert brand == "Billionaire Goal"
+    assert cta.lower().startswith("follow")
+    assert url == "@billionairegoal"
+
+
+def test_page_never_shows_a_purchase_cta():
+    """A themed page has nothing to sell, so "Start a subscription" describes a
+    transaction that does not exist."""
+    _, cta, _ = outro_text_for(_Page(primaryOffer="Start a subscription"))
+    assert "subscription" not in cta.lower()
+    assert cta.lower().startswith("follow")
+
+
+def test_page_keeps_its_own_follow_wording():
+    _, cta, _ = outro_text_for(_Page(primaryOffer="Follow for daily luxury"))
+    assert cta == "Follow for daily luxury"
+
+
+def test_page_with_a_website_shows_the_website():
+    """The handle is the fallback for having no site, not a replacement."""
+    _, _, url = outro_text_for(_Page(websiteUrl="https://bgoal.com"))
+    assert url == "bgoal.com"
+
+
+@pytest.mark.parametrize("model,offer,expected", [
+    ("SaaS", "Run a free scan", "Run a free scan"),
+    ("E-commerce", "Book a fitting", "Book a fitting"),
+    ("Creator", "Join the newsletter", "Join the newsletter"),
+])
+def test_other_models_keep_their_offer(model, offer, expected):
+    p = _Profile(primaryOffer=offer)
+    p.businessModel = model
+    _, cta, _ = outro_text_for(p)
+    assert cta == expected

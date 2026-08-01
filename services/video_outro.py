@@ -369,6 +369,8 @@ def outro_text_for(profile) -> Tuple[str, str, str]:
     The spoken CTA drives the video; this is its written counterpart, and here
     a URL is safe because ffmpeg renders it legibly.
     """
+    import re as _re
+
     brand = (getattr(profile, "name", "") or "").strip()
     cta = (getattr(profile, "primaryOffer", "") or "").strip().rstrip(".")
 
@@ -377,6 +379,18 @@ def outro_text_for(profile) -> Tuple[str, str, str]:
         if url.lower().startswith(prefix):
             url = url[len(prefix):]
     url = url.rstrip("/")
+
+    # A themed page has nothing to sell, so the offer field is either empty or
+    # describes a transaction that does not exist. The whole economy of the
+    # account is the follow, and the handle is what a viewer can act on — there
+    # is usually no website to put on the card at all.
+    model = (getattr(profile, "businessModel", "") or "").strip().lower()
+    if model in {"social page", "social_page", "page"}:
+        handle = _re.sub(r"[^a-z0-9]", "", brand.lower())
+        if not cta or not _re.match(r"^(follow|subscribe)\b", cta, _re.IGNORECASE):
+            cta = "Follow for more"
+        if not url and handle:
+            url = f"@{handle}"
 
     # A long offer wraps badly on a 1080-wide card and reads as a paragraph.
     if len(cta.split()) > 6:
