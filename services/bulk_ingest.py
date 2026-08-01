@@ -32,10 +32,17 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-# Vision calls are the slow part. Four at a time keeps a 240-file folder moving
-# without tripping the provider's rate limit, which returns 429 for everything
-# in flight rather than queueing.
-MAX_CONCURRENT = 4
+# Vision calls are the slow part, so these run concurrently — but each one
+# holds a chunk of video in memory while it waits, and this pass runs at the
+# same time as an ffmpeg encode that needs ~310MB of the instance's 512MB.
+# Two describes plus an encode fits; four did not, and Render killed the
+# service twice mid-backlog.
+MAX_CONCURRENT = 2
+
+# Enough to reach the frame at the one-second mark, not a whole clip. This was
+# 6MB, which bought nothing — the poster frame is long decoded by then — and
+# cost that much resident memory per concurrent describe.
+CAPTION_FETCH_BYTES = 3 * 1024 * 1024
 
 # ffmpeg is CPU-bound, not IO-bound. Four concurrent 1080p encodes saturate a
 # shared container even from worker threads, and the web server is competing
@@ -429,7 +436,7 @@ async def finish_pending_media(
                                 else:
                                     async for chunk in resp.aiter_bytes(1024 * 256):
                                         body.extend(chunk)
-                                        if len(body) >= 6 * 1024 * 1024:
+                                        if len(body) >= CAPTION_FETCH_BYTES:
                                             break
 
                         if body:
@@ -446,16 +453,27 @@ async def finish_pending_media(
                 # Branded after describing, so the description comes from the
                 # original footage rather than a frame carrying our own mark.
                 if needs_brand:
+                    probe: dict = {}
                     async with _encode_slot:
                         branded = await brand_video_at_url(
-                            media.url, profile, workspace_id, media_id
+                            media.url, profile, workspace_id, media_id,
+                            probe_out=probe,
                         )
-                    if branded and branded != media.url:
+                    changed = branded and branded != media.url
+                    # The probe is worth persisting even when the encode
+                    # failed — knowing a clip is silent is what routes it to
+                    # manual posting, and that answer does not depend on
+                    # whether the watermark landed.
+                    if changed or "has_audio" in probe:
                         async with AsyncSessionLocal() as s2:
                             row = await s2.get(Media, media_id)
                             if row:
-                                row.url = branded
+                                if changed:
+                                    row.url = branded
+                                if probe.get("has_audio") is not None:
+                                    row.hasAudio = probe["has_audio"]
                                 await s2.commit()
+                    if changed:
                         logger.info(f"Branded {media.filename}")
             except Exception:
                 logger.exception(f"Could not describe media {media_id}")

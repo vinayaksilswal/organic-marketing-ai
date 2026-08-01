@@ -446,6 +446,15 @@ class Media(Base):
     caption = Column(Text, nullable=True)
     # Deactivated assets stay in the catalog but are never chosen for posting.
     isActive = Column(Boolean, default=True, nullable=False)
+    # Whether the file carries a sound track. NULL means nobody has looked yet.
+    #
+    # This exists because Instagram's music picker is app-only: the Content
+    # Publishing API has no field for attaching a licensed track, so a silent
+    # clip published through the API goes out silent forever. Knowing which
+    # clips those are lets the scheduler post the ones that already have sound
+    # and leave the rest for the operator to post by hand, picking a track in
+    # the app.
+    hasAudio = Column(Boolean, nullable=True)
     # Generation state for assets produced asynchronously.
     # NULL = nothing to generate (a plain upload). PENDING/READY/FAILED track a
     # background AI job, so the request can return immediately instead of

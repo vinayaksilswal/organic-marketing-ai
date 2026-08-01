@@ -240,6 +240,40 @@ def build_watermark_png(
     return path
 
 
+# Music the operator has the rights to, stored per workspace and rotated so a
+# feed does not carry one track on every clip.
+#
+# Deliberately NOT a bundled "trending" library. Chart music is copyrighted;
+# Instagram's Content ID mutes or removes posts that use it, and repeat hits
+# cost the account. Instagram's own licensed catalogue is only attachable
+# inside the app — the Content Publishing API has no field for it — so the
+# in-app music picker cannot be automated at all. What can be automated is
+# applying tracks the operator already licensed.
+AUDIO_TYPES = {".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac"}
+
+# Under the voice of a talking clip, over nothing on a silent one. Silent
+# clips get the bed at full strength; this only exists so the constant is
+# named rather than buried in a filter string.
+BED_VOLUME = 0.85
+
+
+def pick_audio_bed(tracks: list, seed_key: str = "") -> Optional[Path]:
+    """One track from the workspace's library, chosen stably per asset.
+
+    Hashed on the asset rather than random so re-running a repair does not
+    change which track a clip already went out with.
+    """
+    usable = [Path(t) for t in tracks if Path(t).suffix.lower() in AUDIO_TYPES]
+    usable = [t for t in usable if t.exists()]
+    if not usable:
+        return None
+    usable.sort()
+    import hashlib
+
+    idx = int(hashlib.sha256(seed_key.encode()).hexdigest(), 16) % len(usable)
+    return usable[idx]
+
+
 def append_outro(
     video_path: str | Path,
     brand: str,
@@ -247,6 +281,7 @@ def append_outro(
     url: str = "",
     seconds: float = DEFAULT_OUTRO_SECONDS,
     output_path: Optional[str | Path] = None,
+    audio_bed: Optional[str | Path] = None,
 ) -> str:
     """Append a branded end card. Returns the new path, or the original.
 
@@ -275,13 +310,19 @@ def append_outro(
 
     dest = Path(output_path) if output_path else src.with_name(f"{src.stem}_outro.mp4")
 
-    # Everything happens in ONE encode. Watermarking and then appending the
-    # card as two passes means encoding the footage twice, and every H.264
-    # generation throws away detail that cannot come back.
+    # Three passes, but the footage is encoded exactly once.
     #
-    # Delivered at Instagram's own vertical spec. Re-encoding cannot add detail
-    # the source never had, but handing the platform a correctly sized file
-    # stops its encoder upscaling a 720p clip with a cheap scaler first.
+    # This used to be a single ffmpeg call that scaled, watermarked and
+    # concatenated the end card in one filter graph. Measured on a real clip
+    # that peaked at 1010MB of RSS — on a 512MB instance, so Render killed the
+    # service mid-backlog, twice. Almost all of it was the graph holding the
+    # main video and the card alive at once while `concat` joined them.
+    #
+    # Encoding each part separately and joining with the concat demuxer at
+    # `-c copy` peaks at 311MB for identical output: same 1080x1920, same
+    # bitrate, same duration. Stream copy re-encodes nothing, so splitting the
+    # work costs no generation loss — the earlier single-pass comment assumed
+    # a second encode that never has to happen.
     tw, th = TARGET_W, TARGET_H
     watermark = build_watermark_png(brand, tw, th)
 
@@ -297,69 +338,42 @@ def append_outro(
         f"fps={fps},format=yuv420p,setsar=1"
     )
 
-    chain = f"[0:v]{polish}[polished];"
-    if watermark:
-        chain += (
-            "[polished][2:v]overlay=0:0:format=auto[main];"
-            f"[1:v]scale={tw}:{th}:flags=lanczos,fps={fps},format=yuv420p,setsar=1[card];"
-        )
-    else:
-        chain += (
-            "[polished]null[main];"
-            f"[1:v]scale={tw}:{th}:flags=lanczos,fps={fps},format=yuv420p,setsar=1[card];"
-        )
-    chain += "[main][card]concat=n=2:v=1:a=0[v]"
+    # A bed is only laid under a clip that has no sound of its own. A clip that
+    # already carries speech or ambience keeps it — dropping music over
+    # someone talking ruins both.
+    bed = Path(audio_bed) if (audio_bed and not has_audio) else None
+    if bed and not bed.exists():
+        logger.warning(f"Audio bed {bed} is missing; posting the clip silent")
+        bed = None
+    want_audio = has_audio or bed is not None
 
-    cmd = [
-        ff, "-y", "-hide_banner", "-loglevel", "error",
-        "-i", str(src),
-        "-loop", "1", "-t", str(seconds), "-i", str(card),
-    ]
-    if watermark:
-        # Bounded to the clip. An earlier "-t 9999" made ffmpeg generate a
-        # 9999-second overlay stream, so a nine-second video took minutes and
-        # would have blown the request timeout all over again.
-        cmd += ["-loop", "1", "-t", f"{max(duration, 1.0):.3f}", "-i", str(watermark)]
+    dest = Path(output_path) if output_path else src.with_name(f"{src.stem}_outro.mp4")
+    main_path = src.with_name(f"{src.stem}__main.mp4")
+    card_path = src.with_name(f"{src.stem}__card.mp4")
+    list_path = src.with_name(f"{src.stem}__join.txt")
 
-    if has_audio:
-        # The card needs its own silence, or concat drops the audio stream and
-        # the clip posts mute.
-        chain += (
-            f";anullsrc=channel_layout=stereo:sample_rate=44100,"
-            f"atrim=duration={seconds}[silence];"
-            f"[0:a][silence]concat=n=2:v=0:a=1[a]"
-        )
-        cmd += ["-filter_complex", chain, "-map", "[v]", "-map", "[a]"]
-    else:
-        cmd += ["-filter_complex", chain, "-map", "[v]"]
-
-    cmd += [
-        # "faster" rather than "veryfast": this no longer runs inside a
-        # request, so a few extra seconds per clip buys real compression
-        # efficiency. Not "slow" — encodes are serialised to keep the single
-        # worker responsive, so per-clip time is the whole backlog's time.
+    # Identical on both encodes, or the concat demuxer refuses to join them.
+    encode = [
         # -threads 1 is the important one. libx264 defaults to every visible
         # core, and this runs on a starter instance with a fraction of one —
         # so a background encode starved the web server badly enough that
-        # /health itself stopped answering. Moving it to a thread fixed the
-        # event loop; it did not stop ffmpeg eating the CPU the loop needs.
-        #
-        # One thread makes each encode slower and leaves the service able to
-        # answer requests while a backlog is processed, which is the correct
-        # trade for work that is already asynchronous.
+        # /health itself stopped answering.
         "-threads", "1",
         "-c:v", "libx264", "-preset", "faster", "-crf", str(QUALITY_CRF),
+        # x264 holds a frame buffer per lookahead slot, and at 1080x1920 that
+        # is ~3MB each. The default costs ~70MB for compression gains that are
+        # invisible next to what the platform's own re-encode does.
+        "-x264-params", "rc-lookahead=10:sync-lookahead=0",
         # High profile at level 4.1 is what every phone decodes and what
         # Instagram expects; anything more exotic gets re-encoded harder.
         "-profile:v", "high", "-level", "4.1",
         "-maxrate", MAX_BITRATE, "-bufsize", BUFSIZE,
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-pix_fmt", "yuv420p",
         # Two seconds between keyframes: the platform seeks on them, and a
         # sparse GOP makes the first frames of a scroll-in look mushy.
         "-g", str(int(fps * 2)), "-sc_threshold", "0",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
-        str(dest),
     ]
+    audio_encode = ["-c:a", "aac", "-b:a", "192k", "-ar", "44100"]
 
     def _low_priority():
         """Let the OS schedule the web server ahead of a background encode."""
@@ -368,23 +382,101 @@ def append_outro(
         except Exception:
             pass
 
-    try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, errors="ignore", timeout=600,
-            # POSIX only; ignored on Windows, where this never runs in prod.
-            preexec_fn=_low_priority if os.name == "posix" else None,
-        )
-    except subprocess.TimeoutExpired:
-        logger.error("Outro: ffmpeg timed out, posting the clip as-is")
-        return str(video_path)
-    finally:
+    def _run(cmd, label: str) -> bool:
+        try:
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, errors="ignore", timeout=600,
+                # POSIX only; ignored on Windows, where this never runs in prod.
+                preexec_fn=_low_priority if os.name == "posix" else None,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error(f"Outro: ffmpeg timed out during {label}")
+            return False
+        if r.returncode != 0:
+            logger.error(f"Outro: {label} failed ({r.returncode}): {r.stderr[:400]}")
+            return False
+        return True
+
+    def _cleanup():
         shutil.rmtree(card.parent, ignore_errors=True)
         if watermark:
             shutil.rmtree(watermark.parent, ignore_errors=True)
+        for leftover in (main_path, card_path, list_path):
+            try:
+                leftover.unlink(missing_ok=True)
+            except Exception:
+                pass
 
-    if result.returncode != 0 or not dest.exists() or dest.stat().st_size == 0:
-        logger.error(f"Outro: ffmpeg failed ({result.returncode}): {result.stderr[:400]}")
-        return str(video_path)
+    try:
+        # ── pass 1: the footage. Scaled, sharpened, watermarked, encoded once.
+        cmd = [ff, "-y", "-hide_banner", "-loglevel", "error", "-i", str(src)]
+        chain = f"[0:v]{polish}[polished]"
+        if watermark:
+            # A still image input, not a looped stream. Looping it produced a
+            # full-length second video of 1080x1920 RGBA frames — 324MB of the
+            # original 1010MB peak. overlay repeats the last frame by itself.
+            cmd += ["-i", str(watermark)]
+            chain += ";[polished][1:v]overlay=0:0:format=auto:eof_action=repeat[v]"
+        else:
+            chain += ";[polished]null[v]"
+
+        maps = ["-map", "[v]"]
+        if bed:
+            # Looped in case the track is shorter than the clip, trimmed to the
+            # footage, and faded so it neither starts abruptly nor cuts off
+            # mid-note. The end card stays silent: the cut to it is a hard
+            # visual break, so music resolving there reads as deliberate.
+            bed_index = 2 if watermark else 1
+            cmd += ["-stream_loop", "-1", "-i", str(bed)]
+            chain += (
+                f";[{bed_index}:a]atrim=duration={duration:.3f},"
+                f"afade=t=in:st=0:d=0.4,"
+                f"afade=t=out:st={max(duration - 0.6, 0):.3f}:d=0.6,"
+                f"volume={BED_VOLUME}[a]"
+            )
+            maps += ["-map", "[a]"]
+        elif has_audio:
+            maps += ["-map", "0:a?"]
+
+        cmd += ["-filter_complex", chain] + maps + encode
+        cmd += (audio_encode if want_audio else ["-an"]) + [str(main_path)]
+        if not _run(cmd, "main encode"):
+            return str(video_path)
+
+        # ── pass 2: the end card. Seconds long, so this is cheap.
+        cmd = [
+            ff, "-y", "-hide_banner", "-loglevel", "error",
+            "-framerate", str(fps), "-loop", "1", "-t", str(seconds), "-i", str(card),
+        ]
+        if want_audio:
+            # The card needs its own silence, or the join drops the audio
+            # stream from that point and the clip posts mute.
+            cmd += ["-f", "lavfi", "-i",
+                    "anullsrc=channel_layout=stereo:sample_rate=44100"]
+        cmd += ["-vf", f"scale={tw}:{th}:flags=lanczos,format=yuv420p,setsar=1"]
+        cmd += encode + (audio_encode + ["-shortest"] if want_audio else ["-an"])
+        cmd += [str(card_path)]
+        if not _run(cmd, "card encode"):
+            return str(video_path)
+
+        # ── pass 3: join. No re-encode, so this is nearly free in both time
+        # and memory — 25MB against the 311MB the encode itself needs.
+        list_path.write_text(
+            f"file '{main_path.as_posix()}'\nfile '{card_path.as_posix()}'\n",
+            encoding="utf-8",
+        )
+        if not _run([
+            ff, "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "concat", "-safe", "0", "-i", str(list_path),
+            "-c", "copy", "-movflags", "+faststart", str(dest),
+        ], "join"):
+            return str(video_path)
+
+        if not dest.exists() or dest.stat().st_size == 0:
+            logger.error("Outro: join produced an empty file, posting the clip as-is")
+            return str(video_path)
+    finally:
+        _cleanup()
 
     logger.info(
         f"Branded {src.name}: watermark + {seconds}s card, {tw}x{th} "
@@ -428,12 +520,25 @@ def outro_text_for(profile) -> Tuple[str, str, str]:
     return brand, cta, url
 
 
+def probe_audio(path: str | Path) -> Optional[bool]:
+    """Does this file carry a sound track? None when it cannot be read.
+
+    None and False mean different things to the caller: False is "definitely
+    silent, hold it back from auto-publishing", None is "unknown, treat it as
+    postable" — guessing silent on an unreadable probe would quietly stall a
+    schedule.
+    """
+    probed = _probe(Path(path))
+    return None if probed is None else probed[3]
+
+
 async def brand_video_at_url(
     video_url: str,
     profile,
     workspace_id: str,
     media_id: str,
     seconds: float = DEFAULT_OUTRO_SECONDS,
+    probe_out: Optional[dict] = None,
 ) -> str:
     """Download a rendered clip, append its outro, and re-upload it.
 
@@ -469,6 +574,12 @@ async def brand_video_at_url(
         except Exception as e:
             logger.error(f"Outro: could not download {video_url}: {e}")
             return video_url
+
+        # The file is already on disk for ffmpeg, so this costs one probe
+        # rather than a second download. Reported through probe_out because
+        # the caller owns the database session and this function does not.
+        if probe_out is not None:
+            probe_out["has_audio"] = probe_audio(source)
 
         # append_outro shells out to ffmpeg with a blocking subprocess call.
         # Awaiting it directly on the event loop froze the entire server for
