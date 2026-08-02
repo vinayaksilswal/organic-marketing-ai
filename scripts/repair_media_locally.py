@@ -52,6 +52,69 @@ def _pending(rows) -> list:
     return out
 
 
+async def _brand_only(workspace_id, profile, args, started) -> int:
+    """Watermark every clip that has not been branded, and nothing else.
+
+    Talks to brand_video_at_url directly rather than going through
+    finish_pending_media, so no encode slot is ever held by a vision call.
+    """
+    from database import AsyncSessionLocal, Media
+    from services.video_outro import brand_video_at_url
+
+    slots = asyncio.Semaphore(args.encodes)
+    done = 0
+    lock = asyncio.Lock()
+
+    async with AsyncSessionLocal() as session:
+        rows = (await session.execute(
+            select(Media).where(Media.businessProfileId == workspace_id)
+        )).scalars().all()
+        targets = [
+            m.id for m in rows
+            if (m.mimeType or "").startswith("video/")
+            and m.url and "_branded" not in m.url and m.isActive
+        ]
+    total = len(targets)
+    print(f"  branding {total} clips, {args.encodes} at a time\n", flush=True)
+
+    async def _one(media_id: str):
+        nonlocal done
+        async with slots:
+            try:
+                async with AsyncSessionLocal() as session:
+                    media = await session.get(Media, media_id)
+                    if not media or not media.url or "_branded" in media.url:
+                        return
+                    url = media.url
+
+                probe: dict = {}
+                branded = await brand_video_at_url(
+                    url, profile, workspace_id, media_id, probe_out=probe
+                )
+                if branded and branded != url:
+                    async with AsyncSessionLocal() as s2:
+                        row = await s2.get(Media, media_id)
+                        if row:
+                            row.url = branded
+                            if probe.get("has_audio") is not None:
+                                row.hasAudio = probe["has_audio"]
+                            await s2.commit()
+            except Exception as e:
+                logger.warning(f"Branding failed for {media_id}: {e}")
+            finally:
+                async with lock:
+                    done += 1
+                    if done % 5 == 0 or done == total:
+                        el = (time.time() - started) / 60
+                        rate = done / el if el else 0
+                        left = (total - done) / rate if rate else 0
+                        print(f"  [{done}/{total}] {el:.1f} min, {rate:.1f}/min, "
+                              f"about {left:.0f} min left", flush=True)
+
+    await asyncio.gather(*(_one(mid) for mid in targets))
+    return done
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("workspace", help="business name or workspace id")
@@ -62,6 +125,8 @@ async def main() -> int:
     ap.add_argument("--describes", type=int, default=3,
                     help="concurrent vision calls. Free models rate-limit above ~4")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--only", choices=("brand", "describe"), default=None,
+                    help="run one job instead of both")
     args = ap.parse_args()
 
     from database import AsyncSessionLocal, BusinessProfile, Media, init_db
@@ -106,6 +171,20 @@ async def main() -> int:
     if args.dry_run or not todo:
         return 0
 
+    if args.only == "brand":
+        # Branding on its own, because coupling it to captioning starves it.
+        # finish_pending_media describes an asset and then brands it, both
+        # under one pool of workers -- so when the free vision models take
+        # their 120-second timeout, every worker sits waiting on the network
+        # and the encoder goes completely idle. Measured: zero ffmpeg
+        # processes for a solid minute while eight slots blocked on 504s.
+        #
+        # The two jobs are independent, so run them apart: this keeps every
+        # encode slot busy, and descriptions are a separate pass afterwards.
+        done = await _brand_only(workspace_id, profile, args, started)
+        print(f"\nFinished {done} clips in {(time.time()-started)/60:.1f} minutes")
+        return 0
+
     total = len(todo)
     while True:
         async with AsyncSessionLocal() as session:
@@ -113,6 +192,9 @@ async def main() -> int:
                 select(Media).where(Media.businessProfileId == workspace_id)
             )).scalars().all()
             batch = [m.id for m in _pending(rows)][: args.batch]
+            if args.only == "describe":
+                batch = [m.id for m in _pending(rows)
+                         if not (m.caption or m.prompt)][: args.batch]
         if not batch:
             break
 

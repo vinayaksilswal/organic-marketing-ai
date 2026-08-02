@@ -1949,6 +1949,121 @@ async def delete_workspace_media(media_id: str, request: Request) -> Any:
         return {"success": True, "message": "Media asset deleted successfully"}
 
 
+def _public_id_from_url(url: str) -> Optional[str]:
+    """The Cloudinary public_id a delivery URL points at, or None.
+
+    Rebuilt from the URL rather than from the media id, because a clip that
+    has been branded is stored under "<id>_branded" and one that has been
+    scored under "<id>_branded_scored". Guessing the id would delete the
+    original and leave the copy that is actually in use.
+
+    Returns None for anything not served by Cloudinary — older assets sit on
+    imgbb, which has no delete API without the token issued at upload time.
+    """
+    import re as _re
+
+    if not url or "res.cloudinary.com" not in url:
+        return None
+    # .../upload/v1234567890/tenants/<ws>/media/<id>.mp4  ->  tenants/.../id
+    m = _re.search(r"/upload/(?:[^/]+/)*?v\d+/(.+?)(?:\.[a-zA-Z0-9]+)?$", url)
+    if not m:
+        m = _re.search(r"/upload/(.+?)(?:\.[a-zA-Z0-9]+)?$", url)
+    return m.group(1) if m else None
+
+
+@router.post("/media/purge")
+async def purge_workspace_media(
+    request: Request,
+    confirm_name: str = "",
+    delete_files: bool = True,
+    user_id: str = Depends(verify_user),
+) -> Any:
+    """Delete every media asset in a workspace, and the stored files with them.
+
+    Irreversible, so it will not run without `confirm_name` matching the
+    workspace's own name exactly. Called without it, it reports what would go
+    and changes nothing — which is also what the dashboard shows the user
+    before asking them to type the name.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with get_tenant_session(workspace_id) as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        rows = (await session.execute(
+            select(Media).where(Media.businessProfileId == workspace_id)
+        )).scalars().all()
+
+        images = sum(1 for m in rows if (m.mimeType or "").startswith("image/"))
+        videos = sum(1 for m in rows if (m.mimeType or "").startswith("video/"))
+        audio = sum(1 for m in rows if (m.mimeType or "").startswith("audio/"))
+        on_cloudinary = sum(1 for m in rows if _public_id_from_url(m.url or ""))
+
+        summary = {
+            "workspace": profile.name,
+            "total": len(rows),
+            "images": images,
+            "videos": videos,
+            "audio": audio,
+            "storedFiles": on_cloudinary,
+            "elsewhere": len(rows) - on_cloudinary,
+        }
+
+        if confirm_name != (profile.name or ""):
+            return {
+                "success": True,
+                "deleted": 0,
+                "confirmed": False,
+                **summary,
+                "message": (
+                    f"This would permanently delete all {len(rows)} assets in "
+                    f"{profile.name!r} and cannot be undone. Type the workspace "
+                    f"name to confirm."
+                ),
+            }
+
+        # Files first. A storage failure must not abort the purge -- an orphaned
+        # file costs pennies, a half-deleted catalog is a broken workspace.
+        removed_files = 0
+        if delete_files:
+            from services.storage_service import delete_media_from_cloudinary
+
+            for m in rows:
+                public_id = _public_id_from_url(m.url or "")
+                if not public_id:
+                    continue
+                kind = "video" if (m.mimeType or "").startswith("video/") else "image"
+                try:
+                    if await delete_media_from_cloudinary(public_id, kind):
+                        removed_files += 1
+                except Exception as e:
+                    logger.warning(f"Could not delete stored file {public_id}: {e}")
+
+        for m in rows:
+            await session.delete(m)
+        await session.commit()
+
+    logger.warning(
+        f"PURGE: removed {len(rows)} media rows and {removed_files} stored files "
+        f"from {profile.name} ({workspace_id}) at the owner's request"
+    )
+    return {
+        "success": True,
+        "deleted": len(rows),
+        "filesRemoved": removed_files,
+        "confirmed": True,
+        **summary,
+        "message": (
+            f"Deleted {len(rows)} assets from {profile.name}"
+            + (f" and {removed_files} stored files." if delete_files else ".")
+        ),
+    }
+
+
 def _dedupe_key(media) -> str:
     """What counts as "the same file".
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music } from 'lucide-react';
+import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music, ShieldAlert } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaList, setMediaList] = useState([]);
@@ -14,6 +14,10 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [autoCaption, setAutoCaption] = useState(true);
   const [showOnlyUnfinished, setShowOnlyUnfinished] = useState(false);
   const [fixing, setFixing] = useState(false);
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [purgePreview, setPurgePreview] = useState(null);
+  const [purgeTyped, setPurgeTyped] = useState('');
+  const [purging, setPurging] = useState(false);
   
   // Modals
   const [previewMedia, setPreviewMedia] = useState(null);
@@ -75,6 +79,45 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const musicTracks = mediaList.filter(
     m => (m.mimeType || '').startsWith('audio/')
   );
+
+
+  // Deleting a whole catalog is not undoable, so it happens in two steps: the
+  // server reports exactly what would go, and only removes anything once the
+  // workspace name is typed back. Same call, with and without the name.
+  const openPurge = async () => {
+    setPurgeTyped('');
+    setPurgeOpen(true);
+    setPurgePreview(null);
+    try {
+      const res = await authFetch(
+        `${API_BASE}/marketing/media/purge`, { method: 'POST' }, token);
+      setPurgePreview(await res.json());
+    } catch (err) {
+      showToast('Could not read the catalog', 'error');
+      setPurgeOpen(false);
+    }
+  };
+
+  const confirmPurge = async () => {
+    setPurging(true);
+    try {
+      const res = await authFetch(
+        `${API_BASE}/marketing/media/purge?confirm_name=${encodeURIComponent(purgeTyped)}`,
+        { method: 'POST' }, token);
+      const d = await res.json();
+      if (d.confirmed) {
+        showToast(d.message, 'success');
+        setPurgeOpen(false);
+        fetchMedia();
+      } else {
+        showToast('That name did not match', 'error');
+      }
+    } catch (err) {
+      showToast('Delete failed', 'error');
+    } finally {
+      setPurging(false);
+    }
+  };
 
   const handleFixUnfinished = async () => {
     setFixing(true);
@@ -729,6 +772,77 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   {previewMedia.caption || previewMedia.filename || 'No caption provided.'}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Danger zone. Deliberately last, visually separate, and never a
+            single click -- it deletes the catalog and the stored files. */}
+        <div style={{
+          marginTop: '2rem', padding: '1.25rem 1.5rem', borderRadius: 12,
+          border: '1px solid rgba(255,90,90,0.35)', background: 'rgba(255,60,60,0.04)',
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#ff8080', textTransform: 'uppercase' }}>
+            <ShieldAlert size={15} /> Danger zone
+          </label>
+          <p style={{ margin: '0 0 0.9rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Delete every image, video and music track in this business, and the
+            stored files behind them. This cannot be undone.
+          </p>
+          <button className="btn" style={{ height: 38, background: 'rgba(255,60,60,0.15)', color: '#ff8080', border: '1px solid rgba(255,90,90,0.4)' }}
+            onClick={openPurge} disabled={purging}>
+            <Trash2 size={15} /> Delete all media
+          </button>
+        </div>
+
+        {purgeOpen && (
+          <div onClick={() => !purging && setPurgeOpen(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+          }}>
+            <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ maxWidth: 460, width: '100%', padding: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ff8080' }}>
+                <ShieldAlert size={18} /> Delete all media
+              </h3>
+              {!purgePreview ? (
+                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+                  <span className="spinner" style={{ width: 14, height: 14 }} /> Checking what is here...
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.88rem', lineHeight: 1.6, marginTop: 0 }}>
+                    This permanently deletes <strong>{purgePreview.total}</strong> asset
+                    {purgePreview.total === 1 ? '' : 's'} from <strong>{purgePreview.workspace}</strong>
+                    {' '}&mdash; {purgePreview.videos} video{purgePreview.videos === 1 ? '' : 's'},
+                    {' '}{purgePreview.images} image{purgePreview.images === 1 ? '' : 's'}
+                    {purgePreview.audio > 0 && `, ${purgePreview.audio} music track${purgePreview.audio === 1 ? '' : 's'}`}
+                    {' '}&mdash; and removes {purgePreview.storedFiles} stored file
+                    {purgePreview.storedFiles === 1 ? '' : 's'}.
+                  </p>
+                  {purgePreview.elsewhere > 0 && (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      {purgePreview.elsewhere} older file{purgePreview.elsewhere === 1 ? ' is' : 's are'} hosted
+                      outside our storage and cannot be deleted from here; the catalog
+                      entries go either way.
+                    </p>
+                  )}
+                  <p style={{ fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                    Type <strong>{purgePreview.workspace}</strong> to confirm:
+                  </p>
+                  <input value={purgeTyped} onChange={e => setPurgeTyped(e.target.value)}
+                    autoFocus placeholder={purgePreview.workspace}
+                    style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', marginBottom: '1rem' }} />
+                  <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
+                    <button className="btn btn-secondary" style={{ height: 38 }}
+                      onClick={() => setPurgeOpen(false)} disabled={purging}>Cancel</button>
+                    <button className="btn" style={{ height: 38, background: purgeTyped === purgePreview.workspace ? '#c62828' : 'rgba(255,255,255,0.08)', color: '#fff', cursor: purgeTyped === purgePreview.workspace ? 'pointer' : 'not-allowed' }}
+                      onClick={confirmPurge}
+                      disabled={purging || purgeTyped !== purgePreview.workspace}>
+                      {purging ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <Trash2 size={15} />} Delete everything
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
