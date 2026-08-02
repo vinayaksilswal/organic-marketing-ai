@@ -20,6 +20,7 @@ Falls back to inline execution if Redis/ARQ is unavailable.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -33,6 +34,7 @@ from database import (
     AsyncSessionLocal,
     BusinessProfile,
     SocialCampaign,
+    SocialConnection,
     SocialPost,
 )
 
@@ -129,12 +131,25 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                         if last_at.tzinfo is None:
                             last_at = last_at.replace(tzinfo=timezone.utc)
                         hours_since_last_post = (now - last_at).total_seconds() / 3600.0
-                        if hours_since_last_post < interval_hours:
+                        if not is_post_due(hours_since_last_post, interval_hours):
                             logger.debug(
                                 f"[MARKETING LOOP] Skipping {profile.name} — "
                                 f"posted {hours_since_last_post:.1f}h ago (interval: {interval_hours}h)"
                             )
                             continue
+
+                    connection = (await session.execute(
+                        select(SocialConnection).where(
+                            SocialConnection.businessProfileId == profile.id
+                        ).limit(1)
+                    )).scalars().first()
+                    if connection is None:
+                        logger.warning(
+                            f"[MARKETING LOOP] {profile.name} has no connected social "
+                            f"account, so there is nowhere to publish. Connect "
+                            f"Facebook or Instagram in Businesses -> Edit -> Social."
+                        )
+                        continue
 
                     logger.info(f"[MARKETING LOOP] Processing workspace: {profile.name} ({profile.id})")
 
@@ -258,16 +273,46 @@ async def execute_creative_generation_loop() -> None:
 # =============================================================================
 # Scheduler Lifecycle Management
 # =============================================================================
+# How often the loop wakes up. This is the resolution of the whole schedule,
+# not the posting rate -- each workspace posts on its own postIntervalHours.
+#
+# It used to be 2 hours, which broke the setting two ways. "Every 1 hour" was
+# unreachable at any setting, because the loop simply never ran that often.
+# And a 4-hour workspace posted every 6: a post's scheduledAt lands a little
+# after the tick that created it, so at the 4-hour tick the elapsed time was
+# 3h59m, the check failed, and it waited for the 6-hour tick. Two real
+# workspaces show it exactly -- 20:58, 02:58, 08:58 on a 4-hour setting.
+MARKETING_LOOP_MINUTES = int(os.getenv("MARKETING_LOOP_MINUTES", "15"))
+
+
+def is_post_due(hours_since_last: float, interval_hours: float,
+                loop_minutes: int = MARKETING_LOOP_MINUTES) -> bool:
+    """Whether a workspace is due to post.
+
+    The grace is half a loop period. Without it the comparison is a race
+    against its own bookkeeping: elapsed is measured from when the last post
+    was recorded, which is always slightly after the tick that produced it, so
+    an exact multiple never quite arrives and the workspace slips a whole
+    period. Half a tick is small enough never to post meaningfully early and
+    large enough to absorb the delay.
+    """
+    grace = (loop_minutes / 60.0) / 2.0
+    return hours_since_last >= max(interval_hours - grace, 0)
+
+
 def create_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler AsyncIOScheduler instance."""
     scheduler = AsyncIOScheduler(timezone="UTC")
 
     scheduler.add_job(
         execute_marketing_loop,
-        trigger=IntervalTrigger(hours=2),
+        trigger=IntervalTrigger(minutes=MARKETING_LOOP_MINUTES),
         id="marketing_loop",
-        name="Autonomous 2-Hour Marketing Loop",
+        name="Marketing Loop",
         replace_existing=True,
+        # A tick that overruns must not queue a second copy behind it.
+        max_instances=1,
+        coalesce=True,
     )
 
     scheduler.add_job(
@@ -278,7 +323,10 @@ def create_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    logger.info("APScheduler initialized (Marketing Loop: 2h, Creative Loop: 2h)")
+    logger.info(
+        f"APScheduler initialized (Marketing Loop: {MARKETING_LOOP_MINUTES}m, "
+        f"Creative Loop: 2h)"
+    )
     return scheduler
 
 

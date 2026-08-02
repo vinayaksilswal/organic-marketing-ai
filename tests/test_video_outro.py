@@ -491,57 +491,107 @@ def test_memory_reading_is_none_when_not_containerised():
         assert memory_headroom_mb() is None
 
 
-def _cgroup(tmp_path, used, limit, v2=True, cache=0):
-    """Write a fake cgroup group and return it in container_memory's form."""
-    names = ("memory.current", "memory.max") if v2 else \
-        ("memory.usage_in_bytes", "memory.limit_in_bytes")
-    key = "inactive_file " if v2 else "total_inactive_file "
-    (tmp_path / names[0]).write_text(str(used))
+def _cgroup(tmp_path, limit, *, anon=0, cache=0, active=None, slab=0, sock=0,
+            v2=True):
+    """Write a fake cgroup and return it in container_memory's form."""
+    names = ("memory.current", "memory.max") if v2 else (
+        "memory.usage_in_bytes", "memory.limit_in_bytes")
+    current = anon + cache + slab + sock
+    (tmp_path / names[0]).write_text(str(current))
     (tmp_path / names[1]).write_text(str(limit))
-    (tmp_path / "memory.stat").write_text(f"anon 123\n{key}{cache}\nslab 9\n")
+    active = cache if active is None else active
+    if v2:
+        keys = ("anon", "slab", "sock")
+        lines = [f"anon {anon}", f"file {cache}", f"slab {slab}", f"sock {sock}",
+                 f"active_file {active}", f"inactive_file {cache - active}"]
+    else:
+        keys = ("total_rss",)
+        lines = [f"total_rss {anon}", f"total_cache {cache}"]
+    (tmp_path / "memory.stat").write_text("\n".join(lines) + "\n")
     return ((str(tmp_path / names[0]), str(tmp_path / names[1]),
-             str(tmp_path / "memory.stat"), key),)
+             str(tmp_path / "memory.stat"), keys),)
 
 
-def test_cgroup_v2_is_parsed(tmp_path):
+def test_cgroup_v2_reports_irreclaimable_memory(tmp_path):
     from services.video_outro import container_memory
 
-    used, limit = container_memory(_cgroup(tmp_path, 200_000_000, 512_000_000))
-    assert (used, limit) == pytest.approx((200.0, 512.0))
+    used, limit = container_memory(
+        _cgroup(tmp_path, 537_000_000, anon=140_000_000, cache=20_000_000))
+    assert (used, limit) == pytest.approx((140.0, 537.0))
 
 
-def test_cgroup_v1_is_parsed(tmp_path):
+def test_cgroup_v1_reports_rss(tmp_path):
     from services.video_outro import container_memory
 
-    reading = container_memory(_cgroup(tmp_path, 300_000_000, 512_000_000, v2=False))
-    assert reading == pytest.approx((300.0, 512.0))
+    used, limit = container_memory(
+        _cgroup(tmp_path, 512_000_000, anon=300_000_000, cache=50_000_000, v2=False))
+    assert (used, limit) == pytest.approx((300.0, 512.0))
 
 
-def test_page_cache_is_not_counted_as_used(tmp_path):
-    """The whole reason branding stalled. Every video written to disk lands in
-    the page cache and inflates memory.current; the kernel reclaims it rather
-    than OOMing, so counting it as used reported "8MB free" on an instance
-    with 380MB genuinely available, and the headroom guard refused every clip.
+def test_active_page_cache_is_not_counted_as_used(tmp_path):
+    """The bug that cost two nights, in one assertion.
+
+    Freshly written video sits in ACTIVE page cache, not inactive. A first fix
+    subtracted only inactive_file, so the reading still said "6MB free" on a
+    container with hundreds of megabytes genuinely available -- and the guard
+    refused every encode after the first. Exactly one clip got branded.
     """
     from services.video_outro import container_memory
 
-    # 528MB counted, but 380MB of it is reclaimable cache.
-    used, limit = container_memory(
-        _cgroup(tmp_path, 528_000_000, 537_000_000, cache=380_000_000)
-    )
-    assert used == pytest.approx(148.0), "page cache was counted as real usage"
-    assert limit - used > 340, "an encode would still be refused"
+    used, limit = container_memory(_cgroup(
+        tmp_path, 537_000_000,
+        anon=145_000_000, cache=390_000_000, active=390_000_000))
+    assert used == pytest.approx(145.0), "page cache counted as real usage"
+    assert limit - used > 340, "an encode would still be wrongly refused"
 
 
-def test_working_set_never_goes_negative(tmp_path):
-    """A cache figure larger than the usage counter is nonsense, but reading
-    it must not produce a negative working set and a bogus surplus."""
+def test_slab_and_socket_memory_count_as_used(tmp_path):
+    """Not reclaimable on demand, so they are real headroom lost."""
     from services.video_outro import container_memory
 
-    used, _ = container_memory(
-        _cgroup(tmp_path, 100_000_000, 537_000_000, cache=900_000_000)
-    )
-    assert used == 0
+    used, _ = container_memory(_cgroup(
+        tmp_path, 537_000_000, anon=140_000_000, slab=20_000_000, sock=5_000_000))
+    assert used == pytest.approx(165.0)
+
+
+def test_used_never_exceeds_what_the_cgroup_reports(tmp_path):
+    """A stat file disagreeing with the counter must not invent headroom."""
+    from services.video_outro import container_memory
+
+    (tmp_path / "memory.current").write_text("100000000")
+    (tmp_path / "memory.max").write_text("537000000")
+    (tmp_path / "memory.stat").write_text("anon 900000000")
+    pair = ((str(tmp_path / "memory.current"), str(tmp_path / "memory.max"),
+             str(tmp_path / "memory.stat"), ("anon", "slab", "sock")),)
+    used, _ = container_memory(pair)
+    assert used == pytest.approx(100.0)
+
+
+def test_falls_back_to_current_minus_cache_without_anon(tmp_path):
+    """A kernel without `anon` must still exclude page cache rather than
+    reverting to the reading that caused the stall."""
+    from services.video_outro import container_memory
+
+    (tmp_path / "memory.current").write_text("500000000")
+    (tmp_path / "memory.max").write_text("537000000")
+    (tmp_path / "memory.stat").write_text("file 360000000")
+    pair = ((str(tmp_path / "memory.current"), str(tmp_path / "memory.max"),
+             str(tmp_path / "memory.stat"), ("anon", "slab", "sock")),)
+    used, _ = container_memory(pair)
+    assert used == pytest.approx(140.0)
+
+
+def test_no_stat_file_degrades_to_the_raw_counter(tmp_path):
+    """Conservative, not wrong: it may refuse an encode it could have run,
+    which is a delay rather than an outage."""
+    from services.video_outro import container_memory
+
+    (tmp_path / "memory.current").write_text("500000000")
+    (tmp_path / "memory.max").write_text("537000000")
+    pair = ((str(tmp_path / "memory.current"), str(tmp_path / "memory.max"),
+             str(tmp_path / "nostat"), ("anon", "slab", "sock")),)
+    used, _ = container_memory(pair)
+    assert used == pytest.approx(500.0)
 
 
 @pytest.mark.parametrize("limit", ["max", str(1 << 63), "0"])
@@ -553,9 +603,9 @@ def test_unset_limit_is_not_treated_as_a_ceiling(tmp_path, limit):
 
     (tmp_path / "memory.current").write_text("200000000")
     (tmp_path / "memory.max").write_text(limit)
-    (tmp_path / "memory.stat").write_text("inactive_file 0\n")
+    (tmp_path / "memory.stat").write_text("anon 100000000")
     pair = ((str(tmp_path / "memory.current"), str(tmp_path / "memory.max"),
-             str(tmp_path / "memory.stat"), "inactive_file "),)
+             str(tmp_path / "memory.stat"), ("anon", "slab", "sock")),)
     assert container_memory(pair) is None
 
 
@@ -563,7 +613,7 @@ def test_missing_cgroup_files_are_not_an_error(tmp_path):
     from services.video_outro import container_memory
 
     pair = ((str(tmp_path / "nope"), str(tmp_path / "alsonope"),
-             str(tmp_path / "nostat"), "inactive_file "),)
+             str(tmp_path / "nostat"), ("anon",)),)
     assert container_memory(pair) is None
 
 

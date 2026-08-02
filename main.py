@@ -309,34 +309,38 @@ async def health_check(request: Request) -> JSONResponse:
         from pathlib import Path as _P
 
         from services.video_outro import (
-            ENCODE_HEADROOM_MB, _inactive_file_bytes, container_memory,
+            ENCODE_HEADROOM_MB, container_memory, read_memory_stat,
         )
 
         reading = container_memory()
         if reading is None:
             memory = None
         else:
-            # Both numbers, because they disagree by hundreds of megabytes and
-            # only one of them means anything. The raw counter includes page
-            # cache, which the kernel drops on demand — reading it as real
-            # usage is what stalled branding at "8MB free".
+            # Every component, because two nights were lost to reading one
+            # number and assuming it meant something it did not. "used" is
+            # anon+slab+sock; page cache is excluded on purpose and shown
+            # separately so the difference is visible rather than argued.
+            stat = read_memory_stat("/sys/fs/cgroup/memory.stat")
             try:
-                raw = int(_P("/sys/fs/cgroup/memory.current").read_text().strip()) / 1e6
-                cache = _inactive_file_bytes(
-                    "/sys/fs/cgroup/memory.stat", "inactive_file ") / 1e6
+                current = int(_P("/sys/fs/cgroup/memory.current").read_text().strip()) / 1e6
             except Exception:
-                raw, cache = reading[0], 0.0
+                current = reading[0]
             memory = {
                 "usedMb": round(reading[0]),
                 "limitMb": round(reading[1]),
                 "freeMb": round(reading[1] - reading[0]),
                 "encodeNeedsMb": ENCODE_HEADROOM_MB,
                 "canEncode": (reading[1] - reading[0]) >= ENCODE_HEADROOM_MB,
-                # Diagnostics only.
-                "rawUsedMb": round(raw),
-                "reclaimableCacheMb": round(cache),
+                # Diagnostics.
+                "cgroupCurrentMb": round(current),
+                "anonMb": round(stat.get("anon", 0) / 1e6),
+                "pageCacheMb": round(stat.get("file", 0) / 1e6),
+                "activeFileMb": round(stat.get("active_file", 0) / 1e6),
+                "inactiveFileMb": round(stat.get("inactive_file", 0) / 1e6),
             }
     except Exception:
+        # /health is the liveness probe and must never fail for a reporting
+        # detail.
         memory = None
 
     return JSONResponse(

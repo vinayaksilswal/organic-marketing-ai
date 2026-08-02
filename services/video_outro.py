@@ -60,53 +60,74 @@ ENCODE_HEADROOM_MB = int(os.getenv("VIDEO_ENCODE_HEADROOM_MB", "340"))
 
 
 _CGROUP_FILES = (
+    # cgroup v2, then v1. The third entry is the stat file and the fourth is
+    # the key in it holding anonymous memory.
     ("/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory.max",
-     "/sys/fs/cgroup/memory.stat", "inactive_file "),
+     "/sys/fs/cgroup/memory.stat", ("anon", "slab", "sock")),
     ("/sys/fs/cgroup/memory/memory.usage_in_bytes",
      "/sys/fs/cgroup/memory/memory.limit_in_bytes",
-     "/sys/fs/cgroup/memory/memory.stat", "total_inactive_file "),
+     "/sys/fs/cgroup/memory/memory.stat", ("total_rss",)),
 )
 
 
-def _inactive_file_bytes(stat_file: str, key: str) -> int:
-    """Page cache the kernel can drop without killing anything.
-
-    Every video this service writes to disk lands in the page cache and is
-    counted by memory.current. Branding a library pushed that reading to 8MB
-    below the limit, which made the headroom guard refuse every encode --
-    while the actual risk was nil, because the kernel reclaims this before it
-    ever OOMs a process. Reading it as real usage is what stalled branding.
-    """
+def read_memory_stat(stat_file: str) -> dict:
+    """Parse a cgroup memory.stat into {key: bytes}."""
+    out = {}
     try:
         for line in Path(stat_file).read_text().splitlines():
-            if line.startswith(key):
-                return int(line.split()[1])
+            parts = line.split()
+            if len(parts) == 2 and parts[1].isdigit():
+                out[parts[0]] = int(parts[1])
     except Exception:
         pass
-    return 0
+    return out
 
 
 def container_memory(pairs=_CGROUP_FILES) -> Optional[Tuple[float, float]]:
-    """(used_mb, limit_mb) for this container, or None when not containerised.
+    """(irreclaimable_mb, limit_mb) for this container, or None off a cgroup.
 
-    Read from the cgroup rather than psutil: the host's total memory says
-    nothing about the 512MB this instance is actually allowed, and that ceiling
-    is the one that gets the process killed. cgroup v2 first, then v1.
+    "Used" here counts anonymous memory, slab and socket buffers -- the memory
+    the kernel cannot take back. It deliberately excludes the page cache.
 
-    "used" is the working set -- what is actually irreclaimable -- not the raw
-    usage counter, for the reason in _inactive_file_bytes.
+    That distinction has cost this service two nights. Every video downloaded,
+    encoded and written to disk enters the page cache, and memory.current
+    counts all of it. The reading therefore parks a few megabytes below the
+    limit and stays there, while the process is in no danger whatsoever: the
+    kernel drops cache on demand. A first attempt subtracted only
+    inactive_file, which is the portion that has aged out -- freshly written
+    video sits in active_file, so the reading still said "6MB free" and the
+    headroom guard refused every encode after the first.
+
+    The proof it is cache and not usage: this container has sat at 536 of
+    537MB for many minutes at a stretch, repeatedly, and has never once been
+    killed for it. Anonymous memory at that level plus a 311MB encode would
+    not survive a second.
+
+    Falls back to (current - file) and then to current, so a kernel that does
+    not expose these keys degrades to the old conservative behaviour rather
+    than reporting nonsense.
     """
-    for used_file, limit_file, stat_file, key in pairs:
+    for used_file, limit_file, stat_file, keys in pairs:
         try:
-            used = int(Path(used_file).read_text().strip())
+            current = int(Path(used_file).read_text().strip())
             raw = Path(limit_file).read_text().strip()
             if raw == "max":
                 continue
             limit = int(raw)
             # An unset v1 limit is a huge sentinel rather than the word "max".
-            if 0 < limit < (1 << 62):
-                working_set = max(used - _inactive_file_bytes(stat_file, key), 0)
-                return working_set / 1e6, limit / 1e6
+            if not (0 < limit < (1 << 62)):
+                continue
+
+            stat = read_memory_stat(stat_file)
+            if keys[0] in stat:
+                used = sum(stat.get(k, 0) for k in keys)
+            elif "file" in stat:
+                used = max(current - stat["file"], 0)
+            elif "total_cache" in stat:
+                used = max(current - stat["total_cache"], 0)
+            else:
+                used = current
+            return min(used, current) / 1e6, limit / 1e6
         except Exception:
             continue
     return None
