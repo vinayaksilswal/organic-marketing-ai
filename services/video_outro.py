@@ -48,15 +48,52 @@ _FONT_CANDIDATES = [
 ]
 
 
-# An encode needs about 310MB of resident memory at 1080x1920, measured. If
-# the container does not have that free, starting one does not produce a slow
-# encode — it produces an OOM kill, which takes the whole web server down and
-# fails every upload in flight along with it. Render restarted this service
-# twice that way.
+# What an encode actually costs, measured on a real clip rather than guessed:
 #
-# So the encode asks first. Refusing to start leaves the clip unbranded and it
-# is picked up on the next pass, which is a delay rather than an outage.
-ENCODE_HEADROOM_MB = int(os.getenv("VIDEO_ENCODE_HEADROOM_MB", "340"))
+#     1080x1920   308 MB peak
+#      720x1280   189 MB peak
+#
+# Starting one without the room does not produce a slow encode, it produces an
+# OOM kill that takes the web server with it and fails every upload in flight.
+# Render restarted this service twice that way.
+#
+# But refusing outright was worse than it looked. A single threshold of 340MB
+# blocked branding on an instance holding 199MB of 537MB -- 338MB free, short
+# by two megabytes, while 199 + 308 = 507 would have fitted with 30MB to
+# spare. Nothing branded, and the dashboard gave no reason.
+#
+# So the size is chosen to fit the room available: full resolution when it
+# fits, 720p when it does not, and only skipped when even that has nowhere to
+# go. A clip delivered at 720p is worth incomparably more than one delivered
+# never -- and the platform re-encodes everything anyway.
+ENCODE_PEAK_MB = {(1080, 1920): 308, (720, 1280): 189}
+
+# Enough that a normal fluctuation in the web server's own usage during an
+# encode does not push the container over.
+ENCODE_SAFETY_MB = int(os.getenv("VIDEO_ENCODE_SAFETY_MB", "25"))
+
+# Kept for callers and tests that refer to it: the room a full-size encode
+# needs, including the margin.
+ENCODE_HEADROOM_MB = int(
+    os.getenv("VIDEO_ENCODE_HEADROOM_MB",
+              str(ENCODE_PEAK_MB[(1080, 1920)] + ENCODE_SAFETY_MB))
+)
+
+
+def choose_encode_size(headroom_mb: Optional[float]) -> Optional[Tuple[int, int]]:
+    """The largest delivery size this instance has room for right now.
+
+    None means not even 720p fits and the clip should be left alone. An
+    unknown headroom (not containerised) means no limit to respect.
+    """
+    if headroom_mb is None:
+        return (TARGET_W, TARGET_H)
+    for size in sorted(ENCODE_PEAK_MB, key=lambda wh: -wh[0] * wh[1]):
+        if size[0] > TARGET_W or size[1] > TARGET_H:
+            continue
+        if headroom_mb >= ENCODE_PEAK_MB[size] + ENCODE_SAFETY_MB:
+            return size
+    return None
 
 
 _CGROUP_FILES = (
@@ -524,20 +561,38 @@ def append_outro(
     # number on every clip, which is how we learn what this instance actually
     # runs at instead of inferring it from crash events.
     headroom = memory_headroom_mb()
-    if headroom is not None:
-        reading = container_memory()
-        logger.info(
-            f"Outro: {headroom:.0f}MB free of {reading[1]:.0f}MB before encoding "
-            f"{src.name} (needs ~310MB)"
+    size = choose_encode_size(headroom)
+    if size is None:
+        logger.warning(
+            f"Outro: only {headroom:.0f}MB free, not enough for even a 720p "
+            f"encode ({ENCODE_PEAK_MB[(720, 1280)] + ENCODE_SAFETY_MB}MB). "
+            f"Leaving {src.name} unbranded for the next pass rather than "
+            f"risking an out-of-memory kill."
         )
-        if headroom < ENCODE_HEADROOM_MB:
-            logger.warning(
-                f"Outro: only {headroom:.0f}MB free, below the {ENCODE_HEADROOM_MB}MB "
-                f"an encode needs. Leaving {src.name} unbranded for the next pass "
-                f"rather than risking an out-of-memory kill."
-            )
-            _cleanup()
-            return str(video_path)
+        _cleanup()
+        return str(video_path)
+
+    if size != (tw, th):
+        logger.warning(
+            f"Outro: {headroom:.0f}MB free, delivering {src.name} at "
+            f"{size[0]}x{size[1]} instead of {tw}x{th}. A smaller clip beats "
+            f"no clip, and the platform re-encodes it regardless."
+        )
+        tw, th = size
+        # The watermark and card were built for the original size.
+        if watermark:
+            shutil.rmtree(watermark.parent, ignore_errors=True)
+        watermark = build_watermark_png(brand, tw, th)
+        polish = (
+            f"scale={tw}:{th}:force_original_aspect_ratio=decrease:flags=lanczos,"
+            f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:color=black,"
+            f"unsharp=5:5:0.35:5:5:0.0,"
+            f"fps={fps},format=yuv420p,setsar=1"
+        )
+    elif headroom is not None:
+        logger.info(
+            f"Outro: {headroom:.0f}MB free, encoding {src.name} at {tw}x{th}"
+        )
 
     try:
         # ── pass 1: the footage. Scaled, sharpened, watermarked, encoded once.

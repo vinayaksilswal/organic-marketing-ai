@@ -739,3 +739,82 @@ def test_other_models_keep_their_offer(model, offer, expected):
     p.businessModel = model
     _, cta, _ = outro_text_for(p)
     assert cta == expected
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Delivery size follows the room available
+#
+# A single 340MB threshold blocked branding on an instance holding 199MB of
+# 537MB: 338MB free, short by two megabytes, while 199 + 308 would have fitted
+# with 30MB to spare. Nothing branded and the dashboard gave no reason.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_full_size_when_there_is_room():
+    from services.video_outro import choose_encode_size
+    assert choose_encode_size(500) == (1080, 1920)
+
+
+def test_the_two_megabyte_miss_now_encodes():
+    """The exact reading that blocked production: 338MB free."""
+    from services.video_outro import choose_encode_size
+    assert choose_encode_size(338) == (1080, 1920)
+
+
+def test_degrades_rather_than_skipping():
+    """300MB cannot hold a 1080p encode but comfortably holds 720p. Skipping
+    delivers nothing; degrading delivers a clip the platform re-encodes anyway."""
+    from services.video_outro import choose_encode_size
+    assert choose_encode_size(300) == (720, 1280)
+
+
+def test_skips_only_when_nothing_fits():
+    from services.video_outro import choose_encode_size
+    assert choose_encode_size(120) is None
+
+
+def test_no_cgroup_means_no_limit_to_respect():
+    """On a laptop there is no container ceiling; full size every time."""
+    from services.video_outro import TARGET_H, TARGET_W, choose_encode_size
+    assert choose_encode_size(None) == (TARGET_W, TARGET_H)
+
+
+def test_never_chooses_a_size_above_the_delivery_target():
+    """VIDEO_TARGET_HEIGHT can lower the target; the table must not override it."""
+    from services.video_outro import TARGET_H, TARGET_W, choose_encode_size
+    for headroom in (10_000, 500, 300):
+        size = choose_encode_size(headroom)
+        if size:
+            assert size[0] <= TARGET_W and size[1] <= TARGET_H
+
+
+@pytest.mark.skipif(_ffmpeg() is None, reason="ffmpeg not available")
+def test_the_degraded_encode_still_produces_a_branded_clip(tmp_path, monkeypatch):
+    """A fallback that produced a broken file would be worse than skipping."""
+    import re
+
+    import services.video_outro as vo
+
+    ff = _ffmpeg()
+    src = tmp_path / "clip.mp4"
+    subprocess.run([
+        ff, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc=size=720x1280:rate=24:duration=2",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(src),
+    ], capture_output=True, timeout=120)
+
+    # Enough for 720p, not for 1080p.
+    monkeypatch.setattr(vo, "memory_headroom_mb", lambda: 300.0)
+    monkeypatch.setattr(vo, "container_memory", lambda: (237.0, 537.0))
+
+    out = Path(vo.append_outro(src, "Acme", "Book now", "acme.com"))
+    assert out != src, "degraded encode returned the original instead of branding"
+    assert out.exists() and out.stat().st_size > 0
+
+    probe = subprocess.run([ff, "-hide_banner", "-i", str(out)],
+                           capture_output=True, text=True, errors="ignore",
+                           timeout=60).stderr
+    assert "720x1280" in probe, probe[:300]
+    m = re.search(r"Duration: 00:00:(\d+\.\d+)", probe)
+    assert m and float(m.group(1)) > 2.0 + DEFAULT_OUTRO_SECONDS - 0.4, (
+        "the end card is missing from the degraded encode"
+    )
