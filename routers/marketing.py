@@ -41,6 +41,7 @@ from database import (
     BusinessProfile,
     MarketingState,
     SocialCampaign,
+    SocialConnection,
     SocialPost,
     EmailCampaign,
     MarketingLog,
@@ -176,21 +177,46 @@ async def get_automation_state(session, workspace_id: str | None, user_id: str |
 
 @router.get("/settings")
 async def get_marketing_settings(request: Request) -> dict[str, Any]:
+    """Automation settings for the active workspace.
+
+    The posting interval comes from the BusinessProfile, because that is the
+    one the scheduler obeys. MarketingState carries a second copy of the same
+    field and the two had drifted apart -- two workspaces set to 4 hours in
+    Businesses -> Edit were reported as 2 here, so this page was telling the
+    user something the scheduler had never agreed to. One field wins now, and
+    it is the one the automation actually reads.
+    """
     workspace_id = request.headers.get("x-workspace-id")
     async with get_tenant_session(workspace_id) as session:
-        stmt = (
+        profile = await session.get(BusinessProfile, workspace_id) if workspace_id else None
+
+        state = (await session.execute(
             select(MarketingState)
             .where(MarketingState.businessProfileId == workspace_id)
             .order_by(MarketingState.createdAt.asc())
-        )
-        state = (await session.execute(stmt)).scalars().first()
-        if state:
-            return {
-                "success": True,
-                "autoApprove": state.autoApprove,
-                "intervalHours": state.postIntervalHours,
-            }
-        return {"success": True, "autoApprove": False, "intervalHours": 2}
+        )).scalars().first()
+
+        # Nothing publishes without somewhere to publish to. A workspace with
+        # a full catalog and no connection produced no posts and no error --
+        # the only way to find out was to ask someone to read the database.
+        connected = False
+        if workspace_id:
+            connected = (await session.execute(
+                select(SocialConnection)
+                .where(SocialConnection.businessProfileId == workspace_id)
+                .limit(1)
+            )).scalars().first() is not None
+
+        return {
+            "success": True,
+            "autoApprove": state.autoApprove if state else False,
+            "intervalHours": (profile.postIntervalHours if profile else None) or 2,
+            "socialConnected": connected,
+            "blockedReason": None if connected else (
+                "No Facebook or Instagram account is connected to this business, "
+                "so nothing can be published. Connect one in Businesses → Edit → Social."
+            ),
+        }
 
 
 @router.post("/settings/auto-approve")
@@ -235,14 +261,24 @@ async def update_interval(
         raise HTTPException(status_code=400, detail="Interval must be between 1 and 168 hours.")
 
     async with get_tenant_session(workspace_id) as session:
-        state = await get_automation_state(session, workspace_id, user_id)
-        if not state:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
             raise HTTPException(status_code=404, detail="That business could not be found.")
 
-        state.postIntervalHours = data.intervalHours
+        # Written to the BusinessProfile, because that is the field the
+        # scheduler reads. MarketingState keeps a mirror so anything still
+        # reading it sees the same number rather than a stale one -- the two
+        # silently disagreeing is what made this setting look ignored.
+        profile.postIntervalHours = data.intervalHours
+        state = await get_automation_state(session, workspace_id, user_id)
+        if state:
+            state.postIntervalHours = data.intervalHours
         await session.commit()
-        await session.refresh(state)
-        return {"success": True, "intervalHours": state.postIntervalHours}
+
+        logger.info(
+            f"Posting interval for {profile.name} set to {data.intervalHours}h by {user_id}"
+        )
+        return {"success": True, "intervalHours": profile.postIntervalHours}
 
 _BANNED_CAPTION_PHRASES = (
     "unlock", "elevate", "game-changer", "game changer", "revolutioni",

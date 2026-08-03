@@ -120,6 +120,22 @@ class OnboardingService:
                     if "influencerReferenceUrl" in data and data["influencerReferenceUrl"] is not None:
                         profile.influencerReferenceUrl = data["influencerReferenceUrl"]
 
+                # MarketingState carries a second copy of the posting interval.
+                # The scheduler reads the profile, so that one is authoritative
+                # -- but leaving the other stale is how two workspaces came to
+                # be set to 4 hours here and reported as 2 on the scheduler
+                # page. Mirrored on write so they cannot drift apart again.
+                if data.get("postIntervalHours"):
+                    from sqlalchemy import update as _update
+
+                    from database import MarketingState
+
+                    await session.execute(
+                        _update(MarketingState)
+                        .where(MarketingState.businessProfileId == profile.id)
+                        .values(postIntervalHours=data["postIntervalHours"])
+                    )
+
                 await session.commit()
                 await session.refresh(profile)
 
