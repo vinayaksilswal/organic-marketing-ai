@@ -157,6 +157,24 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
       return;
     }
 
+    // Pinned once, for every batch of this upload.
+    //
+    // authFetch otherwise reads the active workspace from localStorage at the
+    // moment each request fires, and a bulk upload is dozens of sequential
+    // requests over several minutes. localStorage is shared across tabs of the
+    // same origin, so switching business in ANOTHER TAB silently redirected
+    // every remaining batch into that business. One folder ended up split
+    // across five workspaces that way, and nothing in the UI showed it
+    // happening.
+    const uploadWorkspaceId =
+      activeWorkspaceId || localStorage.getItem('activeWorkspaceId');
+    if (!uploadWorkspaceId) {
+      setBulkResult({ message: 'Select a business before uploading.', failed: 0 });
+      setBulkUploading(false);
+      return;
+    }
+    const pinnedWorkspace = { 'X-Workspace-Id': uploadWorkspaceId };
+
     let stored = 0, failed = 0, described = 0, skipped = 0, lastError = null;
     try {
       // Batched by SIZE, not by count. Three clips sounds small until three
@@ -202,7 +220,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
           try {
             const res = await authFetch(
               `${API_BASE}/marketing/media/bulk-upload`,
-              { method: 'POST', body: form },
+              { method: 'POST', body: form, headers: pinnedWorkspace },
               token
             );
             // Surface WHAT failed, not just that something did. A bare
@@ -234,12 +252,22 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         await sleep(700);
       }
 
+      // If the business was switched while this ran, the files still went where
+      // the upload started -- but the catalog on screen is now a different one,
+      // so say so rather than letting it look like nothing arrived.
+      const switchedAway =
+        (localStorage.getItem('activeWorkspaceId') || '') !== uploadWorkspaceId;
+
       setBulkResult({
         message:
           `${stored} added` +
           (skipped ? `, ${skipped} already in the catalog` : '') +
           (failed ? `, ${failed} failed` : '') +
-          ` — ${media.length} selected`,
+          ` — ${media.length} selected` +
+          (switchedAway
+            ? '. You changed business while this was running; the files went to '
+              + 'the one you started from, not the one shown now.'
+            : ''),
         failed,
         error: stored === 0 && !skipped ? lastError : null,
       });
