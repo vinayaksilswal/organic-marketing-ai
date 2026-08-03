@@ -15,11 +15,20 @@ it returns index 0, the newest asset, on every single run forever. That is the
 The rule this module implements instead: an asset is never reused while any
 other asset has been used less recently. Never-published assets always outrank
 published ones, so a full pass over the catalog completes before anything
-repeats, and the pass runs in a stable order rather than a shuffled one.
+repeats.
+
+Within that rule the order is random. A strict oldest-first pass posts a
+library in the order it was uploaded, which on a scraped folder means the feed
+runs alphabetically by filename -- visibly mechanical. Choosing at random from
+whichever assets are equally "most overdue" keeps the feed unpredictable while
+preserving the guarantee that nothing repeats until everything has run. That
+is the part naive random.choice cannot offer: it repeats by birthday
+collision, which is the bug this module was written to fix.
 """
 
 from __future__ import annotations
 
+import random
 from datetime import timezone
 from typing import Any, List, Optional
 
@@ -111,17 +120,28 @@ async def select_next_media(
             # preference can never resurrect an asset the rotation has covered.
             ai_first = [m for m in pool if getattr(m, "aiGenerated", False)]
             pool = ai_first or pool
-        chosen = pool[0]  # oldest first — the catalog fills in a stable order
+        # Any unpublished asset is equally overdue, so the choice among them is
+        # free -- and making it randomly is what stops a bulk-imported folder
+        # going out in filename order.
+        chosen = random.choice(pool)
         logger.info(
             f"Media rotation: {len(never_used)} of {len(catalog)} assets still "
-            f"unpublished, selected {chosen.id}"
+            f"unpublished, selected {chosen.id} at random"
         )
         return chosen
 
-    # Full pass complete. Start the next one from whatever has waited longest.
-    chosen = min(catalog, key=lambda m: last_used[m.url])
+    # Full pass complete. The next pass starts from whatever has waited longest,
+    # but "longest" is a band rather than a single row: picking strictly the
+    # oldest replays the previous pass in the same order every cycle, so a
+    # viewer sees the same sequence of clips again and again. Choosing at
+    # random from the most-overdue quarter keeps each cycle different while
+    # still never touching anything recently posted.
+    ordered = sorted(catalog, key=lambda m: last_used[m.url])
+    band = ordered[: max(1, len(ordered) // 4)]
+    chosen = random.choice(band)
     logger.info(
         f"Media rotation: catalog of {len(catalog)} fully covered, recycling "
-        f"{chosen.id} (last used {last_used[chosen.url].isoformat()})"
+        f"{chosen.id} at random from the {len(band)} most overdue "
+        f"(last used {last_used[chosen.url].isoformat()})"
     )
     return chosen

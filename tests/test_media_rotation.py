@@ -84,18 +84,25 @@ async def test_full_catalog_covered_before_any_repeat(db_session):
 
 @pytest.mark.asyncio
 async def test_second_pass_recycles_least_recently_used_first(db_session):
-    """After a full pass, the next pick is the one that has waited longest."""
-    media = await _seed(db_session, count=3)
+    """After a full pass, the next pick is the one that has waited longest.
+
+    The order of the first pass is random, so the asset idle the longest is
+    whichever went out first -- not index 0. Asserting on index 0 only worked
+    while the pass ran in catalog order.
+    """
+    await _seed(db_session, count=3)
 
     when = datetime(2026, 2, 1, tzinfo=timezone.utc)
+    published = []
     for i in range(3):
         chosen = await select_next_media(db_session, WORKSPACE)
+        published.append(chosen.url)
         await _record_post(db_session, chosen, when + timedelta(hours=i))
 
-    # The first asset published is now the one idle the longest.
-    first_published = media[0].url
     nxt = await select_next_media(db_session, WORKSPACE)
-    assert nxt.url == first_published
+    assert nxt.url == published[0], (
+        "recycling did not start with the asset that has waited longest"
+    )
 
 
 @pytest.mark.asyncio
@@ -217,3 +224,71 @@ async def test_empty_catalog_returns_none(db_session):
     db_session.add(session_profile)
     await db_session.commit()
     assert await select_next_media(db_session, WORKSPACE) is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Random order, without reintroducing the repeats that random.choice caused
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_the_feed_order_is_not_the_upload_order(db_session):
+    """A bulk-imported folder posted strictly oldest-first goes out in
+    filename order, which reads as mechanical. Over a full pass the sequence
+    should differ from the catalog order at least sometimes."""
+    await _seed(db_session, count=12)
+
+    when = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    order = []
+    for i in range(12):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        order.append(chosen.url)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    from database import Media
+    from sqlalchemy import select as _select
+    catalog = [
+        m.url for m in (await db_session.execute(
+            _select(Media).where(Media.businessProfileId == WORKSPACE)
+            .order_by(Media.createdAt.asc())
+        )).scalars().all()
+    ]
+    # 12! orders exist; matching the catalog exactly is a 1-in-479-million
+    # coincidence, so this is a real signal rather than a flaky one.
+    assert order != catalog, "the pass ran in catalog order"
+
+
+@pytest.mark.asyncio
+async def test_random_order_still_never_repeats_within_a_pass(db_session):
+    """The guarantee that made this module necessary. Naive random.choice
+    repeats by birthday collision -- with six assets, better than even odds of
+    a repeat inside four posts. Shuffling within the rotation must not bring
+    that back."""
+    await _seed(db_session, count=8)
+
+    when = datetime(2026, 4, 1, tzinfo=timezone.utc)
+    seen = []
+    for i in range(8):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        seen.append(chosen.url)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    assert len(set(seen)) == 8, f"an asset repeated before the pass finished: {seen}"
+
+
+@pytest.mark.asyncio
+async def test_recycling_never_picks_something_just_posted(db_session):
+    """Randomness is drawn from the most-overdue band only, so the clip that
+    went out last cannot come round again immediately."""
+    await _seed(db_session, count=12)
+
+    when = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    order = []
+    for i in range(12):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        order.append(chosen.url)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    most_recent = order[-1]
+    for _ in range(5):
+        nxt = await select_next_media(db_session, WORKSPACE)
+        assert nxt.url != most_recent, "recycled the asset posted most recently"
