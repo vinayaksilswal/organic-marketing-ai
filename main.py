@@ -309,7 +309,8 @@ async def health_check(request: Request) -> JSONResponse:
         from pathlib import Path as _P
 
         from services.video_outro import (
-            ENCODE_HEADROOM_MB, container_memory, read_memory_stat,
+            ENCODE_HEADROOM_MB, choose_encode_size, container_memory,
+            memory_headroom_mb, read_memory_stat,
         )
 
         reading = container_memory()
@@ -330,7 +331,16 @@ async def health_check(request: Request) -> JSONResponse:
                 "limitMb": round(reading[1]),
                 "freeMb": round(reading[1] - reading[0]),
                 "encodeNeedsMb": ENCODE_HEADROOM_MB,
-                "canEncode": (reading[1] - reading[0]) >= ENCODE_HEADROOM_MB,
+                # Reported as the size that would actually be produced, not as
+                # a yes/no against the full-resolution threshold. It read
+                # "canEncode: false" at 269MB free, which is ample for 720p --
+                # and I used that flag to diagnose, so a misleading answer
+                # there costs real time.
+                "encodeSize": (
+                    "x".join(map(str, choose_encode_size(memory_headroom_mb())))
+                    if choose_encode_size(memory_headroom_mb()) else None
+                ),
+                "canEncode": choose_encode_size(memory_headroom_mb()) is not None,
                 # Diagnostics.
                 "cgroupCurrentMb": round(current),
                 "anonMb": round(stat.get("anon", 0) / 1e6),
