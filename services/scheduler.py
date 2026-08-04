@@ -66,6 +66,7 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
     logger.info("=" * 60)
     logger.info("[MARKETING LOOP] Starting autonomous marketing cycle")
     logger.info("=" * 60)
+    cycle_started = utc_now()
 
     try:
         # Read the workspace list, then let the connection go.
@@ -103,6 +104,14 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
         if not workspaces:
             logger.info("[MARKETING LOOP] No workspaces found")
             return
+
+        # Every workspace's outcome, written to the database at the end of the
+        # cycle. Two businesses posted on schedule and two never did, and the
+        # logs said nothing at all about the ones that did not -- no attempt,
+        # no skip, no error. A cycle that leaves no trace of where it stopped
+        # cannot be diagnosed without guessing, and guessing has been expensive
+        # here. This records the answer instead.
+        outcomes: list = []
 
         for workspace_id, name, interval_hours, brand_ready in workspaces:
             try:
@@ -158,6 +167,10 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                                 f"[MARKETING LOOP] Skipping {name} — posted "
                                 f"{hours_since_last_post:.1f}h ago (interval: {interval_hours}h)"
                             )
+                            outcomes.append(
+                                f"{name}: not due ({hours_since_last_post:.1f}h "
+                                f"of {interval_hours}h)"
+                            )
                             continue
 
                     connection = (await session.execute(
@@ -172,6 +185,7 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                         f"so there is nowhere to publish. Connect Facebook or "
                         f"Instagram in Businesses -> Edit -> Social."
                     )
+                    outcomes.append(f"{name}: no social connection")
                     continue
 
                 logger.info(f"[MARKETING LOOP] Processing workspace: {name} ({workspace_id})")
@@ -179,10 +193,19 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                 # No session is open here. This is the slow part -- uploading a
                 # video to Instagram and waiting for it to process -- and it is
                 # precisely what killed the connection when one was held.
+                started = utc_now()
                 enqueued = await _try_enqueue_arq(workspace_id)
-                if not enqueued:
+                if enqueued:
+                    # Only meaningful if an ARQ worker is actually consuming the
+                    # queue. If none is, the job is accepted and never runs --
+                    # which looks exactly like a workspace that quietly refuses
+                    # to post.
+                    outcomes.append(f"{name}: ENQUEUED to arq (not run inline)")
+                else:
                     logger.info(f"[MARKETING LOOP] Running inline for {name}")
                     await _execute_inline(workspace_id)
+                    took = (utc_now() - started).total_seconds()
+                    outcomes.append(f"{name}: PUBLISHED inline in {took:.0f}s")
 
             except Exception as workspace_err:
                 # One workspace failing must never affect the next one. It used
@@ -191,12 +214,50 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                     f"[MARKETING LOOP] Error processing {name} ({workspace_id}): "
                     f"{workspace_err}"
                 )
+                outcomes.append(f"{name}: ERROR {type(workspace_err).__name__}: {workspace_err}")
                 continue
+
+        await _record_cycle(outcomes, cycle_started)
 
     except Exception as e:
         logger.error(f"[MARKETING LOOP] Loop exception: {e}")
+        try:
+            await _record_cycle(
+                (outcomes if "outcomes" in dir() else []) + [f"LOOP ABORTED: {e}"],
+                cycle_started,
+            )
+        except Exception:
+            pass
 
     logger.info("[MARKETING LOOP] Cycle complete")
+
+
+async def _record_cycle(outcomes: list, started) -> None:
+    """Write what the cycle did, per workspace, as one row.
+
+    A run that reaches only some of the workspaces is indistinguishable from a
+    run that reached all of them and found nothing to do -- unless it says so.
+    Written on a fresh session because the cycle deliberately holds none.
+    """
+    from database import MarketingLog
+
+    took = (utc_now() - started).total_seconds()
+    summary = f"cycle {took:.0f}s | " + " | ".join(outcomes) if outcomes else \
+        f"cycle {took:.0f}s | no workspaces considered"
+    try:
+        async with AsyncSessionLocal() as session:
+            session.add(MarketingLog(
+                userId=None,
+                businessProfileId=None,
+                status="CYCLE",
+                socialSuccess=False,
+                emailSuccess=False,
+                emailCount=0,
+                errorLog=summary[:4000],
+            ))
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"[MARKETING LOOP] Could not record cycle summary: {e}")
 
 
 async def _try_enqueue_arq(workspace_id: str) -> bool:
