@@ -19,20 +19,20 @@ from database import (
     Media, SocialPost, SocialCampaign, EmailCampaign, MarketingLog,
     MarketingState, Product, Audience, VideoApiConfig, TeamMember,
 )
-from routers.auth import verify_user
+from routers.auth import verify_user, verify_workspace_access
 from services.onboarding_service import OnboardingService
 from services.crypto_service import encrypt_token, decrypt_token
 
 router = APIRouter(
     prefix="/api/v1/users/me",
     tags=["User API"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 businesses_router = APIRouter(
     prefix="/api/v1/businesses",
     tags=["Businesses"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 class BusinessProfileUpdate(BaseModel):

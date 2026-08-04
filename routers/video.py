@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from database import AsyncSessionLocal, VideoApiConfig, Media, BusinessProfile
-from routers.auth import verify_user, get_workspace_id
+from routers.auth import verify_user, get_workspace_id, verify_workspace_access
 from sqlalchemy import select, and_
 from loguru import logger
 from services.crypto_service import encrypt_token, decrypt_token
@@ -12,7 +12,7 @@ from services.crypto_service import encrypt_token, decrypt_token
 router = APIRouter(
     prefix="/api/v1/video",
     tags=["Video Studio"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 class VideoConfigUpdate(BaseModel):

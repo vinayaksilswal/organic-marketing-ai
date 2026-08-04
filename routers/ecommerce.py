@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import AsyncSessionLocal, Product
-from routers.auth import verify_user, get_workspace_id
+from routers.auth import verify_user, get_workspace_id, verify_workspace_access
 from sqlalchemy import select, and_, delete
 
 router = APIRouter(
     prefix="/api/v1/ecommerce",
     tags=["Ecommerce"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 class ProductCreate(BaseModel):

@@ -53,7 +53,7 @@ from fastapi.templating import Jinja2Templates
 from loguru import logger
 from pydantic import BaseModel
 
-from routers.auth import verify_user
+from routers.auth import verify_user, verify_workspace_access
 from services.ai_service import generate_campaign_email, generate_campaign_variation
 from services.email_service import send_email_blast
 from services.social_service import (
@@ -68,7 +68,7 @@ from services.storage_service import upload_media_to_cloudinary
 router = APIRouter(
     prefix="/api/v1/marketing",
     tags=["Marketing"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 templates = Jinja2Templates(directory="templates")
 

@@ -17,6 +17,7 @@ from typing import Optional
 import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
+from loguru import logger
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
@@ -101,6 +102,68 @@ def get_workspace_id(request: Request) -> Optional[str]:
     Extracts the workspace ID from the X-Workspace-Id header.
     """
     return request.headers.get("X-Workspace-Id")
+
+
+async def verify_workspace_access(
+    request: Request, user_id: str = Depends(verify_user)
+) -> Optional[str]:
+    """Reject a request naming a workspace the caller has no claim to.
+
+    verify_user proves who is calling. It does not prove that the workspace in
+    X-Workspace-Id belongs to them -- and row-level security does not either,
+    because it scopes queries to whatever workspace it is handed. Together
+    those meant any signed-up account could pass another customer's workspace
+    id and read their catalog, delete their media, or publish to their social
+    accounts. Twenty workspace-scoped endpoints relied on nothing but the
+    header being present.
+
+    Applied at the router level rather than per endpoint, so it cannot be
+    forgotten on the next one added. A request with no workspace header is
+    passed through untouched: plenty of endpoints legitimately have none, and
+    those that need one already reject it themselves.
+
+    Access means: the workspace is yours, you are an accepted team member of
+    it, or you are a superadmin.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get(
+        "X-Workspace-Id"
+    )
+    if not workspace_id:
+        return None
+
+    from sqlalchemy import select
+
+    from database import AsyncSessionLocal, BusinessProfile, TeamMember, User
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if profile is None:
+            # Deliberately the same answer as "not yours": distinguishing the
+            # two lets an attacker enumerate which workspace ids exist.
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        if profile.userId == user_id:
+            return workspace_id
+
+        member = (await session.execute(
+            select(TeamMember).where(
+                TeamMember.businessProfileId == workspace_id,
+                TeamMember.userId == user_id,
+                TeamMember.status == "ACCEPTED",
+            )
+        )).scalars().first()
+        if member is not None:
+            return workspace_id
+
+        user = await session.get(User, user_id)
+        if user is not None and getattr(user, "isSuperAdmin", False):
+            return workspace_id
+
+    logger.warning(
+        f"Blocked cross-tenant access: user {user_id} requested workspace "
+        f"{workspace_id} owned by {profile.userId}"
+    )
+    raise HTTPException(status_code=404, detail="Workspace not found")
 
 # =============================================================================
 # User Registration & Login Models

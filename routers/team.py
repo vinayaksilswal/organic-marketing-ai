@@ -11,12 +11,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from database import AsyncSessionLocal, TeamMember, BusinessProfile, User
-from routers.auth import verify_user
+from routers.auth import verify_user, verify_workspace_access
 
 router = APIRouter(
     prefix="/api/v1/team",
     tags=["Team Management"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 

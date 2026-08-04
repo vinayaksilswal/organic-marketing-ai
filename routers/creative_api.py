@@ -31,7 +31,7 @@ from database import (
     Product,
     VideoApiConfig,
 )
-from routers.auth import verify_user
+from routers.auth import verify_user, verify_workspace_access
 from services.crypto_service import decrypt_token
 from services.creative_service import (
     generate_brand_context,
@@ -44,7 +44,7 @@ from services.creative_service import (
 router = APIRouter(
     prefix="/api/v1/creatives",
     tags=["Creatives"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 

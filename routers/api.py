@@ -31,7 +31,7 @@ from database import (
     MarketingState,
     Media,
 )
-from routers.auth import verify_user
+from routers.auth import verify_user, verify_workspace_access
 from services.chat_agent import chat_with_agent
 
 
@@ -41,7 +41,7 @@ from services.chat_agent import chat_with_agent
 router = APIRouter(
     prefix="/api/v1",
     tags=["API"],
-    dependencies=[Depends(verify_user)],
+    dependencies=[Depends(verify_user), Depends(verify_workspace_access)],
 )
 
 
