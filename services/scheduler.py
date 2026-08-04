@@ -68,6 +68,25 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
     logger.info("=" * 60)
 
     try:
+        # Read the workspace list, then let the connection go.
+        #
+        # This loop used to hold ONE session open across every workspace while
+        # each one published -- and publishing a Reel means uploading a video
+        # to Instagram and polling until it finishes, which takes minutes. The
+        # database connection sat idle throughout, and Neon closes idle
+        # connections. By the fifth workspace the session was dead:
+        #
+        #   InterfaceError: connection is closed
+        #     SELECT count("Audience".id) ... WHERE businessProfileId = ...
+        #
+        # Every workspace after that point failed on the dead session, every
+        # run, permanently. Two workspaces kept posting and five stopped, with
+        # the only difference being their position in the iteration -- which is
+        # exactly what it looked like from the dashboard: some businesses work
+        # and some never do.
+        #
+        # Each step now takes a connection only for as long as it is using one,
+        # and no connection is held across the publish.
         async with AsyncSessionLocal() as session:
             # Every workspace is eligible, not just those whose brand analysis
             # finished. Gating on brandAnalysisComplete meant a workspace whose
@@ -75,57 +94,60 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
             # was skipped forever with no error and no way to recover. Brand
             # analysis improves caption quality; it is not a precondition for
             # posting. Workspaces without it fall back to a brand template.
-            stmt = select(BusinessProfile)
-            profiles = (await session.execute(stmt)).scalars().all()
+            profiles = (await session.execute(select(BusinessProfile))).scalars().all()
+            workspaces = [
+                (p.id, p.name, p.postIntervalHours or 2, bool(p.brandAnalysisComplete))
+                for p in profiles
+            ]
 
-            if not profiles:
-                logger.info("[MARKETING LOOP] No workspaces found")
-                return
+        if not workspaces:
+            logger.info("[MARKETING LOOP] No workspaces found")
+            return
 
-            # Self-heal a missing brand profile rather than degrading forever.
-            # Onboarding builds one automatically, but if that attempt failed —
-            # a rate limit, a dropped task — the workspace previously stayed
-            # generic permanently and the only remedy was a manual button. The
-            # loop already runs every couple of hours, so it is the natural
-            # place to retry. Each attempt is isolated: a failure here must not
-            # stop the workspace from posting.
-            for profile in profiles:
-                if profile.brandAnalysisComplete:
-                    continue
-                try:
-                    from services.creative_service import generate_brand_context
-                    logger.info(f"[MARKETING LOOP] Building missing brand profile for {profile.name}")
-                    ctx = await generate_brand_context(profile)
-                    profile.industry = ctx["industry"]
-                    profile.targetAudience = ctx["targetAudience"]
-                    profile.toneOfVoice = ctx["toneOfVoice"]
-                    profile.contentPillars = ctx["contentPillars"]
-                    profile.suggestedHashtags = ctx["suggestedHashtags"]
-                    profile.brandColors = ctx["brandColors"]
-                    profile.brandAnalysisComplete = True
-                    await session.commit()
-                    logger.info(f"[MARKETING LOOP] Brand profile ready for {profile.name}")
-                except Exception as e:
-                    await session.rollback()
-                    logger.warning(
-                        f"[MARKETING LOOP] Brand profile for {profile.name} still unavailable "
-                        f"({e}); posting continues with fallback captions"
-                    )
+        for workspace_id, name, interval_hours, brand_ready in workspaces:
+            try:
+                # Self-heal a missing brand profile rather than degrading
+                # forever. Onboarding builds one automatically, but if that
+                # attempt failed the workspace previously stayed generic
+                # permanently. Isolated: a failure here must not stop the
+                # workspace from posting.
+                if not brand_ready:
+                    try:
+                        from services.creative_service import generate_brand_context
 
-            for profile in profiles:
-                try:
-                    # Check when this profile last posted
-                    last_post_stmt = (
+                        async with AsyncSessionLocal() as session:
+                            profile = await session.get(BusinessProfile, workspace_id)
+                            if profile is not None:
+                                logger.info(
+                                    f"[MARKETING LOOP] Building missing brand profile for {name}"
+                                )
+                                ctx = await generate_brand_context(profile)
+                                profile.industry = ctx["industry"]
+                                profile.targetAudience = ctx["targetAudience"]
+                                profile.toneOfVoice = ctx["toneOfVoice"]
+                                profile.contentPillars = ctx["contentPillars"]
+                                profile.suggestedHashtags = ctx["suggestedHashtags"]
+                                profile.brandColors = ctx["brandColors"]
+                                profile.brandAnalysisComplete = True
+                                await session.commit()
+                                logger.info(f"[MARKETING LOOP] Brand profile ready for {name}")
+                    except Exception as e:
+                        logger.warning(
+                            f"[MARKETING LOOP] Brand profile for {name} still unavailable "
+                            f"({e}); posting continues with fallback captions"
+                        )
+
+                # Due check and connection check, on their own short-lived
+                # connection.
+                async with AsyncSessionLocal() as session:
+                    last_post = (await session.execute(
                         select(SocialPost)
-                        .where(SocialPost.businessProfileId == profile.id)
+                        .where(SocialPost.businessProfileId == workspace_id)
                         .order_by(SocialPost.scheduledAt.desc())
                         .limit(1)
-                    )
-                    last_post = (await session.execute(last_post_stmt)).scalars().first()
+                    )).scalars().first()
 
                     now = utc_now()
-                    interval_hours = profile.postIntervalHours or 2
-
                     if last_post and last_post.scheduledAt:
                         last_at = last_post.scheduledAt
                         if last_at.tzinfo is None:
@@ -133,35 +155,43 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                         hours_since_last_post = (now - last_at).total_seconds() / 3600.0
                         if not is_post_due(hours_since_last_post, interval_hours):
                             logger.debug(
-                                f"[MARKETING LOOP] Skipping {profile.name} — "
-                                f"posted {hours_since_last_post:.1f}h ago (interval: {interval_hours}h)"
+                                f"[MARKETING LOOP] Skipping {name} — posted "
+                                f"{hours_since_last_post:.1f}h ago (interval: {interval_hours}h)"
                             )
                             continue
 
                     connection = (await session.execute(
-                        select(SocialConnection).where(
-                            SocialConnection.businessProfileId == profile.id
-                        ).limit(1)
+                        select(SocialConnection)
+                        .where(SocialConnection.businessProfileId == workspace_id)
+                        .limit(1)
                     )).scalars().first()
-                    if connection is None:
-                        logger.warning(
-                            f"[MARKETING LOOP] {profile.name} has no connected social "
-                            f"account, so there is nowhere to publish. Connect "
-                            f"Facebook or Instagram in Businesses -> Edit -> Social."
-                        )
-                        continue
 
-                    logger.info(f"[MARKETING LOOP] Processing workspace: {profile.name} ({profile.id})")
-
-                    # Try ARQ (Redis) first, fall back to inline
-                    enqueued = await _try_enqueue_arq(profile.id)
-                    if not enqueued:
-                        logger.info(f"[MARKETING LOOP] Running inline for {profile.name}")
-                        await _execute_inline(profile.id)
-
-                except Exception as workspace_err:
-                    logger.error(f"[MARKETING LOOP] Error processing {profile.id}: {workspace_err}")
+                if connection is None:
+                    logger.warning(
+                        f"[MARKETING LOOP] {name} has no connected social account, "
+                        f"so there is nowhere to publish. Connect Facebook or "
+                        f"Instagram in Businesses -> Edit -> Social."
+                    )
                     continue
+
+                logger.info(f"[MARKETING LOOP] Processing workspace: {name} ({workspace_id})")
+
+                # No session is open here. This is the slow part -- uploading a
+                # video to Instagram and waiting for it to process -- and it is
+                # precisely what killed the connection when one was held.
+                enqueued = await _try_enqueue_arq(workspace_id)
+                if not enqueued:
+                    logger.info(f"[MARKETING LOOP] Running inline for {name}")
+                    await _execute_inline(workspace_id)
+
+            except Exception as workspace_err:
+                # One workspace failing must never affect the next one. It used
+                # to, because they shared a connection.
+                logger.error(
+                    f"[MARKETING LOOP] Error processing {name} ({workspace_id}): "
+                    f"{workspace_err}"
+                )
+                continue
 
     except Exception as e:
         logger.error(f"[MARKETING LOOP] Loop exception: {e}")

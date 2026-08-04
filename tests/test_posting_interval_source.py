@@ -16,12 +16,21 @@ import pytest
 
 
 def test_the_scheduler_reads_the_profile():
-    """If this moves to MarketingState, the settings page becomes a lie again."""
+    """If this moves to MarketingState, the settings page becomes a lie again.
+
+    Matched on the attribute rather than a specific expression: the loop reads
+    it off a BusinessProfile row into a plain value now, so `postIntervalHours`
+    is what matters, not the name of the variable holding the row.
+    """
     import services.scheduler as sched
 
     src = inspect.getsource(sched.execute_marketing_loop)
-    assert "profile.postIntervalHours" in src, (
-        "the loop no longer reads the interval from the BusinessProfile"
+    assert "postIntervalHours" in src, (
+        "the loop no longer reads the posting interval at all"
+    )
+    assert "BusinessProfile" in src, (
+        "the interval must come from the BusinessProfile, which the settings "
+        "screen writes"
     )
     assert "MarketingState" not in src, (
         "the loop must not take the interval from the mirror copy"
