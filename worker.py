@@ -338,23 +338,38 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
 
             elif profile.businessModel == "AI Influencer":
                 # AI Influencer Flow: Use character chart/reference
+                #
+                # Same rule as the standard flow: a campaign is a base idea,
+                # not a precondition. A persona workspace built by importing a
+                # folder has media and no campaigns, and would otherwise stop
+                # dead exactly as the Social Page workspaces did.
                 campaign = await _get_next_campaign_for_workspace(session, profile)
-                if not campaign:
-                    logger.info(f"No active campaigns found for workspace {workspace_id}.")
-                    return "no_campaigns"
-                
-                logger.info(f"Selected campaign {campaign.id} for AI Influencer workspace {workspace_id}")
-                
                 media_obj = await _select_media_object_for_post(session, profile)
+                if not campaign and not media_obj and not getattr(profile, "influencerReferenceUrl", None):
+                    logger.info(
+                        f"Workspace {workspace_id} has no campaigns, no media and no "
+                        f"character reference, so there is nothing to publish."
+                    )
+                    return "no_campaigns"
+
+                if campaign:
+                    logger.info(f"Selected campaign {campaign.id} for AI Influencer workspace {workspace_id}")
+
                 media_url = media_obj.url if media_obj else None
                 if getattr(profile, "influencerReferenceUrl", None):
                     # If they have a reference URL, prioritize it if we don't have fresh media
                     if not media_url:
                         media_url = profile.influencerReferenceUrl
-                elif not media_url and campaign.mediaUrl:
+                elif not media_url and campaign and campaign.mediaUrl:
                     media_url = campaign.mediaUrl
-                    
+
                 media_urls = [media_url] if media_url else []
+
+                influencer_idea = (
+                    campaign.baseCaption if campaign
+                    else (media_obj.caption or media_obj.prompt if media_obj else None)
+                    or f"A moment in the life of {profile.name}"
+                )
 
                 char_reference = f"\nCHARACTER VISUAL REFERENCE URL: {profile.influencerReferenceUrl}" if getattr(profile, "influencerReferenceUrl", None) else ""
                 
@@ -364,7 +379,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     f"Persona Description: {profile.description or 'No description provided.'}\n"
                     f"Target Audience: {profile.targetAudience or 'General audience'}\n"
                     f"Content Pillars: {', '.join(profile.contentPillars or [])}\n"
-                    f"Base Idea: {campaign.baseCaption}\n"
+                    f"Base Idea: {influencer_idea}\n"
                     f"{char_reference}\n\n"
                     "Instructions: Write a highly authentic, first-person social media post. Focus on building parasocial connection with the audience.\n"
                     "1. Start with an engaging, conversational hook.\n"
@@ -372,23 +387,57 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     "3. End with a question or community-driven CTA to encourage comments and engagement.\n"
                     f"Include 3-5 hashtags naturally at the bottom from: {', '.join(profile.suggestedHashtags or ['#aiinfluencer', '#lifestyle'])}."
                 )
-                fallback_caption = campaign.baseCaption
-                campaign_id = campaign.id
+                fallback_caption = influencer_idea
+                campaign_id = campaign.id if campaign else None
 
             else:
-                # Standard Flow: Pick a campaign
+                # Standard Flow: a campaign if there is one, the catalog if not.
+                #
+                # A campaign contributes exactly two things here: a base idea
+                # for the caption prompt, and a fallback image when the catalog
+                # is empty. Neither is essential when the workspace has media.
+                #
+                # Requiring one silently stopped every Social Page workspace.
+                # Those are built by bulk-importing a folder, which never
+                # creates campaigns, so the task returned "no_campaigns" in
+                # seconds and wrote nothing -- no post, no error, and no
+                # advance to the last-posted time, so it repeated every cycle
+                # forever. Three businesses holding 5631 finished assets
+                # between them published nothing for hours while two others on
+                # the same loop posted normally. The only difference was
+                # whether a campaign row happened to exist.
                 campaign = await _get_next_campaign_for_workspace(session, profile)
-                if not campaign:
-                    logger.info(f"No active campaigns found for workspace {workspace_id}.")
+                media_obj = await _select_media_object_for_post(session, profile)
+
+                if not campaign and not media_obj:
+                    logger.info(
+                        f"Workspace {workspace_id} has no campaigns and no postable "
+                        f"media, so there is nothing to publish."
+                    )
                     return "no_campaigns"
 
-                logger.info(f"Selected campaign {campaign.id} for workspace {workspace_id}")
-
-                # 2. Select media from catalog (prefer unused AI-generated)
-                media_obj = await _select_media_object_for_post(session, profile)
                 media_url = media_obj.url if media_obj else None
-                if not media_url and campaign.mediaUrl:
-                    media_url = campaign.mediaUrl
+                if campaign:
+                    logger.info(f"Selected campaign {campaign.id} for workspace {workspace_id}")
+                    base_idea = campaign.baseCaption
+                    campaign_id = campaign.id
+                    if not media_url and campaign.mediaUrl:
+                        media_url = campaign.mediaUrl
+                else:
+                    # The asset's own description is a better base idea than a
+                    # campaign line anyway: it describes what is actually in
+                    # the picture, which is what the caption should talk about.
+                    base_idea = (
+                        media_obj.caption
+                        or media_obj.prompt
+                        or f"A post for {profile.name}"
+                    )
+                    campaign_id = None
+                    logger.info(
+                        f"No campaigns for workspace {workspace_id}; posting from "
+                        f"the media catalog using the asset's own description"
+                    )
+
                 media_urls = [media_url] if media_url else []
 
                 # 3. Generate fresh AI caption
@@ -398,7 +447,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     f"Target Audience: {profile.targetAudience or 'General audience'}\n"
                     f"Tone of Voice: {profile.toneOfVoice or 'Professional'}\n"
                     f"Content Pillars: {', '.join(profile.contentPillars or [])}\n"
-                    f"Base Idea: {campaign.baseCaption}\n\n"
+                    f"Base Idea: {base_idea}\n\n"
                     "Instructions: Write a high-converting social media post following the AIDA (Attention, Interest, Desire, Action) framework.\n"
                     "1. Start with a scroll-stopping hook.\n"
                     "2. Provide compelling value and build desire.\n"
@@ -406,8 +455,7 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     f"Include 3-5 relevant hashtags from: {', '.join(profile.suggestedHashtags or ['#business', '#growth'])}.\n"
                     "Make it sound natural, professional, and use emojis appropriately."
                 )
-                fallback_caption = campaign.baseCaption
-                campaign_id = campaign.id
+                fallback_caption = base_idea
 
             # Caption generation. The scheduled loop used to build its own
             # inline prompt from campaign.baseCaption, which meant unattended

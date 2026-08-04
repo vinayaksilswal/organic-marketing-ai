@@ -203,9 +203,11 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                     outcomes.append(f"{name}: ENQUEUED to arq (not run inline)")
                 else:
                     logger.info(f"[MARKETING LOOP] Running inline for {name}")
-                    await _execute_inline(workspace_id)
+                    result = await _execute_inline(workspace_id)
                     took = (utc_now() - started).total_seconds()
-                    outcomes.append(f"{name}: PUBLISHED inline in {took:.0f}s")
+                    # The task's own verdict, not an assumption that running it
+                    # meant something was published.
+                    outcomes.append(f"{name}: {result} ({took:.0f}s)")
 
             except Exception as workspace_err:
                 # One workspace failing must never affect the next one. It used
@@ -276,14 +278,23 @@ async def _try_enqueue_arq(workspace_id: str) -> bool:
         return False
 
 
-async def _execute_inline(workspace_id: str) -> None:
-    """Execute the marketing task inline (without ARQ worker)."""
+async def _execute_inline(workspace_id: str) -> str:
+    """Execute the marketing task inline (without ARQ worker).
+
+    Returns what the task reported. This used to be discarded, so a task that
+    returned "no_campaigns" in seconds without publishing anything was
+    indistinguishable from one that published -- and the cycle summary
+    confidently recorded "PUBLISHED" for three workspaces that had posted
+    nothing for hours.
+    """
     try:
         from worker import context_aggregation_task
         result = await context_aggregation_task({}, workspace_id)
         logger.info(f"[MARKETING LOOP] Inline execution result for {workspace_id}: {result}")
+        return str(result)
     except Exception as e:
         logger.error(f"[MARKETING LOOP] Inline execution failed for {workspace_id}: {e}")
+        return f"exception: {e}"
 
 
 # =============================================================================
