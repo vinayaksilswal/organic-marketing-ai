@@ -28,6 +28,7 @@ collision, which is the bug this module was written to fix.
 
 from __future__ import annotations
 
+import os
 import random
 from datetime import timezone
 from typing import Any, List, Optional
@@ -37,15 +38,43 @@ from sqlalchemy import select
 
 from database import Media, SocialPost
 
-# Nothing in the catalog should be excluded from rotation by a LIMIT — that is
-# how assets became permanently unreachable. This cap only exists so a runaway
-# catalog cannot exhaust memory, and it sits far above any real workspace.
-_MAX_CATALOG = 5000
+# The cap exists so a runaway catalog cannot exhaust a 512MB instance. It is
+# NOT a correctness boundary, and it used to behave like one: the query took
+# the OLDEST rows by createdAt, so a workspace past the cap could never select
+# anything uploaded afterwards. Silently. One workspace here holds 4,400 assets
+# and is still growing, so "far above any real workspace" had about six hundred
+# uploads left in it.
+#
+# Two changes make the cap safe rather than merely large. Only the columns
+# rotation actually needs are loaded, so a row costs a fraction of a full ORM
+# entity — Media carries a LargeBinary `data` column that was being fetched for
+# every candidate. And when a catalog does exceed the cap, the newest assets are
+# taken rather than the oldest, because those are the ones a user just uploaded
+# and is waiting to see published.
+_MAX_CATALOG = int(os.getenv("MEDIA_ROTATION_MAX_CATALOG", "20000"))
 
 # The window of history that defines "recently used". It has to comfortably
 # exceed the catalog size or the oldest usage falls off the end and an asset
 # looks never-used again.
 _MAX_HISTORY = 2000
+
+
+class _Candidate:
+    """A catalog row carrying only what rotation reads.
+
+    Rotation compares urls and timestamps; it never needs the caption, the
+    prompt, or the LargeBinary column. The winner is re-fetched in full.
+    """
+
+    __slots__ = ("id", "url", "isActive", "mimeType", "aiGenerated", "createdAt")
+
+    def __init__(self, id, url, isActive, mimeType, aiGenerated, createdAt):
+        self.id = id
+        self.url = url
+        self.isActive = isActive
+        self.mimeType = mimeType
+        self.aiGenerated = aiGenerated
+        self.createdAt = createdAt
 
 
 def _is_postable(media: Any) -> bool:
@@ -75,17 +104,37 @@ async def select_next_media(
     distinguish "empty catalog" from "nothing postable" themselves, since the
     two need different messages to the user.
     """
+    # Only the columns rotation needs. Selecting whole Media entities pulled the
+    # LargeBinary `data` column for every candidate in the workspace.
     catalog_stmt = (
-        select(Media)
+        select(
+            Media.id, Media.url, Media.isActive, Media.mimeType,
+            Media.aiGenerated, Media.createdAt,
+        )
         .where(Media.businessProfileId == workspace_id)
-        .order_by(Media.createdAt.asc())
+        # Newest first: if a catalog ever exceeds the cap, the assets that fall
+        # off the end should be the oldest, not the ones just uploaded.
+        .order_by(Media.createdAt.desc())
         .limit(_MAX_CATALOG)
     )
     catalog: List[Any] = [
-        m for m in (await session.execute(catalog_stmt)).scalars().all() if _is_postable(m)
+        _Candidate(*row) for row in (await session.execute(catalog_stmt)).all()
     ]
+    catalog = [c for c in catalog if _is_postable(c)]
     if not catalog:
         return None
+
+    total = len(catalog)
+    if total >= _MAX_CATALOG:
+        logger.warning(
+            f"Workspace {workspace_id} has at least {_MAX_CATALOG} assets, the "
+            f"rotation cap. The oldest beyond that are not being selected. "
+            f"Raise MEDIA_ROTATION_MAX_CATALOG."
+        )
+
+    # Rotation walks the catalog oldest-first once the never-used pool is
+    # exhausted, so restore that order after the newest-first fetch.
+    catalog.reverse()
 
     # When was each URL last published? mediaUrls is a JSON array, so this is
     # resolved in Python rather than SQL to stay portable across the JSON
@@ -128,7 +177,7 @@ async def select_next_media(
             f"Media rotation: {len(never_used)} of {len(catalog)} assets still "
             f"unpublished, selected {chosen.id} at random"
         )
-        return chosen
+        return await session.get(Media, chosen.id)
 
     # Full pass complete. The next pass starts from whatever has waited longest,
     # but "longest" is a band rather than a single row: picking strictly the
@@ -144,4 +193,4 @@ async def select_next_media(
         f"{chosen.id} at random from the {len(band)} most overdue "
         f"(last used {last_used[chosen.url].isoformat()})"
     )
-    return chosen
+    return await session.get(Media, chosen.id)

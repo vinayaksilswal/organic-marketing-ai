@@ -292,3 +292,56 @@ async def test_recycling_never_picks_something_just_posted(db_session):
     for _ in range(5):
         nxt = await select_next_media(db_session, WORKSPACE)
         assert nxt.url != most_recent, "recycled the asset posted most recently"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The cap must bound memory, not correctness
+#
+# It took the OLDEST rows by createdAt, so a workspace past the cap could never
+# select anything uploaded afterwards — silently. One real workspace holds 4,400
+# assets and is still growing.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_recent_uploads_are_reachable_past_the_cap(db_session, monkeypatch):
+    """The assets that fall off a too-large catalog must be the oldest ones,
+    never the ones a user just uploaded and is waiting to see published."""
+    import services.media_rotation as rot
+
+    await _seed(db_session, count=10)
+    monkeypatch.setattr(rot, "_MAX_CATALOG", 3)
+
+    # Newest three are media-7, -8, -9 (createdAt increases with the index).
+    seen = set()
+    when = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    for i in range(3):
+        chosen = await rot.select_next_media(db_session, WORKSPACE)
+        seen.add(chosen.id)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    assert seen == {"media-7", "media-8", "media-9"}, (
+        f"the cap selected {seen}; recent uploads are unreachable"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_full_media_row_is_returned(db_session):
+    """Rotation fetches light rows to keep memory down, but callers read the
+    caption to write the post — returning the stand-in would break them."""
+    from database import Media
+
+    await _seed(db_session, count=3)
+    chosen = await select_next_media(db_session, WORKSPACE)
+    assert isinstance(chosen, Media), f"got {type(chosen).__name__}, not a Media row"
+    assert hasattr(chosen, "caption")
+
+
+@pytest.mark.asyncio
+async def test_the_cap_is_configurable(db_session):
+    """A hard-coded ceiling is what made this a correctness bug. It has to be
+    raisable without a code change when a customer outgrows it."""
+    import services.media_rotation as rot
+
+    assert rot._MAX_CATALOG >= 20000, (
+        "the default cap is too low for a library-scale workspace"
+    )
