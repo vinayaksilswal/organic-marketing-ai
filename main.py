@@ -451,28 +451,14 @@ templates = Jinja2Templates(directory="templates")
 # =============================================================================
 from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, team, meta_oauth, billing, data_deletion  # noqa: E402
 from routers.auth import verify_user  # noqa: E402
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+from rate_limit import limiter  # noqa: E402
 # Prompt Engine router import
 from prompt_engine.router import router as prompt_engine_router  # noqa: E402
 
 
-def _get_rate_limit_key(request: Request) -> str:
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        try:
-            import jwt as pyjwt
-            payload = pyjwt.decode(auth_header.split(" ")[1], options={"verify_signature": False})
-            uid = payload.get("sub")
-            if uid:
-                return f"user:{uid}"
-        except Exception:
-            pass
-    return get_remote_address(request)
-
-
-limiter = Limiter(key_func=_get_rate_limit_key, default_limits=["200/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

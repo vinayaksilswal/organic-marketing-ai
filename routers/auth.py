@@ -9,6 +9,7 @@ Handles admin login (cookie-based JWT) and user API authentication
 
 from __future__ import annotations
 
+import asyncio
 import re
 import secrets
 from datetime import timedelta
@@ -26,6 +27,7 @@ from sqlalchemy import select
 from auth import create_access_token
 from config import settings
 from database import AsyncSessionLocal, User
+from rate_limit import limiter
 
 router = APIRouter(tags=["Authentication"])
 templates = Jinja2Templates(directory="templates")
@@ -288,43 +290,109 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+def password_fingerprint(password_hash: str) -> str:
+    """A short digest of the stored password hash.
+
+    Carried inside the reset token and re-checked when the token is redeemed.
+    Because a bcrypt hash changes every time the password is set, this makes a
+    reset link single-use and kills every other outstanding link at the same
+    moment: the fingerprint no longer matches what is in the database.
+
+    Without it the token was a bearer credential valid for a full hour and
+    replayable for the whole of it. A reset email sitting in a mailbox someone
+    else can read could be used again after the owner had already recovered
+    their account -- which is the exact scenario a password reset exists to
+    close.
+    """
+    import hashlib
+
+    return hashlib.sha256((password_hash or "").encode("utf-8")).hexdigest()[:16]
+
+
+async def _send_reset_email(to_email: str, reset_link: str) -> bool:
+    """Send the reset email. Returns whether it actually went out.
+
+    The Resend SDK is synchronous. Called directly from an async endpoint it
+    blocks the event loop for the duration of an outbound HTTPS request, and
+    this service runs a single uvicorn worker -- so one slow send stalls every
+    other request in flight. Same class of fault as the ffmpeg call that
+    froze the server, and the same fix.
+    """
+    from loguru import logger
+
+    if not settings.resend_api_key:
+        # Previously this fell through and the endpoint still answered "a reset
+        # link has been sent". The user waited for an email that was never
+        # attempted, with nothing in the logs to say so.
+        logger.error(
+            "Password reset requested but RESEND_API_KEY is not configured. "
+            "No email was sent, and the caller was told one was. Set the key "
+            "in the environment or password recovery does not exist."
+        )
+        return False
+
+    def _send() -> None:
+        import resend
+
+        resend.api_key = settings.resend_api_key
+        resend.Emails.send({
+            "from": f"OrganicAI <noreply@{settings.resend_from_domain or 'organicai.pro'}>",
+            "to": [to_email],
+            "subject": "Reset your OrganicAI password",
+            "html": (
+                f"<p>You requested a password reset.</p>"
+                f'<p><a href="{reset_link}">Click here to reset your password</a></p>'
+                f"<p>This link expires in 1 hour and can only be used once. "
+                f"If you didn't request this, you can ignore this email.</p>"
+            ),
+        })
+
+    try:
+        await asyncio.to_thread(_send)
+        logger.info(f"Password reset email sent to {to_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send reset email to {to_email}: {e}")
+        return False
+
+
 @router.post("/api/v1/auth/forgot-password")
-async def forgot_password(data: ForgotPasswordRequest):
-    """Send a password reset email with a time-limited token."""
+@limiter.limit("5/hour")
+async def forgot_password(request: Request, data: ForgotPasswordRequest):
+    """Send a password reset email with a single-use, time-limited token.
+
+    Rate limited hard. The global default of 200/minute is right for ordinary
+    API traffic and badly wrong here: this endpoint sends mail to an address
+    the caller supplies, so an unthrottled one is a way to flood somebody
+    else's inbox and burn the sending quota at the same time.
+    """
     async with AsyncSessionLocal() as session:
         stmt = select(User).where(User.email == data.email)
         user = (await session.execute(stmt)).scalar_one_or_none()
 
+    # The same answer either way, so the endpoint cannot be used to find out
+    # which email addresses have accounts.
+    neutral = {
+        "success": True,
+        "message": "If that email exists, a reset link has been sent.",
+    }
     if not user:
-        return {"success": True, "message": "If that email exists, a reset link has been sent."}
+        return neutral
 
     reset_token = create_access_token(
-        data={"sub": user.id, "type": "password_reset"},
+        data={
+            "sub": user.id,
+            "type": "password_reset",
+            "pw": password_fingerprint(user.password),
+        },
         expires_delta=timedelta(hours=1),
     )
 
     frontend_url = settings.allowed_origins[0] if settings.allowed_origins else "https://organic-marketing-ai.vercel.app"
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
-    try:
-        import resend
-        resend.api_key = settings.resend_api_key
-        if settings.resend_api_key:
-            resend.Emails.send({
-                "from": f"OrganicAI <noreply@{settings.resend_from_domain or 'organicai.pro'}>",
-                "to": [data.email],
-                "subject": "Reset your OrganicAI password",
-                "html": (
-                    f"<p>You requested a password reset.</p>"
-                    f'<p><a href="{reset_link}">Click here to reset your password</a></p>'
-                    f"<p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>"
-                ),
-            })
-    except Exception as e:
-        from loguru import logger
-        logger.error(f"Failed to send reset email: {e}")
-
-    return {"success": True, "message": "If that email exists, a reset link has been sent."}
+    await _send_reset_email(data.email, reset_link)
+    return neutral
 
 
 @router.post("/api/v1/auth/reset-password")
@@ -347,8 +415,22 @@ async def reset_password(data: ResetPasswordRequest):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # The token carries a digest of the password hash it was issued
+        # against. If the password has changed since -- because this link was
+        # already used, or a newer link was -- the digest no longer matches and
+        # the link is spent. This is what makes a reset single-use.
+        issued_for = payload.get("pw")
+        if issued_for and issued_for != password_fingerprint(user.password):
+            raise HTTPException(
+                status_code=400,
+                detail="This reset link has already been used. Request a new one.",
+            )
+
         user.password = bcrypt.hashpw(data.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         await session.commit()
+
+        from loguru import logger
+        logger.info(f"Password reset completed for user {user.id}")
 
     return {"success": True, "message": "Password has been reset successfully"}
 
