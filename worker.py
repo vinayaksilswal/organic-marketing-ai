@@ -489,6 +489,31 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             fb_post_id = None
             ig_post_id = None
 
+            # The plan is checked HERE, at the only point where the automation
+            # actually publishes on someone's behalf.
+            #
+            # Manual posting through the API has always been metered. This path
+            # never was -- so the free tier advertised "5 published posts a
+            # month" while the scheduler published every one to four hours,
+            # indefinitely, unmetered. The single capability the subscription
+            # exists to sell was the only one given away without limit, which
+            # leaves no reason to ever upgrade.
+            #
+            # Over quota is not an error: the workspace is working exactly as
+            # its plan describes. It records a DRAFT the operator can publish
+            # by hand and returns a status the cycle summary reports plainly.
+            if auto_approve:
+                from services import billing_service as billing
+
+                allowed, why = await billing.check_quota(profile.userId, "posts")
+                if not allowed:
+                    logger.info(
+                        f"Workspace {workspace_id} is over its plan's posting "
+                        f"limit; drafting instead of publishing. {why}"
+                    )
+                    auto_approve = False
+                    errors.append(f"Plan limit: {why}")
+
             if auto_approve:
                 # Facebook
                 try:
@@ -561,6 +586,14 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             if auto_approve:
                 is_success = fb_post_id is not None or ig_post_id is not None
                 status = "POSTED" if is_success else "FAILED"
+                if is_success:
+                    # One published post, however many platforms carried it.
+                    # Counted only on success, so a failed attempt does not
+                    # consume someone's allowance.
+                    try:
+                        await billing.record_usage(profile.userId, "posts")
+                    except Exception as e:
+                        logger.warning(f"Could not record post usage: {e}")
             else:
                 is_success = True
                 status = "DRAFT"
