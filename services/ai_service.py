@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Any
+from typing import Any, Optional
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import httpx
@@ -565,19 +565,41 @@ Return a JSON object with:
 # =============================================================================
 # generate_campaign_variation() — AI Rewrite for Social Campaigns
 # =============================================================================
-async def generate_campaign_variation(base_caption: str) -> str:
-    """
-    Generate a unique variation of a base campaign caption.
-    """
-    prompt = f"""Rewrite the following base social media caption to create a highly engaging, professional yet energetic variation for an enterprise B2B audience.
-The goal is to drive organic engagement, establish authority, and compel users to click the link.
-Use modern formatting, targeted high-value hashtags, and strategic emojis.
-Appened this link at the end of the post (it includes UTM tracking): https://organicmarketing.ai/?utm_source=auto_social&utm_medium=organic&utm_campaign=ai_loop
+async def generate_campaign_variation(
+    base_caption: str, link: Optional[str] = None
+) -> str:
+    """Write the caption for a post.
 
-Base Caption:
+    Two things used to be hardcoded here, and both were wrong the moment this
+    platform had a customer other than us.
+
+    It instructed the model to write "for an enterprise B2B audience" on every
+    caption for every workspace -- overriding the audience the caller had just
+    spent a long prompt describing. A luxury lifestyle page and an AI art page
+    both came out sounding like a SaaS landing page.
+
+    Worse, it appended https://organicmarketing.ai to the end of every post.
+    That is our marketing link in a paying customer's Instagram caption,
+    advertising us on their account instead of their own site. Charging someone
+    $17 a month and then using their audience as our billboard is not a feature.
+
+    `link` is now supplied by the caller, which passes the workspace's own
+    website or nothing at all. Social pages generally have no website, and a
+    caption with no link outperforms one carrying an irrelevant commercial URL.
+    """
+    link_line = (
+        f"End the post with this link on its own line: {link}\n" if link else
+        "Do not include any URL or link in the post.\n"
+    )
+    prompt = f"""Rewrite the following brief into a finished social media caption.
+Follow the audience, tone and content pillars given in the brief exactly -- they
+describe this specific account and are not interchangeable with any other.
+Use modern formatting, relevant hashtags and emojis where they suit the tone.
+{link_line}
+Brief:
 {base_caption}
 
-Return ONLY the new caption text. No intro, no quotes around it."""
+Return ONLY the caption text. No intro, no commentary, no quotes around it."""
 
     text = await _call_openrouter(prompt)
     return text if text and len(text) > 10 else base_caption
