@@ -89,7 +89,17 @@ async def build(profile: Any, image_url: str = "") -> Optional[Dict[str, Any]]:
     scraped = ""
     if website:
         try:
-            scraped = await scrape_product_url(website)
+            raw = await scrape_product_url(website)
+            # Whoever controls that page controls these bytes, and the model
+            # reading them cannot tell an instruction from a description.
+            # Fenced with a per-call nonce so an imperative inside it reads as
+            # content rather than as a turn in the conversation.
+            if raw:
+                from services.untrusted_text import guarded_block
+
+                scraped = guarded_block(
+                    raw, label="website_content", source=website
+                )
         except Exception as e:
             # Thin or missing website content is expected and handled by the
             # synthesis prompt's Tier 3 rules, so this is not fatal.
