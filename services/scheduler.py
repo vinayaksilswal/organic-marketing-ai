@@ -134,7 +134,8 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
             # posting. Workspaces without it fall back to a brand template.
             profiles = (await session.execute(select(BusinessProfile))).scalars().all()
             workspaces = [
-                (p.id, p.name, p.postIntervalHours or 2, bool(p.brandAnalysisComplete))
+                (p.id, p.name, p.postIntervalHours or 2,
+                 bool(p.brandAnalysisComplete), p.userId)
                 for p in profiles
             ]
 
@@ -150,7 +151,7 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
         # here. This records the answer instead.
         outcomes: list = []
 
-        for workspace_id, name, interval_hours, brand_ready in workspaces:
+        for workspace_id, name, interval_hours, brand_ready, owner_id in workspaces:
             try:
                 # Self-heal a missing brand profile rather than degrading
                 # forever. Onboarding builds one automatically, but if that
@@ -212,7 +213,17 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
 
                     # The interval said it is time. This asks whether going
                     # ahead would make the account look automated.
-                    published_today = await posts_in_last_24h(session, workspace_id)
+                    # An unlimited account has accepted the trade knowingly:
+                    # enterprise is granted, not bought, and the operator's own
+                    # workspaces are the ones whose cadence they own outright.
+                    # The rail protects customers who did not choose it.
+                    from services import billing_service as _billing
+
+                    unlimited = await _billing._is_unlimited(owner_id)
+
+                    published_today = 0 if unlimited else await posts_in_last_24h(
+                        session, workspace_id
+                    )
                     if published_today >= MAX_POSTS_PER_DAY:
                         logger.warning(
                             f"[MARKETING LOOP] {name} has published "

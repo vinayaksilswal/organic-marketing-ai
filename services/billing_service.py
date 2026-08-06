@@ -433,7 +433,15 @@ async def _is_unlimited(user_id: str) -> bool:
     try:
         async with AsyncSessionLocal() as session:
             user = await session.get(User, user_id)
-            return bool(user and getattr(user, "isSuperAdmin", False))
+            if user and getattr(user, "isSuperAdmin", False):
+                return True
+
+        # Enterprise is a granted plan whose every limit is null. Reading the
+        # plan rather than the flag means an account can be made unlimited by
+        # assignment, without also handing it super-admin over other tenants --
+        # those are different powers and were the same switch.
+        plan = plan_for(await active_plan_code(user_id))
+        return all(v is None for v in plan.get("limits", {}).values())
     except Exception as e:
         # Metering must not be the thing that takes the product down. A failed
         # lookup falls through to the normal plan check rather than raising.
