@@ -277,10 +277,26 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
         await _record_cycle(outcomes, cycle_started)
 
     except Exception as e:
-        logger.error(f"[MARKETING LOOP] Loop exception: {e}")
+        # str(e) is empty for a whole family of exceptions -- asyncpg's, most
+        # timeouts, anything raised bare. Two cycles aborted an hour apart and
+        # recorded "LOOP ABORTED:" with nothing after the colon, which is a
+        # log line that costs time and returns none of it. The type is what
+        # identifies the fault; the message is a bonus.
+        import traceback
+
+        detail = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
+        logger.error(f"[MARKETING LOOP] Loop exception: {detail}\n{traceback.format_exc()}")
         try:
+            # The last frame says which line gave up, which is the difference
+            # between "something failed" and a place to look.
+            frames = traceback.extract_tb(e.__traceback__)
+            where = ""
+            if frames:
+                last = frames[-1]
+                where = f" at {last.filename.rsplit('/', 1)[-1]}:{last.lineno} in {last.name}"
             await _record_cycle(
-                (outcomes if "outcomes" in dir() else []) + [f"LOOP ABORTED: {e}"],
+                (outcomes if "outcomes" in dir() else [])
+                + [f"LOOP ABORTED: {detail}{where}"],
                 cycle_started,
             )
         except Exception:

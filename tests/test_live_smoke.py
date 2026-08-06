@@ -23,7 +23,11 @@ import os
 import httpx
 import pytest
 
-BASE_URL = os.getenv("LIVE_BASE_URL", "https://organic-marketing-ai1.onrender.com")
+# The default follows the service that is actually deployed. The previous
+# host stopped serving after a migration and every endpoint on it returns 503,
+# so a suite defaulting there fails 91 checks for a reason that has nothing to
+# do with the code under test.
+BASE_URL = os.getenv("LIVE_BASE_URL", "https://organic-marketing-ai-0abh.onrender.com")
 TOKEN = os.getenv("LIVE_TEST_TOKEN")
 FRONTEND_ORIGIN = "https://organic-marketing-ai.vercel.app"
 
