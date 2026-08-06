@@ -485,6 +485,27 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             # Backstop the no-links rule even on the fallback paths.
             final_caption = _strip_urls(final_caption) or fallback_caption
 
+            # Last gate before anything reaches a public account. Seventy-eight
+            # captions went out declaring these pages as adult content in
+            # plain text; Meta acts on caption text alone, and the app's
+            # standing is shared by every workspace publishing through it.
+            from services.caption_policy import enforce as enforce_caption_policy
+
+            asset_description = (
+                (media_obj.caption or media_obj.prompt or "") if media_obj else ""
+            )
+            final_caption, violations = enforce_caption_policy(
+                final_caption, asset_description, workspace=profile.name
+            )
+            if violations and not final_caption:
+                # Nothing safe to say about this asset. One empty slot in a
+                # schedule is cheaper than one actioned app.
+                logger.error(
+                    f"Skipping post for {profile.name}: caption and asset "
+                    f"description both contain {violations}"
+                )
+                return "blocked_by_caption_policy"
+
             # 4. Post to all platforms
             fb_post_id = None
             ig_post_id = None
