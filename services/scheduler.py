@@ -21,7 +21,7 @@ Falls back to inline execution if Redis/ARQ is unavailable.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -41,6 +41,43 @@ from database import (
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# A ceiling on autonomous posting, per workspace, per rolling 24 hours.
+#
+# The posting interval is the customer's setting; this is a safety rail on top
+# of it, and it exists to protect something the customer does not own -- the
+# standing of the Meta app every customer publishes through.
+#
+# Meta scores an app on the aggregate behaviour of the accounts authorised to
+# it. If a meaningful share of those accounts are flagged as spam, the app's
+# API access is throttled, its permissions cut, or the app removed. That is not
+# one customer losing reach; it is every customer losing the ability to publish
+# at all, and the product with them.
+#
+# An hourly interval is 24 posts a day. No authentic business account posts
+# hourly, and the platform will read it as automated flooding whether the post
+# arrives through the API or the app. The interval setting alone could not
+# express that risk, because a customer choosing "every 1 hour" is choosing a
+# cadence, not accepting a ban.
+#
+# Eight is deliberately above what any real business needs and well beneath
+# what looks automated. Raise it with SOCIAL_MAX_POSTS_PER_DAY if a specific
+# account has the engagement to carry more.
+MAX_POSTS_PER_DAY = int(os.getenv("SOCIAL_MAX_POSTS_PER_DAY", "8"))
+
+
+async def posts_in_last_24h(session, workspace_id: str) -> int:
+    """How many posts this workspace has published in the last rolling day."""
+    from sqlalchemy import func
+
+    since = utc_now() - timedelta(hours=24)
+    return (await session.execute(
+        select(func.count(SocialPost.id)).where(
+            SocialPost.businessProfileId == workspace_id,
+            SocialPost.scheduledAt >= since.replace(tzinfo=None),
+        )
+    )).scalar() or 0
 
 
 # =============================================================================
@@ -172,6 +209,24 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                                 f"of {interval_hours}h)"
                             )
                             continue
+
+                    # The interval said it is time. This asks whether going
+                    # ahead would make the account look automated.
+                    published_today = await posts_in_last_24h(session, workspace_id)
+                    if published_today >= MAX_POSTS_PER_DAY:
+                        logger.warning(
+                            f"[MARKETING LOOP] {name} has published "
+                            f"{published_today} times in 24h, at the safety "
+                            f"ceiling of {MAX_POSTS_PER_DAY}. Holding until the "
+                            f"window clears. A {interval_hours}h interval asks "
+                            f"for {24 // max(interval_hours, 1)} posts a day, "
+                            f"which reads as spam and risks the app's standing "
+                            f"for every workspace on it."
+                        )
+                        outcomes.append(
+                            f"{name}: daily cap ({published_today}/{MAX_POSTS_PER_DAY})"
+                        )
+                        continue
 
                     connection = (await session.execute(
                         select(SocialConnection)
