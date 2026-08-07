@@ -14,7 +14,12 @@ export const authFetch = async (url, options = {}, token, onLogout) => {
   };
 
   try {
-    const res = await fetch(url, { ...options, headers });
+    // A caller passing an empty X-Workspace-Id is saying "this request is not
+  // about one workspace". Send no header at all rather than an empty one,
+  // which the server would try to resolve and refuse.
+  if (headers['X-Workspace-Id'] === '') delete headers['X-Workspace-Id'];
+
+  const res = await fetch(url, { ...options, headers });
 
     if (res.status === 401) {
       if (onLogout) onLogout();

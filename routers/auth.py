@@ -106,6 +106,23 @@ def get_workspace_id(request: Request) -> Optional[str]:
     return request.headers.get("X-Workspace-Id")
 
 
+# Paths whose answer depends on the authenticated user and not on the
+# X-Workspace-Id header. Each one already filters by user_id in its own
+# handler; listing them here only stops a stale header from locking a client
+# out of the calls it needs to recover.
+#
+# Kept as an explicit set rather than a prefix match: "/api/v1/businesses" is
+# user-scoped, but "/api/v1/businesses/{id}" acts on one workspace and must
+# stay guarded.
+_USER_SCOPED_PATHS = {
+    "/api/v1/businesses",          # list mine, and create a new one
+    "/api/v1/users/me",            # who am I
+    "/api/v1/billing/me",          # my plan and usage
+    "/api/v1/billing/plans",
+    "/api/v1/team",                # my invitations across workspaces
+}
+
+
 async def verify_workspace_access(
     request: Request, user_id: str = Depends(verify_user)
 ) -> Optional[str]:
@@ -127,6 +144,22 @@ async def verify_workspace_access(
     Access means: the workspace is yours, you are an accepted team member of
     it, or you are a superadmin.
     """
+    # Endpoints that answer "what do I have access to", not "act on this
+    # workspace". They filter by the authenticated user themselves and never
+    # read the header, so enforcing it here is not security, it is a deadlock:
+    #
+    # The client stores the active workspace in localStorage and attaches it to
+    # every request. When a second user signs in on the same browser they
+    # inherit the previous user's workspace id -- so listing their own
+    # workspaces was refused, which is the one call that would have corrected
+    # the stale value. The dashboard 404'd on every request, permanently, and
+    # the only escape was clearing site data. Creating a business had the same
+    # shape from the other end: a new account has no workspace, so requiring
+    # one in order to make one is circular.
+    path = request.url.path.rstrip("/")
+    if path in _USER_SCOPED_PATHS:
+        return None
+
     workspace_id = request.headers.get("x-workspace-id") or request.headers.get(
         "X-Workspace-Id"
     )
