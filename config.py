@@ -37,7 +37,18 @@ class Settings(BaseSettings):
         "https://www.organicai.pro"
     ]
     # Public origin of this API — used to build OAuth redirect URIs
-    backend_public_url: str = "https://organic-marketing-ai1.onrender.com"
+    # The host Meta redirects back to after OAuth, and the base for the data
+    # deletion callback. It has to be the service that is actually serving:
+    # after a migration the previous host was suspended, and every customer
+    # clicking "Connect Facebook" was sent to a page reading "This service has
+    # been suspended by its owner" -- with a valid authorisation code in the
+    # URL that nothing was left alive to exchange.
+    #
+    # This default only applies when BACKEND_PUBLIC_URL is unset. Set it
+    # explicitly in the environment; a default that silently points at the
+    # wrong deployment breaks account connection without breaking anything a
+    # health check would notice.
+    backend_public_url: str = "https://organic-marketing-ai-0abh.onrender.com"
     # Where OAuth flows send the browser back to
     frontend_url: str = "https://organic-marketing-ai.vercel.app"
 
