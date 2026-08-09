@@ -92,11 +92,45 @@ def _is_postable(media: Any) -> bool:
     return mime.startswith("image/") or mime.startswith("video/")
 
 
+def _kind_of(media: Any) -> str:
+    """"video" or "image"."""
+    return "video" if (getattr(media, "mimeType", "") or "").startswith("video/") else "image"
+
+
+async def last_posted_kind(session: Any, workspace_id: str) -> Optional[str]:
+    """What the most recent post carried, or None if nothing has gone out.
+
+    Read from the post history rather than stored on the workspace: the
+    history is already the source of truth for rotation, and a second copy of
+    the same fact is a second thing that can disagree with it.
+    """
+    last = (await session.execute(
+        select(SocialPost)
+        .where(
+            SocialPost.businessProfileId == workspace_id,
+            SocialPost.mediaUrls.isnot(None),
+        )
+        .order_by(SocialPost.createdAt.desc())
+        .limit(1)
+    )).scalars().first()
+    if not last or not last.mediaUrls:
+        return None
+
+    media = (await session.execute(
+        select(Media).where(
+            Media.businessProfileId == workspace_id,
+            Media.url == last.mediaUrls[0],
+        ).limit(1)
+    )).scalars().first()
+    return _kind_of(media) if media else None
+
+
 async def select_next_media(
     session: Any,
     workspace_id: str,
     *,
     prefer_ai_generated: bool = False,
+    alternate_kinds: bool = True,
 ) -> Optional[Any]:
     """Return the media row that has gone longest without being published.
 
@@ -164,6 +198,28 @@ async def select_next_media(
     never_used = [m for m in catalog if m.url not in last_used]
     if never_used:
         pool = never_used
+
+        # Alternate video and image so a feed does not run in blocks of one
+        # kind. Applied only when the other kind still has something
+        # unpublished: two of these workspaces hold 9 and 35 videos against
+        # 4,398 and 938 images, and at an hourly interval strict alternation
+        # would exhaust nine videos inside a day and then republish the same
+        # nine every other post. Preferring a kind must never override the
+        # guarantee that nothing repeats while anything is still unused.
+        if alternate_kinds:
+            previous = await last_posted_kind(session, workspace_id)
+            if previous:
+                wanted = "image" if previous == "video" else "video"
+                other = [m for m in pool if _kind_of(m) == wanted]
+                if other:
+                    pool = other
+                else:
+                    logger.info(
+                        f"Media rotation: no unpublished {wanted} left for "
+                        f"{workspace_id}; staying on {previous} rather than "
+                        f"repeating one"
+                    )
+
         if prefer_ai_generated:
             # Only narrows within assets that are already unpublished, so a
             # preference can never resurrect an asset the rotation has covered.

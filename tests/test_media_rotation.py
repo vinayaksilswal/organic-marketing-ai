@@ -345,3 +345,90 @@ async def test_the_cap_is_configurable(db_session):
     assert rot._MAX_CATALOG >= 20000, (
         "the default cap is too low for a library-scale workspace"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Alternating video and image
+#
+# Two workspaces hold 9 and 35 videos against 4,398 and 938 images. At an
+# hourly interval, strict alternation asks for 12 videos a day -- so nine are
+# exhausted inside a day and then republished every other post. Preferring a
+# kind must never override the guarantee that nothing repeats while anything
+# is still unused.
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _seed_mixed(session, *, videos, images):
+    session.add(BusinessProfile(id=WORKSPACE, userId=USER, name="Mixed"))
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    i = 0
+    for kind, count, mime in (("vid", videos, "video/mp4"), ("img", images, "image/jpeg")):
+        for n in range(count):
+            session.add(Media(
+                id=f"{kind}-{n}", userId=USER, businessProfileId=WORKSPACE,
+                filename=f"{kind}-{n}", mimeType=mime,
+                url=f"https://cdn.example.com/{kind}-{n}",
+                isActive=True, aiGenerated=True,
+                createdAt=base + timedelta(hours=i),
+            ))
+            i += 1
+    await session.commit()
+
+
+def _kind(media):
+    return "video" if (media.mimeType or "").startswith("video/") else "image"
+
+
+@pytest.mark.asyncio
+async def test_posts_alternate_between_video_and_image(db_session):
+    await _seed_mixed(db_session, videos=6, images=6)
+
+    when = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    kinds = []
+    for i in range(6):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        kinds.append(_kind(chosen))
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    # After the first, every pick is the opposite of the one before it.
+    for a, b in zip(kinds, kinds[1:]):
+        assert a != b, f"two of the same kind in a row: {kinds}"
+
+
+@pytest.mark.asyncio
+async def test_it_falls_back_rather_than_repeating_a_scarce_kind(db_session):
+    """HollyVerse in miniature: far more images than videos. Once the videos
+    are used, alternation must yield to the no-repeat guarantee."""
+    await _seed_mixed(db_session, videos=2, images=10)
+
+    when = datetime(2026, 4, 1, tzinfo=timezone.utc)
+    seen = []
+    for i in range(10):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        seen.append(chosen.id)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    assert len(set(seen)) == 10, f"an asset repeated while others were unused: {seen}"
+    assert sum(1 for x in seen if x.startswith("vid")) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_single_kind_catalog_is_unaffected(db_session):
+    """Billionaire Goal777 is 251 videos and no images. Alternation must not
+    stall a workspace that has only one kind to give."""
+    await _seed_mixed(db_session, videos=5, images=0)
+
+    when = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    seen = []
+    for i in range(5):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        assert chosen is not None
+        seen.append(chosen.id)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+    assert len(set(seen)) == 5
+
+
+@pytest.mark.asyncio
+async def test_alternation_can_be_turned_off(db_session):
+    await _seed_mixed(db_session, videos=3, images=3)
+    chosen = await select_next_media(db_session, WORKSPACE, alternate_kinds=False)
+    assert chosen is not None
