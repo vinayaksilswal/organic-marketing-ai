@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
-import {
-  Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2,
-  Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter,
-  Save, Edit3, Zap, Clock, Bot, Trash2, AlertTriangle, Unplug
-} from 'lucide-react';
+import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter, Save, Edit3, Zap, Clock, Bot, Trash2, AlertTriangle, Unplug, Pause, Play } from 'lucide-react';
 
 const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [isCreating, setIsCreating] = useState(false);
@@ -161,6 +157,33 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
       showToast(err.message, true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Pausing holds the automation without destroying anything. The
+  // alternatives a user would otherwise reach for all lose something:
+  // disconnecting the social account drops the token, deleting the workspace
+  // drops the catalog, and a 24-hour interval still posts.
+  const [pausing, setPausing] = useState(null);
+
+  const toggleAutomation = async (bp) => {
+    const next = !bp.automationPaused;
+    setPausing(bp.id);
+    try {
+      const res = await authFetch(
+        `${API_BASE}/businesses/${bp.id}`,
+        { method: 'PATCH', body: JSON.stringify({ automationPaused: next }) },
+        token
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast(next
+        ? `${bp.name} paused — no posts until you resume`
+        : `${bp.name} resumed — posting on its usual schedule`);
+      await refreshWorkspaces();
+    } catch (err) {
+      showToast(`Could not ${next ? 'pause' : 'resume'} ${bp.name}`, 'error');
+    } finally {
+      setPausing(null);
     }
   };
 
@@ -333,10 +356,38 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     )}
                   </div>
 
+                  {bp.automationPaused && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: 6,
+                      background: 'rgba(234,179,8,0.12)', color: '#facc15',
+                      border: '1px solid rgba(234,179,8,0.3)',
+                    }}>
+                      <Pause size={12} /> Automation paused — nothing is being posted
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
                     <button className={`btn ${isActive ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1, fontSize: '0.85rem', padding: '0.55rem' }}
                       onClick={() => { setActiveWorkspace(bp.id); showToast(`Switched to ${bp.name}`); }}>
                       {isActive ? 'Active' : 'Switch'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      title={bp.automationPaused
+                        ? 'Resume automatic posting for this business'
+                        : 'Hold all automatic posting for this business'}
+                      style={{
+                        padding: '0.55rem 0.85rem', fontSize: '0.85rem',
+                        display: 'flex', alignItems: 'center', gap: '0.35rem',
+                        color: bp.automationPaused ? '#4ade80' : '#facc15',
+                      }}
+                      disabled={pausing === bp.id}
+                      onClick={() => toggleAutomation(bp)}>
+                      {pausing === bp.id
+                        ? <span className="spinner" style={{ width: 14, height: 14 }} />
+                        : bp.automationPaused ? <Play size={14} /> : <Pause size={14} />}
+                      {bp.automationPaused ? 'Resume' : 'Pause'}
                     </button>
                     <button className="btn btn-secondary" style={{ padding: '0.55rem 0.85rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                       onClick={() => openEditModal(bp)}>

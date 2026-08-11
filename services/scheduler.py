@@ -135,7 +135,8 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
             profiles = (await session.execute(select(BusinessProfile))).scalars().all()
             workspaces = [
                 (p.id, p.name, p.postIntervalHours or 2,
-                 bool(p.brandAnalysisComplete), p.userId)
+                 bool(p.brandAnalysisComplete), p.userId,
+                 bool(getattr(p, "automationPaused", False)))
                 for p in profiles
             ]
 
@@ -151,8 +152,15 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
         # here. This records the answer instead.
         outcomes: list = []
 
-        for workspace_id, name, interval_hours, brand_ready, owner_id in workspaces:
+        for workspace_id, name, interval_hours, brand_ready, owner_id, paused in workspaces:
             try:
+                # Checked before anything else, including the brand backfill:
+                # a paused workspace should consume no LLM calls either.
+                if paused:
+                    logger.info(f"[MARKETING LOOP] {name} is paused by its owner")
+                    outcomes.append(f"{name}: paused")
+                    continue
+
                 # Self-heal a missing brand profile rather than degrading
                 # forever. Onboarding builds one automatically, but if that
                 # attempt failed the workspace previously stayed generic

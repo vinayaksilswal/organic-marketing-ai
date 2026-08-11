@@ -98,6 +98,15 @@ class BusinessProfile(Base):
     productCatalogUrl = Column(String, nullable=True)
     influencerReferenceUrl = Column(String, nullable=True)
     postIntervalHours = Column(Integer, default=2, nullable=False)
+    # Stops the automation for this workspace without deleting anything.
+    #
+    # A customer needs a way to hold posting during a rebrand, an incident, or
+    # a holiday, and the alternatives are all destructive: disconnecting the
+    # social account loses the token, deleting the workspace loses the
+    # catalog, and setting a 24-hour interval still posts. Non-null with a
+    # default so an existing workspace is never accidentally paused by a
+    # migration.
+    automationPaused = Column(Boolean, default=False, nullable=False)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     # AI Brand Context Fields

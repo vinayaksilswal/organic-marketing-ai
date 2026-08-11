@@ -46,6 +46,7 @@ class BusinessProfileUpdate(BaseModel):
     niche: Optional[str] = None
     primaryOffer: Optional[str] = None
     postIntervalHours: Optional[int] = None
+    automationPaused: Optional[bool] = None
     creativeGenerationIntervalHours: Optional[int] = None
     autoGenerateCreatives: Optional[bool] = None
 
@@ -104,6 +105,7 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
                 "description": bp.description,
                 "businessModel": bp.businessModel or "General",
                 "postIntervalHours": bp.postIntervalHours,
+                "automationPaused": bool(getattr(bp, "automationPaused", False)),
                 "industry": bp.industry,
                 "targetAudience": bp.targetAudience,
                 "toneOfVoice": bp.toneOfVoice,
@@ -351,6 +353,7 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
                 "niche": bp.niche,
                 "primaryOffer": bp.primaryOffer,
                 "postIntervalHours": bp.postIntervalHours,
+                "automationPaused": bool(getattr(bp, "automationPaused", False)),
                 "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": bp.autoGenerateCreatives,
                 "brandAnalysisComplete": bp.brandAnalysisComplete,
@@ -466,6 +469,8 @@ async def update_business(workspace_id: str, data: BusinessProfileUpdate, reques
                 "productCatalogUrl": bp.productCatalogUrl,
                 "influencerReferenceUrl": bp.influencerReferenceUrl,
                 "postIntervalHours": bp.postIntervalHours,
+                "automationPaused": bool(getattr(bp, "automationPaused", False)),
+                "automationPaused": bool(getattr(bp, "automationPaused", False)),
                 "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
                 "autoGenerateCreatives": bp.autoGenerateCreatives,
             },
