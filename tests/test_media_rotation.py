@@ -395,20 +395,68 @@ async def test_posts_alternate_between_video_and_image(db_session):
 
 
 @pytest.mark.asyncio
-async def test_it_falls_back_rather_than_repeating_a_scarce_kind(db_session):
-    """HollyVerse in miniature: far more images than videos. Once the videos
-    are used, alternation must yield to the no-repeat guarantee."""
+async def test_the_scarce_kind_restarts_instead_of_disappearing(db_session):
+    """HollyVerse in miniature: 9 videos against 4,398 images.
+
+    Waiting for the video pool to be "fresh" means the feed is images forever
+    after the first day. Recycling the videos is a far smaller repetition than
+    never showing one again, and it is what was asked for.
+
+    This deliberately reverses an earlier decision in this file, which
+    preferred the no-repeat guarantee over a predictable mix.
+    """
     await _seed_mixed(db_session, videos=2, images=10)
 
     when = datetime(2026, 4, 1, tzinfo=timezone.utc)
-    seen = []
-    for i in range(10):
+    kinds = []
+    for i in range(8):
         chosen = await select_next_media(db_session, WORKSPACE)
-        seen.append(chosen.id)
+        kinds.append(_kind(chosen))
         await _record_post(db_session, chosen, when + timedelta(hours=i))
 
-    assert len(set(seen)) == 10, f"an asset repeated while others were unused: {seen}"
-    assert sum(1 for x in seen if x.startswith("vid")) == 2
+    # Two videos cannot cover four slots without repeating, and they should.
+    assert kinds.count("video") >= 3, (
+        f"the video pool stopped appearing once exhausted: {kinds}"
+    )
+    for x, y in zip(kinds, kinds[1:]):
+        assert x != y, f"two of the same kind in a row: {kinds}"
+
+
+@pytest.mark.asyncio
+async def test_the_abundant_kind_still_never_repeats_early(db_session):
+    """Recycling is confined to the kind that ran out. Images have plenty
+    left, so none of them may repeat while others are untouched."""
+    await _seed_mixed(db_session, videos=2, images=10)
+
+    when = datetime(2026, 4, 1, tzinfo=timezone.utc)
+    images = []
+    for i in range(8):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        if _kind(chosen) == "image":
+            images.append(chosen.id)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    assert len(set(images)) == len(images), f"an image repeated early: {images}"
+
+
+@pytest.mark.asyncio
+async def test_the_recycled_pick_is_the_one_idle_longest(db_session):
+    """Restarting a kind should begin with whichever of them has waited
+    longest, not an arbitrary one."""
+    await _seed_mixed(db_session, videos=2, images=6)
+
+    when = datetime(2026, 4, 1, tzinfo=timezone.utc)
+    order = []
+    for i in range(6):
+        chosen = await select_next_media(db_session, WORKSPACE)
+        if _kind(chosen) == "video":
+            order.append(chosen.id)
+        await _record_post(db_session, chosen, when + timedelta(hours=i))
+
+    # First two are the fresh pair in some order; the third repeats whichever
+    # went out first.
+    assert len(order) >= 3
+    assert order[2] == order[0], f"recycled out of order: {order}"
 
 
 @pytest.mark.asyncio

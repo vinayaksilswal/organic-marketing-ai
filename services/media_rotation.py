@@ -30,13 +30,16 @@ from __future__ import annotations
 
 import os
 import random
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from loguru import logger
 from sqlalchemy import select
 
 from database import Media, SocialPost
+
+# Sorts a never-published asset ahead of every published one.
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 # The cap exists so a runaway catalog cannot exhaust a 512MB instance. It is
 # NOT a correctness boundary, and it used to behave like one: the query took
@@ -200,24 +203,49 @@ async def select_next_media(
         pool = never_used
 
         # Alternate video and image so a feed does not run in blocks of one
-        # kind. Applied only when the other kind still has something
-        # unpublished: two of these workspaces hold 9 and 35 videos against
-        # 4,398 and 938 images, and at an hourly interval strict alternation
-        # would exhaust nine videos inside a day and then republish the same
-        # nine every other post. Preferring a kind must never override the
-        # guarantee that nothing repeats while anything is still unused.
+        # kind.
+        #
+        # When the wanted kind has nothing unpublished left, the rotation for
+        # THAT KIND restarts rather than the feed giving up and staying on the
+        # other one. Asked for explicitly, and it is the right call for these
+        # catalogs: HollyVerse holds 9 videos against 4,398 images, so waiting
+        # for the video pool to be "fresh" means the feed is images forever
+        # after the first day. Recycling nine videos across a month of hourly
+        # posts is a far smaller repetition than never showing one again.
+        #
+        # The cost is real and worth naming: a video can now repeat while
+        # images are still unused. That is a deliberate trade of the
+        # no-repeat guarantee for a predictable mix, and it applies only
+        # within the scarce kind.
         if alternate_kinds:
             previous = await last_posted_kind(session, workspace_id)
             if previous:
                 wanted = "image" if previous == "video" else "video"
-                other = [m for m in pool if _kind_of(m) == wanted]
-                if other:
-                    pool = other
+                fresh = [m for m in pool if _kind_of(m) == wanted]
+                if fresh:
+                    pool = fresh
                 else:
-                    logger.info(
-                        f"Media rotation: no unpublished {wanted} left for "
-                        f"{workspace_id}; staying on {previous} rather than "
-                        f"repeating one"
+                    # Nothing unpublished of the wanted kind. Restart that
+                    # kind's rotation from whichever of them has waited
+                    # longest, so the repeat is the oldest rather than random.
+                    recycled = [m for m in catalog if _kind_of(m) == wanted]
+                    if recycled:
+                        recycled.sort(key=lambda m: last_used.get(m.url) or _EPOCH)
+                        band = recycled[: max(1, len(recycled) // 4)]
+                        chosen = random.choice(band)
+                        logger.info(
+                            f"Media rotation: {wanted} pool exhausted for "
+                            f"{workspace_id}, restarting it — selected "
+                            f"{chosen.id} (least recently used of "
+                            f"{len(recycled)})"
+                        )
+                        return await session.get(Media, chosen.id)
+                    # The workspace has none of that kind at all. Billionaire
+                    # Goal777 is 251 videos and no images; alternation must
+                    # not stall it.
+                    logger.debug(
+                        f"Media rotation: {workspace_id} has no {wanted} "
+                        f"media; continuing with {previous}"
                     )
 
         if prefer_ai_generated:
