@@ -8,7 +8,14 @@ WHAT THIS CAN AND CANNOT SEE, measured against a live token on 12 Aug 2026:
 
     like_count, comments_count      available with instagram_basic
     impressions, reach, views       BLOCKED, needs instagram_manage_insights
-    Facebook post engagement        BLOCKED, needs pages_read_engagement
+    Facebook post engagement        AVAILABLE — pages_read_engagement is granted
+
+That last line said BLOCKED until the stored tokens were inspected with
+debug_token on 12 Aug 2026. Every connected page grants pages_read_engagement
+AND pages_manage_posts, and every connected Instagram account grants
+instagram_content_publish. The earlier claim was wrong and was being used to
+rule out work that is in fact possible today: Facebook post engagement can be
+read now, without waiting on App Review.
 
 So this ranks on likes and comments, not views. That is a weaker signal and it
 is stated plainly rather than dressed up: an account whose median post gets one

@@ -77,6 +77,41 @@ def _is_video(url: str) -> bool:
 # =============================================================================
 # HTTP Helper — Retry-wrapped async POST to Graph API
 # =============================================================================
+def _graph_error_message(response: httpx.Response) -> str:
+    """Meta's own explanation of a failure, in the words it used.
+
+    Everything useful is in the response body. raise_for_status() throws it
+    away, and tenacity then wraps the result in a RetryError whose string form
+    is `RetryError[<Future at 0x.. state=finished raised HTTPStatusError>]` --
+    which names neither the status code nor the reason. That string is what
+    155 failed posts recorded, and it is why the Facebook failures on two
+    accounts stayed undiagnosable for a week.
+    """
+    try:
+        error = response.json().get("error", {}) or {}
+    except Exception:
+        return f"HTTP {response.status_code}: {response.text[:300]}"
+
+    parts = [str(error.get("message") or "").strip()]
+    if error.get("error_user_msg"):
+        parts.append(str(error["error_user_msg"]).strip())
+    detail = " — ".join(p for p in parts if p)
+
+    code = error.get("code")
+    subcode = error.get("error_subcode")
+    marker = f"code {code}" + (f"/{subcode}" if subcode else "") if code else ""
+    return f"{detail} [{marker}]" if marker else (detail or f"HTTP {response.status_code}")
+
+
+class GraphAPIError(IntegrationError):
+    """A request Meta rejected on its merits, carrying Meta's own message.
+
+    Deliberately NOT an httpx error, so the retry policy below does not catch
+    it: a 400 means the request was wrong and will be wrong all three times,
+    and retrying it only spends thirty seconds arriving at the same answer.
+    """
+
+
 @retry(
     wait=wait_exponential(multiplier=1, min=2, max=30),
     stop=stop_after_attempt(3),
@@ -84,22 +119,32 @@ def _is_video(url: str) -> bool:
     before_sleep=lambda retry_state: logger.warning(
         f"Meta API retry attempt {retry_state.attempt_number}"
     ),
+    # Surface the last real exception rather than tenacity's RetryError
+    # wrapper, which hides what actually went wrong.
+    reraise=True,
 )
 async def _graph_post(url: str, data: dict[str, Any]) -> dict:
     """POST to the Meta Graph API with exponential backoff retry."""
     async with httpx.AsyncClient(timeout=META_TIMEOUT) as client:
         response = await client.post(url, data=data)
         if response.is_error:
+            reason = _graph_error_message(response)
             logger.error(f"Meta Graph API Error: {response.status_code} - {response.text}")
+
             try:
                 error_code = response.json().get("error", {}).get("code")
-                if error_code == 190:
-                    raise ValueError(f"Meta Graph API OAuth Error: {response.text}")
-            except ValueError:
-                raise
             except Exception:
-                pass
-        response.raise_for_status()
+                error_code = None
+            if error_code == 190:
+                raise ValueError(f"Meta Graph API OAuth Error: {response.text}")
+
+            # Retry only what a retry can fix: rate limits, server faults and
+            # transport errors. A 4xx is a verdict, not a hiccup.
+            if response.status_code == 429 or response.status_code >= 500:
+                response.raise_for_status()
+
+            raise GraphAPIError(reason)
+
         return response.json()
 
 
