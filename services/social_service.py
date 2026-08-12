@@ -24,7 +24,7 @@ Error handling catches "Unsupported post request" without crashing.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 from loguru import logger
@@ -541,6 +541,69 @@ async def post_to_instagram(
         return ",".join(post_ids)
 
 
+async def _ig_newest_media_id(ig_user_id: str, access_token: str) -> Optional[str]:
+    """The id of the account's most recent post, or None if unreadable."""
+    try:
+        body = await _graph_get(
+            f"{GRAPH_BASE_URL}/{ig_user_id}/media",
+            {"access_token": access_token, "fields": "id", "limit": "1"},
+        )
+        items = body.get("data") or []
+        return items[0].get("id") if items else None
+    except Exception as e:
+        logger.debug(f"Could not read newest media for {ig_user_id}: {e}")
+        return None
+
+
+async def _ig_publish(
+    ig_user_id: str, access_token: str, container_id: str, label: str
+) -> str:
+    """Publish a container, and find out what really happened when it errors.
+
+    Instagram returns HTTP 403 with "Application request limit reached" on
+    media_publish AND PUBLISHES THE MEDIA ANYWAY. Measured on 13 Aug 2026:
+    four posts recorded as failures were live on the account, including a
+    carousel whose caption still says "diagnostic, not published".
+
+    Taking that error at face value is expensive in both directions. Real
+    posts get recorded as failures, so the account looks broken when it is
+    working; and rotation treats the asset as unpublished, so the next cycle
+    posts it AGAIN -- duplicate posts on a customer's feed, which is worse
+    than the original problem.
+
+    So a failed publish is reconciled against the account: if the newest media
+    id changed, the post exists and its real id is returned.
+    """
+    before = await _ig_newest_media_id(ig_user_id, access_token)
+
+    try:
+        response = await _graph_post(
+            f"{GRAPH_BASE_URL}/{ig_user_id}/media_publish",
+            {"creation_id": container_id, "access_token": access_token},
+        )
+        post_id = response.get("id")
+        if post_id:
+            return post_id
+        error_text = f"Instagram returned no id: {response}"
+    except Exception as e:
+        error_text = str(e)
+
+    # Give Instagram a moment to make the post visible on the account before
+    # concluding it does not exist.
+    await asyncio.sleep(5)
+    after = await _ig_newest_media_id(ig_user_id, access_token)
+
+    if after and after != before:
+        logger.warning(
+            f"Instagram reported a failure publishing this {label} but the post "
+            f"is live as {after}. Recording it as published so it is not posted "
+            f"a second time. Its complaint was: {error_text[:200]}"
+        )
+        return after
+
+    raise IntegrationError(f"{label} could not be published — {error_text}")
+
+
 async def _ig_post_video(
     ig_user_id: str, access_token: str, caption: str, video_url: str
 ) -> str | None:
@@ -569,23 +632,7 @@ async def _ig_post_video(
                 "A shorter or smaller file usually resolves this."
             )
 
-        # Publish
-        publish_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media_publish"
-        publish_payload = {
-            "creation_id": container_id,
-            "access_token": access_token,
-        }
-        pub_res = await _graph_post(publish_url, publish_payload)
-        post_id = pub_res.get("id")
-        if not post_id:
-            # The container reached FINISHED and the publish call still gave
-            # back no id. Returning None here made the caller report
-            # "Instagram accepted no media", which points at the file — and the
-            # file was fine. Carry whatever Instagram actually said.
-            raise IntegrationError(
-                f"Instagram accepted the video but refused to publish it. "
-                f"Its reply was: {pub_res}"
-            )
+        post_id = await _ig_publish(ig_user_id, access_token, container_id, "Reel")
         logger.info(f"✓ Instagram Reel posted: {post_id}")
         return post_id
 
@@ -620,18 +667,7 @@ async def _ig_post_single_image(
         if not is_ready:
             raise IntegrationError("Instagram never finished processing the image.")
 
-        publish_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media_publish"
-        publish_payload = {
-            "creation_id": container_id,
-            "access_token": access_token,
-        }
-        pub_res = await _graph_post(publish_url, publish_payload)
-        post_id = pub_res.get("id")
-        if not post_id:
-            raise IntegrationError(
-                f"Instagram accepted the image but refused to publish it. "
-                f"Its reply was: {pub_res}"
-            )
+        post_id = await _ig_publish(ig_user_id, access_token, container_id, "image")
         logger.info(f"✓ Instagram image posted: {post_id}")
         return post_id
 
@@ -751,13 +787,7 @@ async def _ig_post_carousel(
             return None
 
         # Step 4: Publish
-        publish_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media_publish"
-        publish_payload = {
-            "creation_id": container_id,
-            "access_token": access_token,
-        }
-        pub_res = await _graph_post(publish_url, publish_payload)
-        post_id = pub_res.get("id")
+        post_id = await _ig_publish(ig_user_id, access_token, container_id, "carousel")
         logger.info(f"✓ Instagram carousel posted: {post_id} ({len(children_ids)} items)")
         return post_id
 

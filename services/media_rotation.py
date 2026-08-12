@@ -259,29 +259,17 @@ async def select_next_media(
     if not catalog:
         return None
 
-    # If Instagram has recently refused images here as suspected spam, offer it
-    # video instead of spending every cycle on a post that cannot publish.
-    # Each refused attempt is another rejected publishing action counted
-    # against the app, so retrying actively deepens the problem.
-    try:
-        from services.publish_cooldown import image_publishing_blocked
-
-        if await image_publishing_blocked(session, workspace_id):
-            videos = [c for c in catalog if _kind_of(c) == "video"]
-            if videos:
-                catalog = videos
-                alternate_kinds = False
-            else:
-                # An image-only catalog has nothing to fall back to. Say so
-                # rather than silently posting into a block.
-                logger.warning(
-                    f"Workspace {workspace_id} is image-blocked on Instagram and "
-                    f"has no video to post instead; its images will keep failing "
-                    f"until the block clears."
-                )
-    except Exception as e:
-        # Never let the cooldown check stop a workspace posting.
-        logger.debug(f"Publish cooldown check unavailable: {e}")
+    # There was a cooldown here that switched a workspace to video after
+    # Instagram "refused" its images. It has been removed because the premise
+    # was false: those images were publishing. Meta returns HTTP 403 with
+    # "Application request limit reached" on media_publish AND publishes the
+    # media anyway, so the post history recorded failures for posts that were
+    # live on the account the whole time. Suppressing images on that evidence
+    # would have switched three accounts to video-only for no reason.
+    #
+    # The real defect is in reading the publish response, and it is handled in
+    # social_service where the 403 is reconciled against the account's actual
+    # media. Rotation has no business second-guessing it.
 
     total = len(catalog)
     if total >= _MAX_CATALOG:
