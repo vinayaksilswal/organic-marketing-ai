@@ -50,12 +50,35 @@ GRAPH_BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 # business_management was requested previously but never used. It is a
 # heavyweight permission that needs its own App Review justification and is a
 # common cause of "Invalid Scopes" at the login dialog, so it is not asked for.
+# Measured against a live token on 12 Aug 2026, which is the only way to know
+# what is actually granted rather than what was asked for:
+#
+#   instagram_basic            GRANTED  -> per-post like_count and comments_count
+#   instagram_content_publish  GRANTED  -> publishing works
+#   pages_manage_posts         GRANTED  -> publishing works
+#   pages_read_engagement      REQUESTED BUT DENIED
+#                                 "(#10) This endpoint requires the
+#                                  pages_read_engagement permission"
+#                              -> no Facebook post engagement until App Review
+#   instagram_manage_insights  NOT REQUESTED, and needed for views/reach/
+#                              impressions. Asking for it costs nothing until
+#                              approved and grants it the moment it is.
+#   instagram_manage_contents  NOT REQUESTED, and needed to delete IG posts.
+#
+# A scope in this list is not a permission. Meta grants the ones the app has
+# passed App Review for and silently withholds the rest, which is why the
+# insights calls fail with a permission error while the login succeeds.
 META_SCOPES = ",".join([
     "pages_show_list",
     "pages_read_engagement",
     "pages_manage_posts",
     "instagram_basic",
     "instagram_content_publish",
+    # Analytics. Denied until App Review approves them; requesting them now
+    # means no second OAuth round trip for every already-connected customer.
+    "instagram_manage_insights",
+    "instagram_manage_contents",
+    "read_insights",
     # Required when the Page belongs to a Business Portfolio rather than the
     # personal account. Without it /me/accounts returns an empty list even
     # though the Page permissions were granted — which looked exactly like

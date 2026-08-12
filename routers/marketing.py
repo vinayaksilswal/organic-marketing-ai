@@ -456,7 +456,21 @@ async def _generate_post_caption(profile, media, product=None) -> str:
     industry = getattr(profile, "industry", None) or getattr(profile, "businessModel", None) or ""
     niche = getattr(profile, "niche", None) or ""
     pillars = getattr(profile, "contentPillars", None) or []
+    # The tiered set holds about a hundred tags in four size bands and a fresh
+    # sample is drawn per asset. suggestedHashtags holds roughly ten, and the
+    # same ten on every post is the clearest automation signal an account can
+    # send. Falls back to it for businesses created before the set existed.
     hashtags = getattr(profile, "suggestedHashtags", None) or []
+    try:
+        from services.hashtag_engine import select as select_hashtags
+
+        tiers = getattr(profile, "hashtagSets", None)
+        if tiers:
+            rotated = select_hashtags(tiers, seed=str(getattr(media, "id", "")))
+            if rotated:
+                hashtags = rotated
+    except Exception as e:
+        logger.debug(f"Hashtag rotation unavailable: {e}")
 
     # What the asset actually depicts. The base caption is authoritative — it
     # is either what the user typed about this asset or the prompt that
@@ -493,6 +507,26 @@ async def _generate_post_caption(profile, media, product=None) -> str:
 
     known.append(f"Tone of voice: {tone}")
     if offer:       known.append(f"The one action to drive (use this exact offer): {offer}")
+
+    # What this account's own results say. Until now a caption was written from
+    # the brand profile alone, so the system could publish the same
+    # underperforming shape indefinitely and never notice. This is read from
+    # Instagram likes and comments -- views need instagram_manage_insights,
+    # which App Review has not granted -- and it deliberately returns nothing
+    # when the account has too few posts or too flat a response to support a
+    # conclusion. A writer told "engagement is low, try harder" produces worse
+    # copy than one told nothing.
+    try:
+        from services.engagement_insights import for_workspace, to_caption_guidance
+
+        async with get_tenant_session(getattr(profile, "id", None)) as _s:
+            guidance = to_caption_guidance(
+                await for_workspace(_s, getattr(profile, "id", None))
+            )
+        if guidance:
+            known.append(f"WHAT IS WORKING ON THIS ACCOUNT: {guidance}")
+    except Exception as e:
+        logger.debug(f"No engagement guidance available: {e}")
 
     # When the post is about a specific catalog item, the product's own facts
     # outrank the brand-level summary — that is what makes an e-commerce post

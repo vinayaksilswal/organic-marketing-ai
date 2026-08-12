@@ -107,6 +107,11 @@ class BusinessProfile(Base):
     # default so an existing workspace is never accidentally paused by a
     # migration.
     automationPaused = Column(Boolean, default=False, nullable=False)
+    # ~100 hashtags in size tiers, built once when the brand profile is built.
+    # suggestedHashtags already existed and holds about ten, which is enough
+    # for one caption and not enough to rotate -- the same ten on every post is
+    # the clearest automation signal an account can send.
+    hashtagSets = Column(JSON, nullable=True)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     # AI Brand Context Fields

@@ -128,6 +128,19 @@ async def build(profile: Any, image_url: str = "") -> Optional[Dict[str, Any]]:
         logger.error(f"Brand intelligence synthesis returned no usable profile: {intel}")
         return None
 
+    # Built here because this is the one place that already has the finished
+    # research, and because a business should arrive with its hashtags rather
+    # than acquiring them on the first post.
+    try:
+        from services.hashtag_engine import generate_for
+
+        tiers = await generate_for(profile, intel)
+        if any(tiers.values()):
+            profile.hashtagSets = tiers
+    except Exception as e:
+        # Captions fall back to suggestedHashtags; never block the profile.
+        logger.warning(f"Could not build hashtag sets: {e}")
+
     intel["_fingerprint"] = _fingerprint(profile)
     intel["_sources"] = {
         "website": bool(scraped),
