@@ -259,6 +259,30 @@ async def select_next_media(
     if not catalog:
         return None
 
+    # If Instagram has recently refused images here as suspected spam, offer it
+    # video instead of spending every cycle on a post that cannot publish.
+    # Each refused attempt is another rejected publishing action counted
+    # against the app, so retrying actively deepens the problem.
+    try:
+        from services.publish_cooldown import image_publishing_blocked
+
+        if await image_publishing_blocked(session, workspace_id):
+            videos = [c for c in catalog if _kind_of(c) == "video"]
+            if videos:
+                catalog = videos
+                alternate_kinds = False
+            else:
+                # An image-only catalog has nothing to fall back to. Say so
+                # rather than silently posting into a block.
+                logger.warning(
+                    f"Workspace {workspace_id} is image-blocked on Instagram and "
+                    f"has no video to post instead; its images will keep failing "
+                    f"until the block clears."
+                )
+    except Exception as e:
+        # Never let the cooldown check stop a workspace posting.
+        logger.debug(f"Publish cooldown check unavailable: {e}")
+
     total = len(catalog)
     if total >= _MAX_CATALOG:
         logger.warning(
