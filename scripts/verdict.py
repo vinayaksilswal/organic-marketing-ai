@@ -18,8 +18,9 @@ from database import (
     AsyncSessionLocal, BusinessProfile, SocialPost, init_db,
 )
 
-# 49eb66c went live at 14:38 UTC on 12 Aug 2026.
-DEPLOY = datetime(2026, 8, 12, 14, 38, tzinfo=timezone.utc)
+# Only posts made after the geometry rewrite and the Graph error surfacing.
+# Earlier posts are already accounted for and would only add noise.
+DEPLOY = datetime(2026, 8, 12, 18, 0, tzinfo=timezone.utc)
 
 
 async def main() -> None:

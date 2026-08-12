@@ -646,6 +646,58 @@ async def _ig_post_single_image(
         raise IntegrationError(f"Image upload failed: {e}") from e
 
 
+# Seconds between carousel item container creations.
+#
+# A ten-slide carousel used to fire ten container calls back to back inside a
+# second, then an eleventh for the parent. Instagram answers that burst with
+# code 4 / subcode 2207051, "Application request limit reached — We restrict
+# certain activity to protect our community", which reads like an account ban
+# and is not one: the same account published single videos immediately before
+# and after, and the app was at 1% of its hourly quota at the time.
+#
+# It looked like an integrity block on the account. It was pacing.
+CAROUSEL_ITEM_DELAY = 2.0
+
+# What Instagram returns when it wants the caller to slow down.
+_RATE_LIMIT_CODES = {4, 17, 32, 613}
+
+
+def _is_rate_limited(error: Exception) -> bool:
+    text = str(error)
+    return any(f"code {code}" in text for code in _RATE_LIMIT_CODES) or (
+        "request limit" in text.lower()
+    )
+
+
+async def _ig_carousel_item(
+    ig_user_id: str, access_token: str, image_url: str
+) -> str | None:
+    """One carousel child container, retried once if Instagram asks us to wait."""
+    payload = {
+        "image_url": image_url,
+        "is_carousel_item": "true",
+        "access_token": access_token,
+    }
+    url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
+    try:
+        res = await _graph_post(url, payload)
+        return res.get("id")
+    except Exception as e:
+        if not _is_rate_limited(e):
+            logger.warning(f"Failed to create IG carousel item: {e}")
+            return None
+        # Backing off and trying again is the documented remedy, and a
+        # half-built carousel is worth one pause to avoid.
+        logger.warning(f"Instagram asked us to slow down; waiting 30s. ({e})")
+        await asyncio.sleep(30)
+        try:
+            res = await _graph_post(url, payload)
+            return res.get("id")
+        except Exception as retry_error:
+            logger.warning(f"Carousel item still refused after backoff: {retry_error}")
+            return None
+
+
 async def _ig_post_carousel(
     ig_user_id: str,
     access_token: str,
@@ -655,25 +707,29 @@ async def _ig_post_carousel(
     """Post a multi-image carousel to Instagram."""
     children_ids: list[str] = []
 
-    # Step 1: Create individual carousel item containers
-    for img_url in image_urls[:10]:  # Max 10 items per carousel
-        item_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
-        item_payload = {
-            "image_url": img_url,
-            "is_carousel_item": "true",
-            "access_token": access_token,
-        }
-        try:
-            res = await _graph_post(item_url, item_payload)
-            item_id = res.get("id")
-            if item_id:
-                children_ids.append(item_id)
-        except Exception as e:
-            logger.warning(f"Failed to create IG carousel item: {e}")
+    # Step 1: Create individual carousel item containers, paced.
+    wanted = image_urls[:10]  # Max 10 items per carousel
+    for index, img_url in enumerate(wanted):
+        if index:
+            await asyncio.sleep(CAROUSEL_ITEM_DELAY)
+        item_id = await _ig_carousel_item(ig_user_id, access_token, img_url)
+        if item_id:
+            children_ids.append(item_id)
 
     if not children_ids:
         logger.error("No carousel items created for Instagram")
         return None
+
+    # A carousel that quietly loses slides is not the post the user arranged,
+    # and folder ordering is explicit precisely so the sequence is theirs.
+    if len(children_ids) < len(wanted):
+        logger.warning(
+            f"Carousel is short: {len(children_ids)} of {len(wanted)} slides "
+            f"were accepted by Instagram"
+        )
+
+    # The parent container is one more call on top of the burst above.
+    await asyncio.sleep(CAROUSEL_ITEM_DELAY)
 
     # Step 2: Create the carousel container
     container_url = f"{GRAPH_BASE_URL}/{ig_user_id}/media"
