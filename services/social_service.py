@@ -186,6 +186,12 @@ async def post_to_facebook(
         image_urls = [url for url in media_urls if not _is_video(url)]
 
         post_ids = []
+        # Why each attempt failed. Every branch below used to log its exception
+        # and return None, and the caller reported "credentials may be
+        # missing" -- a guess that was wrong and sent an investigation after
+        # tokens that were valid. The Graph API says exactly what is wrong;
+        # this carries that sentence back to the person who can act on it.
+        failures: list[str] = []
 
         # --- 1. Post Each Video Separately ---
         for vid_url in video_urls:
@@ -203,6 +209,7 @@ async def post_to_facebook(
                     post_ids.append(post_id)
             except Exception as e:
                 logger.error(f"Facebook video post failed: {e}")
+                failures.append(f"video: {e}")
 
         # --- 2. Post Images ---
         if len(image_urls) > 1:
@@ -237,6 +244,7 @@ async def post_to_facebook(
                         post_ids.append(post_id)
                 except Exception as e:
                     logger.error(f"Facebook multi-photo post failed: {e}")
+                    failures.append(f"multi-photo: {e}")
 
         elif len(image_urls) == 1:
             # Single image
@@ -254,6 +262,7 @@ async def post_to_facebook(
                     post_ids.append(post_id)
             except Exception as e:
                 logger.error(f"Facebook image post failed: {e}")
+                failures.append(f"image: {e}")
 
         # --- 3. Text only (if no media was provided) ---
         if not video_urls and not image_urls:
@@ -270,8 +279,20 @@ async def post_to_facebook(
                     post_ids.append(post_id)
             except Exception as e:
                 logger.error(f"Facebook text post failed: {e}")
+                failures.append(f"text: {e}")
 
         if not post_ids:
+            if failures:
+                # Raised rather than returned: the caller records the message
+                # of anything raised, and drops the detail of anything that
+                # merely returns None.
+                raise IntegrationError(
+                    "Facebook rejected every attempt — " + " | ".join(failures)
+                )
+            logger.warning(
+                f"Facebook post for page {page_id} produced no id and no error; "
+                f"media_urls={len(media_urls)}"
+            )
             return None
         return ",".join(post_ids)
 
