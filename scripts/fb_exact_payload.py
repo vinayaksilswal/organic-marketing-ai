@@ -1,4 +1,4 @@
-"""Replicate post_to_facebook's exact payload, minus publication.
+﻿"""Replicate post_to_facebook's exact payload, minus publication.
 
 The only difference from production is published=false, which keeps the photo
 in the page's media library instead of the feed. Nothing becomes visible.
@@ -75,7 +75,7 @@ async def main() -> None:
                 data={
                     "access_token": token,
                     "message": caption,
-                    "url": publishable_url(img),
+                    "url": await publishable_url(img),
                     "published": "false",
                 },
             )

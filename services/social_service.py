@@ -196,7 +196,7 @@ async def post_to_facebook(
         # Cloudinary cache entry rather than two.
         from services.instagram_geometry import publishable_urls
 
-        media_urls = publishable_urls(media_urls)
+        media_urls = await publishable_urls(media_urls)
 
         video_urls = [url for url in media_urls if _is_video(url)]
         image_urls = [url for url in media_urls if not _is_video(url)]
@@ -462,7 +462,7 @@ async def post_to_instagram(
         # conditional, so an already-valid image is untouched.
         from services.instagram_geometry import publishable_urls
 
-        media_urls = publishable_urls(media_urls)
+        media_urls = await publishable_urls(media_urls)
 
         # Separate videos and images
         video_urls = [url for url in media_urls if _is_video(url)]
@@ -532,6 +532,15 @@ async def _ig_post_video(
         }
         pub_res = await _graph_post(publish_url, publish_payload)
         post_id = pub_res.get("id")
+        if not post_id:
+            # The container reached FINISHED and the publish call still gave
+            # back no id. Returning None here made the caller report
+            # "Instagram accepted no media", which points at the file — and the
+            # file was fine. Carry whatever Instagram actually said.
+            raise IntegrationError(
+                f"Instagram accepted the video but refused to publish it. "
+                f"Its reply was: {pub_res}"
+            )
         logger.info(f"✓ Instagram Reel posted: {post_id}")
         return post_id
 
@@ -573,12 +582,23 @@ async def _ig_post_single_image(
         }
         pub_res = await _graph_post(publish_url, publish_payload)
         post_id = pub_res.get("id")
+        if not post_id:
+            raise IntegrationError(
+                f"Instagram accepted the image but refused to publish it. "
+                f"Its reply was: {pub_res}"
+            )
         logger.info(f"✓ Instagram image posted: {post_id}")
         return post_id
 
     except Exception as e:
+        # Re-raised, not swallowed. The video path above has always re-raised
+        # and the image path has always returned None, so an image failure
+        # reached the delivery log as "Instagram accepted no media from this
+        # post" — a message about the FILE — no matter what Instagram said.
+        # HollyVerse recorded 131 of those against images that were reachable,
+        # correctly sized JPEGs whose containers reached FINISHED.
         _handle_ig_error("image", e)
-        return None
+        raise IntegrationError(f"Image upload failed: {e}") from e
 
 
 async def _ig_post_carousel(

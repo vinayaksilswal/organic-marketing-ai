@@ -1,4 +1,4 @@
-"""What does the Graph API actually return for these pages?
+﻿"""What does the Graph API actually return for these pages?
 
 post_to_facebook only records a post when the response carries an id, and only
 records a failure when the call raises. A 200 response in any other shape
@@ -82,7 +82,7 @@ async def main() -> None:
                     f"{GRAPH}/{conn.fbPageId}/photos",
                     data={
                         "access_token": token,
-                        "url": publishable_url(img),
+                        "url": await publishable_url(img),
                         "published": "false",
                     },
                 )
