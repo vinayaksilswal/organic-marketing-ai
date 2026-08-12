@@ -158,10 +158,17 @@ async def post_to_facebook(
     Returns:
         The Facebook post ID string (comma-separated if multiple), or None on failure
     """
+    # These used to `return None`, and the caller reported every None as
+    # "credentials may be missing". HollyVerse recorded 74 of those in a week
+    # with a valid token, a valid Page and working Instagram posting — the
+    # real fault was image geometry, and the message sent the investigation
+    # after credentials that were fine the whole time.
     access_token, page_id = await _get_fb_credentials(workspace_id)
     if not access_token or not page_id:
-        logger.warning("Facebook credentials missing — skipping post")
-        return None
+        raise IntegrationError(
+            "No Facebook Page is connected to this business. Connect one in "
+            "Businesses → Edit."
+        )
 
     if not media_urls:
         media_urls = []
@@ -170,8 +177,10 @@ async def post_to_facebook(
     lock_key = f"fb_post_{page_id}"
     async with distributed_lock(lock_key, timeout_seconds=120) as acquired:
         if not acquired:
-            logger.error(f"Could not acquire lock for Facebook Page {page_id}")
-            return None
+            raise IntegrationError(
+                "Another post to this Facebook Page is already in progress. "
+                "Nothing was published; the next cycle will retry."
+            )
 
         # Facebook fetches the media itself, so relative paths must be made
         # absolute against THIS backend. The previous hardcoded marketing
@@ -181,6 +190,13 @@ async def post_to_facebook(
             f"{_base}{url}" if url.startswith("/") and _base else url
             for url in media_urls
         ]
+
+        # Facebook is far more permissive about shape than Instagram, but the
+        # same asset usually goes to both and a single normalised URL means one
+        # Cloudinary cache entry rather than two.
+        from services.instagram_geometry import publishable_urls
+
+        media_urls = publishable_urls(media_urls)
 
         video_urls = [url for url in media_urls if _is_video(url)]
         image_urls = [url for url in media_urls if not _is_video(url)]
@@ -434,6 +450,19 @@ async def post_to_instagram(
                 url = f"{base}{url}"
             absolute.append(url)
         media_urls = absolute
+
+        # Crop anything outside Instagram's 0.8–1.91 aspect ratio window.
+        #
+        # Without this, an out-of-range image is ACCEPTED as a container and
+        # then refused at publish, and the caller sees "Instagram accepted no
+        # media" — which reads like a broken URL. HollyVerse was losing 56% of
+        # its catalog this way, BollyVerse 44%, MyCart4U 27%.
+        #
+        # A Cloudinary URL transformation, so it costs this instance nothing;
+        # conditional, so an already-valid image is untouched.
+        from services.instagram_geometry import publishable_urls
+
+        media_urls = publishable_urls(media_urls)
 
         # Separate videos and images
         video_urls = [url for url in media_urls if _is_video(url)]

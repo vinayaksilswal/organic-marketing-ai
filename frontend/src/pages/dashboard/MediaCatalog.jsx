@@ -184,6 +184,46 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
     );
   };
 
+  // Move one slide to an explicit position. The user picks "3" and it becomes
+  // the third slide; everything else closes the gap around it. Sending the
+  // whole desired order rather than a single index keeps the server's view
+  // authoritative — there is no way for two slides to claim position 3.
+  const handleSetPosition = async (folder, mediaId, newIndex) => {
+    const items = (folders.find(f => f.id === folder.id)?.items || []);
+    const current = items.findIndex(m => m.id === mediaId);
+    if (current === -1 || newIndex === current) return;
+
+    const reordered = items.map(m => m.id);
+    reordered.splice(current, 1);
+    reordered.splice(newIndex, 0, mediaId);
+
+    setFolderBusy(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/folders/${folder.id}/order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaIds: reordered }),
+      }, token);
+      if (res.ok) {
+        await fetchFolders();
+      } else {
+        showToast('Could not change the slide order.', 'error');
+      }
+    } catch (err) {
+      showToast('Could not reach the server.', 'error');
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  // A file that has been moved into a folder leaves this list and lives in the
+  // folder instead — that is what "moving" it means, and leaving it in both
+  // places made it look like the file would post twice. `showFiled` brings
+  // them back into view when someone wants to see everything at once.
+  const [showFiled, setShowFiled] = useState(false);
+  const filedCount = mediaList.filter(m => m.folderId).length;
+  const visibleMedia = showFiled ? mediaList : mediaList.filter(m => !m.folderId);
+
   // Sent in batches rather than one 242-file request: a single upload of a
   // whole library exceeds request size limits and gives no progress, and one
   // network blip loses the lot. Each batch is independent.
@@ -716,7 +756,16 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               Every file in a folder goes out as one carousel post. Loose files post one at a time.
             </span>
-            <button className="btn btn-secondary" style={{ height: 34, marginLeft: 'auto' }}
+            {filedCount > 0 && (
+              <button className="btn btn-secondary" style={{ height: 34, marginLeft: 'auto', fontSize: '0.8rem' }}
+                onClick={() => setShowFiled(v => !v)}>
+                {showFiled
+                  ? `Hide the ${filedCount} filed file${filedCount === 1 ? '' : 's'}`
+                  : `Show the ${filedCount} filed file${filedCount === 1 ? '' : 's'} in the table`}
+              </button>
+            )}
+            <button className="btn btn-secondary"
+              style={{ height: 34, marginLeft: filedCount > 0 ? 0 : 'auto' }}
               onClick={() => setCreatingFolder(v => !v)}>
               <FolderPlus size={15} /> New folder
             </button>
@@ -798,28 +847,58 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   Empty. Tick files in the table below, then press “Move here”.
                 </p>
               ) : (
-                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
-                  {(folders.find(f => f.id === openFolder.id)?.items || []).map((m, i) => (
-                    <div key={m.id} style={{ width: 78, position: 'relative' }}>
-                      <div style={{ width: 78, height: 78, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
-                        {(m.mimeType || '').startsWith('video/')
-                          ? <video src={m.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          : <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                      </div>
-                      <div style={{
-                        position: 'absolute', top: 3, left: 3, background: 'rgba(0,0,0,0.7)',
-                        borderRadius: 4, fontSize: '0.65rem', padding: '1px 5px',
-                      }}>{i + 1}</div>
-                      <button
-                        onClick={() => handleUnfile([m.id])}
-                        title="Take out of this folder"
-                        style={{
-                          position: 'absolute', top: 3, right: 3, background: 'rgba(0,0,0,0.7)',
-                          border: 'none', borderRadius: 4, color: '#f87171', cursor: 'pointer',
-                          padding: '1px 4px', lineHeight: 1,
-                        }}>×</button>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap' }}>
+                  {(() => {
+                    const items = folders.find(f => f.id === openFolder.id)?.items || [];
+                    return items.map((m, i) => {
+                      // Instagram publishes the first ten. Showing which slides
+                      // fall outside that is the whole point of letting the
+                      // order be edited.
+                      const willPost = i < 10;
+                      return (
+                        <div key={m.id} style={{ width: 86 }}>
+                          <div style={{
+                            width: 86, height: 86, borderRadius: 8, overflow: 'hidden',
+                            background: '#000', position: 'relative',
+                            opacity: willPost ? 1 : 0.35,
+                            outline: willPost ? 'none' : '1px dashed #fbbf24',
+                          }}>
+                            {(m.mimeType || '').startsWith('video/')
+                              ? <video src={m.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                            <button
+                              onClick={() => handleUnfile([m.id])}
+                              title="Take out of this folder"
+                              style={{
+                                position: 'absolute', top: 3, right: 3, background: 'rgba(0,0,0,0.75)',
+                                border: 'none', borderRadius: 4, color: '#f87171', cursor: 'pointer',
+                                padding: '0 5px', lineHeight: 1.35, fontSize: '0.82rem',
+                              }}>×</button>
+                          </div>
+                          {/* Explicit placement — pick the slide number this
+                              image should occupy. */}
+                          <select
+                            value={i}
+                            disabled={folderBusy}
+                            onChange={e => handleSetPosition(openFolder, m.id, Number(e.target.value))}
+                            title="Slide position in the carousel"
+                            style={{
+                              width: '100%', marginTop: 4, fontSize: '0.72rem',
+                              padding: '2px 4px', borderRadius: 5, cursor: 'pointer',
+                              background: 'rgba(255,255,255,0.06)', color: 'inherit',
+                              border: '1px solid var(--border-color)',
+                            }}
+                          >
+                            {items.map((_, n) => (
+                              <option key={n} value={n}>
+                                {n + 1}{n >= 10 ? ' — not posted' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>
@@ -886,14 +965,16 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                       </div>
                     </td>
                   </tr>
-                ) : mediaList.length === 0 ? (
+                ) : visibleMedia.length === 0 ? (
                   <tr>
                     <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No media yet. Upload a file above, or generate one in AI Video Studio.
+                      {mediaList.length === 0
+                        ? 'No media yet. Upload a file above, or generate one in AI Video Studio.'
+                        : `Every file is inside a folder. Use “Show the ${filedCount} filed files in the table” above to see them.`}
                     </td>
                   </tr>
                 ) : (
-                  (showOnlyUnfinished ? unfinished : mediaList).map(item => {
+                  (showOnlyUnfinished ? unfinished : visibleMedia).map(item => {
                     const isVideo = item.mimeType?.startsWith('video/') || item.filename?.endsWith('.mp4');
                     const isAudio = item.mimeType?.startsWith('audio/');
                     const caption = item.caption || item.prompt || '';
