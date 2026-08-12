@@ -1,8 +1,8 @@
-import urllib.request
+﻿import urllib.request
 import urllib.error
 import json
 
-base_url = "https://organic-marketing-ai1.onrender.com/api/v1"
+base_url = "https://organic-marketing-ai-0abh.onrender.com/api/v1"
 
 # Try login
 try:

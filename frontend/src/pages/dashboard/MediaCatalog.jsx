@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music, ShieldAlert } from 'lucide-react';
+import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music, ShieldAlert, Folder, FolderPlus, FolderOpen, Layers } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaList, setMediaList] = useState([]);
@@ -28,8 +28,23 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [loadError, setLoadError] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Folders. A folder publishes as ONE carousel post; loose files each post on
+  // their own. Selection lives here rather than on the rows so the action bar
+  // can act on a set spanning the whole table.
+  const [folders, setFolders] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [openFolder, setOpenFolder] = useState(null);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [folderBusy, setFolderBusy] = useState(false);
+
   useEffect(() => {
     fetchMedia();
+    fetchFolders();
+    // A folder belongs to one business; carrying a selection across a
+    // workspace switch would move another business's files.
+    setSelectedIds([]);
+    setOpenFolder(null);
   }, [activeWorkspaceId]);
 
   const fetchMedia = async () => {
@@ -54,6 +69,119 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchFolders = async () => {
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/folders`, {}, token);
+      if (res.ok) setFolders(await res.json());
+    } catch (err) {
+      console.error('Failed to fetch folders', err);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+    setFolderBusy(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/folders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      }, token);
+      if (res.ok) {
+        setNewFolderName('');
+        setCreatingFolder(false);
+        await fetchFolders();
+        showToast(`Folder "${name}" created — tick files below and move them in.`, 'success');
+      } else {
+        showToast('Could not create the folder.', 'error');
+      }
+    } catch (err) {
+      showToast('Could not reach the server.', 'error');
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleMoveToFolder = async (folderId) => {
+    if (!selectedIds.length) return;
+    setFolderBusy(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/folders/${folderId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaIds: selectedIds }),
+      }, token);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedIds([]);
+        await Promise.all([fetchMedia(), fetchFolders()]);
+        // The warning is the server's, and it is the honest one: a folder of
+        // 14 cannot post 14 slides however the UI phrases it.
+        showToast(
+          data.warning || `${data.moved} file(s) moved. This folder posts as one carousel of ${data.count}.`,
+          data.warning ? 'warning' : 'success'
+        );
+      } else {
+        showToast('Could not move those files.', 'error');
+      }
+    } catch (err) {
+      showToast('Could not reach the server.', 'error');
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleUnfile = async (ids) => {
+    if (!ids.length) return;
+    setFolderBusy(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/folders/unfile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaIds: ids }),
+      }, token);
+      if (res.ok) {
+        setSelectedIds([]);
+        await Promise.all([fetchMedia(), fetchFolders()]);
+        showToast('Taken out of the folder — each posts on its own again.', 'success');
+      }
+    } catch (err) {
+      showToast('Could not reach the server.', 'error');
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const handleDeleteFolder = async (folder) => {
+    if (!window.confirm(
+      `Remove the folder "${folder.name}"?\n\nThe ${folder.count} file(s) inside are NOT deleted — ` +
+      `they go back to posting one at a time.`
+    )) return;
+    setFolderBusy(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/media/folders/${folder.id}`, {
+        method: 'DELETE',
+      }, token);
+      if (res.ok) {
+        const data = await res.json();
+        if (openFolder?.id === folder.id) setOpenFolder(null);
+        await Promise.all([fetchMedia(), fetchFolders()]);
+        showToast(`Folder removed. ${data.released} file(s) kept.`, 'success');
+      }
+    } catch (err) {
+      showToast('Could not reach the server.', 'error');
+    } finally {
+      setFolderBusy(false);
+    }
+  };
+
+  const toggleSelected = (id) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   // Sent in batches rather than one 242-file request: a single upload of a
@@ -580,12 +708,155 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
           </div>
         )}
 
+        {/* FOLDERS — each folder publishes as ONE carousel post */}
+        <div className="glass-panel" style={{ padding: '1.1rem 1.35rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <Layers size={17} color="var(--primary-color)" />
+            <strong style={{ fontSize: '0.95rem' }}>Carousel folders</strong>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Every file in a folder goes out as one carousel post. Loose files post one at a time.
+            </span>
+            <button className="btn btn-secondary" style={{ height: 34, marginLeft: 'auto' }}
+              onClick={() => setCreatingFolder(v => !v)}>
+              <FolderPlus size={15} /> New folder
+            </button>
+          </div>
+
+          {creatingFolder && (
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem', flexWrap: 'wrap' }}>
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); }}
+                placeholder="Folder name — e.g. Diwali launch set"
+                style={{
+                  flex: '1 1 260px', padding: '0.55rem 0.8rem', borderRadius: 8,
+                  border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.04)',
+                  color: 'inherit', fontSize: '0.88rem',
+                }}
+              />
+              <button className="btn btn-primary" style={{ height: 38 }}
+                onClick={handleCreateFolder} disabled={folderBusy || !newFolderName.trim()}>
+                Create
+              </button>
+              <button className="btn btn-secondary" style={{ height: 38 }}
+                onClick={() => { setCreatingFolder(false); setNewFolderName(''); }}>
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {folders.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', marginTop: '0.95rem' }}>
+              {folders.map(f => (
+                <div key={f.id} style={{
+                  border: '1px solid var(--border-color)', borderRadius: 10,
+                  padding: '0.65rem 0.8rem', minWidth: 190, background: 'rgba(255,255,255,0.03)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {f.count ? <FolderOpen size={16} color="#6ea8fe" /> : <Folder size={16} color="var(--text-muted)" />}
+                    <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{f.name}</span>
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                    {f.count} file{f.count === 1 ? '' : 's'} · one carousel post
+                  </div>
+                  {f.warning && (
+                    <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: '0.35rem', lineHeight: 1.35 }}>
+                      {f.warning}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.55rem', flexWrap: 'wrap' }}>
+                    {selectedIds.length > 0 && (
+                      <button className="btn btn-primary" style={{ height: 30, fontSize: '0.76rem', padding: '0 0.6rem' }}
+                        onClick={() => handleMoveToFolder(f.id)} disabled={folderBusy}>
+                        Move {selectedIds.length} here
+                      </button>
+                    )}
+                    <button className="btn btn-secondary" style={{ height: 30, fontSize: '0.76rem', padding: '0 0.6rem' }}
+                      onClick={() => setOpenFolder(openFolder?.id === f.id ? null : f)}>
+                      {openFolder?.id === f.id ? 'Hide' : 'View'}
+                    </button>
+                    <button className="btn btn-secondary" style={{ height: 30, fontSize: '0.76rem', padding: '0 0.6rem', color: '#f87171' }}
+                      onClick={() => handleDeleteFolder(f)} disabled={folderBusy}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {openFolder && (
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem' }}>
+              <div style={{ fontSize: '0.83rem', marginBottom: '0.6rem' }}>
+                <strong>{openFolder.name}</strong>
+                <span style={{ color: 'var(--text-muted)' }}> — slides in posting order</span>
+              </div>
+              {(folders.find(f => f.id === openFolder.id)?.items || []).length === 0 ? (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
+                  Empty. Tick files in the table below, then press “Move here”.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  {(folders.find(f => f.id === openFolder.id)?.items || []).map((m, i) => (
+                    <div key={m.id} style={{ width: 78, position: 'relative' }}>
+                      <div style={{ width: 78, height: 78, borderRadius: 8, overflow: 'hidden', background: '#000' }}>
+                        {(m.mimeType || '').startsWith('video/')
+                          ? <video src={m.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                      </div>
+                      <div style={{
+                        position: 'absolute', top: 3, left: 3, background: 'rgba(0,0,0,0.7)',
+                        borderRadius: 4, fontSize: '0.65rem', padding: '1px 5px',
+                      }}>{i + 1}</div>
+                      <button
+                        onClick={() => handleUnfile([m.id])}
+                        title="Take out of this folder"
+                        style={{
+                          position: 'absolute', top: 3, right: 3, background: 'rgba(0,0,0,0.7)',
+                          border: 'none', borderRadius: 4, color: '#f87171', cursor: 'pointer',
+                          padding: '1px 4px', lineHeight: 1,
+                        }}>×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Selection bar — appears only when files are ticked */}
+        {selectedIds.length > 0 && (
+          <div className="glass-panel" style={{
+            padding: '0.75rem 1.25rem', marginBottom: '1rem', display: 'flex',
+            alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+            border: '1px solid rgba(110,168,254,0.35)',
+          }}>
+            <strong style={{ fontSize: '0.88rem' }}>{selectedIds.length} selected</strong>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              {folders.length === 0
+                ? 'Create a folder above to group them into one carousel.'
+                : 'Press “Move here” on a folder above.'}
+            </span>
+            <button className="btn btn-secondary" style={{ height: 32, fontSize: '0.8rem' }}
+              onClick={() => handleUnfile(selectedIds)} disabled={folderBusy}>
+              Take out of folders
+            </button>
+            <button className="btn btn-secondary" style={{ height: 32, fontSize: '0.8rem', marginLeft: 'auto' }}
+              onClick={() => setSelectedIds([])}>
+              Clear
+            </button>
+          </div>
+        )}
+
         {/* TABLE SECTION */}
         <div className="glass-panel" style={{ overflowX: 'auto', border: 'none', background: 'transparent', boxShadow: 'none' }}>
           <div className="glass-panel" style={{ overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '1rem 0 1rem 1.25rem', fontWeight: '600', width: 34 }}></th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Media</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Base Caption</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Status</th>
@@ -596,13 +867,13 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       <span className="spinner" style={{ width: 20, height: 20 }} />
                     </td>
                   </tr>
                 ) : loadError ? (
                   <tr>
-                    <td colSpan="5" style={{ padding: '2.5rem', textAlign: 'center' }}>
+                    <td colSpan="6" style={{ padding: '2.5rem', textAlign: 'center' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
                         <AlertTriangle size={22} color="#f87171" />
                         <div style={{ color: '#fca5a5', fontSize: '0.9rem', maxWidth: 460, lineHeight: 1.55 }}>
@@ -617,7 +888,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   </tr>
                 ) : mediaList.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                       No media yet. Upload a file above, or generate one in AI Video Studio.
                     </td>
                   </tr>
@@ -627,8 +898,21 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                     const isAudio = item.mimeType?.startsWith('audio/');
                     const caption = item.caption || item.prompt || '';
                     const inactive = item.isActive === false;
+                    const inFolder = folders.find(f => f.id === item.folderId);
                     return (
                       <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <td style={{ padding: '1rem 0 1rem 1.25rem', width: 34 }}>
+                          {/* Tracks are never posted, so grouping one into a
+                              carousel would only produce a broken slide. */}
+                          {!isAudio && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(item.id)}
+                              onChange={() => toggleSelected(item.id)}
+                              style={{ width: 15, height: 15, cursor: 'pointer' }}
+                            />
+                          )}
+                        </td>
                         <td style={{ padding: '1rem 1.5rem', width: '80px' }}>
                           <div style={{ width: '56px', height: '56px', borderRadius: '8px', overflow: 'hidden', background: '#000', position: 'relative' }}>
                             {isAudio ? (
@@ -660,6 +944,11 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                             {item.branded === false && (
                               <span style={{ marginLeft: '0.5rem', color: '#fbbf24' }}>
                                 &middot; no watermark yet
+                              </span>
+                            )}
+                            {inFolder && (
+                              <span style={{ marginLeft: '0.5rem', color: '#6ea8fe' }}>
+                                &middot; in “{inFolder.name}” — posts as part of that carousel
                               </span>
                             )}
                           </p>

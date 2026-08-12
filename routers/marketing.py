@@ -46,6 +46,7 @@ from database import (
     EmailCampaign,
     MarketingLog,
     Media,
+    MediaFolder,
     utc_now,
 )
 from fastapi.responses import RedirectResponse
@@ -527,6 +528,21 @@ async def _generate_post_caption(profile, media, product=None) -> str:
             known.append(f"WHAT IS WORKING ON THIS ACCOUNT: {guidance}")
     except Exception as e:
         logger.debug(f"No engagement guidance available: {e}")
+
+    # What this business has already sold, and the angle that sold it. The
+    # organic signal above is weak by construction -- likes and comments on an
+    # account with no audience. Ad results are the opposite: a hook that
+    # returned 14x on paid traffic is expensive, unambiguous evidence about
+    # which product converts and which problem the buyer actually feels. That
+    # evidence existed the whole time and never reached the captions.
+    try:
+        from services.proven_offers import for_profile, to_caption_guidance as offers_guidance
+
+        proven = offers_guidance(for_profile(profile))
+        if proven:
+            known.append(proven)
+    except Exception as e:
+        logger.debug(f"No proven-offer guidance available: {e}")
 
     # When the post is about a specific catalog item, the product's own facts
     # outrank the brand-level summary — that is what makes an e-commerce post
@@ -1911,9 +1927,233 @@ async def get_workspace_media(request: Request) -> Any:
                 "needsCaption": not (m.caption or m.prompt),
                 "branded": _is_branded(m),
                 "createdAt": m.createdAt.isoformat() if m.createdAt else None,
+                # A loose file posts on its own; a filed one is a slide of its
+                # folder's carousel.
+                "folderId": m.folderId,
+                "folderPosition": m.folderPosition or 0,
             }
             for m in media_list
         ]
+
+
+# Instagram publishes at most 10 items in one carousel and rejects the whole
+# container above that, so a folder of 14 must not be sent and hoped for.
+CAROUSEL_MAX = 10
+# Below two slides it is not a carousel; it publishes as a normal single post.
+CAROUSEL_MIN = 2
+
+
+class FolderIn(BaseModel):
+    name: str
+    caption: Optional[str] = None
+
+
+class FolderPatch(BaseModel):
+    name: Optional[str] = None
+    caption: Optional[str] = None
+    isActive: Optional[bool] = None
+
+
+class FolderItems(BaseModel):
+    mediaIds: List[str]
+
+
+async def _load_owned_folder(session, folder_id: str, workspace_id: str | None) -> MediaFolder:
+    """Fetch a folder, refusing ids belonging to another business."""
+    folder = await session.get(MediaFolder, folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if workspace_id and folder.businessProfileId and folder.businessProfileId != workspace_id:
+        raise HTTPException(status_code=403, detail="That folder belongs to another business")
+    return folder
+
+
+def _folder_warning(count: int, videos: int) -> Optional[str]:
+    """What is wrong with this folder as a carousel, in the user's terms.
+
+    Reported rather than silently corrected: a folder of 14 images quietly
+    truncated to 10 looks like it worked, and the missing four are only
+    discovered on the live post.
+    """
+    if count == 0:
+        return "Empty — add images and it will post as one carousel."
+    if count < CAROUSEL_MIN:
+        return "Only one file — this will post as a normal single post, not a carousel."
+    if count > CAROUSEL_MAX:
+        return (
+            f"{count} files, but Instagram allows {CAROUSEL_MAX} in a carousel. "
+            f"Only the first {CAROUSEL_MAX} will be posted."
+        )
+    if videos:
+        return (
+            f"{videos} video(s) in this folder. Videos publish as separate Reels, "
+            f"not as slides of the carousel."
+        )
+    return None
+
+
+@router.get("/media/folders")
+async def list_media_folders(request: Request) -> Any:
+    """Folders in the active workspace, each with its slide count."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        stmt = select(MediaFolder)
+        if workspace_id:
+            stmt = stmt.where(MediaFolder.businessProfileId == workspace_id)
+        folders = (await session.execute(stmt.order_by(MediaFolder.createdAt.desc()))).scalars().all()
+
+        out = []
+        for f in folders:
+            items = (await session.execute(
+                select(Media).where(Media.folderId == f.id)
+                .order_by(Media.folderPosition, Media.createdAt)
+            )).scalars().all()
+            videos = sum(1 for m in items if (m.mimeType or "").startswith("video/"))
+            out.append({
+                "id": f.id,
+                "name": f.name,
+                "caption": f.caption,
+                "isActive": f.isActive,
+                "count": len(items),
+                "videos": videos,
+                "warning": _folder_warning(len(items), videos),
+                "cover": items[0].url if items else None,
+                "items": [
+                    {
+                        "id": m.id,
+                        "url": m.url,
+                        "filename": m.filename,
+                        "mimeType": m.mimeType,
+                        "caption": m.caption or m.prompt,
+                        "folderPosition": m.folderPosition or 0,
+                    }
+                    for m in items
+                ],
+                "createdAt": f.createdAt.isoformat() if f.createdAt else None,
+            })
+        return out
+
+
+@router.post("/media/folders")
+async def create_media_folder(payload: FolderIn, request: Request) -> Any:
+    """Create an empty folder. Files are moved in afterwards."""
+    workspace_id = request.headers.get("x-workspace-id")
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="A folder needs a name")
+
+    async with get_tenant_session(workspace_id) as session:
+        folder = MediaFolder(
+            name=name[:120],
+            caption=(payload.caption or "").strip() or None,
+            businessProfileId=workspace_id,
+        )
+        session.add(folder)
+        await session.commit()
+        logger.info(f"Media folder created: {name} in workspace {workspace_id}")
+        return {"id": folder.id, "name": folder.name, "count": 0}
+
+
+@router.patch("/media/folders/{folder_id}")
+async def update_media_folder(folder_id: str, payload: FolderPatch, request: Request) -> Any:
+    """Rename a folder, set its carousel caption, or pause it."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        folder = await _load_owned_folder(session, folder_id, workspace_id)
+        if payload.name is not None:
+            name = payload.name.strip()
+            if not name:
+                raise HTTPException(status_code=400, detail="A folder needs a name")
+            folder.name = name[:120]
+        if payload.caption is not None:
+            folder.caption = payload.caption.strip() or None
+        if payload.isActive is not None:
+            folder.isActive = payload.isActive
+        folder.updatedAt = utc_now()
+        await session.commit()
+        return {"id": folder.id, "name": folder.name, "isActive": folder.isActive}
+
+
+@router.delete("/media/folders/{folder_id}")
+async def delete_media_folder(folder_id: str, request: Request) -> Any:
+    """Remove the folder. Its files become loose again — nothing is deleted."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        folder = await _load_owned_folder(session, folder_id, workspace_id)
+        items = (await session.execute(
+            select(Media).where(Media.folderId == folder.id)
+        )).scalars().all()
+        for m in items:
+            m.folderId = None
+            m.folderPosition = 0
+        await session.delete(folder)
+        await session.commit()
+        logger.info(f"Media folder {folder.name} removed; {len(items)} file(s) released")
+        return {"released": len(items)}
+
+
+@router.post("/media/folders/{folder_id}/items")
+async def add_media_to_folder(folder_id: str, payload: FolderItems, request: Request) -> Any:
+    """Move assets into a folder, appended after whatever is already there."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        folder = await _load_owned_folder(session, folder_id, workspace_id)
+
+        highest = (await session.execute(
+            select(func.max(Media.folderPosition)).where(Media.folderId == folder.id)
+        )).scalar()
+        position = (highest or 0) + 1
+
+        moved = 0
+        for media_id in payload.mediaIds:
+            media = await _load_owned_media(session, media_id, workspace_id)
+            media.folderId = folder.id
+            media.folderPosition = position
+            position += 1
+            moved += 1
+
+        await session.commit()
+
+        items = (await session.execute(
+            select(Media).where(Media.folderId == folder.id)
+        )).scalars().all()
+        videos = sum(1 for m in items if (m.mimeType or "").startswith("video/"))
+        return {
+            "moved": moved,
+            "count": len(items),
+            "warning": _folder_warning(len(items), videos),
+        }
+
+
+@router.post("/media/folders/unfile")
+async def remove_media_from_folder(payload: FolderItems, request: Request) -> Any:
+    """Take assets out of whatever folder they are in. They post singly again."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        released = 0
+        for media_id in payload.mediaIds:
+            media = await _load_owned_media(session, media_id, workspace_id)
+            if media.folderId:
+                media.folderId = None
+                media.folderPosition = 0
+                released += 1
+        await session.commit()
+        return {"released": released}
+
+
+@router.post("/media/folders/{folder_id}/order")
+async def reorder_folder(folder_id: str, payload: FolderItems, request: Request) -> Any:
+    """Set slide order. mediaIds is the folder's contents in the order wanted."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        folder = await _load_owned_folder(session, folder_id, workspace_id)
+        for index, media_id in enumerate(payload.mediaIds):
+            media = await _load_owned_media(session, media_id, workspace_id)
+            if media.folderId != folder.id:
+                continue
+            media.folderPosition = index
+        await session.commit()
+        return {"ordered": len(payload.mediaIds)}
 
 
 async def _load_owned_media(session, media_id: str, workspace_id: str | None) -> Media:

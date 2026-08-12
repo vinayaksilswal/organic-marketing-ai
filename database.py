@@ -112,6 +112,13 @@ class BusinessProfile(Base):
     # for one caption and not enough to rotate -- the same ten on every post is
     # the clearest automation signal an account can send.
     hashtagSets = Column(JSON, nullable=True)
+    # Products and angles this business has already sold with, taken from its ad
+    # results. Two of these businesses have real revenue from paid and almost
+    # none from organic, and the reason is visible in the data: paid knows which
+    # product converts and which problem the buyer feels, and the organic
+    # captions were written from a brand description that knows neither.
+    # A list of {product, problem, audience, proof, offer, best_format}.
+    provenOffers = Column(JSON, nullable=True)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     # AI Brand Context Fields
@@ -440,6 +447,41 @@ class EmailCampaign(Base):
     businessProfile = relationship('BusinessProfile', back_populates='emailcampaigns')
 
 
+class MediaFolder(Base):
+    """A folder of assets that publishes as ONE carousel post.
+
+    The catalog was flat, so every asset was its own post and there was no way
+    to say "these six images belong together". A folder is that statement: the
+    files inside it go out as a single carousel, in order, under one caption.
+
+    It is a real table rather than a name written on each asset so an empty
+    folder can exist. The user makes the folder first and moves files into it
+    afterwards, which is impossible if the folder is only implied by its
+    members.
+
+    Deleting a folder never deletes the assets inside it -- they simply become
+    loose files again, each its own post. Losing a business's media to a
+    mis-clicked folder delete would be unrecoverable.
+    """
+
+    __tablename__ = "MediaFolder"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    name = Column(String, nullable=False)
+    # A caption written for the carousel as a whole. Optional: left empty, the
+    # normal caption writer runs against the folder's first asset.
+    caption = Column(Text, nullable=True)
+    # Excluded from automatic posting while false, without unpacking it.
+    isActive = Column(Boolean, default=True, nullable=False)
+    businessProfileId = Column(
+        String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True
+    )
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    medias = relationship('Media', back_populates='folder')
+
+
 class Media(Base):
     __tablename__ = "Media"
 
@@ -479,6 +521,16 @@ class Media(Base):
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     businessProfileId = Column(String, ForeignKey('BusinessProfile.id', ondelete='CASCADE'), nullable=True)
     businessProfile = relationship('BusinessProfile', back_populates='medias')
+    # NULL means a loose file, which posts on its own. Set means this asset is
+    # one slide of its folder's carousel. SET NULL on delete so removing a
+    # folder frees its files rather than destroying them.
+    folderId = Column(
+        String, ForeignKey('MediaFolder.id', ondelete='SET NULL'), nullable=True
+    )
+    # Slide order within the folder. A carousel whose slides arrive in creation
+    # order is not the same post as one the user arranged deliberately.
+    folderPosition = Column(Integer, default=0, nullable=False)
+    folder = relationship('MediaFolder', back_populates='medias')
 
 
 class MarketingLog(Base):

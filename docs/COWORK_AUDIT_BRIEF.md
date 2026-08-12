@@ -1,4 +1,4 @@
-# Cowork Brief — Conversion & Enterprise-Readiness Audit
+﻿# Cowork Brief â€” Conversion & Enterprise-Readiness Audit
 
 Paste everything below the line into Cowork as a single prompt. It is written to
 stand alone: the agent starts cold and has no memory of this project.
@@ -7,14 +7,14 @@ stand alone: the agent starts cold and has no memory of this project.
 
 ## Context
 
-**Product:** OrganicAI — a SaaS that runs organic social marketing on autopilot for
+**Product:** OrganicAI â€” a SaaS that runs organic social marketing on autopilot for
 small businesses. A user adds their business (website + description), the AI reads
 the site to build a brand profile, generates creatives and video prompts, and
 publishes to Facebook, Instagram, LinkedIn and X on a schedule (default every 2
 hours). Single plan, $17/month, PayPal only.
 
 **Live:** https://organic-marketing-ai.vercel.app
-**Backend:** https://organic-marketing-ai1.onrender.com (FastAPI)
+**Backend:** https://organic-marketing-ai-0abh.onrender.com (FastAPI)
 **Repo:** the working directory you are in.
 
 **Stack:** React 18 + Vite (`frontend/`), FastAPI + SQLAlchemy async + PostgreSQL,
@@ -37,8 +37,8 @@ Work in this order.
 ### 1. Map the real user journey
 
 Walk the actual flow in the code and, where possible, the live site:
-landing → signup → checkout → onboarding → add business → connect socials →
-creatives generated → posts queued → review/approve → published.
+landing â†’ signup â†’ checkout â†’ onboarding â†’ add business â†’ connect socials â†’
+creatives generated â†’ posts queued â†’ review/approve â†’ published.
 
 For each step record: what the user sees, what could confuse them, what could
 fail silently, and how many clicks/fields it takes. Flag any step where a
@@ -50,7 +50,7 @@ reasonable person would give up.
 
 - Does the hero make the value proposition obvious in under 5 seconds?
 - Is there a credible reason to trust this? (Note: fake customer logos were
-  deliberately removed — do **not** propose adding social proof the business
+  deliberately removed â€” do **not** propose adding social proof the business
   cannot substantiate. Propose ways to earn trust honestly instead.)
 - Is the pricing objection handled? Is the risk reversal clear?
 - Is there a single dominant call to action, or are there competing ones?
@@ -60,7 +60,7 @@ reasonable person would give up.
 ### 3. Find the "too many ways to do the same thing" problem
 
 The owner's words: *"there many options for the same thing, aline everything up."*
-There is real duplication across the dashboard — e.g. content generation is
+There is real duplication across the dashboard â€” e.g. content generation is
 reachable from the Overview campaign generator, the AI Video Studio, and the
 Media & Catalog uploader; posting cadence is configurable in both the Workspaces
 automation tab and the Social Scheduler. Inventory every place a user can perform
@@ -86,7 +86,7 @@ This is the highest-stakes area. Trace what happens after a user clicks
   fail silently?
 - Is there anywhere a failure is swallowed without reaching a log or the UI?
 
-## Known issues — already fixed, do not re-report
+## Known issues â€” already fixed, do not re-report
 
 - Fake customer logo marquee on the landing page (removed)
 - Team page rendered unstyled because it used Tailwind classes that are not
@@ -98,7 +98,7 @@ This is the highest-stakes area. Trace what happens after a user clicks
 - A JSX nesting bug left `social-proof-section` unclosed on the landing page
 - New users were being auto-assigned a "Default Workspace"
 
-## Known issue — still open, needs your plan
+## Known issue â€” still open, needs your plan
 
 The live backend on Render is serving a stale build: every endpoint added
 recently (`/api/v1/team`, `/api/v1/meta/connect`, `/api/v1/admin/system-status`)
@@ -115,15 +115,15 @@ whether the current `main` already fixes these, and if not, fix them.
 
 A single markdown document, `docs/ENTERPRISE_AUDIT.md`, containing:
 
-1. **Executive summary** — the three changes most likely to increase paid
+1. **Executive summary** â€” the three changes most likely to increase paid
    conversion, and the three most likely to reduce churn. One paragraph each.
-2. **Journey map** — the table from step 1, with a friction score per step.
-3. **Findings** — each with: severity (critical / high / medium / low), the
+2. **Journey map** â€” the table from step 1, with a friction score per step.
+3. **Findings** â€” each with: severity (critical / high / medium / low), the
    evidence (`file:line`), the user-visible consequence, and the proposed fix.
    Order by severity. Separate revenue-affecting findings into their own section.
-4. **Consolidation plan** — the duplicate-surface inventory and the single
+4. **Consolidation plan** â€” the duplicate-surface inventory and the single
    canonical home proposed for each.
-5. **Implementation plan** — sequenced, with each item small enough to ship
+5. **Implementation plan** â€” sequenced, with each item small enough to ship
    independently. Mark which are safe to do without design input.
 
 ## Ground rules
@@ -137,5 +137,5 @@ A single markdown document, `docs/ENTERPRISE_AUDIT.md`, containing:
 - Prefer removing a surface over adding one. The owner's complaint is that there
   is already too much, not too little.
 - Do not make changes to payment logic, authentication, or the Meta integration
-  as part of the audit — report on them and propose fixes, but leave the code
+  as part of the audit â€” report on them and propose fixes, but leave the code
   alone so the changes can be reviewed deliberately.

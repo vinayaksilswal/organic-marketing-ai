@@ -1,10 +1,10 @@
-import urllib.request
+﻿import urllib.request
 import urllib.error
 import json
 import time
 import random
 
-base_url = "https://organic-marketing-ai1.onrender.com/api/v1"
+base_url = "https://organic-marketing-ai-0abh.onrender.com/api/v1"
 rand_email = f"test_{random.randint(1000,9999)}@example.com"
 password = "password123"
 

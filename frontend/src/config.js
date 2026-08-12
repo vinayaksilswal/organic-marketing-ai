@@ -1,4 +1,8 @@
-export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai1.onrender.com/api/v1';
+// The fallback is only reached when VITE_API_URL is unset — a local run or a
+// preview deploy that did not inherit the env var. It pointed at
+// organic-marketing-ai1 long after that service was migrated away from, so
+// every such build silently talked to a dead host.
+export const API_BASE = import.meta.env.VITE_API_URL || 'https://organic-marketing-ai-0abh.onrender.com/api/v1';
 
 export const authFetch = async (url, options = {}, token, onLogout) => {
   const activeWorkspaceId = localStorage.getItem('activeWorkspaceId');

@@ -466,8 +466,25 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             from routers.marketing import _generate_post_caption, _strip_urls
 
             final_caption = None
+
+            # A folder carousel can carry a caption the user wrote for the set
+            # as a whole. Six slides telling one story rarely read well under a
+            # caption generated from slide one alone, so when the user has
+            # written one it wins outright.
+            folder_caption = None
+            if media_obj is not None and getattr(media_obj, "folderId", None):
+                try:
+                    from database import MediaFolder
+
+                    folder = await session.get(MediaFolder, media_obj.folderId)
+                    folder_caption = (getattr(folder, "caption", None) or "").strip() or None
+                except Exception as e:
+                    logger.debug(f"Could not read folder caption: {e}")
+
             try:
-                if media_obj is not None or product is not None:
+                if folder_caption:
+                    final_caption = folder_caption
+                elif media_obj is not None or product is not None:
                     final_caption = await _generate_post_caption(
                         profile, media_obj, product=product
                     )
@@ -505,6 +522,26 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     f"description both contain {violations}"
                 )
                 return "blocked_by_caption_policy"
+
+            # A folder in the media catalog is ONE post carrying every file in
+            # it, so the chosen asset expands into its siblings here — after
+            # every branch above has settled on an asset and before anything is
+            # published. Instagram builds the carousel itself from multiple
+            # image URLs, so no separate carousel path is needed.
+            #
+            # Rotation already collapsed the folder to a single candidate, so
+            # this cannot make a folder post more often than a loose file.
+            if media_obj is not None and getattr(media_obj, "folderId", None):
+                from services.media_rotation import expand_to_group
+
+                slides = await expand_to_group(session, media_obj)
+                if len(slides) > 1:
+                    media_urls = [s.url for s in slides if s.url]
+                    logger.info(
+                        f"Workspace {workspace_id}: posting folder "
+                        f"{media_obj.folderId} as one carousel of "
+                        f"{len(media_urls)} slides"
+                    )
 
             # 4. Post to all platforms
             fb_post_id = None

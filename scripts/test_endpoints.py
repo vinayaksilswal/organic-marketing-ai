@@ -1,9 +1,9 @@
-import urllib.request
+﻿import urllib.request
 import json
 import ssl
 
 def run_test():
-    base_url = "https://organic-marketing-ai1.onrender.com/api/v1"
+    base_url = "https://organic-marketing-ai-0abh.onrender.com/api/v1"
     
     # Login
     print("Logging in...")

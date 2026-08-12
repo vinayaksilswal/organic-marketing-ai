@@ -1,9 +1,9 @@
-import urllib.request
+﻿import urllib.request
 import urllib.parse
 import json
 import uuid
 
-BASE_URL = "https://organic-marketing-ai1.onrender.com"
+BASE_URL = "https://organic-marketing-ai-0abh.onrender.com"
 
 def test_health():
     print("Testing /health...")

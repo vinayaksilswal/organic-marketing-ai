@@ -36,7 +36,7 @@ from typing import Any, List, Optional
 from loguru import logger
 from sqlalchemy import select
 
-from database import Media, SocialPost
+from database import Media, MediaFolder, SocialPost
 
 # Sorts a never-published asset ahead of every published one.
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -61,6 +61,10 @@ _MAX_CATALOG = int(os.getenv("MEDIA_ROTATION_MAX_CATALOG", "20000"))
 # looks never-used again.
 _MAX_HISTORY = 2000
 
+# Instagram rejects a carousel container holding more than ten children
+# outright, so a folder above this publishes its first ten rather than failing.
+CAROUSEL_MAX = 10
+
 
 class _Candidate:
     """A catalog row carrying only what rotation reads.
@@ -69,15 +73,23 @@ class _Candidate:
     prompt, or the LargeBinary column. The winner is re-fetched in full.
     """
 
-    __slots__ = ("id", "url", "isActive", "mimeType", "aiGenerated", "createdAt")
+    __slots__ = (
+        "id", "url", "isActive", "mimeType", "aiGenerated", "createdAt",
+        "folderId", "folderPosition",
+    )
 
-    def __init__(self, id, url, isActive, mimeType, aiGenerated, createdAt):
+    def __init__(
+        self, id, url, isActive, mimeType, aiGenerated, createdAt,
+        folderId=None, folderPosition=0,
+    ):
         self.id = id
         self.url = url
         self.isActive = isActive
         self.mimeType = mimeType
         self.aiGenerated = aiGenerated
         self.createdAt = createdAt
+        self.folderId = folderId
+        self.folderPosition = folderPosition
 
 
 def _is_postable(media: Any) -> bool:
@@ -128,6 +140,90 @@ async def last_posted_kind(session: Any, workspace_id: str) -> Optional[str]:
     return _kind_of(media) if media else None
 
 
+async def _collapse_folders(
+    session: Any, workspace_id: str, catalog: List[Any]
+) -> List[Any]:
+    """Reduce each folder to a single candidate: its first slide.
+
+    A folder is ONE post -- six images in a folder publish as one carousel, not
+    as six posts. Left uncollapsed, every slide would be its own candidate, so
+    a folder of six would be selected six times as often as a loose file and
+    each selection would publish the whole carousel again.
+
+    The representative is the first slide, which is also the URL that lands in
+    mediaUrls[0] when the carousel publishes. That keeps "when was this last
+    used" answerable from the post history exactly as it is for a loose file,
+    with no second bookkeeping path to drift.
+    """
+    filed = [c for c in catalog if c.folderId]
+    if not filed:
+        return catalog
+
+    # A paused folder leaves the rotation whole rather than shedding slides
+    # into it as loose files, which is what the user asked "pause" to mean.
+    active: dict = {}
+    folder_ids = {c.folderId for c in filed}
+    rows = (await session.execute(
+        select(MediaFolder.id, MediaFolder.isActive, MediaFolder.name)
+        .where(MediaFolder.id.in_(folder_ids))
+    )).all()
+    names = {}
+    for fid, is_active, name in rows:
+        active[fid] = is_active
+        names[fid] = name
+
+    first_of: dict = {}
+    for c in filed:
+        if not active.get(c.folderId, False):
+            continue
+        current = first_of.get(c.folderId)
+        # Ties on position fall back to creation order so the slide chosen as
+        # representative is stable between cycles.
+        key = (c.folderPosition or 0, c.createdAt or _EPOCH)
+        if current is None or key < current[0]:
+            first_of[c.folderId] = (key, c)
+
+    collapsed = [c for c in catalog if not c.folderId]
+    for _, (_, first) in first_of.items():
+        collapsed.append(first)
+
+    dropped = len(catalog) - len(collapsed)
+    if dropped:
+        logger.info(
+            f"Media rotation: {len(first_of)} folder(s) in {workspace_id} "
+            f"collapsed to one candidate each ({dropped} slide(s) not counted "
+            f"as separate posts)"
+        )
+    return collapsed
+
+
+async def expand_to_group(session: Any, media: Any) -> List[Any]:
+    """The full post for a chosen asset: a folder's slides, or just the asset.
+
+    Callers publish every URL returned. Instagram builds a carousel from
+    multiple images on its own, so this needs no separate carousel path.
+    """
+    folder_id = getattr(media, "folderId", None)
+    if not folder_id:
+        return [media]
+
+    slides = (await session.execute(
+        select(Media)
+        .where(Media.folderId == folder_id)
+        .order_by(Media.folderPosition, Media.createdAt)
+    )).scalars().all()
+    slides = [m for m in slides if _is_postable(m)]
+    if not slides:
+        return [media]
+
+    if len(slides) > CAROUSEL_MAX:
+        logger.warning(
+            f"Folder {folder_id} holds {len(slides)} slides; Instagram accepts "
+            f"{CAROUSEL_MAX} in one carousel, so the rest are not published."
+        )
+    return slides[:CAROUSEL_MAX]
+
+
 async def select_next_media(
     session: Any,
     workspace_id: str,
@@ -147,6 +243,7 @@ async def select_next_media(
         select(
             Media.id, Media.url, Media.isActive, Media.mimeType,
             Media.aiGenerated, Media.createdAt,
+            Media.folderId, Media.folderPosition,
         )
         .where(Media.businessProfileId == workspace_id)
         # Newest first: if a catalog ever exceeds the cap, the assets that fall
@@ -158,6 +255,7 @@ async def select_next_media(
         _Candidate(*row) for row in (await session.execute(catalog_stmt)).all()
     ]
     catalog = [c for c in catalog if _is_postable(c)]
+    catalog = await _collapse_folders(session, workspace_id, catalog)
     if not catalog:
         return None
 
