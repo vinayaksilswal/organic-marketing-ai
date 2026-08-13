@@ -60,32 +60,46 @@ GRAPH_BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 #   instagram_manage_insights  NOT on the live tokens -> no views/reach
 #   instagram_manage_contents  NOT on the live tokens -> cannot delete posts
 #
-# The last two ARE in the scope list below, and the tokens still lack them,
-# because every stored token was issued BEFORE they were added here. A scope is
-# fixed at the moment consent is given; adding one later does nothing for a
-# connection that already exists. Reconnecting the account is what picks them
-# up, and DELETE /{ig-media-id} starts working the moment
-# instagram_manage_contents is on the token.
+# The last two are absent from the tokens because Meta will not issue them to
+# this app at all yet. Asking for them produced, on 13 Aug 2026:
+#
+#   Invalid Scopes: instagram_manage_insights, instagram_manage_contents,
+#   read_insights
+#
+# with an error page in place of the consent dialog. So they are NOT requested
+# below. Views, reach and post deletion are unavailable until App Review
+# approves those permissions for the app, and only then may they be listed.
 #
 # pages_read_engagement is listed as GRANTED above after being recorded as
 # DENIED for weeks. It was never denied. The "denied" reading came from the
 # scope list rather than from asking Meta, and debug_token on 13 Aug 2026
 # shows it granted on all six Pages. Check tokens, not this file.
 #
-# A scope in this list is not a permission. Meta grants the ones the app has
-# passed App Review for and silently withholds the rest, which is why the
-# insights calls fail with a permission error while the login succeeds.
+# A scope in this list is not a permission, and a permission not yet approved
+# is not a valid scope. Both directions have cost real time here.
 META_SCOPES = ",".join([
     "pages_show_list",
     "pages_read_engagement",
     "pages_manage_posts",
     "instagram_basic",
     "instagram_content_publish",
-    # Analytics. Denied until App Review approves them; requesting them now
-    # means no second OAuth round trip for every already-connected customer.
-    "instagram_manage_insights",
-    "instagram_manage_contents",
-    "read_insights",
+    # instagram_manage_insights, instagram_manage_contents and read_insights
+    # were requested here and are NOT in this list any more. Meta rejects them
+    # outright for this app:
+    #
+    #   Invalid Scopes: instagram_manage_insights, instagram_manage_contents,
+    #   read_insights
+    #
+    # and serves an error page instead of the consent dialog, so asking for
+    # them did not merely fail to grant them -- it broke the login flow for
+    # anyone with a developer role on the app. Meta's own note says ordinary
+    # users would ignore them, which means the cost was invisible in testing
+    # and total for the operator.
+    #
+    # A permission only becomes a valid scope AFTER App Review approves it for
+    # the app. Listing one early does not queue it up; it invalidates the
+    # whole request. They go back in the moment they are approved, and not
+    # before.
     # Required when the Page belongs to a Business Portfolio rather than the
     # personal account. Without it /me/accounts returns an empty list even
     # though the Page permissions were granted — which looked exactly like
