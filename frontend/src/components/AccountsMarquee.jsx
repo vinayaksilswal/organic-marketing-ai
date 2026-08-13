@@ -87,12 +87,15 @@ const Chip = ({ account }) => {
         // stands in rather than leaving a broken-image box on the page.
         <span className="omai-chip-av">{(account.name || '?').charAt(0).toUpperCase()}</span>
       )}
-      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.22 }}>
-        <span style={{ fontSize: '.87rem', fontWeight: 660, color: '#0b1020' }}>
+      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.28 }}>
+        {/* The account name is the whole point of the strip -- it is the
+            evidence. It was set smaller than the platform label it sits
+            above, which buried it. */}
+        <span style={{ fontSize: '.98rem', fontWeight: 700, color: '#0b1020', letterSpacing: '-.012em' }}>
           {account.name}
         </span>
-        <span style={{ fontSize: '.7rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '.28rem' }}>
-          <Icon size={11} color={tint} />
+        <span style={{ fontSize: '.72rem', color: tint, fontWeight: 600, display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+          <Icon size={12} color={tint} />
           {account.platform === 'instagram' ? 'Instagram' : 'Facebook Page'}
         </span>
       </span>
@@ -120,12 +123,15 @@ const AccountsMarquee = () => {
   return (
     <div style={{ padding: '0 0 1rem' }}>
       <style>{css}</style>
+      {/* No count. A number invites the reader to judge how small it is, and
+          it would have to be maintained as truth as the list changes. The
+          accounts themselves are the claim. */}
       <p style={{
         textAlign: 'center', fontSize: '.74rem', fontWeight: 700,
         letterSpacing: '.1em', textTransform: 'uppercase',
         color: '#94a3b8', marginBottom: '1.15rem',
       }}>
-        {accounts.length} accounts publishing on autopilot right now
+        Publishing on autopilot right now
       </p>
       <div className="omai-marquee-mask">
         <div className="omai-marquee-track">

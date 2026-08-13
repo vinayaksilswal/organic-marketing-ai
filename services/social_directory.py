@@ -14,6 +14,7 @@ an empty strip.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,23 @@ GRAPH = "https://graph.facebook.com/v21.0"
 # Long enough that Meta is called a handful of times an hour no matter the
 # traffic, short enough that a newly connected account appears the same day.
 CACHE_MINUTES = 30
+
+# Which businesses appear on the public page.
+#
+# Not every connected account belongs on a marketing site. This is the set the
+# operator chose to show, and everything else is simply absent -- there is no
+# "show all" default, because appearing on someone else's sales page is not
+# something a customer agrees to by connecting an Instagram account. When
+# other people sign up, this becomes a per-profile opt-in flag; the shape of
+# the decision is the same, only the storage changes.
+FEATURED = {
+    name.strip().lower()
+    for name in os.getenv(
+        "LANDING_FEATURED_BUSINESSES",
+        "quantcai,Lumively,Billionaire Goal777,MyCart4U",
+    ).split(",")
+    if name.strip()
+}
 
 _cache: Dict[str, Any] = {"at": 0.0, "accounts": []}
 
@@ -87,9 +105,13 @@ async def _build() -> List[Dict[str, str]]:
             .order_by(BusinessProfile.name)
         )).all()
 
-    accounts: List[Dict[str, str]] = []
+    instagram: List[Dict[str, str]] = []
+    facebook: List[Dict[str, str]] = []
+
     async with httpx.AsyncClient(timeout=20) as client:
-        for _profile, conn in rows:
+        for profile, conn in rows:
+            if (profile.name or "").strip().lower() not in FEATURED:
+                continue
             if not conn.fbAccessToken:
                 continue
             try:
@@ -100,13 +122,20 @@ async def _build() -> List[Dict[str, str]]:
             if conn.igAccountId:
                 account = await _instagram_profile(client, conn.igAccountId, token)
                 if account:
-                    accounts.append(account)
+                    instagram.append(account)
             if conn.fbPageId:
                 account = await _facebook_profile(client, conn.fbPageId, token)
                 if account:
-                    accounts.append(account)
+                    facebook.append(account)
 
-    return accounts
+    # Every Instagram first, then every Facebook Page.
+    #
+    # Built brand-by-brand, the strip read "quantcai Instagram, Quantcai
+    # Facebook, Lumively Instagram, Lumively Facebook" -- the same name twice
+    # in a row, which looks like a duplicate rather than two channels and
+    # makes a short list feel even shorter. Splitting by platform puts three
+    # different businesses between a brand's two entries.
+    return instagram + facebook
 
 
 async def public_accounts(force: bool = False) -> List[Dict[str, str]]:

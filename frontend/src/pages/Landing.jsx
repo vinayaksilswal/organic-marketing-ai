@@ -8,6 +8,7 @@ import { Helmet } from 'react-helmet-async';
 
 import AccountsMarquee from '../components/AccountsMarquee';
 import CardRail from '../components/CardRail';
+import CountUp from '../components/CountUp';
 import { API_BASE } from '../config';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
@@ -511,10 +512,32 @@ const Landing = () => {
             ))}
           </div>
 
+          {/* The one number on the page that is checkable and grows on its own.
+              It was set at footnote size, which wasted it. */}
           {stats?.posts > 0 && (
-            <p style={{ textAlign: 'center', marginTop: '2.5rem', fontSize: '.88rem', color: 'var(--ink-faint)' }}>
-              <strong style={{ color: 'var(--ink)' }}>{stats.posts.toLocaleString()}</strong> posts generated on the platform so far
-            </p>
+            <div style={{ textAlign: 'center', marginTop: '3.2rem' }}>
+              <CountUp
+                value={stats.posts}
+                style={{
+                  display: 'block',
+                  fontSize: 'clamp(3.2rem, 8vw, 5.6rem)',
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  letterSpacing: '-.045em',
+                  background: 'linear-gradient(120deg, var(--violet), var(--blue) 55%, var(--pink))',
+                  WebkitBackgroundClip: 'text',
+                  backgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              />
+              <p style={{
+                marginTop: '.7rem', fontSize: '.8rem', fontWeight: 700,
+                letterSpacing: '.12em', textTransform: 'uppercase',
+                color: 'var(--ink-faint)',
+              }}>
+                posts published so far — and counting
+              </p>
+            </div>
           )}
         </div>
       </section>
