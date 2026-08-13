@@ -46,9 +46,16 @@ MIN_VIEWS = int(os.getenv("POST_CLEANUP_MIN_VIEWS", "100"))
 # decision; the worst case is this many posts, and the next run reports it.
 MAX_DELETIONS_PER_RUN = int(os.getenv("POST_CLEANUP_MAX_PER_RUN", "20"))
 
-# How far back to look. Deep enough to reach a backlog, bounded so a huge
-# account does not spend the whole cycle paging.
+# Posts fetched per request. Instagram pages, so this is a page size, not a
+# ceiling -- MAX_PAGES below decides how far back the scan actually reaches.
 SCAN_LIMIT = int(os.getenv("POST_CLEANUP_SCAN_LIMIT", "100"))
+
+# A single page only ever reached the newest hundred posts, which on an
+# account posting six times a day is about two weeks -- almost exactly the
+# window this job is meant to look PAST. So the backlog it exists to clear was
+# the part it could not see. Ten pages is roughly a thousand posts, enough for
+# any account here, and the loop stops early once posts are too new to qualify.
+MAX_PAGES = int(os.getenv("POST_CLEANUP_MAX_PAGES", "10"))
 
 ENABLED = os.getenv("POST_CLEANUP_ENABLED", "").lower() in ("1", "true", "yes")
 
@@ -81,25 +88,49 @@ async def find_underperformers(
     """Posts old enough to judge and too weak to keep. Returns (posts, note)."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=MIN_AGE_DAYS)
 
-    try:
-        body = (await client.get(
-            f"{GRAPH}/{ig_account_id}/media",
-            params={
-                "access_token": access_token,
-                "fields": "id,caption,media_product_type,media_type,timestamp,permalink",
-                "limit": SCAN_LIMIT,
-            },
-        )).json()
-    except Exception as e:
-        return [], f"could not list media: {e}"
+    # Walk back through the account's history rather than glancing at the
+    # newest page. Media comes newest-first, so the walk can stop as soon as a
+    # whole page is too recent to qualify.
+    posts: List[Dict[str, Any]] = []
+    url = f"{GRAPH}/{ig_account_id}/media"
+    params: Dict[str, Any] = {
+        "access_token": access_token,
+        "fields": "id,caption,media_product_type,media_type,timestamp,permalink",
+        "limit": SCAN_LIMIT,
+    }
 
-    if "error" in body:
-        return [], f"could not list media: {body['error'].get('message')}"
+    for page in range(MAX_PAGES):
+        try:
+            body = (await client.get(url, params=params)).json()
+        except Exception as e:
+            return [], f"could not list media: {e}"
+        if "error" in body:
+            return [], f"could not list media: {body['error'].get('message')}"
+
+        batch = body.get("data", []) or []
+        posts.extend(batch)
+        if not batch:
+            break
+
+        oldest = batch[-1].get("timestamp") or ""
+        try:
+            oldest_when = datetime.fromisoformat(oldest.replace("Z", "+00:00"))
+        except Exception:
+            oldest_when = None
+        # The whole page is newer than the age threshold, so everything beyond
+        # it is newer still.
+        if oldest_when and oldest_when > cutoff:
+            break
+
+        after = ((body.get("paging") or {}).get("cursors") or {}).get("after")
+        if not after:
+            break
+        params = dict(params, after=after)
 
     candidates = []
     unmeasurable = 0
 
-    for post in body.get("data", []) or []:
+    for post in posts:
         try:
             when = datetime.fromisoformat(
                 (post.get("timestamp") or "").replace("Z", "+00:00")
@@ -109,8 +140,16 @@ async def find_underperformers(
         if when > cutoff:
             continue
 
-        is_reel = post.get("media_product_type") == "REELS"
-        metrics = "plays,reach" if is_reel else "impressions,reach"
+        # "views" for everything, Reel or feed post.
+        #
+        # This used to ask for "plays" on Reels and "impressions" on feed
+        # posts. Both are gone: from v22 Meta retired impressions for media
+        # insights and replaced the family with a single `views`, and asking
+        # for a retired name fails the whole request with (#100) rather than
+        # degrading. The failure was indistinguishable from having no
+        # permission at all, which is why it looked like the reconnect had not
+        # worked.
+        metrics = "views,reach"
         try:
             insights = (await client.get(
                 f"{GRAPH}/{post['id']}/insights",

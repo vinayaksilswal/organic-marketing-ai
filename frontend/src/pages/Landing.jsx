@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
+import AccountsMarquee from '../components/AccountsMarquee';
+import CardRail from '../components/CardRail';
 import { API_BASE } from '../config';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
@@ -37,7 +39,14 @@ const styles = `
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   position: relative;
-  overflow-x: hidden;
+  /* clip, NOT hidden. Setting overflow-x to hidden forces overflow-y to
+     compute to auto -- the spec does not allow one axis to clip while the
+     other stays visible -- which quietly turns this element into a scroll
+     container. That put every section below the fold outside the viewport's
+     intersection chain, so IntersectionObserver never fired and the scroll
+     reveals stayed invisible. clip clips without creating a scroll container.
+     (No backticks anywhere in this stylesheet: it is a template literal.) */
+  overflow-x: clip;
 }
 /* Colour washes. These sit behind everything and are what the frosted
    surfaces blur, so the page reads as light-with-colour, not grey. */
@@ -54,7 +63,30 @@ const styles = `
 
 .omai h1, .omai h2, .omai h3 { color: var(--ink); letter-spacing: -0.028em; margin: 0; }
 .omai p { color: var(--ink-soft); margin: 0; }
-.omai section { padding: 6rem 0; }
+/* 6rem left long dead bands between sections, which reads as a slow page and
+   costs scroll depth. Tighter keeps the argument moving. */
+.omai section { padding: 3.6rem 0; }
+
+/* Sections lift in as they enter the viewport. Movement earns attention on a
+   long page, and a section that arrives is read more than one already sitting
+   there when you get to it.
+   Short, single-direction and once only: repeating on every scroll past is
+   what makes this kind of thing feel cheap, and content that animates out
+   again is content someone has to wait for twice.
+   The hidden state applies ONLY once JS has added .js-ready, so if the
+   observer never runs the page still renders fully rather than blank.
+   (No backticks in here: this block lives inside a template literal.) */
+.omai.js-ready .reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity .62s cubic-bezier(.4,0,.2,1), transform .62s cubic-bezier(.4,0,.2,1);
+  will-change: opacity, transform;
+}
+.omai.js-ready .reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .omai.js-ready .reveal { opacity: 1; transform: none; transition: none; }
+}
 .omai .wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 1.5rem; }
 
 .omai .eyebrow {
@@ -114,11 +146,21 @@ const styles = `
   -webkit-backdrop-filter: blur(16px) saturate(160%);
   border-bottom: 1px solid var(--line);
 }
+/* Full width, not the 1180px content column. A bar that stops short of the
+   window edge reads as a page inside a page; the mark hard left and the
+   action hard right is what enterprise software looks like, and it puts the
+   primary button in the corner the eye finishes on. */
 .omai .nav-in {
-  max-width: 1180px; margin: 0 auto; padding: .8rem 1.5rem;
+  width: 100%; padding: .78rem clamp(1.1rem, 3.5vw, 2.75rem);
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  box-sizing: border-box;
 }
-.omai .brand { display: flex; align-items: center; gap: .55rem; font-weight: 750; font-size: 1.1rem; cursor: pointer; letter-spacing: -.02em; }
+.omai .brand {
+  display: flex; align-items: center; gap: .55rem;
+  font-weight: 750; font-size: 1.1rem; cursor: pointer; letter-spacing: -.021em;
+  margin-right: auto;
+}
+.omai .nav-actions { display: flex; align-items: center; gap: .55rem; margin-left: auto; }
 
 .omai .grid { display: grid; gap: 1.25rem; }
 .omai .g2 { grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); }
@@ -165,6 +207,49 @@ const Landing = () => {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(null);
   const [stats, setStats] = useState(null);
+  const rootRef = React.useRef(null);
+
+  // Reveal each section as it scrolls into view.
+  //
+  // The hidden state is applied by JS (`js-ready`) rather than sitting in the
+  // stylesheet, so a browser that never runs this effect shows the whole page
+  // instead of a blank one. That failure mode is worth the extra class: a
+  // landing page that renders empty sells nothing at all.
+  //
+  // Unobserved after firing, so nothing animates twice and the observer is
+  // not carrying every section for the life of the page.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+
+    const targets = Array.from(root.querySelectorAll('section > .wrap'));
+    if (!targets.length || typeof IntersectionObserver === 'undefined') {
+      return undefined;
+    }
+
+    root.classList.add('js-ready');
+    targets.forEach((el) => el.classList.add('reveal'));
+
+    // The hero is above the fold and must never wait for a scroll event that
+    // may never come.
+    if (targets[0]) targets[0].classList.add('in');
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('in');
+          observer.unobserve(entry.target);
+        });
+      },
+      // Fires a little before the section is fully on screen, so it has
+      // finished arriving by the time it is being read.
+      { threshold: 0.08, rootMargin: '0px 0px -8% 0px' }
+    );
+
+    targets.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
 
   // Mirrors services/billing_service.PLANS. A pricing block that renders a
   // spinner when the API is unreachable sells nothing, so the page always has
@@ -245,7 +330,7 @@ const Landing = () => {
   ];
 
   return (
-    <div className="omai">
+    <div className="omai" ref={rootRef}>
       <style>{styles}</style>
       <Helmet>
         <title>OrganicAI — Organic marketing that runs itself</title>
@@ -266,7 +351,7 @@ const Landing = () => {
           <div className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <Sparkles size={20} color="#6d28d9" /> OrganicAI
           </div>
-          <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center' }}>
+          <div className="nav-actions">
             <button className="b b-ghost" style={{ padding: '.6rem 1rem' }} onClick={() => navigate('/auth')}>Log in</button>
             <button className="b b-primary" style={{ padding: '.6rem 1.15rem' }} onClick={() => navigate('/auth')}>Start free</button>
           </div>
@@ -345,57 +430,11 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* LIVE DEMO — the real writer, not a canned string */}
-      <section id="try" style={{ paddingTop: '2rem' }}>
-        <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-            <span className="eyebrow">Try it now</span>
-            <h2 className="h2" style={{ margin: '1.1rem 0 .8rem' }}>Watch it write for your business</h2>
-            <p className="lede" style={{ maxWidth: 560, margin: '0 auto' }}>
-              This runs the same copywriter your posts use. No signup.
-            </p>
-          </div>
-
-          <div className="glass" style={{ maxWidth: 780, margin: '0 auto', padding: '2rem' }}>
-            <form onSubmit={runDemo} className="grid" style={{ gap: '.9rem' }}>
-              <div className="grid g2" style={{ gap: '.9rem' }}>
-                <input className="field" placeholder="Your business name" value={bizName}
-                  onChange={e => setBizName(e.target.value)} required maxLength={80} />
-                <select className="field" value={bizModel} onChange={e => setBizModel(e.target.value)}>
-                  <option>SaaS</option><option>E-commerce</option>
-                  <option>Agency</option><option>Local Business</option>
-                  <option>Education</option><option>Health & Fitness</option>
-                </select>
-              </div>
-              <input className="field" placeholder="What do you sell? (one line — the more specific, the better the copy)"
-                value={bizDesc} onChange={e => setBizDesc(e.target.value)} maxLength={200} />
-              <button type="submit" className="b b-primary" disabled={demoBusy} style={{ justifySelf: 'start', padding: '.85rem 1.6rem' }}>
-                {demoBusy ? <>Writing…</> : <><Sparkles size={16} /> Write a caption</>}
-              </button>
-            </form>
-
-            {demoErr && (
-              <div style={{ marginTop: '1.4rem', padding: '.9rem 1rem', borderRadius: 12, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', gap: '.5rem' }}>
-                <AlertCircle size={16} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
-                <p style={{ fontSize: '.87rem', color: '#b91c1c', lineHeight: 1.5 }}>{demoErr}</p>
-              </div>
-            )}
-
-            {demoOut && (
-              <div style={{ marginTop: '1.6rem' }}>
-                <div style={{ fontSize: '.72rem', fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: '.6rem' }}>
-                  Written just now
-                </div>
-                <div style={{ background: '#fff', border: '1px solid rgba(11,16,32,0.09)', borderRadius: 14, padding: '1.3rem', whiteSpace: 'pre-wrap', fontSize: '.94rem', lineHeight: 1.65 }}>
-                  {demoOut}
-                </div>
-                <button className="b b-primary" style={{ marginTop: '1.2rem', width: '100%' }} onClick={() => navigate('/auth')}>
-                  Get this posting automatically — free <ArrowRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* LIVE ACCOUNTS — real profiles, clickable, growing as customers connect.
+          Placed directly under the hero because it is the evidence for the
+          claim the hero just made. Renders nothing if none come back. */}
+      <section style={{ padding: '0 0 3.5rem' }}>
+        <AccountsMarquee />
       </section>
 
       {/* THE PROBLEM */}
@@ -494,30 +533,33 @@ const Landing = () => {
             </p>
           </div>
 
-          <div className="grid g3">
-            {[
-              [<Sparkles size={17} />, 'Brand profile from your site',
-               'It reads your website and builds what it needs: what you sell, who buys it, your tone, your content themes, your offer. Every asset after that is written from it.', 'var(--violet)'],
-              [<Wand2 size={17} />, 'Creative briefs a model can render',
-               'Ten-second vertical shots built for what video models actually produce — one subject, one camera move, no unreadable interface text. Copy the brief into Veo, Flow, Runway or Kling.', 'var(--blue)'],
-              [<Eye size={17} />, 'Captions that know the visual',
-               'Each caption is written from your brand profile plus a description of the specific asset attached, so it speaks to what is on screen instead of the category in general.', 'var(--pink)'],
-              [<Send size={17} />, 'Publishing with a real delivery log',
-               'Facebook Pages and Instagram, including Reels. Every attempt is recorded per platform with the reason if it failed — no post that silently went nowhere.', 'var(--green)'],
-              [<Clock size={17} />, 'Runs on your schedule',
-               'Every two hours, or whatever interval you choose. Auto-approve is off until you switch it on, so nothing reaches an audience you have not approved.', 'var(--violet)'],
-              [<CheckCircle2 size={17} />, 'Email campaigns from the same brain',
-               'Drafts written from the same profile, sent from your own domain, to your own subscriber list — with edit and preview before anything goes out.', 'var(--blue)'],
-            ].map(([icon, t, b, c]) => (
-              <div key={t} className="glass glass-lift" style={{ padding: '1.85rem' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${c}14`, border: `1px solid ${c}2e`, color: c, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+          {/* A rail rather than a grid: six cards in a four-wide grid leave an
+              orphaned row of two, which reads as an unfinished section. */}
+          <CardRail
+            items={[
+              { key: 'brand', icon: <Sparkles size={17} />, title: 'Brand profile from your site',
+                body: 'It reads your website and builds what it needs: what you sell, who buys it, your tone, your content themes, your offer. Every asset after that is written from it.', colour: 'var(--violet)' },
+              { key: 'briefs', icon: <Wand2 size={17} />, title: 'Creative briefs a model can render',
+                body: 'Ten-second vertical shots built for what video models actually produce — one subject, one camera move, no unreadable interface text. Copy the brief into Veo, Flow, Runway or Kling.', colour: 'var(--blue)' },
+              { key: 'captions', icon: <Eye size={17} />, title: 'Captions that know the visual',
+                body: 'Each caption is written from your brand profile plus a description of the specific asset attached, so it speaks to what is on screen instead of the category in general.', colour: 'var(--pink)' },
+              { key: 'publish', icon: <Send size={17} />, title: 'Publishing with a real delivery log',
+                body: 'Facebook Pages and Instagram, including Reels. Every attempt is recorded per platform with the reason if it failed — no post that silently went nowhere.', colour: 'var(--green)' },
+              { key: 'schedule', icon: <Clock size={17} />, title: 'Runs on your schedule',
+                body: 'Every two hours, or whatever interval you choose. Auto-approve is off until you switch it on, so nothing reaches an audience you have not approved.', colour: 'var(--violet)' },
+              { key: 'email', icon: <CheckCircle2 size={17} />, title: 'Email campaigns from the same brain',
+                body: 'Drafts written from the same profile, sent from your own domain, to your own subscriber list — with edit and preview before anything goes out.', colour: 'var(--blue)' },
+            ]}
+            renderItem={({ icon, title, body, colour }) => (
+              <div className="glass glass-lift" style={{ padding: '1.85rem', height: '100%', boxSizing: 'border-box' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${colour}14`, border: `1px solid ${colour}2e`, color: colour, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
                   {icon}
                 </div>
-                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 690 }}>{t}</h3>
-                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{b}</p>
+                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 690 }}>{title}</h3>
+                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
-            ))}
-          </div>
+            )}
+          />
         </div>
       </section>
 
@@ -535,28 +577,30 @@ const Landing = () => {
             </p>
           </div>
 
-          <div className="grid g3">
-            {[
-              ['💻', 'SaaS & Data', 'var(--blue)',
-               'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.'],
-              ['🛒', 'E-commerce', 'var(--violet)',
-               'Point it at your product feed and it rotates through your catalog, one product at a time, writing problem-solution copy against that product\'s own details rather than your brand blurb.'],
-              ['🤖', 'AI Influencer', 'var(--pink)',
-               'Writes in first person as the persona, not as a company. Keep a character reference on file and the visuals stay recognisably the same face across posts.'],
-              ['🎨', 'Creators & Agencies', 'var(--green)',
-               'Run several brands from one login, each with its own profile, media library, connected accounts and schedule. Nothing bleeds between them.'],
-              ['🏪', 'Local Business', 'var(--violet)',
-               'Real places and real hands rather than stock polish. The creative direction leans on materials, light and the moment a customer reacts — which is what these models render best.'],
-              ['📚', 'Education & Coaching', 'var(--blue)',
-               'The strongest shot is the face at the moment of understanding, not a graduation stock photo. Copy leads with the specific thing someone will be able to do.'],
-            ].map(([emoji, t, c, b]) => (
-              <div key={t} className="glass glass-lift" style={{ padding: '1.85rem' }}>
+          <CardRail
+            interval={3900}
+            items={[
+              { key: 'saas', emoji: '💻', title: 'SaaS & Data', colour: 'var(--blue)',
+                body: 'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.' },
+              { key: 'ecom', emoji: '🛒', title: 'E-commerce', colour: 'var(--violet)',
+                body: 'Point it at your product feed and it rotates through your catalog, one product at a time, writing problem-solution copy against that product\'s own details rather than your brand blurb.' },
+              { key: 'influencer', emoji: '🤖', title: 'AI Influencer', colour: 'var(--pink)',
+                body: 'Writes in first person as the persona, not as a company. Keep a character reference on file and the visuals stay recognisably the same face across posts.' },
+              { key: 'agency', emoji: '🎨', title: 'Creators & Agencies', colour: 'var(--green)',
+                body: 'Run several brands from one login, each with its own profile, media library, connected accounts and schedule. Nothing bleeds between them.' },
+              { key: 'local', emoji: '🏪', title: 'Local Business', colour: 'var(--violet)',
+                body: 'Real places and real hands rather than stock polish. The creative direction leans on materials, light and the moment a customer reacts — which is what these models render best.' },
+              { key: 'education', emoji: '📚', title: 'Education & Coaching', colour: 'var(--blue)',
+                body: 'The strongest shot is the face at the moment of understanding, not a graduation stock photo. Copy leads with the specific thing someone will be able to do.' },
+            ]}
+            renderItem={({ emoji, title, colour, body }) => (
+              <div className="glass glass-lift" style={{ padding: '1.85rem', height: '100%', boxSizing: 'border-box' }}>
                 <div style={{ fontSize: '1.7rem', marginBottom: '.85rem', lineHeight: 1 }}>{emoji}</div>
-                <h3 style={{ fontSize: '1.04rem', marginBottom: '.55rem', fontWeight: 690, color: c }}>{t}</h3>
-                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{b}</p>
+                <h3 style={{ fontSize: '1.04rem', marginBottom: '.55rem', fontWeight: 690, color: colour }}>{title}</h3>
+                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
-            ))}
-          </div>
+            )}
+          />
 
           <p style={{ textAlign: 'center', marginTop: '2.2rem', fontSize: '.88rem', color: 'var(--ink-faint)' }}>
             Not on the list? The general pipeline handles any business with a website — the

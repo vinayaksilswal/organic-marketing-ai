@@ -589,6 +589,36 @@ async def get_public_stats() -> dict:
         }
 
 
+@app.get("/api/public/connected-accounts", tags=["Public"])
+async def get_connected_accounts() -> dict:
+    """Accounts publishing through the platform, for the landing page strip.
+
+    Real proof rather than a logo wall: these are live Facebook Pages and
+    Instagram profiles with posts going out on a schedule, and each one links
+    to the account so a visitor can check.
+
+    PRIVACY. This exposes a customer's account on a public page. Today every
+    connected account belongs to the operator, so there is nobody else to
+    surprise. Before other people sign up this needs to be opt-in -- a
+    `showOnLanding` flag on the profile, defaulting to false -- because
+    appearing on someone else's marketing page is not something a customer
+    consents to by connecting an Instagram account. Nothing here is private
+    data, but "public information" and "consented to be advertised" are not
+    the same thing.
+
+    Serves a cached snapshot: this runs on every landing page view, and it
+    must never put the Graph API or the database on the critical path of a
+    sales page.
+    """
+    from services.social_directory import public_accounts
+
+    try:
+        return {"accounts": await public_accounts()}
+    except Exception as e:
+        logger.warning(f"Connected accounts unavailable: {e}")
+        return {"accounts": []}
+
+
 # The landing page demo used to be a setTimeout over a hardcoded template
 # string, presented as "see what our AI can generate for your brand". This runs
 # the real caption writer so the demo is the product.
