@@ -16,53 +16,43 @@ import React from 'react';
  * fastest, and could not inherit the heading face. This way the word is
  * selectable, searchable and sharp at any size.
  */
-const Logo = ({ size = 30, showWordmark = false, tagline = false, style }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.28, ...style }}>
+const Logo = ({ size = 30, showWordmark = false, tagline = false, style }) => {
+  // Three cuts of the same artwork, each for the size it is used at:
+  //   logo.png         mark + wordmark + tagline, for heroes and share cards
+  //   logo-lockup.png  mark + wordmark, for navigation
+  //   logo-mark.png    the mark alone, squared, for avatars and the favicon
+  //
+  // The tagline is dropped from the nav cut deliberately. In a 34px bar it
+  // renders around six pixels tall, which is not small type — it is grey
+  // mush that makes the whole lockup look blurred.
+  const src = showWordmark
+    ? (tagline ? '/logo.png' : '/logo-lockup.png')
+    : '/logo-mark.png';
+
+  // The lockups are wide, so height is the dimension worth fixing; width
+  // follows. The mark is square.
+  const dimensions = showWordmark
+    ? { height: size, width: 'auto' }
+    : { height: size, width: size };
+
+  return (
     <img
-      src="/logo-mark.png"
+      src={src}
       alt="Organiflo"
-      width={size}
-      height={size}
-      // Eager and high priority: this is above the fold on every page it
+      // Eager and high priority: this sits above the fold on every page it
       // appears on, and a logo that pops in late is the first thing a visitor
       // sees go wrong.
       loading="eager"
-      fetchpriority="high"
-      style={{ width: size, height: size, display: 'block', flexShrink: 0, objectFit: 'contain' }}
+      fetchPriority="high"
+      style={{
+        ...dimensions,
+        display: 'block',
+        flexShrink: 0,
+        objectFit: 'contain',
+        ...style,
+      }}
     />
-
-    {showWordmark && (
-      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.06 }}>
-        <span
-          style={{
-            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
-            fontWeight: 800,
-            fontSize: size * 0.66,
-            letterSpacing: '-.03em',
-            background: 'linear-gradient(100deg, #22d3ee, #3b82f6 46%, #a855f7)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Organiflo
-        </span>
-        {tagline && (
-          <span style={{
-            fontSize: size * 0.235,
-            letterSpacing: '.015em',
-            color: 'currentColor',
-            opacity: 0.6,
-            fontWeight: 500,
-            whiteSpace: 'nowrap',
-          }}>
-            Your Organic Social Growth Engine
-          </span>
-        )}
-      </span>
-    )}
-  </span>
-);
+  );
+};
 
 export default Logo;

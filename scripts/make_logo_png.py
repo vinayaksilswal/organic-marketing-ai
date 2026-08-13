@@ -83,6 +83,30 @@ def main() -> None:
     print(f"wrote {wide_path}  {wide.size[0]}x{wide.size[1]}  "
           f"{wide_path.stat().st_size // 1024}KB")
 
+    # The lockup WITHOUT the tagline, for navigation bars.
+    #
+    # The full lockup is the right artwork on a hero or a share card, and the
+    # wrong one in a 34px-tall nav: the tagline lands at about six pixels,
+    # which is not small type, it is grey mush. Cropping it away keeps the
+    # logo as drawn and drops only the line that cannot be read at that size.
+    # A straight horizontal cut cannot do this: the cloud descends lower than
+    # the wordmark does, so any line high enough to lose the tagline also
+    # slices the base off the mark. Instead the tagline's own region is
+    # cleared -- it lives to the RIGHT of the mark and below the wordmark --
+    # and the result is re-cropped to whatever is left.
+    w, h = transparent.size
+    no_tagline = transparent.copy()
+    tagline_box = (int(w * 0.34), int(h * 0.72), w, h)
+    no_tagline.paste((0, 0, 0, 0), tagline_box)
+    box_nt = no_tagline.getbbox()
+    if box_nt:
+        no_tagline = no_tagline.crop(box_nt)
+    no_tagline.thumbnail((900, 900), Image.LANCZOS)
+    lockup_path = OUT_DIR / "logo-lockup.png"
+    no_tagline.save(lockup_path, "PNG", optimize=True)
+    print(f"wrote {lockup_path}  {no_tagline.size[0]}x{no_tagline.size[1]}  "
+          f"{lockup_path.stat().st_size // 1024}KB")
+
     # The mark alone, squared, for avatars and the favicon. The cloud sits in
     # roughly the first third of the lockup.
     w, h = transparent.size

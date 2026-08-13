@@ -188,7 +188,19 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # The production domain is matched here as well as listed in
+    # settings.allowed_origins, deliberately.
+    #
+    # allowed_origins is a pydantic setting, so an ALLOWED_ORIGINS environment
+    # variable on the host silently replaces the whole list — and a list that
+    # predates the domain launch would take the site down again with a change
+    # that looks correct in the repository. This regex lives in code and
+    # cannot be overridden that way.
+    #
+    # Both the apex and any subdomain match, because organiflo.com
+    # 308-redirects to www.organiflo.com and www is the origin the browser
+    # actually sends.
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*(vercel\.app|organiflo\.com)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

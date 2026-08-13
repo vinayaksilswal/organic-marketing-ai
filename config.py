@@ -29,12 +29,24 @@ class Settings(BaseSettings):
     # Core Application
     # =========================================================================
     environment: str = "development"
+    # Every origin the browser may call this API from. A domain missing here
+    # does not degrade — the browser blocks every request before it is sent,
+    # so the site loads and then does nothing at all: no stats, no pricing, no
+    # login. That is exactly what launching organiflo.com did, because CORS
+    # was still listing only the Vercel preview host and a domain that is no
+    # longer used.
+    #
+    # BOTH the apex and www are listed. organiflo.com 308-redirects to
+    # www.organiflo.com, so www is the origin the browser actually sends, and
+    # listing only the apex would have looked correct and fixed nothing.
     allowed_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
+        "https://organiflo.com",
+        "https://www.organiflo.com",
         "https://organic-marketing-ai.vercel.app",
         "https://organicai.pro",
-        "https://www.organicai.pro"
+        "https://www.organicai.pro",
     ]
     # Public origin of this API — used to build OAuth redirect URIs
     # The host Meta redirects back to after OAuth, and the base for the data
@@ -49,8 +61,19 @@ class Settings(BaseSettings):
     # wrong deployment breaks account connection without breaking anything a
     # health check would notice.
     backend_public_url: str = "https://organic-marketing-ai-0abh.onrender.com"
-    # Where OAuth flows send the browser back to
-    frontend_url: str = "https://organic-marketing-ai.vercel.app"
+    # Where OAuth flows, billing returns and password-reset links send the
+    # browser. This is the LIVE domain, not the Vercel host.
+    #
+    # Sending someone to a different origin than the one they signed in on is
+    # not a cosmetic wrinkle: localStorage is per-origin, so the session token
+    # written on www.organiflo.com does not exist on the .vercel.app host. A
+    # user who connected Facebook or completed a payment would land back
+    # apparently logged out, with no way to tell that their work had actually
+    # succeeded.
+    #
+    # www, not the apex: organiflo.com 308-redirects to www, and a redirect in
+    # the middle of an OAuth return can drop the query string on some clients.
+    frontend_url: str = "https://www.organiflo.com"
 
     # =========================================================================
     # Database (PostgreSQL) & Redis (ARQ)

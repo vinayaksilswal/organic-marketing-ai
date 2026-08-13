@@ -50,7 +50,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
       }}>
         {/* The mark carries its own gradient, so it does not need the tinted
             tile it used to sit inside — that was standing in for a logo. */}
-        <Logo size={30} showWordmark />
+        <Logo size={32} showWordmark />
       </div>
       
       {/* Multi-Tenant Workspace Selector */}

@@ -421,7 +421,15 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest):
         expires_delta=timedelta(hours=1),
     )
 
-    frontend_url = settings.allowed_origins[0] if settings.allowed_origins else "https://organic-marketing-ai.vercel.app"
+    # settings.frontend_url, NOT allowed_origins[0].
+    #
+    # allowed_origins[0] is "http://localhost:5173" — the development origin,
+    # deliberately first so local work is not blocked by CORS. Every password
+    # reset email this service has sent therefore contained a localhost link,
+    # which does nothing on the recipient's machine. The failure is silent at
+    # both ends: the sender sees an email go out, and the recipient assumes
+    # the link is broken and gives up.
+    frontend_url = (settings.frontend_url or "https://www.organiflo.com").rstrip("/")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
     await _send_reset_email(data.email, reset_link)
