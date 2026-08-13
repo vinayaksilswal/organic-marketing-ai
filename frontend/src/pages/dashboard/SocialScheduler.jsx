@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE, authFetch } from '../../config';
-import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw, CalendarDays } from 'lucide-react';
+import PostCalendar from '../../components/PostCalendar';
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const navigate = useNavigate();
@@ -262,6 +263,25 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               {runningLoop ? <span className="spinner"></span> : <>⚡ Run Automation</>}
             </button>
           </div>
+        </div>
+
+        {/* SCHEDULE — the month, with every post on the day it went out.
+            A table answers "what happened last?"; the questions people
+            actually have about a schedule are shape questions: is anything
+            going out tomorrow, did Tuesday publish, why is there a gap. */}
+        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+            <CalendarDays size={18} color="var(--primary-color)" />
+            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Posting calendar</h2>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Click any post to preview or edit it
+            </span>
+          </div>
+          {postsLoading ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading the schedule…</p>
+          ) : (
+            <PostCalendar posts={posts} onSelect={handleEditDraft} />
+          )}
         </div>
 
         {/* LOGS SECTION */}
