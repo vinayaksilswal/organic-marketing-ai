@@ -33,7 +33,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
   // Falls back to clearing the session itself if the prop is missing, so the
   // button always works rather than silently doing nothing.
   const handleLogout = () => {
-    if (!window.confirm('Log out of OrganicAI?')) return;
+    if (!window.confirm('Log out of Organiflo?')) return;
     if (typeof onLogout === 'function') {
       onLogout();
       return;

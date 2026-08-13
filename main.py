@@ -169,7 +169,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 # FastAPI Application Instance
 # =============================================================================
 app = FastAPI(
-    title="Organic Marketing AI",
+    title="Organiflo",
     description="AI-Powered Autonomous Organic Marketing Platform",
     version="2.0.0",
     lifespan=lifespan,
@@ -744,7 +744,7 @@ async def get_public_self_promotion() -> dict:
 
             return {
                 "active": True,
-                "botName": "OrganicAI Self-Growth Engine",
+                "botName": "Organiflo Self-Growth Engine",
                 "intervalHours": 2,
                 "campaigns": [
                     {

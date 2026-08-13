@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import Logo from './Logo';
 import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LogOut } from 'lucide-react';
 import { API_BASE, authFetch } from '../config';
 
@@ -47,19 +48,9 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         color: '#fff',
         letterSpacing: '-0.02em'
       }}>
-        <div style={{
-          width: '34px',
-          height: '34px',
-          borderRadius: '10px',
-          background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 0 16px rgba(168, 85, 247, 0.4)'
-        }}>
-          <Sparkles size={18} color="#fff" />
-        </div>
-        <span>Organic<span style={{ color: 'var(--primary-color)' }}>AI</span></span>
+        {/* The mark carries its own gradient, so it does not need the tinted
+            tile it used to sit inside — that was standing in for a logo. */}
+        <Logo size={30} showWordmark />
       </div>
       
       {/* Multi-Tenant Workspace Selector */}
@@ -167,7 +158,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
             means the next person is already logged in as you. */}
         <button
           onClick={() => {
-            if (window.confirm('Sign out of OrganicAI?')) onLogout?.();
+            if (window.confirm('Sign out of Organiflo?')) onLogout?.();
           }}
           title="Sign out"
           aria-label="Sign out"

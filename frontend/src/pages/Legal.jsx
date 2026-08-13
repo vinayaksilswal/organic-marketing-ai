@@ -13,7 +13,7 @@ export default function Legal({ title }) {
           </p>
           <h2 className="text-2xl font-semibold mt-8 mb-4 text-white">1. Introduction</h2>
           <p className="mb-4">
-            Welcome to OrganicAI. By using our services, you agree to these terms and conditions. 
+            Welcome to Organiflo. By using our services, you agree to these terms and conditions. 
             Our platform provides autonomous marketing solutions.
           </p>
           <h2 className="text-2xl font-semibold mt-8 mb-4 text-white">2. Data Privacy</h2>

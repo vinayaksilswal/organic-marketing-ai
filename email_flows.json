@@ -5,10 +5,10 @@
       "steps": [
         {
           "delay_hours": 0,
-          "subject": "Welcome to OrganicAI - Your Marketing Autopilot is Ready",
+          "subject": "Welcome to Organiflo - Your Marketing Autopilot is Ready",
           "template": "brand_highlight",
           "headline": "Your Marketing Autopilot is Ready",
-          "body": "Thanks for joining OrganicAI! Set up your first workspace, connect your social accounts, and let our AI start generating and publishing content for you automatically.",
+          "body": "Thanks for joining Organiflo! Set up your first workspace, connect your social accounts, and let our AI start generating and publishing content for you automatically.",
           "cta_text": "Set Up My Workspace",
           "cta_link": "https://organic-marketing-ai.vercel.app/onboarding"
         },
@@ -23,10 +23,10 @@
         },
         {
           "delay_hours": 72,
-          "subject": "Your first week with OrganicAI - Here's what happened",
+          "subject": "Your first week with Organiflo - Here's what happened",
           "template": "brand_highlight",
           "headline": "Your First Week in Review",
-          "body": "You've been on OrganicAI for a few days now. Check your dashboard to see how many posts were auto-generated, which platforms they were published to, and how your content pipeline is performing.",
+          "body": "You've been on Organiflo for a few days now. Check your dashboard to see how many posts were auto-generated, which platforms they were published to, and how your content pipeline is performing.",
           "cta_text": "View My Dashboard",
           "cta_link": "https://organic-marketing-ai.vercel.app/dashboard"
         }
@@ -40,7 +40,7 @@
           "subject": "Your marketing autopilot is waiting for you",
           "template": "brand_highlight",
           "headline": "We Noticed You've Been Away",
-          "body": "Your OrganicAI workspace is still set up and ready to go. Connect your social accounts or add a new campaign to get your automated posting back on track.",
+          "body": "Your Organiflo workspace is still set up and ready to go. Connect your social accounts or add a new campaign to get your automated posting back on track.",
           "cta_text": "Reactivate My Autopilot",
           "cta_link": "https://organic-marketing-ai.vercel.app/dashboard"
         }

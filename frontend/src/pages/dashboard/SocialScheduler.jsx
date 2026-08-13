@@ -29,7 +29,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
     fetchPosts();
     fetchMedia();
     // The preview shows the real business name and handle rather than a
-    // hardcoded "OrganicAI", so it reflects what will actually be published.
+    // hardcoded "Organiflo", so it reflects what will actually be published.
     (async () => {
       try {
         const res = await authFetch(`${API_BASE}/businesses`, {}, token);

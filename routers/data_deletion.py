@@ -240,7 +240,7 @@ async def data_deletion_status(confirmation_code: str):
     return HTMLResponse(
         f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Data deletion &mdash; OrganicAI</title>
+<title>Data deletion &mdash; Organiflo</title>
 <style>
  body{{font:16px/1.6 system-ui,-apple-system,Segoe UI,sans-serif;margin:0;
       background:#0b0d10;color:#e8eaed;display:grid;place-items:center;min-height:100vh}}
@@ -251,7 +251,7 @@ async def data_deletion_status(confirmation_code: str):
 <h1>Your data has been deleted</h1>
 <p>The request completed. Your account, business profiles, connected social
 accounts, stored access tokens, media, posts and scheduling history have been
-permanently removed from OrganicAI.</p>
+permanently removed from Organiflo.</p>
 <p>Confirmation code: <code>{safe_code}</code></p>
 <p>Deletion is immediate and cannot be undone. If you believe data remains,
 email <a href="mailto:vinayaksilswal@gmail.com">vinayaksilswal@gmail.com</a>
@@ -266,7 +266,7 @@ async def data_deletion_instructions():
     return HTMLResponse(
         """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>How to delete your data &mdash; OrganicAI</title>
+<title>How to delete your data &mdash; Organiflo</title>
 <style>
  body{font:16px/1.6 system-ui,-apple-system,Segoe UI,sans-serif;margin:0;
       background:#0b0d10;color:#e8eaed;display:grid;place-items:center;min-height:100vh}
@@ -274,10 +274,10 @@ async def data_deletion_instructions():
  li{margin:.4rem 0}
  a{color:#7aa2ff}
 </style></head><body><main>
-<h1>Deleting your OrganicAI data</h1>
+<h1>Deleting your Organiflo data</h1>
 <p>You can erase your account and everything in it at any time. There are two
 ways, and both delete the same thing.</p>
-<h2>From OrganicAI</h2>
+<h2>From Organiflo</h2>
 <ol>
  <li>Sign in and open <strong>Settings</strong>.</li>
  <li>Choose <strong>Delete account</strong>.</li>
@@ -287,7 +287,7 @@ ways, and both delete the same thing.</p>
 <ol>
  <li>Open <strong>Settings &amp; privacy &rarr; Settings</strong> on Facebook.</li>
  <li>Go to <strong>Apps and Websites</strong>.</li>
- <li>Remove <strong>OrganicAI</strong>. Facebook notifies us and we delete your
+ <li>Remove <strong>Organiflo</strong>. Facebook notifies us and we delete your
      data automatically.</li>
 </ol>
 <h2>What gets deleted</h2>

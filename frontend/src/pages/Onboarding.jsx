@@ -230,7 +230,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
               </div>
             </div>
 
-            <h2 style={{ marginBottom: '2rem' }}>OrganicAI is working...</h2>
+            <h2 style={{ marginBottom: '2rem' }}>Organiflo is working...</h2>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '400px', margin: '0 auto', textAlign: 'left' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', opacity: analysisPhase >= 0 ? 1 : 0.4 }}>

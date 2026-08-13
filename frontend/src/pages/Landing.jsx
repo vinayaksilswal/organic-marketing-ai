@@ -11,6 +11,7 @@ import {
 import { Helmet } from 'react-helmet-async';
 
 import AccountsMarquee from '../components/AccountsMarquee';
+import Logo from '../components/Logo';
 import CardRail from '../components/CardRail';
 import CountUp from '../components/CountUp';
 import { API_BASE } from '../config';
@@ -361,12 +362,12 @@ const Landing = () => {
     <div className="omai" ref={rootRef}>
       <style>{styles}</style>
       <Helmet>
-        <title>OrganicAI — Organic marketing that runs itself</title>
+        <title>Organiflo — Organic marketing that runs itself</title>
         <meta name="description" content="AI writes brand-matched social posts and publishes them to your Facebook Page and Instagram on a schedule you set. Free plan, no card required." />
         <script type="application/ld+json">{JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          name: 'OrganicAI',
+          name: 'Organiflo',
           applicationCategory: 'BusinessApplication',
           offers: { '@type': 'Offer', price: String(entry), priceCurrency: 'USD' },
           description: 'Automated organic marketing for small businesses',
@@ -377,7 +378,7 @@ const Landing = () => {
       <nav className="nav">
         <div className="nav-in">
           <div className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <Sparkles size={20} color="#6d28d9" /> OrganicAI
+            <Logo size={26} showWordmark />
           </div>
           <div className="nav-actions">
             <button className="b b-ghost" style={{ padding: '.6rem 1rem' }} onClick={() => navigate('/auth')}>Log in</button>
@@ -397,7 +398,7 @@ const Landing = () => {
           </h1>
 
           <p className="lede" style={{ maxWidth: 640, margin: '1.5rem auto 0' }}>
-            Add your website once. OrganicAI learns what you sell, writes the copy and the
+            Add your website once. Organiflo learns what you sell, writes the copy and the
             creative brief, and publishes to your Facebook Page and Instagram on the schedule
             you set — with every post reviewable before it goes out.
           </p>
@@ -838,7 +839,7 @@ const Landing = () => {
       <footer style={{ borderTop: '1px solid var(--line)', padding: '2.5rem 0', background: 'rgba(255,255,255,0.6)' }}>
         <div className="wrap" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="brand" style={{ fontSize: '1rem' }}>
-            <Sparkles size={17} color="#6d28d9" /> OrganicAI
+            <Logo size={22} showWordmark />
           </div>
           <div style={{ display: 'flex', gap: '1.4rem', fontSize: '.85rem' }}>
             <a href="/privacy" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>Privacy</a>
@@ -846,7 +847,7 @@ const Landing = () => {
             <a href="/dpa" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>DPA</a>
           </div>
           <span style={{ fontSize: '.82rem', color: 'var(--ink-faint)' }}>
-            © {new Date().getFullYear()} OrganicAI
+            © {new Date().getFullYear()} Organiflo
           </span>
         </div>
       </footer>

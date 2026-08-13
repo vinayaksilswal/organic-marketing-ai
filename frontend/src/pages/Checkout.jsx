@@ -77,7 +77,7 @@ export default function Checkout({ user, onLogout }) {
                           amount: {
                             value: "17.00",
                           },
-                          description: "Organic Marketing AI - Pro Plan"
+                          description: "Organiflo — Pro Plan"
                         },
                       ],
                     });

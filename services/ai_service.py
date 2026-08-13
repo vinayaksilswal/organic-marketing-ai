@@ -825,7 +825,7 @@ CTA Link to include in post 3: {cta_link}"""
             "post_1": str(parsed.get("post_1", ""))[:280],
             "post_2": str(parsed.get("post_2", ""))[:280],
             "post_3": str(parsed.get("post_3", ""))[:280],
-            "hashtags": parsed.get("hashtags", ["#Research", "#OrganicAI"]),
+            "hashtags": parsed.get("hashtags", ["#Research", "#Organiflo"]),
         }
 
     # Fallback if LLM fails

@@ -110,7 +110,7 @@ async def seed_system_workspace() -> None:
                         "#SaaS",
                         "#SocialMediaAutomation",
                         "#GrowthHacking",
-                        "#OrganicAI",
+                        "#Organiflo",
                     ],
                 )
                 session.add(system_workspace)

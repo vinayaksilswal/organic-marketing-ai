@@ -369,9 +369,9 @@ async def _send_reset_email(to_email: str, reset_link: str) -> bool:
 
         resend.api_key = settings.resend_api_key
         resend.Emails.send({
-            "from": f"OrganicAI <noreply@{settings.resend_from_domain or 'organicai.pro'}>",
+            "from": f"Organiflo <noreply@{settings.resend_from_domain or 'organicai.pro'}>",
             "to": [to_email],
-            "subject": "Reset your OrganicAI password",
+            "subject": "Reset your Organiflo password",
             "html": (
                 f"<p>You requested a password reset.</p>"
                 f'<p><a href="{reset_link}">Click here to reset your password</a></p>'
