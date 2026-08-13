@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Activity,
   BarChart3, Clock, RefreshCw, Image as ImageIcon, AlertTriangle,
-  Building2, Sparkles, XCircle
+  Building2, Sparkles, XCircle, LogOut
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../config';
 
@@ -15,7 +15,7 @@ import { API_BASE, authFetch } from '../../config';
  * made it ambiguous which control was authoritative. This page answers one
  * question: is my marketing running, and what has it done lately.
  */
-const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
+const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
   const navigate = useNavigate();
   const [business, setBusiness] = useState(null);
   const [connection, setConnection] = useState(null);
@@ -25,6 +25,23 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaCount, setMediaCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Confirmed first. Logging out is not destructive, but an accidental one
+  // costs the operator a re-login in the middle of whatever they were doing,
+  // and this button sits directly under the one they press most.
+  //
+  // Falls back to clearing the session itself if the prop is missing, so the
+  // button always works rather than silently doing nothing.
+  const handleLogout = () => {
+    if (!window.confirm('Log out of OrganicAI?')) return;
+    if (typeof onLogout === 'function') {
+      onLogout();
+      return;
+    }
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/';
+  };
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -111,10 +128,36 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId }) => {
               </span>
             </div>
           </div>
-          <button onClick={load} disabled={refreshing} className="btn btn-secondary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}>
-            <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} /> Refresh
-          </button>
+          {/* Stacked, so the destructive action is never where the muscle
+              memory for Refresh lands. */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0.55rem' }}>
+            <button onClick={load} disabled={refreshing} className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}>
+              <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} /> Refresh
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                padding: '0.5rem 0.9rem', fontSize: '0.85rem', fontWeight: 600,
+                cursor: 'pointer', borderRadius: 12,
+                color: '#f87171',
+                background: 'rgba(239,68,68,0.10)',
+                border: '1px solid rgba(239,68,68,0.32)',
+                transition: 'background .18s, border-color .18s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.18)';
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.55)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.10)';
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.32)';
+              }}
+            >
+              <LogOut size={14} /> Log out
+            </button>
+          </div>
         </div>
 
         {/* Blockers — the reason it is not publishing, stated plainly */}

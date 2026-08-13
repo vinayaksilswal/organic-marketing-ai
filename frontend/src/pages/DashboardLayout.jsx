@@ -34,7 +34,10 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
       <div style={{ flex: 1, marginLeft: '260px', overflowY: 'auto' }}>
         <SystemBanner />
         <Routes>
-          <Route path="/" element={<Overview user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          {/* onLogout reaches Overview so its Log out button clears React
+              state through the router, rather than falling back to wiping
+              localStorage and hard-reloading the page. */}
+          <Route path="/" element={<Overview user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} onLogout={onLogout} />} />
           <Route path="/video-studio" element={<VideoStudio user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/media-catalog" element={<MediaCatalog user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/social-scheduler" element={<SocialScheduler user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
