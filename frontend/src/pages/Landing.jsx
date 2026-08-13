@@ -402,13 +402,16 @@ const Landing = () => {
             you set — with every post reviewable before it goes out.
           </p>
 
-          <div style={{ display: 'flex', gap: '.8rem', justifyContent: 'center', marginTop: '2.2rem', flexWrap: 'wrap' }}>
-            <button className="b b-primary" style={{ padding: '1rem 1.9rem', fontSize: '1rem' }} onClick={() => navigate('/auth')}>
+          {/* One action, not two.
+              The second button pointed at #try, which was the live-demo
+              section — removed earlier, so it had become a button that
+              scrolled nowhere. Beyond being broken it was splitting the
+              decision: a secondary CTA beside the primary one gives the
+              visitor a way to not decide, and "watch a demo" is exactly the
+              path that ends in a closed tab. There is one thing to do here. */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.2rem' }}>
+            <button className="b b-primary" style={{ padding: '1.05rem 2.4rem', fontSize: '1.04rem' }} onClick={() => navigate('/auth')}>
               Start free <ArrowRight size={17} />
-            </button>
-            <button className="b b-ghost" style={{ padding: '1rem 1.6rem', fontSize: '1rem' }}
-              onClick={() => document.getElementById('try')?.scrollIntoView({ behavior: 'smooth' })}>
-              Watch it write one <Wand2 size={16} />
             </button>
           </div>
 

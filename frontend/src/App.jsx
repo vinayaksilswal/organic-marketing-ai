@@ -61,7 +61,19 @@ function App() {
 
   const requireAuth = (Component) => {
     if (!token) return <Navigate to="/auth" />;
-    if (user && user.subscriptionStatus !== "ACTIVE") return <Navigate to="/checkout" />;
+    // A signed-in user reaches the product. Full stop.
+    //
+    // This used to bounce anyone whose subscriptionStatus was not "ACTIVE"
+    // straight to /checkout — and new accounts are created INACTIVE, so the
+    // free plan advertised on the landing page could not be reached at all.
+    // Every visitor who pressed "Start free" met a payment wall instead of
+    // the product, which is the worst possible outcome for paid traffic.
+    //
+    // The free plan is not enforced by locking the door. It is enforced by
+    // the quota checks in billing_service, which run server-side on the
+    // actions that cost money — publishing, generating, emailing — and cannot
+    // be bypassed from the client. Letting someone in to hit a limit later is
+    // how a free tier is supposed to work; the limit is the upsell.
     return <Component user={user} token={token} showToast={showToast} onLogout={handleLogout} updateAuth={(data) => {
       setUser(data);
       localStorage.setItem('user', JSON.stringify(data));
