@@ -515,11 +515,42 @@ def create_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # Prune posts older than 15 days that never reached 100 views. Daily
+    # rather than hourly: the input only changes on the scale of days, and a
+    # job that DELETES published content should run as seldom as it can while
+    # still doing its work.
+    scheduler.add_job(
+        _run_post_cleanup,
+        trigger=IntervalTrigger(hours=24),
+        id="post_cleanup",
+        name="Daily Post Cleanup",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     logger.info(
         f"APScheduler initialized (Marketing Loop: {MARKETING_LOOP_MINUTES}m, "
-        f"Creative Loop: 2h)"
+        f"Creative Loop: 2h, Post Cleanup: 24h)"
     )
     return scheduler
+
+
+async def _run_post_cleanup() -> None:
+    """Daily cleanup, wrapped so a failure cannot take the scheduler down."""
+    try:
+        from services.post_cleanup import run_cleanup
+
+        results = await run_cleanup()
+        for outcome in results:
+            if outcome.get("deleted") or outcome.get("note"):
+                logger.info(
+                    f"[CLEANUP] {outcome.get('name')}: "
+                    f"{outcome.get('deleted', 0)} deleted of "
+                    f"{outcome.get('found', 0)} found. {outcome.get('note', '')}"
+                )
+    except Exception as e:
+        logger.error(f"[CLEANUP] Daily post cleanup failed: {e}")
 
 
 def shutdown_scheduler(scheduler: AsyncIOScheduler) -> None:
