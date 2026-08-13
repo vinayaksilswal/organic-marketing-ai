@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%238b5cf6'/%3E%3Ctext x='50' y='50' font-family='sans-serif' font-size='50' fill='white' text-anchor='middle' dy='.3em'%3EO%3C/text%3E%3C/svg%3E" />
+    <!-- The real mark. This was a placeholder purple circle with an O in it. -->
+    <link rel="icon" type="image/png" href="/logo-mark.png" />
+    <link rel="apple-touch-icon" href="/logo-mark.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Organiflo — Your Organic Social Growth Engine</title>
     
@@ -10,13 +12,19 @@
     <meta property="og:title" content="Organiflo" />
     <meta property="og:description" content="Automate your organic social media and email marketing with AI. Set it and forget it." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://organicmarketing.ai/" />
+    <meta property="og:url" content="https://organic-marketing-ai.vercel.app/" />
+    <!-- Without an og:image a shared link renders as a bare grey card, which
+         matters most on the channel this product is about. -->
+    <meta property="og:image" content="https://organic-marketing-ai.vercel.app/logo.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Organiflo" />
     <meta name="twitter:description" content="Automate your organic social media and email marketing with AI." />
+    <meta name="twitter:image" content="https://organic-marketing-ai.vercel.app/logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inter was loaded here and is no longer used anywhere: the type is now
+         Bricolage Grotesque and Manrope, imported once in index.css. Leaving
+         this in downloaded a whole unused family on first paint. -->
   </head>
   <body>
     <div id="root"></div>
