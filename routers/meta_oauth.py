@@ -56,14 +56,21 @@ GRAPH_BASE_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
 #   instagram_basic            GRANTED  -> per-post like_count and comments_count
 #   instagram_content_publish  GRANTED  -> publishing works
 #   pages_manage_posts         GRANTED  -> publishing works
-#   pages_read_engagement      REQUESTED BUT DENIED
-#                                 "(#10) This endpoint requires the
-#                                  pages_read_engagement permission"
-#                              -> no Facebook post engagement until App Review
-#   instagram_manage_insights  NOT REQUESTED, and needed for views/reach/
-#                              impressions. Asking for it costs nothing until
-#                              approved and grants it the moment it is.
-#   instagram_manage_contents  NOT REQUESTED, and needed to delete IG posts.
+#   pages_read_engagement      GRANTED  -> Facebook post engagement is readable
+#   instagram_manage_insights  NOT on the live tokens -> no views/reach
+#   instagram_manage_contents  NOT on the live tokens -> cannot delete posts
+#
+# The last two ARE in the scope list below, and the tokens still lack them,
+# because every stored token was issued BEFORE they were added here. A scope is
+# fixed at the moment consent is given; adding one later does nothing for a
+# connection that already exists. Reconnecting the account is what picks them
+# up, and DELETE /{ig-media-id} starts working the moment
+# instagram_manage_contents is on the token.
+#
+# pages_read_engagement is listed as GRANTED above after being recorded as
+# DENIED for weeks. It was never denied. The "denied" reading came from the
+# scope list rather than from asking Meta, and debug_token on 13 Aug 2026
+# shows it granted on all six Pages. Check tokens, not this file.
 #
 # A scope in this list is not a permission. Meta grants the ones the app has
 # passed App Review for and silently withholds the rest, which is why the

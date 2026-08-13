@@ -473,6 +473,18 @@ async def _generate_post_caption(profile, media, product=None) -> str:
     except Exception as e:
         logger.debug(f"Hashtag rotation unavailable: {e}")
 
+    # The business's own tag goes on every post, whichever path writes it.
+    # Defined here so the generated caption and the fallback template share
+    # one implementation and neither can return a caption without it.
+    def _add_brand_tag(text: str, prof) -> str:
+        try:
+            from services.hashtag_engine import ensure_brand_tag
+
+            return ensure_brand_tag(text, prof)
+        except Exception as e:
+            logger.debug(f"Could not add the brand hashtag: {e}")
+            return text
+
     # What the asset actually depicts. The base caption is authoritative — it
     # is either what the user typed about this asset or the prompt that
     # generated it, and in both cases it beats a filename. The raw generation
@@ -720,6 +732,7 @@ async def _generate_post_caption(profile, media, product=None) -> str:
         # Instagram caption is unclickable text that reads as spam.
         caption = _strip_urls(caption)
         if caption:
+            caption = _add_brand_tag(caption, profile)
             return caption[:2200]  # Instagram's caption limit
         logger.warning(f"Caption generation returned empty for workspace {getattr(profile, 'id', '?')}")
     except Exception as e:
@@ -732,9 +745,12 @@ async def _generate_post_caption(profile, media, product=None) -> str:
     cta = offer or "Link in bio."
     if description:
         first = description.split(".")[0].strip()
-        return _strip_urls(f"{first}.\n\n{cta}\n\n{tags}")
-    return _strip_urls(
-        f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{cta}\n\n{tags}"
+        return _add_brand_tag(_strip_urls(f"{first}.\n\n{cta}\n\n{tags}"), profile)
+    return _add_brand_tag(
+        _strip_urls(
+            f"Something new from {brand_name}. Take a look and tell us what you think.\n\n{cta}\n\n{tags}"
+        ),
+        profile,
     )
 
 

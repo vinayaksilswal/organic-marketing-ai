@@ -147,6 +147,44 @@ async def generate_for(profile: Any, intelligence: Optional[dict] = None) -> Dic
     return tiers
 
 
+def brand_tag(profile: Any) -> Optional[str]:
+    """The business's own name as a hashtag, or None if it cannot be one.
+
+    Every post carries this. A branded tag is the only hashtag on a post that
+    is guaranteed to be uncontested -- nobody else is competing for
+    #Lumively -- so it is the one place an account can reliably be found, and
+    it collects the account's whole body of work in one tappable place.
+
+    Derived from the name rather than stored, so renaming a business renames
+    its tag and there is no second copy to fall out of step.
+    """
+    return _clean((getattr(profile, "name", "") or "").replace(" ", ""))
+
+
+def ensure_brand_tag(caption: str, profile: Any) -> str:
+    """Guarantee the brand tag is in this caption, appending it if absent.
+
+    Applied to the finished text rather than asked of the model. The prompt
+    can request it and usually gets it, but "usually" across thousands of
+    automated posts means a steady trickle without it, and the whole value of
+    a branded tag is that it is on everything.
+    """
+    tag = brand_tag(profile)
+    if not tag:
+        return caption
+    if tag.lower() in (caption or "").lower():
+        return caption
+
+    body = (caption or "").rstrip()
+    # Onto the existing hashtag line when there is one, so the caption does
+    # not grow a second block of tags.
+    lines = body.split("\n")
+    if lines and lines[-1].lstrip().startswith("#"):
+        lines[-1] = f"{lines[-1].rstrip()} {tag}"
+        return "\n".join(lines)
+    return f"{body}\n\n{tag}" if body else tag
+
+
 def select(tiers: Dict[str, List[str]], seed: str = "", count: int = TAGS_PER_POST) -> List[str]:
     """A fresh mix for one caption.
 
