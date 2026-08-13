@@ -16,7 +16,7 @@ import React from 'react';
  * fastest, and could not inherit the heading face. This way the word is
  * selectable, searchable and sharp at any size.
  */
-const Logo = ({ size = 30, showWordmark = false, tagline = false, style }) => {
+const Logo = ({ size = 30, showWordmark = false, noTagline = false, style }) => {
   // Three cuts of the same artwork, each for the size it is used at:
   //   logo.png         mark + wordmark + tagline, for heroes and share cards
   //   logo-lockup.png  mark + wordmark, for navigation
@@ -25,8 +25,16 @@ const Logo = ({ size = 30, showWordmark = false, tagline = false, style }) => {
   // The tagline is dropped from the nav cut deliberately. In a 34px bar it
   // renders around six pixels tall, which is not small type — it is grey
   // mush that makes the whole lockup look blurred.
+  // The full lockup, tagline included, is the default wherever the wordmark
+  // shows. Cutting the tagline off left a ghost of its glow under the word --
+  // neon type carries a halo above its own letterforms, so no horizontal cut
+  // separates the two lines cleanly. It also threw away the line that says
+  // what the company does, on the one surface every visitor sees.
+  //
+  // The size is what makes it legible: at 34px tall the tagline is six pixels
+  // of mush, so the nav uses 46 and the strapline reads.
   const src = showWordmark
-    ? (tagline ? '/logo.png' : '/logo-lockup.png')
+    ? (noTagline ? '/logo-lockup.png' : '/logo.png')
     : '/logo-mark.png';
 
   // The lockups are wide, so height is the dimension worth fixing; width

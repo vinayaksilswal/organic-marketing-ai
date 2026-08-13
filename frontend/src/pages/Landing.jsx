@@ -378,7 +378,7 @@ const Landing = () => {
       <nav className="nav">
         <div className="nav-in">
           <div className="brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <Logo size={34} showWordmark />
+            <Logo size={46} showWordmark />
           </div>
           <div className="nav-actions">
             <button className="b b-ghost" style={{ padding: '.6rem 1rem' }} onClick={() => navigate('/auth')}>Log in</button>
@@ -839,7 +839,7 @@ const Landing = () => {
       <footer style={{ borderTop: '1px solid var(--line)', padding: '2.5rem 0', background: 'rgba(255,255,255,0.6)' }}>
         <div className="wrap" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="brand" style={{ fontSize: '1rem' }}>
-            <Logo size={28} showWordmark />
+            <Logo size={40} showWordmark />
           </div>
           <div style={{ display: 'flex', gap: '1.4rem', fontSize: '.85rem' }}>
             <a href="/privacy" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>Privacy</a>

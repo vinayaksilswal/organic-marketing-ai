@@ -94,10 +94,42 @@ def main() -> None:
     # slices the base off the mark. Instead the tagline's own region is
     # cleared -- it lives to the RIGHT of the mark and below the wordmark --
     # and the result is re-cropped to whatever is left.
+    # The cut line is FOUND, not guessed. A fixed percentage left a ghost of
+    # the tagline's glow under the wordmark: neon type carries a halo well
+    # above its own letterforms, so any line low enough to spare the "g"
+    # descender also kept the top of that halo.
+    #
+    # Instead, look only at the right-hand side (where the two lines of type
+    # are, clear of the mark) and measure ink per row. The wordmark and the
+    # tagline are separated by a band of near-nothing; the quietest row in
+    # that band is the seam, and cutting there removes the tagline and its
+    # halo together while leaving the descenders intact.
     w, h = transparent.size
+    alpha = transparent.getchannel("A")
+    text_left = int(w * 0.34)
+
+    ink = []
+    for y in range(h):
+        strip = alpha.crop((text_left, y, w, y + 1))
+        ink.append(sum(strip.getdata()))
+
+    peak = max(ink) or 1
+    quiet = peak * 0.04
+
+    # Taking the globally quietest row finds the empty space BELOW the
+    # tagline, which is quieter than the gap between the lines and cuts
+    # nothing. The seam is the first quiet row that still has type under it.
+    seam = None
+    for y in range(int(h * 0.5), int(h * 0.9)):
+        if ink[y] <= quiet and any(v > quiet for v in ink[y + 1:]):
+            seam = y
+            break
+    if seam is None:
+        seam = int(h * 0.72)
+    print(f"  tagline seam found at y={seam} ({seam / h:.0%} of height)")
+
     no_tagline = transparent.copy()
-    tagline_box = (int(w * 0.34), int(h * 0.72), w, h)
-    no_tagline.paste((0, 0, 0, 0), tagline_box)
+    no_tagline.paste((0, 0, 0, 0), (text_left, seam, w, h))
     box_nt = no_tagline.getbbox()
     if box_nt:
         no_tagline = no_tagline.crop(box_nt)

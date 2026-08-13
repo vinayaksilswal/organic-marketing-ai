@@ -220,7 +220,7 @@ async def post_to_facebook(
 
     # Acquire distributed lock to prevent concurrent posts to the same page
     lock_key = f"fb_post_{page_id}"
-    async with distributed_lock(lock_key, timeout_seconds=120) as acquired:
+    async with distributed_lock(lock_key, timeout_seconds=120, wait_seconds=90) as acquired:
         if not acquired:
             raise IntegrationError(
                 "Another post to this Facebook Page is already in progress. "
@@ -473,7 +473,7 @@ async def post_to_instagram(
 
     # Acquire distributed lock to prevent concurrent posts to the same IG account
     lock_key = f"ig_post_{ig_user_id}"
-    async with distributed_lock(lock_key, timeout_seconds=300) as acquired:
+    async with distributed_lock(lock_key, timeout_seconds=300, wait_seconds=150) as acquired:
         if not acquired:
             raise IntegrationError(
                 "Another post to this Instagram account is already in progress. "
