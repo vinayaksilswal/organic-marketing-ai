@@ -83,23 +83,24 @@ META_SCOPES = ",".join([
     "pages_manage_posts",
     "instagram_basic",
     "instagram_content_publish",
-    # instagram_manage_insights, instagram_manage_contents and read_insights
-    # were requested here and are NOT in this list any more. Meta rejects them
-    # outright for this app:
+    # Restored on 13 Aug 2026 after the operator added them to the app's use
+    # cases in the Meta dashboard.
     #
-    #   Invalid Scopes: instagram_manage_insights, instagram_manage_contents,
-    #   read_insights
+    # These two were removed hours earlier because Meta answered the consent
+    # dialog with "Invalid Scopes: instagram_manage_insights,
+    # instagram_manage_contents, read_insights" and an error page. A permission
+    # is only a valid scope once the app actually holds it, and one invalid
+    # entry invalidates the entire authorisation request -- which broke login
+    # for anyone with a developer role while ordinary users saw nothing wrong.
     #
-    # and serves an error page instead of the consent dialog, so asking for
-    # them did not merely fail to grant them -- it broke the login flow for
-    # anyone with a developer role on the app. Meta's own note says ordinary
-    # users would ignore them, which means the cost was invisible in testing
-    # and total for the operator.
+    # So if the dialog errors again, the fix is to remove these two lines, not
+    # to debug the rest of the flow.
     #
-    # A permission only becomes a valid scope AFTER App Review approves it for
-    # the app. Listing one early does not queue it up; it invalidates the
-    # whole request. They go back in the moment they are approved, and not
-    # before.
+    # read_insights is deliberately NOT restored. It was rejected alongside
+    # them, it is a Facebook Page permission rather than an Instagram one, and
+    # nothing here needs it.
+    "instagram_manage_insights",   # views, reach, impressions
+    "instagram_manage_contents",   # DELETE /{ig-media-id}
     # Required when the Page belongs to a Business Portfolio rather than the
     # personal account. Without it /me/accounts returns an empty list even
     # though the Page permissions were granted — which looked exactly like
