@@ -1,4 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
+/* Bricolage Grotesque for display, Manrope for text.
+   Outfit and Inter were doing the job, but Inter in particular is the face
+   every AI-drafted SaaS page reaches for, and a page that looks like every
+   other page cannot claim to be the serious option. Bricolage has optical
+   sizing and real character at large sizes without being a novelty face;
+   Manrope is geometric, quiet, and holds up at 14px, which is where most of
+   this page actually lives. */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 /* ==========================================================================
    Organic Marketing AI - Premium Enterprise CSS
@@ -25,8 +32,8 @@
   --success: #10b981;
   --error: #ef4444;
   
-  --font-family-heading: 'Outfit', sans-serif;
-  --font-family-body: 'Inter', sans-serif;
+  --font-family-heading: 'Bricolage Grotesque', 'Outfit', sans-serif;
+  --font-family-body: 'Manrope', 'Inter', sans-serif;
   
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 25px rgba(168, 85, 247, 0.2);

@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Sparkles, ArrowRight, ChevronDown, ShieldCheck,
   Instagram, Facebook, Wand2, Clock, Eye, Send, AlertCircle,
+  // Replacing the emoji section markers. Emoji render differently on every
+  // platform, carry no brand, and are one of the clearest tells of a page
+  // that was generated rather than designed.
+  MonitorSmartphone, ShoppingBag, Bot, Layers, Store, GraduationCap,
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -62,8 +66,28 @@ const styles = `
 }
 .omai > * { position: relative; z-index: 1; }
 
-.omai h1, .omai h2, .omai h3 { color: var(--ink); letter-spacing: -0.028em; margin: 0; }
-.omai p { color: var(--ink-soft); margin: 0; }
+.omai, .omai p, .omai button, .omai input, .omai select, .omai a {
+  font-family: 'Manrope', system-ui, sans-serif;
+}
+.omai h1, .omai h2, .omai h3, .omai .brand, .omai .h1, .omai .h2 {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+  font-optical-sizing: auto;
+}
+.omai h1, .omai h2, .omai h3 {
+  color: var(--ink); letter-spacing: -0.03em; margin: 0;
+  text-wrap: balance;
+}
+/* max-width keeps running text near a readable measure. margin-inline: auto
+   is not optional alongside it: without it a constrained paragraph inside a
+   centred section is capped at 68ch and then sits hard LEFT of its container,
+   because text-align centres the text inside the box and does nothing to
+   place the box itself. That broke the stat caption and several section
+   subheads the moment the measure was introduced.
+   Where a paragraph is already narrower than its container the auto margins
+   have no effect, so this is safe for the left-aligned card copy too. */
+.omai p { color: var(--ink-soft); margin: 0; max-width: 68ch; margin-inline: auto; }
+/* Digits that line up wherever a figure is the point. */
+.omai .tnum { font-variant-numeric: tabular-nums; }
 /* 6rem left long dead bands between sections, which reads as a slow page and
    costs scroll depth. Tighter keeps the argument moving. */
 .omai section { padding: 3.6rem 0; }
@@ -171,10 +195,13 @@ const styles = `
 .omai .h1 { font-size: clamp(2.5rem, 5.4vw, 4rem); line-height: 1.04; font-weight: 780; }
 .omai .h2 { font-size: clamp(1.9rem, 3.2vw, 2.6rem); line-height: 1.12; font-weight: 740; }
 .omai .lede { font-size: clamp(1.02rem, 1.35vw, 1.18rem); line-height: 1.62; }
-.omai .tint {
-  background: linear-gradient(120deg, var(--violet), var(--blue) 55%, var(--pink));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
+/* One colour, not three.
+   A violet-to-blue-to-pink gradient across a headline is the single most
+   common tell of a generated page, and it spends the page's whole colour
+   budget in the first three seconds. The headline now carries one accent
+   hue, which leaves the primary button as the only other saturated thing
+   above the fold -- so the eye goes to the button. */
+.omai .tint { color: var(--violet); }
 
 .omai .faq { border-bottom: 1px solid var(--line); }
 .omai .faq button {
@@ -603,22 +630,29 @@ const Landing = () => {
           <CardRail
             interval={3900}
             items={[
-              { key: 'saas', emoji: '💻', title: 'SaaS & Data', colour: 'var(--blue)',
+              { key: 'saas', icon: <MonitorSmartphone size={18} />, title: 'SaaS & Data', colour: 'var(--blue)',
                 body: 'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.' },
-              { key: 'ecom', emoji: '🛒', title: 'E-commerce', colour: 'var(--violet)',
+              { key: 'ecom', icon: <ShoppingBag size={18} />, title: 'E-commerce', colour: 'var(--violet)',
                 body: 'Point it at your product feed and it rotates through your catalog, one product at a time, writing problem-solution copy against that product\'s own details rather than your brand blurb.' },
-              { key: 'influencer', emoji: '🤖', title: 'AI Influencer', colour: 'var(--pink)',
+              { key: 'influencer', icon: <Bot size={18} />, title: 'AI Influencer', colour: 'var(--pink)',
                 body: 'Writes in first person as the persona, not as a company. Keep a character reference on file and the visuals stay recognisably the same face across posts.' },
-              { key: 'agency', emoji: '🎨', title: 'Creators & Agencies', colour: 'var(--green)',
+              { key: 'agency', icon: <Layers size={18} />, title: 'Creators & Agencies', colour: 'var(--green)',
                 body: 'Run several brands from one login, each with its own profile, media library, connected accounts and schedule. Nothing bleeds between them.' },
-              { key: 'local', emoji: '🏪', title: 'Local Business', colour: 'var(--violet)',
+              { key: 'local', icon: <Store size={18} />, title: 'Local Business', colour: 'var(--violet)',
                 body: 'Real places and real hands rather than stock polish. The creative direction leans on materials, light and the moment a customer reacts — which is what these models render best.' },
-              { key: 'education', emoji: '📚', title: 'Education & Coaching', colour: 'var(--blue)',
+              { key: 'education', icon: <GraduationCap size={18} />, title: 'Education & Coaching', colour: 'var(--blue)',
                 body: 'The strongest shot is the face at the moment of understanding, not a graduation stock photo. Copy leads with the specific thing someone will be able to do.' },
             ]}
-            renderItem={({ emoji, title, colour, body }) => (
+            renderItem={({ icon, title, colour, body }) => (
               <div className="glass glass-lift" style={{ padding: '1.85rem', height: '100%', boxSizing: 'border-box' }}>
-                <div style={{ fontSize: '1.7rem', marginBottom: '.85rem', lineHeight: 1 }}>{emoji}</div>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 11,
+                  background: `${colour}14`, border: `1px solid ${colour}2e`, color: colour,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: '1rem',
+                }}>
+                  {icon}
+                </div>
                 <h3 style={{ fontSize: '1.04rem', marginBottom: '.55rem', fontWeight: 690, color: colour }}>{title}</h3>
                 <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
