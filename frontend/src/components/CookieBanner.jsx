@@ -45,8 +45,8 @@ export default function CookieBanner() {
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
           <button 
             onClick={handleDecline}
-            style={{ padding: '0.5rem 1rem', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '4px', background: 'transparent', cursor: 'pointer', transition: '0.2s' }}
-            onMouseOver={e => e.target.style.background='rgba(255,255,255,0.05)'} onMouseOut={e => e.target.style.background='transparent'}
+            style={{ padding: '0.5rem 1rem', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '4px', background: 'transparent', cursor: 'pointer', transition: '0.2s' }}
+            onMouseOver={e => e.target.style.background='rgba(11, 16, 32, 0.05)'} onMouseOut={e => e.target.style.background='transparent'}
           >
             Decline
           </button>

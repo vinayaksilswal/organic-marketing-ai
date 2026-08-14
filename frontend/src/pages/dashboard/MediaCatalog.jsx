@@ -581,7 +581,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Upload Image/Video for AI Campaign
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem', height: '42px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem', height: '42px' }}>
               <input 
                 type="file" 
                 id="campaign-file-upload"
@@ -601,7 +601,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
               placeholder="e.g. Founder demos the scanner on a laptop in a dark office"
               value={baseCaption}
               onChange={(e) => setBaseCaption(e.target.value)}
-              style={{ width: '100%', padding: '0.6rem 1rem', height: '42px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '8px' }}
+              style={{ width: '100%', padding: '0.6rem 1rem', height: '42px', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '8px' }}
             />
           </div>
 
@@ -781,7 +781,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                 placeholder="Folder name — e.g. Diwali launch set"
                 style={{
                   flex: '1 1 260px', padding: '0.55rem 0.8rem', borderRadius: 8,
-                  border: '1px solid var(--border-color)', background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid var(--border-color)', background: 'rgba(11, 16, 32, 0.04)',
                   color: 'inherit', fontSize: '0.88rem',
                 }}
               />
@@ -801,7 +801,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
               {folders.map(f => (
                 <div key={f.id} style={{
                   border: '1px solid var(--border-color)', borderRadius: 10,
-                  padding: '0.65rem 0.8rem', minWidth: 190, background: 'rgba(255,255,255,0.03)',
+                  padding: '0.65rem 0.8rem', minWidth: 190, background: 'rgba(11, 16, 32, 0.03)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {f.count ? <FolderOpen size={16} color="#6ea8fe" /> : <Folder size={16} color="var(--text-muted)" />}
@@ -885,7 +885,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                             style={{
                               width: '100%', marginTop: 4, fontSize: '0.72rem',
                               padding: '2px 4px', borderRadius: 5, cursor: 'pointer',
-                              background: 'rgba(255,255,255,0.06)', color: 'inherit',
+                              background: 'rgba(11, 16, 32, 0.06)', color: 'inherit',
                               border: '1px solid var(--border-color)',
                             }}
                           >
@@ -981,7 +981,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                     const inactive = item.isActive === false;
                     const inFolder = folders.find(f => f.id === item.folderId);
                     return (
-                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <tr key={item.id} style={{ borderBottom: '1px solid rgba(11, 16, 32, 0.05)' }}>
                         <td style={{ padding: '1rem 0 1rem 1.25rem', width: 34 }}>
                           {/* Tracks are never posted, so grouping one into a
                               carousel would only produce a broken slide. */}
@@ -1039,7 +1039,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                                 <Sparkles size={11} />
                                 {item.promptType === 'video' ? 'Video prompt' : 'AI prompt'}
                               </summary>
-                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
                                 <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
                                   {item.prompt}
                                 </p>
@@ -1123,13 +1123,13 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   value={editCaption}
                   onChange={(e) => setEditCaption(e.target.value)}
                   placeholder="e.g. Developer runs a post-quantum scan from a terminal; the result returns compliant in under a second."
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', resize: 'vertical', fontSize: '0.85rem', lineHeight: 1.5 }}
+                  style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', resize: 'vertical', fontSize: '0.85rem', lineHeight: 1.5 }}
                 />
               </div>
 
               <div className="input-group" style={{ marginBottom: '2rem' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'block' }}>Update Media (Optional)</label>
-                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem' }}>
                   <input type="file" onChange={(e) => setEditFile(e.target.files[0])} style={{ fontSize: '0.85rem', width: '100%', color: 'var(--text-muted)' }} />
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.5rem 0 0 0' }}>Leave empty to keep existing media.</p>
@@ -1151,7 +1151,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
             <div style={{ position: 'absolute', top: '2rem', right: '2rem' }}>
               <button 
                 onClick={() => setPreviewMedia(null)} 
-                style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid var(--border-color)', color: '#fff', cursor: 'pointer', borderRadius: '50%', padding: '0.5rem', display: 'flex' }}
+                style={{ background: 'rgba(11, 16, 32, 0.06)', border: '1px solid var(--border-color)', color: 'var(--text-main)', cursor: 'pointer', borderRadius: '50%', padding: '0.5rem', display: 'flex' }}
               >
                 <X size={24} />
               </button>
@@ -1229,11 +1229,16 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   </p>
                   <input value={purgeTyped} onChange={e => setPurgeTyped(e.target.value)}
                     autoFocus placeholder={purgePreview.workspace}
-                    style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', marginBottom: '1rem' }} />
+                    style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.05)', border: '1px solid var(--border-color)', color: 'var(--text-main)', marginBottom: '1rem' }} />
                   <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end' }}>
                     <button className="btn btn-secondary" style={{ height: 38 }}
                       onClick={() => setPurgeOpen(false)} disabled={purging}>Cancel</button>
-                    <button className="btn" style={{ height: 38, background: purgeTyped === purgePreview.workspace ? '#c62828' : 'rgba(255,255,255,0.08)', color: '#fff', cursor: purgeTyped === purgePreview.workspace ? 'pointer' : 'not-allowed' }}
+                    <button className="btn" style={{ height: 38, background: purgeTyped === purgePreview.workspace ? '#c62828' : 'rgba(11, 16, 32, 0.08)',
+                      // White only once the button turns red and is armed; on
+                      // the pale disabled state it has to be ink or the label
+                      // disappears exactly when the user is reading it.
+                      color: purgeTyped === purgePreview.workspace ? '#fff' : 'var(--text-muted)',
+                      cursor: purgeTyped === purgePreview.workspace ? 'pointer' : 'not-allowed' }}
                       onClick={confirmPurge}
                       disabled={purging || purgeTyped !== purgePreview.workspace}>
                       {purging ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <Trash2 size={15} />} Delete everything

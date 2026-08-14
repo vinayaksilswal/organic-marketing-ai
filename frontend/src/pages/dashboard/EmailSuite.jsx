@@ -279,7 +279,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
   const inputStyle = {
     width: '100%', padding: '0.55rem 0.75rem', borderRadius: 8,
     background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-color)',
-    color: '#fff', fontSize: '0.86rem',
+    color: 'var(--text-main)', fontSize: '0.86rem',
   };
 
   const filteredAudiences = audiences.filter(a =>
@@ -422,7 +422,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {campaigns.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(11, 16, 32, 0.03)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
                   No email campaigns created yet for this workspace.
                 </div>
               ) : (
@@ -556,7 +556,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
                       </tr>
                     ) : (
                       filteredAudiences.map(sub => (
-                        <tr key={sub.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <tr key={sub.id} style={{ borderBottom: '1px solid rgba(11, 16, 32, 0.05)' }}>
                           <td style={{ padding: '1rem', fontWeight: '500' }}>{sub.email}</td>
                           <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{sub.name || '—'}</td>
                           <td style={{ padding: '1rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{sub.source}</td>
@@ -643,7 +643,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
                     {/* Inbox chrome, so the subject is judged the way a
                         recipient actually sees it. */}
                     <div style={{ maxWidth: 640, margin: '0 auto' }}>
-                      <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', borderRadius: '10px 10px 0 0', padding: '0.9rem 1.1rem' }}>
+                      <div style={{ background: 'rgba(11, 16, 32, 0.04)', border: '1px solid var(--border-color)', borderRadius: '10px 10px 0 0', padding: '0.9rem 1.1rem' }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           From: {emailCfg?.fromName || emailCfg?.fromEmail || 'your business'}
                           {emailCfg?.fromEmail && emailCfg?.fromName ? ` <${emailCfg.fromEmail}>` : ''}
@@ -706,7 +706,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
             <div className="glass-panel" style={{ maxWidth: '780px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: 0 }}>Newsletter & Campaign Builder</h3>
-                <button onClick={() => setIsCampaignModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
+                <button onClick={() => setIsCampaignModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}>
                   <X size={20} />
                 </button>
               </div>
@@ -770,7 +770,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
             <div className="glass-panel" style={{ maxWidth: '480px', width: '100%', padding: '2rem', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: 0 }}>Add Contact Subscriber</h3>
-                <button onClick={() => setIsAudienceModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
+                <button onClick={() => setIsAudienceModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}>
                   <X size={20} />
                 </button>
               </div>

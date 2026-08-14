@@ -77,7 +77,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
   useEffect(() => { load(); }, [load]);
 
   const panel = { background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: '1.5rem' };
-  const muted = { color: 'rgba(255,255,255,0.45)' };
+  const muted = { color: 'var(--text-muted)' };
 
   const connected = [
     connection?.hasFacebook && { icon: <Facebook size={14} color="#60a5fa" />, label: connection.fbPageName || 'Facebook Page' },
@@ -103,7 +103,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: '0.85rem', ...muted }}>{label}</div>
         {loading
-          ? <div style={{ width: 52, height: 30, borderRadius: 6, background: 'rgba(255,255,255,0.06)', marginTop: 4 }} />
+          ? <div style={{ width: 52, height: 30, borderRadius: 6, background: 'rgba(11, 16, 32, 0.06)', marginTop: 4 }} />
           : <div style={{ fontSize: '1.85rem', fontWeight: 700, lineHeight: 1.2 }}>{value ?? 0}</div>}
         {hint && <div style={{ fontSize: '0.75rem', ...muted }}>{hint}</div>}
       </div>
@@ -171,7 +171,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
             </div>
             <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {blockers.map((b, i) => (
-                <li key={i} style={{ fontSize: '0.87rem', color: 'rgba(255,255,255,0.75)' }}>
+                <li key={i} style={{ fontSize: '0.87rem', color: 'var(--text-muted)' }}>
                   {b.text}{b.where && <span style={{ ...muted }}> — {b.where}</span>}
                 </li>
               ))}
@@ -204,11 +204,11 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                   ))}
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: 'rgba(255,255,255,0.5)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: 'var(--text-muted)' }}>
                   <XCircle size={14} color="#f87171" /> None connected
                 </div>
               )}
-              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: '0.78rem', ...muted }}>
+              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(11, 16, 32, 0.06)', fontSize: '0.78rem', ...muted }}>
                 Managed in{' '}
                 <button onClick={() => navigate('/dashboard/workspaces')}
                   style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', font: 'inherit' }}>
@@ -248,7 +248,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
 
           {/* Recent activity */}
           <div style={{ ...panel, padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Clock size={16} color="var(--primary-color)" />
               <h3 style={{ margin: 0, fontSize: '1rem' }}>Recent posts</h3>
               <span style={{ marginLeft: 'auto', fontSize: '0.78rem', ...muted }}>{recentPosts.length} shown</span>
@@ -271,7 +271,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                   const failed = p.status === 'FAILED';
                   const color = ok ? '#10b981' : failed ? '#f87171' : '#f59e0b';
                   return (
-                    <div key={p.id || i} style={{ display: 'flex', gap: '0.85rem', padding: '0.9rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div key={p.id || i} style={{ display: 'flex', gap: '0.85rem', padding: '0.9rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.04)' }}>
                       <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, marginTop: 7, flexShrink: 0 }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: '0.86rem', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>

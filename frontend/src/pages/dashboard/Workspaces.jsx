@@ -255,8 +255,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
   const currentBp = businessList.find(b => b.id === editWorkspaceId);
 
-  const inputStyle = { width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.9rem', outline: 'none' };
-  const labelStyle = { display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', fontWeight: 500 };
+  const inputStyle = { width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px', background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.9rem', outline: 'none' };
+  const labelStyle = { display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 500 };
 
   return (
     <div className="view">
@@ -281,7 +281,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
               <Building2 size={28} color="var(--primary-color)" />
             </div>
             <h2 style={{ margin: '0 0 0.6rem 0', fontSize: '1.35rem' }}>Add your first business</h2>
-            <p style={{ margin: '0 0 1.75rem 0', fontSize: '0.92rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.6 }}>
+            <p style={{ margin: '0 0 1.75rem 0', fontSize: '0.92rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
               Tell us your website and what you sell. The AI reads your site, learns your brand voice,
               and starts generating creatives and posts automatically.
             </p>
@@ -308,7 +308,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                     {bp.logoUrl ? (
-                      <img src={bp.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                      <img src={bp.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border-color)' }} />
                     ) : (
                       <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.2rem', color: '#fff' }}>
                         {bp.name ? bp.name.charAt(0).toUpperCase() : 'B'}
@@ -344,7 +344,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     {sc?.hasFacebook && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}><Facebook size={12} /> {sc.fbPageName || 'Connected'}</span>}
                     {sc?.igAccountId && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(236,72,153,0.12)', color: '#f472b6' }}><Instagram size={12} /> {sc.igAccountName || 'Connected'}</span>}
                     {sc?.hasLinkedin && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(59,130,246,0.12)', color: '#93c5fd' }}><Linkedin size={12} /></span>}
-                    {sc?.hasTwitter && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: '#e5e7eb' }}><Twitter size={12} /></span>}
+                    {sc?.hasTwitter && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(11, 16, 32, 0.08)', color: '#e5e7eb' }}><Twitter size={12} /></span>}
                     {!sc?.hasFacebook && (
                       <button
                         onClick={() => handleConnectMeta(bp.id)}
@@ -493,15 +493,15 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
             onClick={e => { if (e.target === e.currentTarget) setEditModalOpen(false); }}>
             <div className="glass-panel" style={{ width: '100%', maxWidth: 680, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
               {/* Header */}
-              <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 2 }}>
+              <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 2 }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Settings size={18} /> Edit: {currentBp?.name || 'Workspace'}
                 </h3>
-                <button onClick={() => setEditModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: '0.25rem' }}><X size={20} /></button>
+                <button onClick={() => setEditModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer', padding: '0.25rem' }}><X size={20} /></button>
               </div>
 
               {/* Tabs */}
-              <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 1.5rem' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', padding: '0 1.5rem' }}>
                 {[
                   { key: 'profile', label: 'Business Profile', icon: <Building2 size={14} /> },
                   { key: 'social', label: 'Social Accounts', icon: <Link2 size={14} /> },
@@ -542,7 +542,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     <div>
                       <label style={labelStyle}>Logo URL</label>
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                        {editData.logoUrl && <img src={editData.logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />}
+                        {editData.logoUrl && <img src={editData.logoUrl} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border-color)' }} />}
                         <input style={{ ...inputStyle, flex: 1 }} type="url" placeholder="https://yourbrand.com/logo.png" value={editData.logoUrl} onChange={e => setEditData({...editData, logoUrl: e.target.value})} />
                       </div>
                     </div>
@@ -591,7 +591,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.9rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <AlertTriangle size={15} /> Danger zone
                       </h4>
-                      <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                      <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                         Deleting this business permanently removes its media library, generated creatives,
                         scheduled posts, campaigns, products, and social connections. This cannot be undone.
                       </p>
@@ -608,7 +608,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                 {/* SOCIAL ACCOUNTS TAB */}
                 {editTab === 'social' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                       Connect social accounts for this workspace. The AI will auto-post creatives to these accounts.
                     </p>
 
@@ -654,7 +654,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         </>
                       ) : (
                         <>
-                          <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                          <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                             Sign in with Facebook and we'll automatically find your Page and its linked
                             Instagram Business account. No tokens to copy.
                           </p>
@@ -677,7 +677,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </div>
 
                     {/* LinkedIn */}
-                    <div style={{ padding: '1.25rem', background: 'rgba(59,130,246,0.03)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ padding: '1.25rem', background: 'rgba(59,130,246,0.03)', borderRadius: '10px', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Linkedin size={16} color="#93c5fd" /> LinkedIn
                       </h4>
@@ -686,7 +686,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </div>
 
                     {/* Twitter */}
-                    <div style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ padding: '1.25rem', background: 'rgba(11, 16, 32, 0.02)', borderRadius: '10px', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Twitter size={16} color="#e5e7eb" /> Twitter / X
                       </h4>
@@ -724,7 +724,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <option value={12}>Every 12 hours</option>
                         <option value={24}>Every 24 hours</option>
                       </select>
-                      <small style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.4)' }}>How often the AI publishes posts to your linked social accounts.</small>
+                      <small style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>How often the AI publishes posts to your linked social accounts.</small>
                     </div>
 
                     <div>
@@ -769,7 +769,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
               <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Facebook size={18} color="#60a5fa" /> Choose a Page
               </h3>
-              <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.85rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.55 }}>
+              <p style={{ margin: '0 0 1.25rem 0', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
                 Your Facebook account manages more than one Page. Pick the one this business
                 should publish as — its linked Instagram account will be connected too.
               </p>
@@ -783,7 +783,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     style={{
                       display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
                       padding: '0.85rem 1rem', borderRadius: '10px', textAlign: 'left',
-                      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)',
                       color: '#fff', cursor: selectingPage ? 'wait' : 'pointer',
                       opacity: selectingPage && selectingPage !== p.id ? 0.4 : 1,
                     }}
@@ -796,7 +796,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                           <Instagram size={11} /> @{p.instagramUsername}
                         </div>
                       ) : (
-                        <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', marginTop: '0.15rem' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
                           No Instagram Business account linked
                         </div>
                       )}
@@ -823,7 +823,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
               <h3 style={{ margin: '0 0 0.6rem 0', fontSize: '1.1rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertTriangle size={18} /> Delete “{deleteTarget.name}”?
               </h3>
-              <p style={{ margin: '0 0 1.1rem 0', fontSize: '0.87rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+              <p style={{ margin: '0 0 1.1rem 0', fontSize: '0.87rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                 This permanently deletes the business and everything belonging to it — media library,
                 generated creatives, scheduled and published posts, campaigns, products, and connected
                 social accounts. This cannot be undone.

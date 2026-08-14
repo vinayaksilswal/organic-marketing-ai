@@ -264,7 +264,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   };
 
-  const card = { background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '1.1rem' };
+  const card = { background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(11, 16, 32, 0.07)', borderRadius: 12, padding: '1.1rem' };
 
   return (
     <div className="view">
@@ -282,7 +282,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
         {!activeWorkspaceId ? (
           <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
             <Building2 size={26} color="var(--primary-color)" style={{ marginBottom: '0.9rem' }} />
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.6)' }}>
+            <p style={{ margin: 0, color: 'var(--text-muted)' }}>
               Select a business from the sidebar to generate a video for it.
             </p>
           </div>
@@ -300,7 +300,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: '1.05rem' }}>{business?.name || 'Active business'}</div>
-                  <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)' }}>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                     {business?.businessModel || 'General'}
                     {business?.brandAnalysisComplete ? ' · brand profile ready' : ' · no brand profile yet'}
                   </div>
@@ -315,7 +315,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fcd34d', marginBottom: '0.3rem' }}>
                         No brand profile for this business
                       </div>
-                      <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                      <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                         Without it the AI has no stored sense of your tone, audience or content
                         themes, so captions and video prompts come out generic. Building it reads
                         your website and takes about a minute.
@@ -334,14 +334,14 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               {/* Product is optional, and only meaningful with a catalog */}
               {products.length > 0 && (
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                  <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     <Package size={13} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />
-                    Product <span style={{ color: 'rgba(255,255,255,0.35)' }}>(optional)</span>
+                    Product <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
                   </label>
                   <select
                     value={productId}
                     onChange={e => setProductId(e.target.value)}
-                    style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
                   >
                     <option value="">Let the AI choose from my catalog</option>
                     {products.map(p => (
@@ -362,7 +362,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   : <><Wand2 size={18} /> Generate Video Prompt</>}
               </button>
 
-              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.42)', flexWrap: 'wrap' }}>
+              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
                 {videoKeySet ? (
                   <><Video size={13} color="#10b981" /> Video rendering connected — renders are queued and saved to your media library automatically.</>
                 ) : (
@@ -377,31 +377,31 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               {showVideoConfig && (
                 <div style={{ ...card, marginTop: '1rem' }}>
                   <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.92rem' }}>Video generation API</h4>
-                  <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                  <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                     With a key set, generated prompts are rendered to video and saved straight to
                     this business’s media library — no manual step.
                   </p>
                   <div style={{ display: 'grid', gap: '0.7rem' }}>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Provider</label>
+                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Provider</label>
                       <select value={videoProvider} onChange={e => setVideoProvider(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.88rem', appearance: 'auto' }}>
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.88rem', appearance: 'auto' }}>
                         <option value="json2video">JSON2Video</option>
                         <option value="custom">Other (custom endpoint)</option>
                       </select>
                     </div>
                     <div>
-                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>API key</label>
+                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>API key</label>
                       <input type="password" value={videoKey} onChange={e => setVideoKey(e.target.value)}
                         placeholder={videoKeySet ? '••••••••  (leave blank to keep current)' : 'Paste your API key'}
-                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.88rem' }} />
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.88rem' }} />
                     </div>
                     {videoProvider === 'custom' && (
                       <div>
-                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Endpoint URL</label>
+                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Endpoint URL</label>
                         <input type="url" value={videoEndpoint} onChange={e => setVideoEndpoint(e.target.value)}
                           placeholder="https://api.example.com/v1/render"
-                          style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.88rem' }} />
+                          style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.88rem' }} />
                       </div>
                     )}
                     <button className="btn btn-primary" onClick={saveVideoConfig} disabled={savingVideoConfig}
@@ -423,7 +423,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               const failed = genStatus === 'FAILED';
               return (
               <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {pending ? <span className="spinner" style={{ width: 15, height: 15 }} />
                     : failed ? <AlertTriangle size={17} color="#f87171" />
                     : <Check size={17} color="#10b981" />}
@@ -439,9 +439,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
                 <div style={{ padding: '1.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                       Video prompt
-                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '0.1rem' }}>
+                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
                         Saved to this business's media library
                       </span>
                     </label>
@@ -461,7 +461,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   {pending ? (
                     <div style={{ ...card, display: 'flex', alignItems: 'center', gap: '0.7rem', minHeight: 110 }}>
                       <span className="spinner" style={{ width: 16, height: 16 }} />
-                      <div style={{ fontSize: '0.87rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.55 }}>
+                      <div style={{ fontSize: '0.87rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
                         Writing the prompt. Free AI providers queue under load, so this
                         can take up to a minute — you can leave this page and it will
                         still finish.
@@ -483,7 +483,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       value={promptText}
                       readOnly
                       onFocus={e => e.target.select()}
-                      style={{ width: '100%', minHeight: 150, padding: '1rem', fontSize: '0.9rem', lineHeight: 1.6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9, color: '#e4e4e7', resize: 'vertical' }}
+                      style={{ width: '100%', minHeight: 150, padding: '1rem', fontSize: '0.9rem', lineHeight: 1.6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(11, 16, 32, 0.07)', borderRadius: 9, color: '#e4e4e7', resize: 'vertical' }}
                     />
                   )}
 
@@ -509,7 +509,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       <h5 style={{ margin: '0 0 0.4rem 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <ImageIcon size={14} /> Made the video elsewhere?
                       </h5>
-                      <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                      <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                         Paste the prompt into Veo, Flow, Seed Dance or Runway, then upload the result
                         here. It attaches to this prompt — so the prompt becomes the video's
                         description, and the caption writer knows what is on screen.
@@ -546,16 +546,16 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
             {/* PROMPT LOG */}
             <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', marginTop: '1.5rem' }}>
-              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                 <Clock size={16} color="var(--primary-color)" />
                 <h3 style={{ margin: 0, fontSize: '1.02rem' }}>Generated prompts</h3>
-                <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {history.length > 0 && `${history.length} total`}
                 </span>
                 <button
                   onClick={fetchHistory}
                   title="Refresh"
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', padding: 4 }}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: 4 }}
                 >
                   <RefreshCw size={14} />
                 </button>
@@ -574,7 +574,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   </button>
                 </div>
               ) : history.length === 0 ? (
-                <div style={{ padding: '2.5rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.88rem' }}>
+                <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
                   No prompts yet. Generate one above and it will appear here.
                 </div>
               ) : (
@@ -596,10 +596,10 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   const isGenerating = !stalled && !text && gen !== 'FAILED';
                   const genFailed = gen === 'FAILED' || stalled;
                   return (
-                    <div key={item.id} style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div key={item.id} style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.05)' }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
                         {/* Thumbnail only once a real file is attached */}
-                        <div style={{ width: 46, height: 46, borderRadius: 9, background: 'rgba(255,255,255,0.04)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 46, height: 46, borderRadius: 9, background: 'rgba(11, 16, 32, 0.04)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {live && item.mimeType?.startsWith('video/') ? (
                             <video src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
                           ) : live ? (
@@ -624,13 +624,13 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                                 : isGenerating ? 'WRITING…'
                                 : live ? 'IN POSTING CYCLE' : 'PROMPT ONLY'}
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                               {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
                             </span>
                           </div>
 
                           {isGenerating ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'rgba(255,255,255,0.5)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                               <span className="spinner" style={{ width: 12, height: 12 }} />
                               Writing this prompt — it will appear here when it is done.
                             </div>
@@ -698,7 +698,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                           </div>
 
                           {!live && text && (
-                            <p style={{ margin: '0.6rem 0 0 0', fontSize: '0.74rem', color: 'rgba(255,255,255,0.38)', lineHeight: 1.5 }}>
+                            <p style={{ margin: '0.6rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                               This is a saved prompt, not a file — the scheduler skips it. Render it in
                               your video tool, then attach the result to put it in rotation.
                             </p>

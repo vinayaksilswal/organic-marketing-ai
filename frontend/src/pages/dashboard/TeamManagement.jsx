@@ -18,8 +18,8 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
 
   const inputStyle = {
     width: '100%', padding: '0.7rem 0.85rem', borderRadius: '8px',
-    background: 'rgba(255,255,255,0.04)', color: '#fff',
-    border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.9rem', outline: 'none',
+    background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)',
+    border: '1px solid var(--border-color)', fontSize: '0.9rem', outline: 'none',
   };
 
   // showToast is deliberately NOT a dependency. It is redefined on every render
@@ -120,7 +120,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
 
         {!activeWorkspaceId ? (
           <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-            <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)' }}>
+            <p style={{ margin: 0, color: 'var(--text-muted)' }}>
               Select a business from the sidebar to manage its team.
             </p>
           </div>
@@ -133,7 +133,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
               </h2>
               <form onSubmit={handleInvite} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                 <div style={{ flex: '1 1 260px', position: 'relative' }}>
-                  <Mail size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.35)' }} />
+                  <Mail size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input
                     type="email" required placeholder="colleague@company.com"
                     value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
@@ -150,20 +150,20 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
                   {inviting ? 'Sending…' : 'Send Invite'}
                 </button>
               </form>
-              <p style={{ margin: '0.85rem 0 0 0', fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)' }}>
+              <p style={{ margin: '0.85rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                 {ROLES.find(r => r.value === inviteRole)?.hint}
               </p>
             </div>
 
             {/* Members */}
             <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <Shield size={16} color="#60a5fa" />
                 <h2 style={{ margin: 0, fontSize: '1rem' }}>Workspace members ({members.length})</h2>
               </div>
 
               {loading ? (
-                <div style={{ padding: '3rem', textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <span className="spinner" style={{ width: 20, height: 20 }} />
                 </div>
               ) : loadError ? (
@@ -176,7 +176,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
                 </div>
               ) : members.length === 0 ? (
                 <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>
-                  <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: '0.9rem' }}>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                     No teammates yet. Invite someone above to collaborate on this workspace.
                   </p>
                 </div>
@@ -184,9 +184,9 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                      <tr style={{ background: 'rgba(11, 16, 32, 0.02)' }}>
                         {['Member', 'Role', 'Status', ''].map((h, i) => (
-                          <th key={i} style={{ padding: '0.75rem 1.5rem', textAlign: i === 3 ? 'right' : 'left', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                          <th key={i} style={{ padding: '0.75rem 1.5rem', textAlign: i === 3 ? 'right' : 'left', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', fontWeight: 600 }}>
                             {h}
                           </th>
                         ))}
@@ -194,7 +194,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
                     </thead>
                     <tbody>
                       {members.map(m => (
-                        <tr key={m.id} style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                        <tr key={m.id} style={{ borderTop: '1px solid rgba(11, 16, 32, 0.05)' }}>
                           <td style={{ padding: '0.9rem 1.5rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
@@ -222,7 +222,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
                           </td>
                           <td style={{ padding: '0.9rem 1.5rem', textAlign: 'right' }}>
                             <button onClick={() => handleRemove(m)} title={`Remove ${m.email}`}
-                              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: '0.35rem', borderRadius: 6, display: 'inline-flex' }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.35rem', borderRadius: 6, display: 'inline-flex' }}
                               onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; }}
                               onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}>
                               <Trash2 size={15} />

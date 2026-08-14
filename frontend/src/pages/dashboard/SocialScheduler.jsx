@@ -217,7 +217,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
       <div className="container" style={{ padding: '3rem 0' }}>
         
         {/* HEADER SECTION */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', background: 'rgba(11, 16, 32, 0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Social Scheduler</h1>
             <p className="text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.95rem' }}>
@@ -231,8 +231,8 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 about which one actually applied. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <Clock size={15} className="text-muted" />
-              <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
-                Posts every <strong style={{ color: '#fff' }}>{frequencyHours}h</strong>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Posts every <strong style={{ color: 'var(--text-main)' }}>{frequencyHours}h</strong>
               </span>
               <button
                 onClick={() => navigate('/dashboard/workspaces')}
@@ -269,7 +269,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             A table answers "what happened last?"; the questions people
             actually have about a schedule are shape questions: is anything
             going out tomorrow, did Tuesday publish, why is there a gap. */}
-        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(255,255,255,0.02)' }}>
+        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(11, 16, 32, 0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
             <CalendarDays size={18} color="var(--primary-color)" />
             <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Posting calendar</h2>
@@ -285,7 +285,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         </div>
 
         {/* LOGS SECTION */}
-        <div className="glass-panel" style={{ overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(255,255,255,0.02)' }}>
+        <div className="glass-panel" style={{ overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(11, 16, 32, 0.02)' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
              <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Automation Logs</h2>
           </div>
@@ -329,7 +329,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 </tr>
               ) : (
                 posts.map(post => (
-                  <tr key={post.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <tr key={post.id} style={{ borderBottom: '1px solid rgba(11, 16, 32, 0.05)' }}>
                     <td style={{ padding: '1rem 1.5rem', verticalAlign: 'top' }}>
                       {/* Never invent a status. This used to render POSTED for
                           any row with no status, which read as a success that
@@ -403,7 +403,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               
               {/* Header */}
               <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', background: 'var(--bg-card-hover)' }}>
-                <button onClick={() => setEditingPost(null)} style={{ border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '0.3rem', marginRight: '1rem' }}>
+                <button onClick={() => setEditingPost(null)} style={{ border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(11, 16, 32, 0.06)', borderRadius: '50%', padding: '0.3rem', marginRight: '1rem' }}>
                   <X size={16} />
                 </button>
                 <div style={{ background: 'var(--secondary-color)', width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: '0.5rem' }}>
@@ -421,7 +421,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     rows="8" 
                     value={editCaption} 
                     onChange={(e) => setEditCaption(e.target.value)} 
-                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', color: '#fff', resize: 'vertical', fontSize: '0.9rem', lineHeight: 1.5 }}
+                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', resize: 'vertical', fontSize: '0.9rem', lineHeight: 1.5 }}
                   />
                   <div style={{ textAlign: 'right', fontSize: '0.8rem', color: editCaption.length > 2200 ? 'var(--danger)' : 'var(--text-muted)', marginTop: '-1rem' }}>
                     {editCaption.length} / 2200 characters
@@ -429,7 +429,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '600' }}>Media (Image/Video)</label>
-                    <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '0.4rem' }}>
                       <input 
                         type="file" 
                         accept="image/*,video/*"
@@ -522,7 +522,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
                     return (
                       <>
-                        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', background: 'rgba(255,255,255,0.08)', padding: '0.25rem', borderRadius: '30px' }}>
+                        <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', background: 'rgba(11, 16, 32, 0.08)', padding: '0.25rem', borderRadius: '30px' }}>
                           {[['reels', 'Reels'], ['feed', 'Feed'], ['profile', 'Profile']].map(([k, label]) => (
                             <button key={k} onClick={() => setPreviewTab(k)}
                               style={{
@@ -536,7 +536,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           ))}
                         </div>
 
-                        <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.75rem', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.75rem', textAlign: 'center' }}>
                           {previewTab === 'reels' ? '9:16 — full screen'
                             : previewTab === 'profile' ? '1:1 — grid thumbnail'
                             : '4:5 — feed post'}
@@ -556,12 +556,12 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                               {mediaEl}
                             </div>
                             {Array.from({ length: 8 }).map((_, i) => (
-                              <div key={i} style={{ aspectRatio: '1/1', background: 'rgba(255,255,255,0.04)' }} />
+                              <div key={i} style={{ aspectRatio: '1/1', background: 'rgba(11, 16, 32, 0.04)' }} />
                             ))}
                           </div>
                         ) : previewTab === 'reels' ? (
                           /* Reels: caption overlays the video, as it does on Instagram */
-                          <div style={{ width: '100%', maxWidth: 260, aspectRatio: '9/16', background: '#000', borderRadius: 14, overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <div style={{ width: '100%', maxWidth: 260, aspectRatio: '9/16', background: '#000', borderRadius: 14, overflow: 'hidden', position: 'relative', border: '1px solid var(--border-color)' }}>
                             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{mediaEl}</div>
                             <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0.85rem', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
@@ -577,7 +577,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           </div>
                         ) : (
                           /* Feed post */
-                          <div style={{ width: '100%', maxWidth: 350, background: '#111', borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                          <div style={{ width: '100%', maxWidth: 350, background: '#111', borderRadius: 12, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                             <div style={{ padding: '0.7rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                               <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--primary-color),var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
                                 {(business?.name || 'B').charAt(0).toUpperCase()}
@@ -593,7 +593,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                             </div>
 
                             <div style={{ padding: '0.7rem 0.75rem' }}>
-                              <div style={{ display: 'flex', gap: '0.9rem', marginBottom: '0.5rem', color: '#fff' }}>
+                              <div style={{ display: 'flex', gap: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-main)' }}>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>

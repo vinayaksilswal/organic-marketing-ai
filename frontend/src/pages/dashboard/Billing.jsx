@@ -108,7 +108,7 @@ const Billing = ({ user, token, showToast }) => {
             {u.used.toLocaleString()}{unlimited ? ' · unlimited' : ` / ${u.limit.toLocaleString()}`}
           </span>
         </div>
-        <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+        <div style={{ height: 6, borderRadius: 99, background: 'rgba(11, 16, 32, 0.07)', overflow: 'hidden' }}>
           <div style={{
             width: `${unlimited ? 4 : pct}%`, height: '100%', borderRadius: 99,
             background: danger ? '#ef4444' : 'linear-gradient(90deg, var(--primary-color), var(--secondary-color))',

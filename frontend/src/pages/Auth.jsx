@@ -201,7 +201,7 @@ const Auth = ({ onLogin, showToast }) => {
           <button 
             type="button" 
             className="btn btn-secondary" 
-            style={{ width: '100%', padding: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)' }}
+            style={{ width: '100%', padding: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(11, 16, 32, 0.05)', border: '1px solid var(--border-color)' }}
             onClick={() => showToast('Google SSO is not configured yet.', true)}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -215,7 +215,7 @@ const Auth = ({ onLogin, showToast }) => {
           <button 
             type="button" 
             className="btn btn-secondary" 
-            style={{ width: '100%', padding: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)' }}
+            style={{ width: '100%', padding: '0.875rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(11, 16, 32, 0.05)', border: '1px solid var(--border-color)' }}
             onClick={() => showToast('Microsoft SSO is not configured yet.', true)}
           >
             <svg width="20" height="20" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">

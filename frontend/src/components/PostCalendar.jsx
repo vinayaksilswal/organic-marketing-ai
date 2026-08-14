@@ -229,7 +229,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
                       title={`${label} · ${timeOf(p)} · ${(p.caption || '').slice(0, 80)}`}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '0.35rem',
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                        background: 'rgba(11, 16, 32, 0.03)', border: '1px solid rgba(11, 16, 32, 0.06)',
                         borderRadius: 8, padding: '0.18rem', cursor: 'pointer', width: '100%',
                         textAlign: 'left',
                       }}
@@ -276,8 +276,8 @@ const PostCalendar = ({ posts = [], onSelect }) => {
 const navBtn = {
   width: 32, height: 32, borderRadius: 9, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(11, 16, 32, 0.05)',
+  border: '1px solid var(--border-color)',
   color: 'var(--text-main)',
 };
 

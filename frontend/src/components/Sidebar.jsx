@@ -57,9 +57,9 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
       <div style={{ 
         marginBottom: '1.75rem',
         padding: '0.85rem',
-        background: 'rgba(255, 255, 255, 0.03)',
+        background: 'rgba(11, 16, 32, 0.03)',
         borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.06)'
+        border: '1px solid rgba(11, 16, 32, 0.06)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', margin: 0 }}>
