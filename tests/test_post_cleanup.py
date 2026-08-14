@@ -43,7 +43,11 @@ class TestViewReading:
 
 class TestThresholds:
     def test_the_rule_matches_what_was_asked_for(self):
-        assert cleanup.MIN_AGE_DAYS == 15
+        # Seven days, reduced from fifteen once every account except quantcai
+        # turned out to be too newly connected for anything to qualify.
+        # Instagram distribution for a Reel settles within 48-72 hours, so a
+        # week still gives a post more than double the time it needs.
+        assert cleanup.MIN_AGE_DAYS == 7
         assert cleanup.MIN_VIEWS == 100
 
     def test_a_run_is_bounded(self):

@@ -38,8 +38,17 @@ from loguru import logger
 
 GRAPH = "https://graph.facebook.com/v21.0"
 
-# Asked for explicitly: older than 15 days, fewer than 100 views.
-MIN_AGE_DAYS = int(os.getenv("POST_CLEANUP_MIN_AGE_DAYS", "15"))
+# Seven days, reduced from fifteen.
+#
+# Fifteen was chosen when the only account with history was quantcai. Every
+# other account here was connected within the last fortnight, so nothing they
+# published was old enough to judge and the rule did nothing for them at all.
+#
+# Seven days is still long enough to be fair to a post: Instagram distribution
+# for a Reel is effectively settled within 48 to 72 hours, so a week gives a
+# post more than double the time it needs to find its audience before being
+# called a failure.
+MIN_AGE_DAYS = int(os.getenv("POST_CLEANUP_MIN_AGE_DAYS", "7"))
 MIN_VIEWS = int(os.getenv("POST_CLEANUP_MIN_VIEWS", "100"))
 
 # The blast radius of a single run. A whole catalog cannot be lost to one bad
