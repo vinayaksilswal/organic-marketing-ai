@@ -145,9 +145,15 @@ const PostCalendar = ({ posts = [], onSelect }) => {
 
   const cellStyle = {
     minHeight: 104, borderRadius: 10, padding: '0.45rem',
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'var(--cal-cell, rgba(0,0,0,0.02))',
+    border: '1px solid var(--border-color)',
     display: 'flex', flexDirection: 'column', gap: '0.3rem',
+    // A grid item's default min-width is auto, meaning it refuses to shrink
+    // below its content. The post chips carry a 26px thumbnail plus text, so
+    // seven columns of them were wider than the panel and the last day was
+    // pushed off the right edge. Zero lets the track do its job.
+    minWidth: 0,
+    overflow: 'hidden',
   };
 
   return (
@@ -186,7 +192,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
       </div>
 
       {/* Day-of-week header */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem', marginBottom: '0.4rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.4rem', marginBottom: '0.4rem' }}>
         {DAY_LABELS.map((d) => (
           <div key={d} style={{
             textAlign: 'center', fontSize: '0.72rem', fontWeight: 700,
@@ -196,7 +202,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
       </div>
 
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.4rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.4rem', width: '100%' }}>
         {cells.map((day, i) => {
           if (!day) return <div key={`pad-${i}`} style={{ ...cellStyle, background: 'transparent', border: '1px solid transparent' }} />;
           const key = `${cursor.year}-${cursor.month}-${day}`;

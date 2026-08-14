@@ -28,7 +28,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
       position: 'fixed',
       left: 0,
       top: 0,
-      background: 'rgba(10, 10, 15, 0.95)',
+      background: 'rgba(255, 255, 255, 0.92)',
       backdropFilter: 'blur(16px)',
       borderRight: '1px solid var(--border-color)',
       padding: '1.5rem 1.25rem',
@@ -45,7 +45,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         gap: '0.75rem',
         fontSize: '1.2rem',
         fontWeight: '700',
-        color: '#fff',
+        color: 'var(--text-main)',
         letterSpacing: '-0.02em'
       }}>
         {/* The mark carries its own gradient, so it does not need the tinted

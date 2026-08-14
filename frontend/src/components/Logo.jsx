@@ -1,66 +1,89 @@
 import React from 'react';
 
 /**
- * The Organiflo mark.
+ * The Organiflo lockup: the mark as artwork, the words as live text.
  *
- * The supplied export was a .jpeg, which cannot carry an alpha channel — the
- * transparency checkerboard had been flattened into the picture as real grey
- * squares. scripts/make_logo_png.py keys it back out on chroma (the mark is
- * saturated neon, the checkerboard is pure grey where R=G=B) and writes the
- * two assets used here. The chroma ramp is what preserves the halo: a glow
- * pixel is grey blended with neon, so it lands between the thresholds and
- * gets a partial alpha instead of being cut off with a visible edge.
+ * WHY THE WORDS ARE NOT PART OF THE IMAGE.
  *
- * The mark is the image; the word is live text. Baking the wordmark in as
- * pixels would go soft on retina, cost bytes on the page that must load
- * fastest, and could not inherit the heading face. This way the word is
- * selectable, searchable and sharp at any size.
+ * The supplied logo was a .jpeg — lossy, with the transparency checkerboard
+ * already flattened into it as grey squares. scripts/make_logo_png.py keys
+ * that back out on chroma, but JPEG compression leaves artefacts along every
+ * high-contrast edge, and those artefacts survive as a soft dark fringe in
+ * the alpha. Against the near-black sidebar it is invisible. Against a white
+ * page it reads as grime, and the type looks blurred — "low quality" is
+ * exactly right, and no amount of re-keying fixes a lossy source.
+ *
+ * Type does not have that problem. Rendered as text, "Organiflo" is vector
+ * sharp at any size and on any ground, costs no bytes, and inherits the
+ * heading face so it belongs to the rest of the page. Only the mark, which
+ * genuinely is artwork, stays an image.
+ *
+ * The gradient runs cyan through blue to violet, sampled from the original
+ * so the words still match the mark beside them.
+ *
+ * If a lossless export ever arrives — PNG with real alpha, or SVG — the mark
+ * gets sharper for free and none of this needs revisiting.
  */
-const Logo = ({ size = 30, showWordmark = false, noTagline = false, style }) => {
-  // Three cuts of the same artwork, each for the size it is used at:
-  //   logo.png         mark + wordmark + tagline, for heroes and share cards
-  //   logo-lockup.png  mark + wordmark, for navigation
-  //   logo-mark.png    the mark alone, squared, for avatars and the favicon
-  //
-  // The tagline is dropped from the nav cut deliberately. In a 34px bar it
-  // renders around six pixels tall, which is not small type — it is grey
-  // mush that makes the whole lockup look blurred.
-  // The full lockup, tagline included, is the default wherever the wordmark
-  // shows. Cutting the tagline off left a ghost of its glow under the word --
-  // neon type carries a halo above its own letterforms, so no horizontal cut
-  // separates the two lines cleanly. It also threw away the line that says
-  // what the company does, on the one surface every visitor sees.
-  //
-  // The size is what makes it legible: at 34px tall the tagline is six pixels
-  // of mush, so the nav uses 46 and the strapline reads.
-  const src = showWordmark
-    ? (noTagline ? '/logo-lockup.png' : '/logo.png')
-    : '/logo-mark.png';
-
-  // The lockups are wide, so height is the dimension worth fixing; width
-  // follows. The mark is square.
-  const dimensions = showWordmark
-    ? { height: size, width: 'auto' }
-    : { height: size, width: size };
-
-  return (
+const Logo = ({ size = 30, showWordmark = false, tagline = true, style }) => (
+  <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: size * 0.26,
+      ...style,
+    }}
+  >
     <img
-      src={src}
+      src="/logo-mark.png"
       alt="Organiflo"
-      // Eager and high priority: this sits above the fold on every page it
-      // appears on, and a logo that pops in late is the first thing a visitor
-      // sees go wrong.
+      width={size}
+      height={size}
+      // Above the fold on every page it appears on: a logo that pops in late
+      // is the first thing a visitor sees go wrong.
       loading="eager"
       fetchPriority="high"
       style={{
-        ...dimensions,
+        width: size,
+        height: size,
         display: 'block',
         flexShrink: 0,
         objectFit: 'contain',
-        ...style,
       }}
     />
-  );
-};
+
+    {showWordmark && (
+      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.04 }}>
+        <span
+          style={{
+            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+            fontWeight: 800,
+            fontSize: size * 0.58,
+            letterSpacing: '-.03em',
+            background: 'linear-gradient(100deg, #22d3ee, #3b82f6 46%, #8b5cf6)',
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Organiflo
+        </span>
+        {tagline && (
+          <span
+            style={{
+              fontSize: Math.max(size * 0.2, 9),
+              letterSpacing: '.005em',
+              color: 'var(--text-muted)',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Your Organic Social Growth Engine
+          </span>
+        )}
+      </span>
+    )}
+  </span>
+);
 
 export default Logo;

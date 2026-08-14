@@ -12,25 +12,41 @@
    ========================================================================== */
 
 :root {
-  /* Color Palette */
-  --bg-dark: #050505;
-  --bg-card: rgba(15, 15, 15, 0.65);
-  --bg-card-hover: rgba(25, 25, 25, 0.85);
-  
-  --primary-color: #a855f7; /* Purple */
-  --primary-hover: #9333ea;
-  --secondary-color: #3b82f6; /* Blue */
-  --secondary-hover: #2563eb;
-  --accent-color: #ec4899; /* Pink */
-  
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-glow: rgba(168, 85, 247, 0.4);
-  
-  --success: #10b981;
-  --error: #ef4444;
+  /* Light, to match the landing page.
+     Every surface in the dashboard reads from these tokens rather than
+     hardcoding colours, so inverting them here turns the whole product
+     light in one place. What changes is only what each token MEANS —
+     --bg-card is still "the card surface", it is simply white now.
+
+     The neutrals carry a slight blue bias (#0b1020, #f7f8fb) rather than
+     being pure grey. Pure grey on a page whose accent is violet reads as
+     unconsidered; a neutral tilted toward the accent reads as chosen. It is
+     the same ink the landing page uses, so the two halves of the product
+     look like one product. */
+  --bg-dark: #f7f8fb;                       /* page ground */
+  --bg-card: rgba(255, 255, 255, 0.86);     /* panels, over the ground */
+  --bg-card-hover: rgba(255, 255, 255, 0.98);
+
+  /* Darkened from the neon versions. #a855f7 on white is 2.9:1 — below the
+     4.5:1 needed for text — so the same purple that read well on near-black
+     would have failed as a link or a label here. */
+  --primary-color: #6d28d9; /* Violet */
+  --primary-hover: #5b21b6;
+  --secondary-color: #2563eb; /* Blue */
+  --secondary-hover: #1d4ed8;
+  --accent-color: #db2777; /* Pink */
+
+  --text-main: #0b1020;
+  --text-muted: #64748b;   /* 4.9:1 on the card surface */
+
+  --border-color: rgba(11, 16, 32, 0.10);
+  --border-glow: rgba(109, 40, 217, 0.35);
+
+  --success: #059669;      /* the neon greens and reds are unreadable on */
+  --error: #dc2626;        /* white, so both are darkened to hold contrast */
+
+  /* Calendar cells, so the grid reads on either ground. */
+  --cal-cell: rgba(11, 16, 32, 0.025);
   
   --font-family-heading: 'Bricolage Grotesque', 'Outfit', sans-serif;
   --font-family-body: 'Manrope', 'Inter', sans-serif;
@@ -78,13 +94,13 @@ body {
 }
 
 @keyframes pulse-skeleton {
-  0% { background-color: rgba(255, 255, 255, 0.05); }
-  50% { background-color: rgba(255, 255, 255, 0.1); }
-  100% { background-color: rgba(255, 255, 255, 0.05); }
+  0% { background-color: rgba(11, 16, 32, 0.05); }
+  50% { background-color: rgba(11, 16, 32, 0.10); }
+  100% { background-color: rgba(11, 16, 32, 0.05); }
 }
 .skeleton-card {
   animation: pulse-skeleton 1.5s ease-in-out infinite;
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: rgba(11, 16, 32, 0.05);
 }
 
 /* Layout & Utility */
@@ -114,7 +130,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-family-heading);
   font-weight: 700;
   letter-spacing: -0.03em;
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 h1 { font-size: 4rem; line-height: 1.1; margin-bottom: 1.5rem; animation: fadeIn 0.8s ease-out; }
@@ -145,8 +161,8 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
   justify-content: space-between;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  background: rgba(5, 5, 5, 0.7);
+  border-bottom: 1px solid rgba(11, 16, 32, 0.05);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px);
   position: sticky;
   top: 0;
@@ -161,7 +177,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: white;
+  color: var(--text-main);
 }
 
 .nav-brand span {
@@ -188,9 +204,12 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  color: white;
+  /* Stays white. This button IS a violet gradient, not the page ground, so
+     it is one of the few places where dark text would be the unreadable
+     choice. A blanket white-to-ink pass over the stylesheet caught it. */
+  color: #ffffff;
   border: none;
-  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 15px rgba(109, 40, 217, 0.32);
 }
 
 .btn-primary:hover {
@@ -200,14 +219,14 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 }
 
 .btn-secondary {
-  background-color: rgba(255, 255, 255, 0.03);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(11, 16, 32, 0.03);
+  color: var(--text-main);
+  border: 1px solid rgba(11, 16, 32, 0.10);
   backdrop-filter: blur(8px);
 }
 
 .btn-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: rgba(11, 16, 32, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -274,7 +293,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 
 .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; }
 .status-dot.green { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
-.badge { display: inline-flex; items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); }
+.badge { display: inline-flex; items: center; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); background: rgba(11, 16, 32, 0.05); }
 .badge.active { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: var(--success); }
 .stat-card:hover {
   transform: translateY(-8px);
@@ -337,7 +356,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
   font-size: 5rem;
   font-family: var(--font-family-heading);
   font-weight: 800;
-  color: white;
+  color: var(--text-main);
   line-height: 1;
   display: flex;
   align-items: baseline;
@@ -372,10 +391,10 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 .input-group { margin-bottom: 1.5rem; }
 .input-group label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-main); }
 input[type="email"], input[type="password"], input[type="url"], input[type="text"], textarea, select {
-  width: 100%; padding: 1rem 1.25rem; background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-main); font-family: var(--font-family-body); font-size: 1rem; transition: all 0.3s ease; backdrop-filter: blur(8px);
+  width: 100%; padding: 1rem 1.25rem; background-color: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-main); font-family: var(--font-family-body); font-size: 1rem; transition: all 0.3s ease; backdrop-filter: blur(8px);
 }
 input:focus, textarea:focus, select:focus {
-  outline: none; border-color: var(--primary-color); background-color: rgba(255, 255, 255, 0.05); box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.15);
+  outline: none; border-color: var(--primary-color); background-color: rgba(11, 16, 32, 0.05); box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.15);
 }
 
 /* Toast Notifications */
@@ -397,12 +416,12 @@ input:focus, textarea:focus, select:focus {
 
 /* Onboarding Wizard */
 .wizard-progress { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
-.wizard-step { flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; transition: all 0.3s ease; }
+.wizard-step { flex: 1; height: 6px; background: rgba(11, 16, 32, 0.10); border-radius: 3px; transition: all 0.3s ease; }
 .wizard-step.active { background: var(--primary-color); box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); }
 
 .selection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-.selection-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); padding: 1.5rem 1rem; border-radius: 16px; text-align: center; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
-.selection-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+.selection-card { background: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); padding: 1.5rem 1rem; border-radius: 16px; text-align: center; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
+.selection-card:hover { background: rgba(11, 16, 32, 0.08); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
 .selection-card.selected { background: rgba(168, 85, 247, 0.1); border-color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
 .selection-card-icon { display: block; font-size: 2rem; margin-bottom: 0.5rem; }
 
@@ -494,7 +513,7 @@ input:focus, textarea:focus, select:focus {
   top: 1.5rem;
   right: -2.5rem;
   background: var(--primary-color);
-  color: white;
+  color: var(--text-main);
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0.25rem 3.5rem;
@@ -739,7 +758,7 @@ input:focus, textarea:focus, select:focus {
   font-size: 1.5rem;
   font-weight: 700;
   font-family: var(--font-family-heading);
-  color: white;
+  color: var(--text-main);
 }
 
 .ticker-label {
@@ -871,7 +890,7 @@ input:focus, textarea:focus, select:focus {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  color: white;
+  color: var(--text-main);
 }
 
 .author-info h4 {
@@ -919,12 +938,12 @@ input:focus, textarea:focus, select:focus {
   cursor: pointer;
   font-weight: 600;
   font-size: 1.125rem;
-  color: white;
+  color: var(--text-main);
   transition: background 0.2s ease;
 }
 
 .faq-question:hover {
-  background: rgba(255,255,255,0.02);
+  background: rgba(11, 16, 32, 0.02);
 }
 
 .faq-icon {
@@ -1053,8 +1072,8 @@ input:focus, textarea:focus, select:focus {
 .integration-bar {
   padding: 2.5rem 0;
   background: rgba(0, 0, 0, 0.25);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(11, 16, 32, 0.05);
+  border-bottom: 1px solid rgba(11, 16, 32, 0.05);
 }
 
 .integration-bar-label {
@@ -1079,8 +1098,8 @@ input:focus, textarea:focus, select:focus {
   gap: 0.55rem;
   padding: 0.6rem 1.15rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(11, 16, 32, 0.03);
+  border: 1px solid rgba(11, 16, 32, 0.08);
   font-size: 0.9rem;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
@@ -1144,7 +1163,7 @@ input:focus, textarea:focus, select:focus {
   padding: 0.9rem;
   border-radius: 11px;
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(11, 16, 32, 0.05);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1178,7 +1197,7 @@ input:focus, textarea:focus, select:focus {
   font-size: 0.72rem;
   color: var(--primary-color);
   padding-top: 0.4rem;
-  border-top: 1px dashed rgba(255, 255, 255, 0.07);
+  border-top: 1px dashed rgba(11, 16, 32, 0.07);
 }
 
 .hiw-prompt {
@@ -1223,16 +1242,16 @@ input:focus, textarea:focus, select:focus {
 
 /* PAS Section */
 .pas-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(11, 16, 32, 0.02);
+  border: 1px solid rgba(11, 16, 32, 0.05);
   padding: 2.5rem;
   border-radius: 20px;
   transition: all 0.3s ease;
 }
 
 .pas-card:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(11, 16, 32, 0.05);
+  border-color: rgba(11, 16, 32, 0.10);
   transform: translateY(-5px);
 }
 
