@@ -1287,3 +1287,120 @@ input:focus, textarea:focus, select:focus {
   transform: translateY(-5px);
 }
 
+
+/* ==========================================================================
+   Phones
+   --------------------------------------------------------------------------
+   The dashboard was built for a desktop and only for a desktop: a fixed
+   260px sidebar with the content pushed 260px right. On a 390px phone that
+   left 130px of usable width with the nav permanently covering the rest, so
+   every page was unreachable rather than merely cramped.
+
+   The sidebar becomes a drawer, the offset goes away, and everything that
+   assumed horizontal room either reflows or gets its own scroll container
+   rather than pushing the page sideways.
+   ========================================================================== */
+
+/* Desktop: the drawer chrome does not exist. */
+.dash-topbar, .dash-scrim, .dash-burger { display: none; }
+.dash-main { margin-left: 260px; }
+
+@media (max-width: 900px) {
+  .dash-main { margin-left: 0; padding-top: 56px; }
+
+  .dash-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 0 0.85rem;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-color);
+    z-index: 1200;
+  }
+
+  .dash-burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* 44px is the smallest target a thumb hits reliably. Anything less and
+       people miss it, then blame the app rather than the button. */
+    width: 44px; height: 44px;
+    margin-left: -0.35rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-main);
+    cursor: pointer;
+  }
+
+  .dash-nav {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    z-index: 1400;
+    transform: translateX(-100%);
+    transition: transform .26s cubic-bezier(.4, 0, .2, 1);
+  }
+  .dash-nav.open { transform: translateX(0); }
+
+  .dash-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 16, 32, 0.42);
+    z-index: 1300;
+    animation: fadeIn .18s ease-out;
+  }
+
+  /* The sidebar itself still sizes for desktop. */
+  .sidebar { width: 268px !important; max-width: 84vw; }
+
+  /* Page furniture */
+  .container { padding: 0 1rem; }
+  h1 { font-size: 1.9rem !important; margin-bottom: 1rem; }
+  h2 { font-size: 1.45rem; }
+  h3 { font-size: 1.2rem; }
+  p  { font-size: 1rem; }
+
+  /* Anything laid out in columns collapses to one. */
+  .grid, .g2, .g3, .g4 { grid-template-columns: 1fr !important; }
+
+  .glass-panel { border-radius: 12px; }
+
+  /* Tables keep their shape and scroll inside their own box, so the page
+     body never scrolls sideways — the thing that makes a site feel broken
+     on a phone. */
+  table { min-width: 560px; }
+  .glass-panel > table,
+  .table-wrap { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Full-width, thumb-sized controls. */
+  .btn { width: 100%; justify-content: center; min-height: 44px; }
+  .btn-inline { width: auto; }
+}
+
+@media (max-width: 560px) {
+  .container { padding: 0 0.85rem; }
+  h1 { font-size: 1.65rem !important; }
+}
+
+/* The posting calendar on a phone.
+   Seven columns across 390px gives each day about 48px, which fits a date
+   and nothing else — the thumbnails and times that make the calendar worth
+   looking at would all be hidden behind "+3 more". So the month keeps its
+   shape but scrolls horizontally inside its own panel at a legible column
+   width, rather than being squeezed into an unreadable one. */
+@media (max-width: 900px) {
+  .cal-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* A hint that there is more to the right, without a scrollbar. */
+    -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent);
+    mask-image: linear-gradient(90deg, #000 92%, transparent);
+  }
+  .cal-grid { min-width: 680px; }
+}

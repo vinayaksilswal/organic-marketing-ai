@@ -1,5 +1,7 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Menu } from 'lucide-react';
+import Logo from '../components/Logo';
 import Sidebar from '../components/Sidebar';
 import Overview from './dashboard/Overview';
 import VideoStudio from './dashboard/VideoStudio';
@@ -21,17 +23,55 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
     businessProfiles: workspaces && workspaces.length > 0 ? workspaces : (user?.businessProfiles || [])
   };
 
+  // The sidebar is a fixed 260px column on desktop and a slide-out drawer on
+  // a phone, where 260px of a 390px screen is most of the screen.
+  const [navOpen, setNavOpen] = useState(false);
+  const location = useLocation();
+
+  // Close the drawer whenever the route changes. Leaving it open over the
+  // page the user just chose means every navigation needs two taps: one to
+  // pick, one to dismiss.
+  useEffect(() => { setNavOpen(false); }, [location.pathname]);
+
+  // A drawer that scrolls the page behind it is disorienting on touch.
+  useEffect(() => {
+    document.body.style.overflow = navOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [navOpen]);
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-dark)' }}>
-      <Sidebar
-        user={userWithWorkspaces}
-        token={token}
-        activeWorkspaceId={activeWorkspaceId}
-        onWorkspaceChange={setActiveWorkspace}
-        onLogout={onLogout}
-      />
-      
-      <div style={{ flex: 1, marginLeft: '260px', overflowY: 'auto' }}>
+    <div className="dash-shell" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-dark)' }}>
+      {/* Phone-only bar. Holds the one control a drawer needs and the brand,
+          so there is always a way back to the top level. */}
+      <header className="dash-topbar">
+        <button
+          onClick={() => setNavOpen(true)}
+          aria-label="Open menu"
+          aria-expanded={navOpen}
+          className="dash-burger"
+        >
+          <Menu size={20} />
+        </button>
+        <Logo size={30} showWordmark noTagline />
+      </header>
+
+      {/* Tapping the dimmed page closes the drawer — the gesture every phone
+          user already expects, and it needs no explaining. */}
+      {navOpen && (
+        <div className="dash-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
+      )}
+
+      <div className={`dash-nav ${navOpen ? 'open' : ''}`}>
+        <Sidebar
+          user={userWithWorkspaces}
+          token={token}
+          activeWorkspaceId={activeWorkspaceId}
+          onWorkspaceChange={setActiveWorkspace}
+          onLogout={onLogout}
+        />
+      </div>
+
+      <div className="dash-main" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
         <SystemBanner />
         <Routes>
           {/* onLogout reaches Overview so its Log out button clears React

@@ -157,7 +157,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
   };
 
   return (
-    <div>
+    <div className="cal-scroll">
       {/* Month bar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '0.75rem',
@@ -192,7 +192,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
       </div>
 
       {/* Day-of-week header */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.4rem', marginBottom: '0.4rem' }}>
+      <div className="cal-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.4rem', marginBottom: '0.4rem' }}>
         {DAY_LABELS.map((d) => (
           <div key={d} style={{
             textAlign: 'center', fontSize: '0.72rem', fontWeight: 700,
@@ -202,7 +202,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
       </div>
 
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.4rem', width: '100%' }}>
+      <div className="cal-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.4rem', width: '100%' }}>
         {cells.map((day, i) => {
           if (!day) return <div key={`pad-${i}`} style={{ ...cellStyle, background: 'transparent', border: '1px solid transparent' }} />;
           const key = `${cursor.year}-${cursor.month}-${day}`;
