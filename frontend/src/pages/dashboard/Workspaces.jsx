@@ -508,7 +508,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                   { key: 'automation', label: 'Automation', icon: <Zap size={14} /> },
                 ].map(tab => (
                   <button key={tab.key} onClick={() => setEditTab(tab.key)}
-                    style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: editTab === tab.key ? '2px solid var(--primary-color)' : '2px solid transparent', color: editTab === tab.key ? '#fff' : 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: editTab === tab.key ? 600 : 400 }}>
+                    style={{ padding: '0.75rem 1rem', background: 'none', border: 'none', borderBottom: editTab === tab.key ? '2px solid var(--primary-color)' : '2px solid transparent', color: editTab === tab.key ? 'var(--primary-color)' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: editTab === tab.key ? 600 : 400 }}>
                     {tab.icon} {tab.label}
                   </button>
                 ))}
@@ -849,7 +849,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.1rem',
                     borderRadius: '8px', border: 'none', fontSize: '0.88rem', fontWeight: 600,
                     background: deleteConfirmText === deleteTarget.name ? '#dc2626' : 'rgba(239,68,68,0.2)',
-                    color: deleteConfirmText === deleteTarget.name ? '#fff' : 'rgba(255,255,255,0.35)',
+                    color: deleteConfirmText === deleteTarget.name ? '#fff' : 'var(--text-muted)',
                     cursor: deleteConfirmText === deleteTarget.name && !deleting ? 'pointer' : 'not-allowed',
                   }}
                 >

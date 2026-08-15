@@ -529,7 +529,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                                 padding: '0.4rem 1.1rem', borderRadius: '20px', border: 'none', cursor: 'pointer',
                                 fontWeight: 600, fontSize: '0.85rem',
                                 background: previewTab === k ? 'var(--secondary-color)' : 'transparent',
-                                color: previewTab === k ? '#fff' : 'var(--text-muted)',
+                                color: previewTab === k ? 'var(--text-main)' : 'var(--text-muted)',
                               }}>
                               {label}
                             </button>
