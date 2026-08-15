@@ -69,8 +69,10 @@ const UpgradeGate = () => {
           onClick={close}
           aria-label="Close"
           style={{
-            position: 'absolute', top: 12, right: 12,
-            width: 32, height: 32, borderRadius: 9,
+            position: 'absolute', top: 8, right: 8,
+            // 40px rather than the icon's size: a dismissal people miss on a
+            // phone reads as a modal that will not close.
+            width: 40, height: 40, borderRadius: 10,
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', border: 'none', cursor: 'pointer',
             color: 'var(--text-muted)',

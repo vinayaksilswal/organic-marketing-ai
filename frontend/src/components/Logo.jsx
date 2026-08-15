@@ -41,7 +41,9 @@ const Logo = ({ size = 30, showWordmark = false, tagline = true, style }) => (
       // Above the fold on every page it appears on: a logo that pops in late
       // is the first thing a visitor sees go wrong.
       loading="eager"
-      fetchPriority="high"
+      // Lowercase: React 18 passes this straight through to the DOM and warns
+      // on the camelCase spelling, which put an error in every console.
+      fetchpriority="high"
       style={{
         width: size,
         height: size,
