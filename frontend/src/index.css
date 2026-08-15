@@ -51,8 +51,33 @@
   --font-family-heading: 'Bricolage Grotesque', 'Outfit', sans-serif;
   --font-family-body: 'Manrope', 'Inter', sans-serif;
   
-  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 25px rgba(168, 85, 247, 0.2);
+  /* Elevation, rebuilt for a light ground.
+     These were 70% and 50% black — tuned to read against near-black, where a
+     heavy shadow is the only thing separating a panel from the page. On white
+     the same values render as muddy grey halos around every card, which is
+     the single loudest reason the dashboard looked cheap.
+
+     Light-surface elevation is layered and quiet instead: a hairline that
+     does the separating, a tight contact shadow, and a wide soft one for
+     depth. The tint is the page's ink rather than pure black, so shadows
+     belong to the palette instead of greying it. */
+  --shadow-sm:
+    0 1px 2px rgba(11, 16, 32, 0.04),
+    0 1px 3px rgba(11, 16, 32, 0.03);
+  --shadow-lg:
+    0 0 0 1px rgba(11, 16, 32, 0.04),
+    0 1px 2px rgba(11, 16, 32, 0.04),
+    0 8px 24px -8px rgba(11, 16, 32, 0.10);
+  --shadow-xl:
+    0 0 0 1px rgba(11, 16, 32, 0.05),
+    0 2px 4px rgba(11, 16, 32, 0.04),
+    0 20px 44px -16px rgba(11, 16, 32, 0.16);
+  /* The lift on hover, tinted violet so it reads as the brand rather than
+     as more grey. */
+  --shadow-glow:
+    0 0 0 1px rgba(109, 40, 217, 0.14),
+    0 2px 4px rgba(11, 16, 32, 0.04),
+    0 18px 40px -14px rgba(109, 40, 217, 0.22);
 }
 
 * {
@@ -109,20 +134,23 @@ body {
 
 /* Glassmorphism Panel */
 .glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #ffffff;
   border: 1px solid var(--border-color);
-  border-radius: 20px;
+  /* 20px on a data panel reads as a consumer app. Enterprise software uses a
+     tighter radius because it signals density and precision — the panels are
+     containers for information, not cards in a feed. */
+  border-radius: 14px;
   box-shadow: var(--shadow-lg);
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: box-shadow .22s ease, border-color .22s ease;
 }
 
+/* Only panels that DO something on click should respond to hover. A status
+   panel that lifts under the cursor is telling the user it is interactive
+   when it is not, and a page where everything moves feels unsettled rather
+   than alive. The lift is gone; the shadow deepens slightly instead. */
 .glass-panel:hover {
-  border-color: var(--border-glow);
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-4px);
-  background: var(--bg-card-hover);
+  border-color: rgba(109, 40, 217, 0.22);
+  box-shadow: var(--shadow-xl);
 }
 
 /* Typography */
@@ -213,7 +241,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 }
 
 .btn-primary:hover {
-  box-shadow: 0 8px 25px rgba(168, 85, 247, 0.6);
+  box-shadow: 0 8px 22px -6px rgba(109, 40, 217, 0.45);
   transform: translateY(-2px);
   background: linear-gradient(135deg, var(--primary-hover) 0%, var(--secondary-hover) 100%);
 }
@@ -394,7 +422,7 @@ input[type="email"], input[type="password"], input[type="url"], input[type="text
   width: 100%; padding: 1rem 1.25rem; background-color: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-main); font-family: var(--font-family-body); font-size: 1rem; transition: all 0.3s ease; backdrop-filter: blur(8px);
 }
 input:focus, textarea:focus, select:focus {
-  outline: none; border-color: var(--primary-color); background-color: rgba(11, 16, 32, 0.05); box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.15);
+  outline: none; border-color: var(--primary-color); background-color: rgba(11, 16, 32, 0.05); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.14);
 }
 
 /* Toast Notifications */
@@ -1000,13 +1028,17 @@ input:focus, textarea:focus, select:focus {
   transition: all 0.2s ease;
 }
 .sidebar-link:hover {
-  background: var(--bg-card);
+  background: rgba(11, 16, 32, 0.045);
   color: var(--text-main);
 }
+/* The active item carries a left rail as well as a tint. Colour alone is a
+   weak signal on a pale surface, and it is the only signal a colour-blind
+   user would have had. */
 .sidebar-link.active {
-  background: rgba(168, 85, 247, 0.1);
+  background: rgba(109, 40, 217, 0.08);
   color: var(--primary-color);
-  font-weight: 600;
+  font-weight: 650;
+  box-shadow: inset 2px 0 0 var(--primary-color);
 }
 
 /* Mockup Container */
