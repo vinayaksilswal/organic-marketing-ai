@@ -25,10 +25,10 @@ from typing import Any, Optional
 
 import httpx
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from config import settings
-from database import AsyncSessionLocal, Subscription, UsageCounter
+from database import AsyncSessionLocal, Media, Subscription, UsageCounter
 
 # =============================================================================
 # Plan catalogue
@@ -135,7 +135,7 @@ METRIC_LABELS = {
     "posts": "published posts",
     "prompts": "AI creative prompts",
     "emails": "marketing emails",
-    "media": "media uploads",
+    "media": "stored media assets",
     "businesses": "businesses",
 }
 
@@ -483,12 +483,80 @@ async def check_business_quota(user_id: str, current_count: int) -> tuple[bool, 
     )
 
 
+async def media_count(user_id: str) -> int:
+    """How many assets this account currently stores."""
+    async with AsyncSessionLocal() as session:
+        return int((await session.execute(
+            select(func.count()).select_from(Media).where(Media.userId == user_id)
+        )).scalar_one() or 0)
+
+
+async def check_media_quota(user_id: str, adding: int = 1) -> tuple[bool, str]:
+    """(allowed, message) for storing `adding` more assets.
+
+    A standing library cap rather than a monthly meter, and deliberately so.
+    Object storage bills for what is *held*, not for what arrived this month —
+    a folder imported in January is still being paid for in March, which a
+    monthly upload counter would have stopped counting. Metering uploads would
+    bound the wrong quantity.
+
+    Counting live rows also means this cannot drift. Media is inserted from a
+    dozen places — direct upload, bulk import, AI generation, the video
+    pipeline — and a counter has to be incremented correctly at every one of
+    them, forever. A COUNT is right at all of them without being called at any
+    of them.
+
+    The user-visible consequence is the one people expect: deleting an asset
+    frees the slot.
+    """
+    if adding <= 0:
+        return True, ""
+    if await _is_unlimited(user_id):
+        return True, ""
+
+    plan = plan_for(await active_plan_code(user_id))
+    limit = plan["limits"].get("media")
+    if limit is None:
+        return True, ""
+
+    held = await media_count(user_id)
+    if held + adding <= limit:
+        return True, ""
+
+    room = max(limit - held, 0)
+    if room and adding > 1:
+        return False, (
+            f"The {plan['name']} plan stores {limit} media assets and you have "
+            f"room for {room} more. Delete some, or upgrade to import all "
+            f"{adding}."
+        )
+
+    # Accounts that filled a library before the cap existed are over it, not at
+    # it, and telling someone holding 162 assets that they are "using all 10"
+    # reads as a bug rather than a limit. Nothing they already uploaded is
+    # touched -- the cap stops the next one, it does not reclaim the last.
+    if held > limit:
+        return False, (
+            f"You are storing {held} media assets and the {plan['name']} plan "
+            f"includes {limit}. Everything already uploaded stays where it is, "
+            f"but adding more needs an upgrade."
+        )
+    return False, (
+        f"The {plan['name']} plan stores {limit} media assets and you are using "
+        f"all of them. Delete one to make room, or upgrade for more."
+    )
+
+
 async def billing_summary(user_id: str) -> dict[str, Any]:
     """Everything the billing screen needs in one call."""
     sub = await get_subscription(user_id)
     code = await active_plan_code(user_id)
     plan = plan_for(code)
     usage = await get_usage(user_id)
+
+    # Media is held, not metered, so it is counted rather than read from
+    # UsageCounter — which has no media rows and reported a permanent zero.
+    usage["media"] = await media_count(user_id)
 
     return {
         "plan": {

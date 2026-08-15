@@ -30,6 +30,29 @@ export const authFetch = async (url, options = {}, token, onLogout) => {
       throw new Error('Session expired. Please log in again.');
     }
 
+    // 402 is the server saying a plan limit stopped this request, and it sends
+    // a written explanation with it ("You have used all 5 published posts...").
+    // That message is the single most valuable thing this product ever says to
+    // a free account, and every caller was dropping it into a generic red
+    // toast. Surfaced globally instead, from the one place every authenticated
+    // request already passes through.
+    //
+    // The response is cloned, not consumed: callers still read their own body
+    // and their own error handling runs unchanged. This is additive.
+    if (res.status === 402) {
+      res.clone().json()
+        .then((body) => {
+          window.dispatchEvent(new CustomEvent('organiflo:upgrade-required', {
+            detail: { message: body?.detail || body?.message || '' },
+          }));
+        })
+        .catch(() => {
+          window.dispatchEvent(new CustomEvent('organiflo:upgrade-required', {
+            detail: { message: '' },
+          }));
+        });
+    }
+
     return res;
   } catch (err) {
     if (err.message === 'Session expired. Please log in again.') throw err;

@@ -10,6 +10,7 @@ import ResetPassword from './pages/ResetPassword';
 import Toast from './components/Toast';
 import { WorkspaceProvider } from './components/WorkspaceContext';
 import CookieBanner from './components/CookieBanner';
+import UpgradeGate from './components/UpgradeGate';
 
 export { API_BASE, authFetch } from './config';
 
@@ -86,6 +87,7 @@ function App() {
       
       <WorkspaceProvider token={token} onLogout={handleLogout}>
         <CookieBanner />
+        <UpgradeGate />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<Navigate to="/dashboard" replace />} />

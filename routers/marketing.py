@@ -2588,19 +2588,32 @@ async def bulk_upload_media(
                 )).scalars().all()
             }
 
-            payload = []
+            # Which files are actually new is settled before any of them is
+            # read. A folder import is the one place a plan limit can be blown
+            # by three figures in a single request, and reading the whole batch
+            # into a 512MB worker only to reject it is how that request becomes
+            # an outage instead of a 402.
+            fresh = []
             duplicates = 0
             seen_in_batch = set()
             for f in files:
-                name = f.filename or "upload"
-                key = _basename(name)
+                key = _basename(f.filename or "upload")
                 # A file already taken earlier in this same request counts too,
                 # or a folder containing two copies imports both.
                 if key in existing or key in seen_in_batch:
                     duplicates += 1
                     continue
                 seen_in_batch.add(key)
-                payload.append((name, await f.read()))
+                fresh.append(f)
+
+            if fresh:
+                from services import billing_service as billing
+
+                allowed, why = await billing.check_media_quota(user_id, len(fresh))
+                if not allowed:
+                    raise HTTPException(status_code=402, detail=why)
+
+            payload = [(f.filename or "upload", await f.read()) for f in fresh]
 
             if not payload:
                 return {

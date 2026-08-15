@@ -135,6 +135,15 @@ async def upload_media(
     but this endpoint had no such parameter, so FastAPI dropped it silently and
     every upload landed with no description at all.
     """
+    # Storage is the largest variable cost in the product and was the only
+    # plan limit never enforced. Checked outside the try below, which turns
+    # every exception into a 500 and would bury the upgrade message in one.
+    from services import billing_service as billing
+
+    allowed, why = await billing.check_media_quota(user_id, 1)
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
     try:
         mime_type = file.content_type or "application/octet-stream"
         file_content = await file.read()
