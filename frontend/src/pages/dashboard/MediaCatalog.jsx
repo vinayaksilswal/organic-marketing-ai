@@ -1104,7 +1104,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
         {/* EDIT MODAL */}
         {editingMedia && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div className="glass-panel" style={{ maxWidth: '500px', width: '100%', padding: '2rem', position: 'relative', borderRadius: '16px' }}>
               <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1.25rem' }}>Edit asset</h3>
               <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -1147,7 +1147,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
         {/* PREVIEW MODAL */}
         {previewMedia && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div style={{ position: 'absolute', top: '2rem', right: '2rem' }}>
               <button 
                 onClick={() => setPreviewMedia(null)} 
@@ -1194,7 +1194,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         </div>
 
         {purgeOpen && (
-          <div onClick={() => !purging && setPurgeOpen(false)} style={{
+          <div className="modal-overlay" onClick={() => !purging && setPurgeOpen(false)} style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
           }}>

@@ -398,7 +398,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
         {/* SIDE-BY-SIDE EDIT MODAL */}
         {editingPost && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
             <div className="glass-panel" style={{ width: '100%', maxWidth: '1000px', height: '80vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
               
               {/* Header */}
@@ -551,7 +551,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
                         {previewTab === 'profile' ? (
                           /* Profile grid: how it sits among other posts */
-                          <div style={{ width: '100%', maxWidth: 330, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
+                          <div className="keep-cols" style={{ width: '100%', maxWidth: 330, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3 }}>
                             <div style={{ aspectRatio: '1/1', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--secondary-color)' }}>
                               {mediaEl}
                             </div>

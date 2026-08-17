@@ -1381,6 +1381,69 @@ input:focus, textarea:focus, select:focus {
   /* Full-width, thumb-sized controls. */
   .btn { width: 100%; justify-content: center; min-height: 44px; }
   .btn-inline { width: auto; }
+
+  /* ------------------------------------------------------------------------
+     The dashboard pages are built with inline styles, which the class rules
+     above cannot reach. That is why the shell went responsive and the pages
+     inside it did not: the drawer worked, and then every screen it opened
+     onto was still laid out for 1280px.
+
+     Inline styles lose to !important in a stylesheet, so these reach them.
+     ---------------------------------------------------------------------- */
+
+  /* Any multi-column grid becomes one column. React serialises
+     gridTemplateColumns to this exact property name, so this catches the
+     columns written inline today and the ones written next month, without
+     either having to know the rule exists.
+
+     Opt out with .keep-cols where columns are the point — a three-up
+     thumbnail strip is worse as a tall stack, not better. */
+  .dash-main [style*="grid-template-columns"]:not(.keep-cols) {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modals were the reason nothing could be finished on a phone. A 2rem
+     backdrop pad on a 375px screen leaves 311px for the dialog, and most of
+     these have no height cap — so the form scrolled off the bottom of the
+     viewport with Save below it, unreachable, on a surface that does not
+     scroll. Vertically centred made it worse: it pushed the top out of reach
+     as well. */
+  .modal-overlay {
+    padding: 0.6rem !important;
+    align-items: flex-start !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* dvh, not vh: mobile browsers report vh as the height with the URL bar
+     hidden, so a 90vh dialog is taller than the screen until you scroll. */
+  .modal-overlay > .glass-panel {
+    max-width: 100% !important;
+    max-height: calc(100dvh - 1.2rem) !important;
+    overflow-y: auto !important;
+    border-radius: 14px;
+  }
+
+  /* Panels carrying desktop padding waste a third of the width on a phone.
+     .keep-pad exempts the ones whose padding is deliberately zero because
+     their own sections carry it — forcing a pad there insets the header
+     against a surface it is supposed to sit flush with. */
+  .dash-main .glass-panel:not(.keep-pad),
+  .modal-overlay > .glass-panel:not(.keep-pad) { padding: 1.15rem !important; }
+
+  /* Inputs below 16px make iOS zoom the whole page on focus, and it does not
+     zoom back out — the single fastest way to make a form feel broken. */
+  .dash-main input,
+  .dash-main select,
+  .dash-main textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+  .dash-main textarea { min-height: 96px; }
+
+  /* Toolbars and button rows wrap instead of overflowing. */
+  .dash-main .toolbar,
+  .dash-main .row { flex-wrap: wrap !important; }
 }
 
 @media (max-width: 560px) {

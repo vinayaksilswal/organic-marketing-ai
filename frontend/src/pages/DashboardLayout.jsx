@@ -14,6 +14,7 @@ import Billing from './dashboard/Billing';
 import { useWorkspace } from '../components/WorkspaceContext';
 import HelpWidget from '../components/HelpWidget';
 import SystemBanner from '../components/SystemBanner';
+import DesktopHint from '../components/DesktopHint';
 
 const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
   const { activeWorkspaceId, setActiveWorkspace, workspaces } = useWorkspace();
@@ -73,6 +74,8 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
 
       <div className="dash-main" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
         <SystemBanner />
+        {/* Renders nothing above 900px, and nothing at all once dismissed. */}
+        <DesktopHint />
         <Routes>
           {/* onLogout reaches Overview so its Log out button clears React
               state through the router, rather than falling back to wiping

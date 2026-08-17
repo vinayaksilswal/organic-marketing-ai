@@ -489,9 +489,9 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
         {/* EDIT MODAL */}
         {editModalOpen && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setEditModalOpen(false); }}>
-            <div className="glass-panel" style={{ width: '100%', maxWidth: 680, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 680, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
               {/* Header */}
               <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg-card)', zIndex: 2 }}>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -764,7 +764,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
         {/* META PAGE PICKER — shown when the account owns several Pages */}
         {pageChoices && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}>
             <div className="glass-panel" style={{ width: '100%', maxWidth: 520, padding: '1.75rem', maxHeight: '85vh', overflow: 'auto' }}>
               <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Facebook size={18} color="#60a5fa" /> Choose a Page
@@ -817,7 +817,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
         {/* DELETE CONFIRMATION */}
         {deleteTarget && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget && !deleting) setDeleteTarget(null); }}>
             <div className="glass-panel" style={{ width: '100%', maxWidth: 460, padding: '1.75rem' }}>
               <h3 style={{ margin: '0 0 0.6rem 0', fontSize: '1.1rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
