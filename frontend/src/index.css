@@ -1361,10 +1361,16 @@ input:focus, textarea:focus, select:focus {
 
   /* Page furniture */
   .container { padding: 0 1rem; }
-  h1 { font-size: 1.9rem !important; margin-bottom: 1rem; }
-  h2 { font-size: 1.45rem; }
-  h3 { font-size: 1.2rem; }
-  p  { font-size: 1rem; }
+
+  /* Scoped to the dashboard. As bare element selectors these applied to the
+     landing page too, and the !important beat its own clamp() -- the marketing
+     headline rendered at 26px on a phone while the type scale that was
+     supposed to govern it sat there being overridden. The landing page has its
+     own responsive scale inside Landing.jsx and does not want this one. */
+  .dash-main h1 { font-size: 1.9rem !important; margin-bottom: 1rem; }
+  .dash-main h2 { font-size: 1.45rem; }
+  .dash-main h3 { font-size: 1.2rem; }
+  .dash-main p  { font-size: 1rem; }
 
   /* Anything laid out in columns collapses to one. */
   .grid, .g2, .g3, .g4 { grid-template-columns: 1fr !important; }
@@ -1448,7 +1454,7 @@ input:focus, textarea:focus, select:focus {
 
 @media (max-width: 560px) {
   .container { padding: 0 0.85rem; }
-  h1 { font-size: 1.65rem !important; }
+  .dash-main h1 { font-size: 1.65rem !important; }
 }
 
 /* The posting calendar on a phone.

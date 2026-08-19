@@ -227,8 +227,46 @@ const styles = `
 }
 .omai .field:focus { border-color: var(--violet-lit); box-shadow: 0 0 0 3px rgba(139,92,246,0.16); }
 
+/* Phones. This block used to set section padding to 4rem, which is MORE than
+   the 3.6rem desktop default -- the smaller screen was getting the larger
+   dead bands, so the argument took longer to scroll through on the device
+   where scrolling costs most. */
 @media (max-width: 720px) {
-  .omai section { padding: 4rem 0; }
+  .omai section { padding: 2.6rem 0; }
+  .omai .wrap { padding: 0 1.15rem; }
+
+  /* The headline is the hook and it should not need three scrolls to read.
+     Tighter tracking at this size keeps a long line on two rows. */
+  .omai .h1 { font-size: clamp(2.05rem, 8.6vw, 2.6rem); letter-spacing: -.035em; }
+  .omai .h2 { font-size: clamp(1.55rem, 6.4vw, 1.95rem); }
+  .omai .lede { font-size: 1rem; line-height: 1.58; }
+
+  /* Full-width and thumb-sized. A centred pill button on a phone reads as a
+     link people are not sure is tappable. */
+  .omai .b { width: 100%; min-height: 48px; padding: .95rem 1.25rem; }
+  .omai .nav-actions .b { width: auto; min-height: 40px; padding: .5rem .9rem; }
+
+  /* The nav carries a mark and two actions across 375px. Without this the
+     brand tagline pushes the primary button off the right edge. */
+  .omai .nav-in { padding: .6rem .9rem; gap: .5rem; }
+  .omai .brand { font-size: 1rem; min-width: 0; }
+  /* The lockup is sized for a desktop bar. At 46px plus a strapline it made
+     the mobile nav 82px tall -- a tenth of the screen, before the page has
+     said anything. The mark shrinks and the strapline goes: the page title
+     already says what this is, twice. */
+  .omai .brand img { width: 32px !important; height: 32px !important; }
+  .omai .logo-tagline { display: none; }
+  .omai .logo-wordmark { font-size: 1.25rem !important; }
+
+  /* The bar holds a lockup and two actions across 375px. Over budget, the
+     buttons were the thing that gave -- "Start free" wrapped onto two lines
+     and took the nav to 82px. They keep their words on one line now and the
+     lockup gives up the width instead. */
+  .omai .nav-actions .b { white-space: nowrap; font-size: .85rem; padding: .5rem .8rem !important; }
+
+  /* Cards carrying desktop padding waste a third of the width. */
+  .omai .glass { border-radius: 14px; }
+  .omai .grid { gap: .9rem; }
 }
 `;
 
@@ -392,15 +430,23 @@ const Landing = () => {
         <div className="wrap" style={{ textAlign: 'center' }}>
           <span className="eyebrow"><Sparkles size={13} /> Free plan · no card</span>
 
+          {/* Pain first, not benefit first.
+              This read "Your marketing runs while you run the business" — true,
+              but it is the destination, and a visitor arriving cold from an ad
+              has not yet agreed there is a problem to solve. A benefit
+              headline asks someone to want something; a loss headline asks
+              them to recognise something, and recognition is the cheaper ask.
+              The old line is not wasted — it is the answer, so it moved down
+              one level to the lede where it now lands as a resolution. */}
           <h1 className="h1" style={{ margin: '1.4rem auto 0', maxWidth: 940 }}>
-            Your marketing runs<br />
-            <span className="tint">while you run the business.</span>
+            Posting every day is a full-time job.<br />
+            <span className="tint">You already have one.</span>
           </h1>
 
           <p className="lede" style={{ maxWidth: 640, margin: '1.5rem auto 0' }}>
-            Add your website once. Organiflo learns what you sell, writes the copy and the
-            creative brief, and publishes to your Facebook Page and Instagram on the schedule
-            you set — with every post reviewable before it goes out.
+            So Organiflo does it. Add your website once — it learns what you sell, writes the
+            copy and the creative brief, and publishes to your Facebook Page and Instagram on
+            the schedule you set. Your marketing runs while you run the business.
           </p>
 
           {/* One action, not two.

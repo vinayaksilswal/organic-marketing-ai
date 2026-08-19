@@ -24,7 +24,15 @@ import React from 'react';
  * If a lossless export ever arrives — PNG with real alpha, or SVG — the mark
  * gets sharper for free and none of this needs revisiting.
  */
-const Logo = ({ size = 30, showWordmark = false, tagline = true, style }) => (
+// Below this the tagline cannot be set at a legible size, so it is not set
+// at all. A line of 9px type is not a small version of a message; it is
+// decoration that costs vertical space and says nothing.
+const TAGLINE_MIN_SIZE = 42;
+
+// noTagline is accepted because a call site already passed it. The prop was
+// named `tagline`, so `noTagline` landed in nothing and the dashboard top bar
+// rendered a 6px strapline nobody asked for.
+const Logo = ({ size = 30, showWordmark = false, tagline = true, noTagline = false, style }) => (
   <span
     style={{
       display: 'inline-flex',
@@ -56,6 +64,7 @@ const Logo = ({ size = 30, showWordmark = false, tagline = true, style }) => (
     {showWordmark && (
       <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.04 }}>
         <span
+          className="logo-wordmark"
           style={{
             fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
             fontWeight: 800,
@@ -70,10 +79,11 @@ const Logo = ({ size = 30, showWordmark = false, tagline = true, style }) => (
         >
           Organiflo
         </span>
-        {tagline && (
+        {tagline && !noTagline && size >= TAGLINE_MIN_SIZE && (
           <span
+            className="logo-tagline"
             style={{
-              fontSize: Math.max(size * 0.2, 9),
+              fontSize: Math.max(size * 0.26, 11),
               letterSpacing: '.005em',
               color: 'var(--text-muted)',
               fontWeight: 600,
