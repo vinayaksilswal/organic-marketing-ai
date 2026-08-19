@@ -461,7 +461,7 @@ templates = Jinja2Templates(directory="templates")
 # =============================================================================
 # Router Registration
 # =============================================================================
-from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, team, meta_oauth, billing, data_deletion  # noqa: E402
+from routers import auth, marketing, api, user_api, paypal_webhook, video, ecommerce, creative_api, support, team, meta_oauth, billing, data_deletion  # noqa: E402
 from routers.auth import verify_user  # noqa: E402
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -486,6 +486,8 @@ app.include_router(video.router)
 app.include_router(ecommerce.router)
 app.include_router(creative_api.router)
 app.include_router(team.router)
+app.include_router(support.router)
+app.include_router(support.public_router)
 app.include_router(meta_oauth.router)
 # Meta App Review requires a Data Deletion Callback; GDPR Arts. 17 and 20
 # require the self-serve erase and export on the same router.

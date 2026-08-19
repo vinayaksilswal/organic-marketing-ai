@@ -566,6 +566,68 @@ class TeamMember(Base):
     user = relationship("User")
 
 
+class SupportTicket(Base):
+    """A problem a customer reported, and what was done about it.
+
+    The reply lives on the ticket rather than in an inbox. Support answered by
+    email is invisible to everyone except the two people in the thread: the
+    customer cannot find it again, and nobody else can see whether an issue
+    was ever resolved. Here the answer sits next to the question, and the
+    person who raised it sees the status change without being told.
+    """
+
+    __tablename__ = "SupportTicket"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False, index=True)
+    businessProfileId = Column(String, ForeignKey("BusinessProfile.id", ondelete="SET NULL"), nullable=True)
+
+    subject = Column(String, nullable=False)
+    body = Column(Text, nullable=False)
+    # question | bug | billing | feature
+    category = Column(String, default="question", nullable=False)
+    # open | in_progress | resolved
+    status = Column(String, default="open", nullable=False, index=True)
+
+    reply = Column(Text, nullable=True)
+    repliedAt = Column(DateTime(timezone=True), nullable=True)
+
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    user = relationship("User")
+
+
+class Review(Base):
+    """What a customer says about the product, and whether it may be shown.
+
+    isApproved defaults to False and there is no path that sets it from a
+    customer request. A review collected in-product and published to the
+    landing page without a human reading it first is an open text field on a
+    marketing site, which is a decision nobody makes twice.
+    """
+
+    __tablename__ = "Review"
+    __table_args__ = (UniqueConstraint("userId", name="uniq_review_per_user"),)
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    rating = Column(Integer, nullable=False)          # 1-5
+    body = Column(Text, nullable=True)
+    # Shown alongside the quote. Captured at submission so a later rename of
+    # the workspace does not silently rewrite an attributed public quote.
+    authorName = Column(String, nullable=True)
+    authorBusiness = Column(String, nullable=True)
+
+    isApproved = Column(Boolean, default=False, nullable=False, index=True)
+
+    createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
+
+    user = relationship("User")
+
+
 # =============================================================================
 # Database Connection Manager
 # =============================================================================
