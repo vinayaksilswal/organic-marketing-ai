@@ -11,6 +11,7 @@ import {
 import { Helmet } from 'react-helmet-async';
 
 import AccountsMarquee from '../components/AccountsMarquee';
+import ReviewWall from '../components/ReviewWall';
 import Logo from '../components/Logo';
 import CardRail from '../components/CardRail';
 import CountUp from '../components/CountUp';
@@ -743,6 +744,10 @@ const Landing = () => {
       </section>
 
       {/* PRICING */}
+      {/* Renders nothing until a review has been approved. Placed immediately
+          above the price, because proof is what a price gets read against. */}
+      <ReviewWall />
+
       <section id="pricing">
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
