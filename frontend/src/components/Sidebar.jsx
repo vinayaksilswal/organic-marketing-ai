@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LogOut } from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut } from 'lucide-react';
 import { API_BASE, authFetch } from '../config';
 
 const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }) => {
@@ -134,6 +134,9 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         </NavLink>
         <NavLink to="/dashboard/billing" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <CreditCard size={18} /> Plan & Billing
+        </NavLink>
+        <NavLink to="/dashboard/support" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <LifeBuoy size={18} /> Support
         </NavLink>
       </nav>
 

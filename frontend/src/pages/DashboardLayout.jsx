@@ -11,6 +11,7 @@ import EmailSuite from './dashboard/EmailSuite';
 import Workspaces from './dashboard/Workspaces';
 import TeamManagement from './dashboard/TeamManagement';
 import Billing from './dashboard/Billing';
+import Support from './dashboard/Support';
 import { useWorkspace } from '../components/WorkspaceContext';
 import HelpWidget from '../components/HelpWidget';
 import SystemBanner from '../components/SystemBanner';
@@ -88,6 +89,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
           <Route path="/workspaces" element={<Workspaces user={user} token={token} showToast={showToast} updateAuth={updateAuth} />} />
           <Route path="/team" element={<TeamManagement user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/billing" element={<Billing user={user} token={token} showToast={showToast} />} />
+          <Route path="/support" element={<Support user={user} token={token} showToast={showToast} />} />
         </Routes>
       </div>
       <HelpWidget />
