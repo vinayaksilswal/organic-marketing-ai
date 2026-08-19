@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime, timedelta, timezone
 import asyncio
 import httpx
 from sqlalchemy import select, delete
@@ -18,6 +19,7 @@ from database import (
     AsyncSessionLocal, User, BusinessProfile, SocialConnection,
     Media, SocialPost, SocialCampaign, EmailCampaign, MarketingLog,
     MarketingState, Product, Audience, VideoApiConfig, TeamMember,
+    Subscription,
 )
 from routers.auth import verify_user, verify_workspace_access
 from services.onboarding_service import OnboardingService
@@ -308,6 +310,34 @@ async def activate_subscription(data: SubscribeRequest, request: Request, user_i
 
         user.subscriptionStatus = "ACTIVE"
         user.paypalOrderId = data.order_id
+
+        # Grant the plan they actually paid for.
+        #
+        # This endpoint only ever set User.subscriptionStatus, which is a
+        # boolean "did someone pay once". Every limit in the product is read
+        # from active_plan_code(), and that reads the Subscription table -- so
+        # a customer could pay $17, be marked ACTIVE, and still be held to the
+        # free plan's 5 posts and 10 media. They would have paid for nothing
+        # and the first they would know is a quota message.
+        #
+        # A one-time order is not a recurring subscription, so it buys a fixed
+        # window rather than open-ended access. 31 days, after which
+        # active_plan_code() sees a lapsed period and falls back to free by
+        # itself -- no cron, no reconciliation, nothing to forget.
+        now = datetime.now(timezone.utc)
+        sub = (await session.execute(
+            select(Subscription).where(Subscription.userId == user_id)
+        )).scalars().first()
+        if sub is None:
+            sub = Subscription(userId=user_id)
+            session.add(sub)
+        sub.planCode = "starter"
+        sub.status = "ACTIVE"
+        sub.currentPeriodEnd = now + timedelta(days=31)
+        sub.lastPaymentAt = now
+        sub.cancelAtPeriodEnd = True  # it does not renew; nothing will charge again
+        sub.lastError = None
+
         try:
             await session.commit()
         except IntegrityError:
