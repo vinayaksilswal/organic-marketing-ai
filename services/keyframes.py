@@ -76,6 +76,45 @@ def _handle_from(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (name or "").lower())
 
 
+# Coarse on purpose. The point is to hand the model a word it has actually
+# seen attached to a colour, not to reproduce the brand hex exactly.
+_HUES = [
+    (345, 15, "crimson red"), (15, 45, "warm orange"), (45, 70, "golden yellow"),
+    (70, 160, "deep green"), (160, 200, "teal"), (200, 250, "royal blue"),
+    (250, 290, "deep violet"), (290, 345, "magenta pink"),
+]
+
+
+def _colour_words(colours: Optional[list]) -> str:
+    """Turn brand hexes into words an image model can act on.
+
+    The video prompt rules already forbid handing a renderer a hex code, for
+    the good reason that it draws the characters. Two of them ran together
+    also asked for a "flat solid background" in two colours at once, which is
+    a contradiction the model resolves by inventing a gradient.
+
+    Only the first colour is used: an end card wants one ground.
+    """
+    for raw in (colours or []):
+        m = re.fullmatch(r"#?([0-9a-fA-F]{6})", str(raw).strip())
+        if not m:
+            continue
+        r, g, b = (int(m.group(1)[i:i + 2], 16) for i in (0, 2, 4))
+        mx, mn = max(r, g, b), min(r, g, b)
+        if mx - mn < 24:
+            return "near-black charcoal" if mx < 110 else "off-white"
+        if mx == r:
+            hue = (60 * ((g - b) / (mx - mn))) % 360
+        elif mx == g:
+            hue = 60 * ((b - r) / (mx - mn)) + 120
+        else:
+            hue = 60 * ((r - g) / (mx - mn)) + 240
+        for lo, hi, name in _HUES:
+            if (lo <= hue < hi) if lo < hi else (hue >= lo or hue < hi):
+                return f"deep {name}" if mx < 150 else name
+    return "near-black charcoal"
+
+
 def cta_for(profile: Any) -> Tuple[str, str, str]:
     """(brand, call to action, destination) for this business.
 
@@ -230,7 +269,7 @@ async def last_frame_prompt(profile: Any, first_frame: str = "") -> str:
     nothing competing: no product, no person, no scenery.
     """
     brand, cta, dest = cta_for(profile)
-    colors = ", ".join(getattr(profile, "brandColors", None) or []) or "deep charcoal with a single bright accent"
+    ground = _colour_words(getattr(profile, "brandColors", None))
 
     # The destination only earns a line when it is not already inside the CTA.
     show_dest = dest and dest.lower() not in cta.lower()
@@ -243,8 +282,8 @@ async def last_frame_prompt(profile: Any, first_frame: str = "") -> str:
         lines.append(f'below that "{dest}" in small light type, centred')
 
     return (
-        "A minimal vertical 9:16 end card, flat solid background in "
-        f"{colors}, no photograph and no objects, nothing else in frame: "
+        "A minimal vertical 9:16 end card, flat solid "
+        f"{ground} background, no photograph and no objects, nothing else in frame: "
         + ", ".join(lines)
         + ". Generous even margins, all text horizontally centred and "
         "vertically centred as one block, crisp high-contrast lettering, "
