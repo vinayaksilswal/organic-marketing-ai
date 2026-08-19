@@ -516,6 +516,18 @@ class Media(Base):
     # background AI job, so the request can return immediately instead of
     # holding an HTTP connection open for minutes and being killed by the
     # server's timeout — which reaches the browser as a bogus CORS error.
+    # The two stills the clip is generated between. Written as prompts, not
+    # images: the frames are produced by an image model outside this system,
+    # and holding the prompts means a frame can be regenerated or re-styled
+    # without re-running the whole pipeline.
+    #
+    # {firstFramePrompt, lastFramePrompt, brand, cta, destination,
+    #  spokenClosingLine, timing} -- see services/keyframes.py.
+    keyframes = Column(JSON, nullable=True)
+    # The beat plan the prompt was written to, so the length a prompt was
+    # built for travels with it. A 30s prompt rendered at 10s is not a shorter
+    # ad, it is a truncated one.
+    plan = Column(JSON, nullable=True)
     generationStatus = Column(String, nullable=True)
     generationError = Column(Text, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)

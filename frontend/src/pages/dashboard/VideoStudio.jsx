@@ -690,6 +690,49 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             </p>
                           )}
 
+                          {/* The two stills the clip is generated between.
+                              Shown only when the prompt is expanded, because
+                              they are what you paste into an image model just
+                              before you paste the prompt into a video one —
+                              and the closing card is the only place the brand
+                              name and the offer are rendered as real text. */}
+                          {open && item.keyframes && (
+                            <div style={{ marginTop: '0.9rem', display: 'grid', gap: '0.6rem' }}>
+                              {[
+                                ['First frame — the hook', item.keyframes.firstFramePrompt],
+                                ['Last frame — the call to action', item.keyframes.lastFramePrompt],
+                              ].filter(([, v]) => v).map(([label, value]) => (
+                                <div key={label} style={{
+                                  border: '1px solid var(--border-color)', borderRadius: 10,
+                                  padding: '0.7rem 0.8rem', background: 'rgba(11,16,32,0.03)',
+                                }}>
+                                  <div style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    gap: '0.5rem', marginBottom: '0.35rem',
+                                  }}>
+                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--primary-color)' }}>
+                                      {label}
+                                    </span>
+                                    <button
+                                      onClick={() => { navigator.clipboard?.writeText(value); showToast('Copied'); }}
+                                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600 }}
+                                    >
+                                      Copy
+                                    </button>
+                                  </div>
+                                  <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{value}</p>
+                                </div>
+                              ))}
+                              {item.keyframes.cta && (
+                                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                                  Closing card reads <strong>{item.keyframes.brand}</strong> · {item.keyframes.cta}
+                                  {item.keyframes.destination ? ` · ${item.keyframes.destination}` : ''}
+                                  {item.plan?.durationSeconds ? ` — written for ${item.plan.durationSeconds}s` : ''}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
                           {text.length > 180 && (
                             <button
                               onClick={() => setExpandedId(open ? null : item.id)}

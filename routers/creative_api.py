@@ -435,11 +435,17 @@ async def _run_video_generation(
         )
         return
 
+    # The two stills are stored beside the prompt. They were being generated
+    # and dropped: the pipeline returned them and nothing read the return, so
+    # the frame carrying the brand name and "Visit ... today" existed for the
+    # length of one function call and never reached anybody.
     await _finish(
         generationStatus="READY",
         generationError=None,
         prompt=veo_prompt,
         caption=veo_prompt,
+        keyframes=(result or {}).get("keyframes") or None,
+        plan=(result or {}).get("plan") or None,
     )
 
     # Rendering is optional and must never turn a good prompt into a failure.
@@ -827,6 +833,12 @@ async def prompt_history(
             "imageUrl": m.url or None,
             "similarityToPrevious": round(overlap, 3),
             "tooSimilar": overlap >= DUPLICATE_THRESHOLD,
+            # The opening still and the closing card. Returned so the studio
+            # can show them next to the video prompt -- they are what the
+            # image model is fed, and the last one is the only place the brand
+            # name and the offer are rendered as real text.
+            "keyframes": m.keyframes or None,
+            "plan": m.plan or None,
         })
 
     repeats = sum(1 for i in items if i["tooSimilar"])
