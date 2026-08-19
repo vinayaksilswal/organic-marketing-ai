@@ -85,25 +85,43 @@ export default function Checkout({ user, onLogout }) {
                   onApprove={async (data, actions) => {
                     const order = await actions.order.capture();
 
+                    // The money has already left the customer's account by
+                    // this point -- capture() has run. Everything below is
+                    // about whether they GET what they paid for, so a failure
+                    // here must never be swallowed and must never be followed
+                    // by a redirect that looks like success.
                     try {
                       const token = localStorage.getItem('token');
-                      if (token) {
-                        await fetch(`${API_BASE}/users/me/subscribe`, {
-                          method: 'POST',
-                          headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                          },
-                          body: JSON.stringify({ order_id: order.id })
-                        });
+                      if (!token) throw new Error('Your session expired during payment.');
+
+                      const res = await fetch(`${API_BASE}/users/me/subscribe`, {
+                        method: 'POST',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ order_id: order.id })
+                      });
+
+                      if (!res.ok) {
+                        const detail = await res.json().catch(() => ({}));
+                        throw new Error(detail.detail || detail.message || `Activation failed (${res.status}).`);
                       }
                     } catch (e) {
-                      console.error("Failed to update subscription status", e);
+                      console.error("Failed to activate the plan after payment", e);
+                      // Show the order id: it is the one thing that lets
+                      // support find the payment and fix this by hand.
+                      setError(
+                        `Your payment went through but the plan did not activate: ${e.message} ` +
+                        `Contact support with order ${order.id} and we will sort it out — ` +
+                        `you will not be charged twice.`
+                      );
+                      return;
                     }
 
                     setTimeout(() => {
                       window.location.href = '/dashboard';
-                    }, 2000);
+                    }, 1500);
                   }}
                   onError={(err) => {
                     console.error("PayPal Error:", err);
