@@ -581,7 +581,10 @@ Product Feature: {product_feature}
 
 [OUTPUT RULES]
 LENGTH: Maximum 3 sentences. Total character count must be under 250 characters. Use line breaks between each sentence.
+FIRST LINE: Instagram and Facebook both cut a caption to roughly 125 characters and hide the rest behind "more". Almost nobody taps it. So the FIRST LINE must be under 120 characters and must be complete on its own — a whole thought that has already paid the reader, not a set-up whose pay-off is hidden behind the fold. Never split a sentence across that boundary.
 HOOK: The first sentence must directly address the "{customer_motivator}" using a concrete scenario, without naming the demographic label.
+WORTH KEEPING: One of the three sentences must carry something a reader would be slightly worse off for not knowing — a number, a method, a constraint, a specific. A caption that only asserts is scrolled; a caption that tells is saved and sent, and both of those are worth more than a like.
+NO LINK: Do not write a URL, a domain, or "link in bio". A caption carrying a link is demoted on both platforms and the destination already lives on the profile.
 SPECIFICITY: You must use at least one specific entity (number, proprietary feature, or location) derived strictly from the Brand Language Anchor.
 TONE: Write from the perspective of the brand itself, not a third-party reviewer.
 SAFETY: Do not invent any statistics, prices, or health/financial claims not explicitly provided in the Context.

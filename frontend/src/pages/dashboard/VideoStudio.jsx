@@ -13,6 +13,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   const [productId, setProductId] = useState('');
   const [business, setBusiness] = useState(null);
   const [videoKeySet, setVideoKeySet] = useState(false);
+  // 10s is the default because it is what every generator supports and
+  // what a Reel audience actually finishes. Longer is offered, not urged.
+  const [duration, setDuration] = useState(10);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = React.useRef(null);
 
@@ -205,7 +208,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
       const res = await authFetch(`${API_BASE}/creatives/auto-video`, {
         method: 'POST',
         headers: { 'X-Workspace-Id': activeWorkspaceId },
-        body: JSON.stringify({ product_id: productId || null, goal: 'conversion' }),
+        body: JSON.stringify({ product_id: productId || null, goal: 'conversion', duration_seconds: duration }),
       }, token);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || data.message || 'Generation failed');
@@ -350,6 +353,42 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   </select>
                 </div>
               )}
+
+              {/* Length. The generators take 8-30s now, and the prompt is
+                  written to a different beat plan for each: the hook stays 3s
+                  and the end card 2s whatever the length, so what actually
+                  changes is how many beats sit between them. */}
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+                  Video length
+                </label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {[8, 10, 15, 20, 30].map((sec) => {
+                    const on = duration === sec;
+                    return (
+                      <button
+                        key={sec}
+                        type="button"
+                        onClick={() => setDuration(sec)}
+                        aria-pressed={on}
+                        style={{
+                          flex: '1 1 60px', minHeight: 44, borderRadius: 10, cursor: 'pointer',
+                          fontFamily: 'var(--font-family-body)', fontWeight: 700, fontSize: '0.9rem',
+                          background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
+                          color: on ? '#fff' : 'var(--text-main)',
+                          border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                          transition: 'background .16s, color .16s, border-color .16s',
+                        }}
+                      >
+                        {sec}s
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.45rem', lineHeight: 1.5 }}>
+                  3s hook and a 2s end card at every length — {duration <= 10 ? 'one beat' : `${Math.ceil((duration - 5) / 8)} beats`} in between, each timed in the prompt.
+                </p>
+              </div>
 
               <button
                 onClick={generate}

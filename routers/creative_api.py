@@ -58,6 +58,10 @@ class VideoCampaignRequest(BaseModel):
     product_url: Optional[str] = None
     image_url: str
     goal: str = "conversion"
+    # 8-30. Clamped in services.video_beats rather than validated here, so an
+    # out-of-range value from an older client still produces a usable clip
+    # instead of a 422 the user cannot act on.
+    duration_seconds: int = 10
 
 
 
@@ -131,6 +135,7 @@ async def generate_video_campaign(
             goal=data.goal,
             profile=profile,
             recent_prompts=prior,
+            duration_seconds=data.duration_seconds,
         )
         _attempt.last = out
         return out.get("veo_prompt") or ""
@@ -199,6 +204,7 @@ class AutoVideoRequest(BaseModel):
     product_id: Optional[str] = None   # optional; e-commerce workspaces only
     goal: str = "conversion"
     render: bool = True                # attempt a render if a key is configured
+    duration_seconds: int = 10         # 8-30, clamped downstream
 
 
 @router.post("/auto-video")
@@ -332,6 +338,7 @@ async def auto_video(
             goal=data.goal,
             recent_prompts=recent_prompts,
             render_key=render_key,
+            duration_seconds=data.duration_seconds,
         )
     )
 
@@ -354,6 +361,7 @@ async def _run_video_generation(
     goal: str,
     recent_prompts: list,
     render_key: Optional[str],
+    duration_seconds: int = 10,
 ) -> None:
     """Generate the prompt out of band and write the result onto the asset row.
 
@@ -389,6 +397,7 @@ async def _run_video_generation(
                 goal=goal,
                 profile=profile,
                 recent_prompts=recent_prompts,
+                duration_seconds=duration_seconds,
             ),
             timeout=600,
         )

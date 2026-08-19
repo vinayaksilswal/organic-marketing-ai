@@ -485,8 +485,16 @@ async def generate_prompt(
     creative_strategy: Dict[str, Any],
     image_url: str,
     recent_prompts: Optional[list] = None,
+    duration_seconds: int = 10,
 ) -> str:
-    """Generate the final video-model prompt for a 10-second vertical ad.
+    """Generate the final video-model prompt for a vertical ad of a chosen length.
+
+    `duration_seconds` is 8-30. The generators accept a range now, and a prompt
+    written for ten seconds and rendered at thirty is not a longer ad -- it is
+    the same ad with twenty seconds of drift after it. The beat sheet in
+    services/video_beats.py divides whatever length was chosen and the prompt
+    carries that clock explicitly, because these models follow a stated
+    timeline far better than they follow a narrative.
 
     Length discipline is the whole game here. Text-to-video models degrade
     past roughly 120 words — they start dropping the subject, the on-screen
@@ -599,11 +607,11 @@ Do NOT end with a list of negatives. These models have no negative parsing —
 "no holograms" raises the odds of a hologram by putting the word in the
 prompt at all. Describe only what IS in frame.
 
-TEN SECONDS:
-  0-1s   something is already happening, the line is ALREADY BEING SPOKEN, and
-         the text is ALREADY on screen. No fade in, no logo card, no pause.
-  1-7s   the single action plays out.
-  7-10s  the reaction, and the brand word in the closing frame.
+THE CLOCK IS SUPPLIED BELOW, in the TIMED STRUCTURE block of the input. Follow
+it exactly: every range in it must appear in the prompt you write, in order,
+each with what is in frame and what is heard. Whatever the length, the first
+frame is already in motion with the line already being spoken and the text
+already on screen -- no fade in, no logo card, no pause.
 
 THREE THINGS A RENDERED TEST PROVED, learn from them:
 
@@ -653,7 +661,7 @@ OUTPUT — valid JSON only. First character { and last character }. No markdown,
   "creative_format_used": "<assigned format name>",
   "variation_modifier_applied": "<assigned modifier name>",
   "product_type": "<product type from marketing intel>",
-  "prompt": "<one 10-second vertical shot, 90-130 words, ONE camera move, ONE subject, ONE action, one short line of 2-6 words rendered large on a named surface with everything else defocused, the business name as a semi-transparent wordmark centred on the bottom edge for the whole clip, one audio clause, and the spoken words verbatim in double quotes. No list of negatives.>"
+  "prompt": "<one vertical ad of the length given in TIMED STRUCTURE, every range in that block described in order, 90-130 words, ONE camera move, ONE subject, ONE action, one short line of 2-6 words rendered large on a named surface with everything else defocused, the business name as a semi-transparent wordmark centred on the bottom edge for the whole clip, one audio clause, and the spoken words verbatim in double quotes. No list of negatives.>"
 }
 
 VOCABULARY WARNING — the prompt is read by a RENDERER, not by you. It must
@@ -668,7 +676,16 @@ instructions into the prompt itself. Live output once read:
 will attempt to draw them. Write the thing, never its label.
 """
 
-    prompt = f"""Translate the product intelligence and assigned creative format below into ONE production-ready 10-second vertical video prompt.
+    from services.video_beats import beat_sheet, clamp_duration
+
+    duration_seconds = clamp_duration(duration_seconds)
+    timed_structure = beat_sheet(duration_seconds)
+
+    prompt = f"""Translate the product intelligence and assigned creative format below into ONE production-ready {duration_seconds}-second vertical video prompt.
+
+═══════════════════════════════════════════════════════════
+{timed_structure}
+═══════════════════════════════════════════════════════════
 
 ═══════════════════════════════════════════════════════════
 INPUT DATA
@@ -753,8 +770,8 @@ MANDATORY RULES
 ═══════════════════════════════════════════════════════════
 RULE 1 — FORMAT COMPLIANCE. Build the whole prompt around the assigned creative format. "ugc_testimonial" means a real face in a real room with zero CGI. "cinematic_product_hero" means no humans and the product as sole subject. Never fall back to a generic tech visual.
 
-RULE 2 — ONE SHOT. ONE MOVE. TEN SECONDS. VERTICAL 9:16.
-A single continuous take with one camera move chosen from: slow push-in, slow
+RULE 2 — ONE MOVE PER BEAT. VERTICAL 9:16.
+Each beat in the TIMED STRUCTURE is one continuous take with one camera move chosen from: slow push-in, slow
 pull-back, slow pan, locked-off static, gentle handheld sway, slow overhead
 descent. No cuts. No "then it flips". No rotations. No montages.
 
@@ -905,6 +922,12 @@ def _strip_brief_vocabulary(text: str) -> str:
     return _re.sub(r"\s+([,.])", r"\1", cleaned).strip()
 
 
+def _beats_summary(duration_seconds: int) -> Dict[str, Any]:
+    from services.video_beats import summary
+
+    return summary(duration_seconds)
+
+
 async def execute_video_pipeline(
     product_name: str,
     product_url: Optional[str] = None,
@@ -912,6 +935,7 @@ async def execute_video_pipeline(
     goal: str = "conversion",
     profile: Optional[Any] = None,
     recent_prompts: Optional[list] = None,
+    duration_seconds: int = 10,
 ) -> Dict[str, Any]:
     """Execute the full end-to-end creative video pipeline.
 
@@ -966,7 +990,8 @@ product_placement: 'center'
     
     # 5. Prompt Generation
     final_prompt = await generate_prompt(
-        intelligence, creative_strategy, image_url, recent_prompts=recent_prompts
+        intelligence, creative_strategy, image_url,
+        recent_prompts=recent_prompts, duration_seconds=duration_seconds,
     )
     
     # 6. Keyframes. The clip is generated BETWEEN two stills: the first locks
@@ -993,6 +1018,7 @@ product_placement: 'center'
         "veo_prompt": final_prompt,
         "image_url": image_url,
         "keyframes": keyframes,
+        "plan": _beats_summary(duration_seconds),
     }
 
 
