@@ -681,36 +681,19 @@ def append_outro(
 def outro_text_for(profile) -> Tuple[str, str, str]:
     """Work out what the card should say from a BusinessProfile.
 
-    The spoken CTA drives the video; this is its written counterpart, and here
-    a URL is safe because ffmpeg renders it legibly.
+    Delegates to services.keyframes, which is also what the generated last
+    frame is built from. These were separate implementations and drifted: the
+    composited card and the generated end frame could disagree about the offer
+    on the same clip. One source of truth now decides both.
     """
-    import re as _re
+    from services.keyframes import cta_for
 
-    brand = (getattr(profile, "name", "") or "").strip()
-    cta = (getattr(profile, "primaryOffer", "") or "").strip().rstrip(".")
-
-    url = (getattr(profile, "websiteUrl", "") or "").strip()
-    for prefix in ("https://", "http://", "www."):
-        if url.lower().startswith(prefix):
-            url = url[len(prefix):]
-    url = url.rstrip("/")
-
-    # A themed page has nothing to sell, so the offer field is either empty or
-    # describes a transaction that does not exist. The whole economy of the
-    # account is the follow, and the handle is what a viewer can act on — there
-    # is usually no website to put on the card at all.
-    model = (getattr(profile, "businessModel", "") or "").strip().lower()
-    if model in {"social page", "social_page", "page"}:
-        handle = _re.sub(r"[^a-z0-9]", "", brand.lower())
-        if not cta or not _re.match(r"^(follow|subscribe)\b", cta, _re.IGNORECASE):
-            cta = "Follow for more"
-        if not url and handle:
-            url = f"@{handle}"
+    brand, cta, dest = cta_for(profile)
 
     # A long offer wraps badly on a 1080-wide card and reads as a paragraph.
     if len(cta.split()) > 6:
         cta = " ".join(cta.split()[:6])
-    return brand, cta, url
+    return brand, cta, dest
 
 
 def probe_audio(path: str | Path) -> Optional[bool]:

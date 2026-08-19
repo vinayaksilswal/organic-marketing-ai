@@ -969,14 +969,30 @@ product_placement: 'center'
         intelligence, creative_strategy, image_url, recent_prompts=recent_prompts
     )
     
+    # 6. Keyframes. The clip is generated BETWEEN two stills: the first locks
+    #    the look, the last carries the brand name and the offer as real text
+    #    an image model can actually spell. See services/keyframes.py.
+    keyframes = {}
+    if profile is not None:
+        try:
+            from services.keyframes import build_keyframes
+
+            keyframes = await build_keyframes(
+                profile, intelligence, recent_prompts=recent_prompts
+            )
+        except Exception as e:
+            # A missing pair of stills is a weaker creative, not a failed one.
+            logger.warning(f"Keyframe prompts unavailable: {e}")
+
     logger.info("Video pipeline completed successfully.")
-    
+
     return {
         "status": "success",
         "intelligence": intelligence,
         "creative_strategy": creative_strategy,
         "veo_prompt": final_prompt,
-        "image_url": image_url
+        "image_url": image_url,
+        "keyframes": keyframes,
     }
 
 
