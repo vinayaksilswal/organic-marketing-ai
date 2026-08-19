@@ -14,6 +14,10 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
   
   // AI Analysis states
   const [analysisPhase, setAnalysisPhase] = useState(0); // 0=Extracting, 1=Brand Context, 2=Images
+  // What the analysis actually produced. The final screen used to show a
+  // hardcoded summary to every business under a heading claiming we had
+  // analysed theirs.
+  const [brand, setBrand] = useState(null);
   
   const navigate = useNavigate();
 
@@ -47,6 +51,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
           if (res.ok) {
             const data = await res.json();
             if (data.brandAnalysisComplete) {
+              if (data.profile) setBrand(data.profile);
               clearInterval(phaseInterval);
               setAnalysisPhase(3); // All complete
               setTimeout(() => { if (active) setStep(4); }, 600);
@@ -110,26 +115,6 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
     }
   };
 
-  const handlePayment = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/users/me/subscribe`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!res.ok) throw new Error('Payment simulation failed');
-      
-      updateAuth({ ...user, subscriptionStatus: 'ACTIVE' });
-      showToast('Payment Successful! Subscription Activated.');
-      navigate('/dashboard');
-    } catch(err) {
-      showToast(err.message, true);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="view centered-layout" style={{ position: 'relative' }}>
@@ -268,44 +253,95 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
 
         {step === 4 && (
           <div className="fade-in">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
-              <CreditCard size={32} color="var(--primary-color)" />
-              <h2 style={{ margin: 0 }}>Brand Engine Ready!</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+              <CheckCircle2 size={30} color="var(--success)" />
+              <h2 style={{ margin: 0 }}>{brand?.name || 'Your business'} is set up</h2>
             </div>
-            <p style={{ marginBottom: '1.5rem', fontSize: '1.05rem', color: 'var(--text-muted)' }}>
-              We analyzed your brand, generated custom content pillars, and created your first set of AI social posts & media. Activate Pro to unlock automated 2-hour publishing.
+            <p style={{ marginBottom: '1.5rem', fontSize: '1.02rem', color: 'var(--text-muted)' }}>
+              Here is what we learned from your site. Change anything you disagree with — this is what every caption and creative is written from.
             </p>
-            
-            {/* Generated Brand Summary Preview */}
-            <div style={{ background: 'rgba(139, 92, 246, 0.08)', border: '1px solid rgba(139, 92, 246, 0.25)', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', fontWeight: '700', color: 'var(--primary-color)' }}>
-                <Sparkles size={18} /> Generated Brand Context Engine
+
+            {/* The real stored analysis, not a fixed string. */}
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.22)',
+              borderRadius: 16, padding: '1.4rem', marginBottom: '1.25rem', textAlign: 'left',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem', fontWeight: 700, color: 'var(--primary-color)' }}>
+                <Sparkles size={17} /> What we understood
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-                <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>Tone: Enterprise Professional</span>
-                <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>Interval: Every 2 Hours (Aggressive)</span>
-                <span className="badge" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc' }}>AI Auto-Pilot: Active</span>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginBottom: '1rem' }}>
+                {brand?.industry && <span className="badge">{brand.industry}</span>}
+                {brand?.toneOfVoice && <span className="badge">Tone: {brand.toneOfVoice}</span>}
+                {brand?.businessModel && <span className="badge">{brand.businessModel}</span>}
+                <span className="badge">Posts every {brand?.postIntervalHours ?? 2}h</span>
               </div>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}><strong>Content Pillars:</strong> Growth Tips • Industry Insights • Product Showcase • Thought Leadership</p>
+
+              {brand?.primaryOffer && (
+                <p style={{ margin: '0 0 0.7rem', fontSize: '0.88rem' }}>
+                  <strong>Your call to action:</strong> {brand.primaryOffer}
+                </p>
+              )}
+              {brand?.targetAudience && (
+                <p style={{ margin: '0 0 0.7rem', fontSize: '0.88rem' }}>
+                  <strong>Who you sell to:</strong> {brand.targetAudience}
+                </p>
+              )}
+              {!!brand?.contentPillars?.length && (
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  <strong>Content pillars:</strong> {brand.contentPillars.join(' • ')}
+                </p>
+              )}
+              {!brand && (
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Your brand profile is saved. Open Workspaces to review it.
+                </p>
+              )}
             </div>
 
-            <div className="payment-box">
-              <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>PRO UNLIMITED</h3>
-              <div className="price" style={{ margin: '1rem 0 1.5rem' }}>
-                <span className="currency">$</span>17<span className="period">/mo</span>
-              </div>
-              
-              <ul style={{ listStyle: 'none', textAlign: 'left', margin: '0 auto 2rem', maxWidth: '340px' }}>
-                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Automated AI Creative Generation (Every 2h+)</li>
-                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Auto-Populated Media Library</li>
-                <li style={{ marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}><CheckCircle2 size={18} color="var(--primary-color)" /> Auto-Publishing (FB, IG, X, LinkedIn)</li>
-              </ul>
-              
-              <button className="btn btn-primary btn-large" style={{ width: '100%' }} onClick={handlePayment} disabled={loading}>
-                {loading ? 'Processing...' : 'Start 14-Day Free Trial'}
-              </button>
-              <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Secure payment processing. Cancel anytime.</p>
+            {/* What happens next, in the order it happens. Nothing here is
+                gated: the free plan publishes, and asking for a card before a
+                single post has gone out is asking someone to buy something
+                they have not seen work. */}
+            <div style={{ textAlign: 'left', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>What happens next</h3>
+              {[
+                ['Connect Facebook and Instagram', 'One click each, in Workspaces. Nothing can publish until you do.'],
+                ['Generate your first video prompt', 'Pick a length — the hook, the beats and the end card are written for it.'],
+                ['Add your media', 'Upload clips or images. The scheduler posts from this library on your interval.'],
+                ['It keeps posting', 'On your schedule, with every post reviewable before it goes out.'],
+              ].map(([t, d], i) => (
+                <div key={t} style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                  <span style={{
+                    flexShrink: 0, width: 26, height: 26, borderRadius: 99,
+                    background: 'var(--primary-color)', color: '#fff', fontWeight: 700,
+                    fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>{i + 1}</span>
+                  <span>
+                    <span style={{ display: 'block', fontWeight: 650, fontSize: '0.92rem' }}>{t}</span>
+                    <span style={{ display: 'block', fontSize: '0.83rem', color: 'var(--text-muted)' }}>{d}</span>
+                  </span>
+                </div>
+              ))}
             </div>
+
+            <button
+              className="btn btn-primary btn-large"
+              style={{ width: '100%', minHeight: 48 }}
+              onClick={() => navigate('/dashboard/workspaces')}
+            >
+              Connect your accounts <ArrowRight size={17} />
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ width: '100%', marginTop: '0.6rem', minHeight: 44 }}
+              onClick={() => navigate('/dashboard')}
+            >
+              Skip to dashboard
+            </button>
+            <p style={{ marginTop: '1rem', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+              You are on the free plan. Upgrade any time from Billing — no card needed to start.
+            </p>
           </div>
         )}
 

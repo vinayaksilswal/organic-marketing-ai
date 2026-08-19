@@ -234,8 +234,31 @@ async def get_onboarding_status(request: Request, user_id: str = Depends(verify_
         res = await session.execute(stmt)
         profile = res.scalars().first()
         if not profile:
-            return {"brandAnalysisComplete": False}
-        return {"brandAnalysisComplete": profile.brandAnalysisComplete}
+            return {"brandAnalysisComplete": False, "profile": None}
+
+        # The final onboarding screen showed a hardcoded summary -- "Tone:
+        # Enterprise Professional", the same four content pillars -- to every
+        # business that ever signed up, under a heading saying we had analysed
+        # theirs. The analysis is real; it was simply never read back. These
+        # are the actual stored values.
+        return {
+            "brandAnalysisComplete": profile.brandAnalysisComplete,
+            "profile": {
+                "id": profile.id,
+                "name": profile.name,
+                "industry": profile.industry,
+                "businessModel": profile.businessModel,
+                "toneOfVoice": profile.toneOfVoice,
+                "targetAudience": profile.targetAudience,
+                "contentPillars": profile.contentPillars or [],
+                "suggestedHashtags": profile.suggestedHashtags or [],
+                "primaryOffer": profile.primaryOffer,
+                "postIntervalHours": profile.postIntervalHours,
+                "autoGenerateCreatives": profile.autoGenerateCreatives,
+                "automationPaused": profile.automationPaused,
+                "websiteUrl": profile.websiteUrl,
+            },
+        }
 
 class SubscribeRequest(BaseModel):
     order_id: str
