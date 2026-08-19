@@ -89,14 +89,68 @@ const CardRail = ({ items, renderItem, interval = 3400 }) => {
     ? `translateX(calc(-1 * ${index} * (100% + ${GAP}px) / ${visible}))`
     : 'none';
 
+  // A rail that only moves on its own timer asks the reader to wait for the
+  // card they want. The arrows let them go and get it. Backwards from the
+  // first card wraps to the last: an endless rail with a dead end on one side
+  // is just a list that moves.
+  const nudge = (dir) => {
+    setAnimate(true);
+    setIndex((i) => (i + dir < 0 ? total - 1 : i + dir));
+  };
+
+  const arrow = (side) => ({
+    position: 'absolute',
+    top: 'calc(50% - 1.6rem)',
+    [side]: -6,
+    transform: 'translateY(-50%)',
+    zIndex: 3,
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    background: 'rgba(255,255,255,0.92)',
+    border: '1px solid rgba(11,16,32,0.10)',
+    boxShadow: '0 2px 6px rgba(11,16,32,0.08), 0 10px 24px -10px rgba(11,16,32,0.22)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    color: '#0b1020',
+    padding: 0,
+    lineHeight: 0,
+  });
+
   return (
     <div
-      style={{ overflow: 'hidden', width: '100%' }}
+      style={{ position: 'relative', width: '100%' }}
       onMouseEnter={() => { paused.current = true; }}
       onMouseLeave={() => { paused.current = false; }}
       onFocusCapture={() => { paused.current = true; }}
       onBlurCapture={() => { paused.current = false; }}
     >
+      {canSlide && (
+        <>
+          <button type="button" aria-label="Previous cards"
+                  onClick={() => nudge(-1)} style={arrow('left')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" strokeWidth="2.4"
+                 strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button type="button" aria-label="Next cards"
+                  onClick={() => nudge(1)} style={arrow('right')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" strokeWidth="2.4"
+                 strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </>
+      )}
+
+      <div style={{ overflow: 'hidden', width: '100%' }}>
       <div
         style={{
           display: 'flex',
@@ -117,6 +171,7 @@ const CardRail = ({ items, renderItem, interval = 3400 }) => {
             {renderItem(item)}
           </div>
         ))}
+        </div>
       </div>
 
       {canSlide && !stillness && (

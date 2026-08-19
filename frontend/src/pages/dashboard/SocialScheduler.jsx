@@ -253,14 +253,17 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Auto-Approve</span>
             </div>
 
-            {/* Run Automation Button */}
+            {/* Run Manually button. It is a manual trigger for the same cycle the
+                scheduler runs on its own, and calling it "Run Automation" read as
+                if it switched the automation on -- so people pressed it to enable
+                something and got one immediate post instead. */}
             <button 
               className="btn btn-primary" 
               onClick={handleRunAutomation}
               disabled={runningLoop}
               style={{ background: '#3b82f6', color: '#fff', fontWeight: '600', padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              {runningLoop ? <span className="spinner"></span> : <>⚡ Run Automation</>}
+              {runningLoop ? <span className="spinner"></span> : <>⚡ Run Manually</>}
             </button>
           </div>
         </div>
