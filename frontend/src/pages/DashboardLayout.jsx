@@ -12,6 +12,7 @@ import Workspaces from './dashboard/Workspaces';
 import TeamManagement from './dashboard/TeamManagement';
 import Billing from './dashboard/Billing';
 import Support from './dashboard/Support';
+import AdminSupport from './dashboard/AdminSupport';
 import { useWorkspace } from '../components/WorkspaceContext';
 import HelpWidget from '../components/HelpWidget';
 import SystemBanner from '../components/SystemBanner';
@@ -90,6 +91,10 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
           <Route path="/team" element={<TeamManagement user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/billing" element={<Billing user={user} token={token} showToast={showToast} />} />
           <Route path="/support" element={<Support user={user} token={token} showToast={showToast} />} />
+          {/* Not linked in the sidebar for anyone. The API answers 404 to a
+              non-admin, so the page renders empty rather than confirming an
+              admin area exists. */}
+          <Route path="/inbox" element={<AdminSupport user={user} token={token} showToast={showToast} />} />
         </Routes>
       </div>
       <HelpWidget />
