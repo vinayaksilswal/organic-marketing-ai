@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
-import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter, Save, Edit3, Zap, Clock, Bot, Trash2, AlertTriangle, Unplug, Pause, Play } from 'lucide-react';
+import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter, Save, Edit3, Zap, Clock, CalendarDays, Bot, Trash2, AlertTriangle, Unplug, Pause, Play } from 'lucide-react';
 
 const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [isCreating, setIsCreating] = useState(false);
@@ -197,6 +197,14 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
       postIntervalHours: bp.postIntervalHours || 2,
       creativeGenerationIntervalHours: bp.creativeGenerationIntervalHours || 12,
       autoGenerateCreatives: bp.autoGenerateCreatives !== false,
+      // null means "no restriction", which is what an unconfigured workspace
+      // has. Kept as null rather than coerced to a default, so opening the
+      // dialog and saving does not silently switch a window on.
+      postingDays: Array.isArray(bp.postingDays) ? bp.postingDays : null,
+      postingStartHour: bp.postingStartHour ?? null,
+      postingEndHour: bp.postingEndHour ?? null,
+      postingTimezone: bp.postingTimezone
+        || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     });
     const sc = bp.socialConnection || {};
     setSocialData({
@@ -725,6 +733,63 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <option value={24}>Every 24 hours</option>
                       </select>
                       <small style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>How often the AI publishes posts to your linked social accounts.</small>
+                    </div>
+
+                    {/* WHEN it may post, as opposed to how often. An interval
+                        alone drifts through the whole clock: a 4-hour cadence
+                        starting at 20:58 posts at 02:58 and 08:58. */}
+                    <div>
+                      <label style={labelStyle}><CalendarDays size={13} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Posting Days</label>
+                      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                        {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => {
+                          const all = editData.postingDays === null;
+                          const on = all || editData.postingDays.includes(i);
+                          return (
+                            <button
+                              key={d} type="button" aria-pressed={on}
+                              onClick={() => {
+                                const current = editData.postingDays === null ? [0,1,2,3,4,5,6] : [...editData.postingDays];
+                                const next = current.includes(i) ? current.filter(x => x !== i) : [...current, i].sort();
+                                // Every day selected is the same as no
+                                // restriction, and storing null says so.
+                                setEditData({ ...editData, postingDays: next.length === 7 ? null : next });
+                              }}
+                              style={{
+                                minWidth: 46, minHeight: 40, borderRadius: 9, cursor: 'pointer',
+                                fontSize: '0.8rem', fontWeight: 650,
+                                background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
+                                color: on ? '#fff' : 'var(--text-main)',
+                                border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                              }}
+                            >{d}</button>
+                          );
+                        })}
+                      </div>
+                      <small style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {editData.postingDays === null ? 'Posting every day.' : 'Nothing publishes on the days left off.'}
+                      </small>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}><Clock size={13} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Posting Hours</label>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <select value={editData.postingStartHour ?? ''}
+                          onChange={e => setEditData({ ...editData, postingStartHour: e.target.value === '' ? null : Number(e.target.value) })}
+                          style={{ ...inputStyle, appearance: 'auto', flex: '1 1 120px' }}>
+                          <option value="">Any time</option>
+                          {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2,'0')}:00</option>)}
+                        </select>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>to</span>
+                        <select value={editData.postingEndHour ?? ''}
+                          onChange={e => setEditData({ ...editData, postingEndHour: e.target.value === '' ? null : Number(e.target.value) })}
+                          style={{ ...inputStyle, appearance: 'auto', flex: '1 1 120px' }}>
+                          <option value="">Any time</option>
+                          {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2,'0')}:00</option>)}
+                        </select>
+                      </div>
+                      <small style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        In {editData.postingTimezone}. An end earlier than the start wraps midnight — 22:00 to 06:00 works.
+                      </small>
                     </div>
 
                     <div>

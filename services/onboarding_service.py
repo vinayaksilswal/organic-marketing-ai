@@ -113,6 +113,17 @@ class OnboardingService:
                         profile.creativeGenerationIntervalHours = data["creativeGenerationIntervalHours"]
                     if "autoGenerateCreatives" in data and data["autoGenerateCreatives"] is not None:
                         profile.autoGenerateCreatives = data["autoGenerateCreatives"]
+                    # The posting window is the one group where null is a real
+                    # value: it means "no restriction". Every other field above
+                    # skips None, so a customer who turned a window ON could
+                    # never turn it off again -- the request to clear it would
+                    # be indistinguishable from not mentioning it. The router
+                    # dumps with exclude_unset, so presence of the key IS the
+                    # instruction and None is a deliberate clear.
+                    for field in ("postingDays", "postingStartHour",
+                                  "postingEndHour", "postingTimezone"):
+                        if field in data:
+                            setattr(profile, field, data[field])
                     if "logoUrl" in data and data["logoUrl"] is not None:
                         profile.logoUrl = data["logoUrl"]
                     if "productCatalogUrl" in data and data["productCatalogUrl"] is not None:

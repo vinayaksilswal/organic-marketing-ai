@@ -136,7 +136,16 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
             workspaces = [
                 (p.id, p.name, p.postIntervalHours or 2,
                  bool(p.brandAnalysisComplete), p.userId,
-                 bool(getattr(p, "automationPaused", False)))
+                 bool(getattr(p, "automationPaused", False)),
+                 # The posting window travels as plain values rather than as a
+                 # detached ORM object, which would raise the moment this
+                 # session closes.
+                 {
+                     "postingDays": p.postingDays,
+                     "postingStartHour": p.postingStartHour,
+                     "postingEndHour": p.postingEndHour,
+                     "postingTimezone": p.postingTimezone,
+                 })
                 for p in profiles
             ]
 
@@ -152,7 +161,8 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
         # here. This records the answer instead.
         outcomes: list = []
 
-        for workspace_id, name, interval_hours, brand_ready, owner_id, paused in workspaces:
+        for (workspace_id, name, interval_hours, brand_ready, owner_id,
+             paused, window) in workspaces:
             try:
                 # Checked before anything else, including the brand backfill:
                 # a paused workspace should consume no LLM calls either.
@@ -218,6 +228,18 @@ async def execute_marketing_loop(user_id: Optional[str] = None) -> None:
                                 f"of {interval_hours}h)"
                             )
                             continue
+
+                    # Due, but is this a moment the customer chose? The window
+                    # only ever withholds -- a window that FORCED a post would
+                    # fire every workspace at 09:00 sharp, which is the most
+                    # obviously automated thing an account can do.
+                    from services.posting_window import within_window
+
+                    allowed, why = within_window(_Window(window), now)
+                    if not allowed:
+                        logger.info(f"[MARKETING LOOP] {name} is outside its posting window - {why}")
+                        outcomes.append(f"{name}: outside posting window ({why})")
+                        continue
 
                     # The interval said it is time. This asks whether going
                     # ahead would make the account look automated.
@@ -475,6 +497,14 @@ async def execute_creative_generation_loop() -> None:
 # 3h59m, the check failed, and it waited for the 6-hour tick. Two real
 # workspaces show it exactly -- 20:58, 02:58, 08:58 on a 4-hour setting.
 MARKETING_LOOP_MINUTES = int(os.getenv("MARKETING_LOOP_MINUTES", "15"))
+
+
+class _Window:
+    """Attribute access over the window values carried out of the session."""
+
+    def __init__(self, values: dict):
+        for k, v in (values or {}).items():
+            setattr(self, k, v)
 
 
 def is_post_due(hours_since_last: float, interval_hours: float,

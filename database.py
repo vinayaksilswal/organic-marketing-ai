@@ -119,6 +119,17 @@ class BusinessProfile(Base):
     # captions were written from a brand description that knows neither.
     # A list of {product, problem, audience, proof, offer, best_format}.
     provenOffers = Column(JSON, nullable=True)
+    # WHEN a workspace may post, as opposed to how often. The interval alone
+    # drifts through the whole clock -- a 4-hour cadence starting at 20:58
+    # posts at 02:58 and 08:58 -- so a shop whose customers are asleep gets a
+    # third of its output at three in the morning.
+    #
+    # All null means no restriction, which is what every existing workspace
+    # has and must keep having. See services/posting_window.py.
+    postingDays = Column(JSON, nullable=True)          # [0..6], Monday = 0
+    postingStartHour = Column(Integer, nullable=True)  # 0-23, local
+    postingEndHour = Column(Integer, nullable=True)    # 0-23, local
+    postingTimezone = Column(String, nullable=True)    # IANA, e.g. Asia/Kolkata
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     # AI Brand Context Fields

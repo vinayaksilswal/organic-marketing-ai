@@ -51,6 +51,11 @@ class BusinessProfileUpdate(BaseModel):
     automationPaused: Optional[bool] = None
     creativeGenerationIntervalHours: Optional[int] = None
     autoGenerateCreatives: Optional[bool] = None
+    # When this workspace may post. Null on any field means no restriction.
+    postingDays: Optional[list[int]] = None
+    postingStartHour: Optional[int] = None
+    postingEndHour: Optional[int] = None
+    postingTimezone: Optional[str] = None
 
 class SocialConnectionUpdate(BaseModel):
     fbAccessToken: Optional[str] = None
@@ -108,6 +113,10 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
                 "businessModel": bp.businessModel or "General",
                 "postIntervalHours": bp.postIntervalHours,
                 "automationPaused": bool(getattr(bp, "automationPaused", False)),
+                "postingDays": bp.postingDays,
+                "postingStartHour": bp.postingStartHour,
+                "postingEndHour": bp.postingEndHour,
+                "postingTimezone": bp.postingTimezone,
                 "industry": bp.industry,
                 "targetAudience": bp.targetAudience,
                 "toneOfVoice": bp.toneOfVoice,
@@ -163,6 +172,10 @@ async def update_business_profile_post(
             "postIntervalHours": profile.postIntervalHours,
             "creativeGenerationIntervalHours": profile.creativeGenerationIntervalHours,
             "autoGenerateCreatives": profile.autoGenerateCreatives,
+            "postingDays": profile.postingDays,
+            "postingStartHour": profile.postingStartHour,
+            "postingEndHour": profile.postingEndHour,
+            "postingTimezone": profile.postingTimezone,
         },
     }
 
