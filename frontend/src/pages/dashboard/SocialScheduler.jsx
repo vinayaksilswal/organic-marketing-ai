@@ -18,6 +18,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   // Toggles
   const [frequencyHours, setFrequencyHours] = useState(2);
   const [autoApproveActive, setAutoApproveActive] = useState(false);
+  const [publishingMode, setPublishingMode] = useState('PUBLIC'); // 'PUBLIC' | 'PRIVATE' | 'DRAFT_REVIEW'
   const [runningLoop, setRunningLoop] = useState(false);
 
   // Edit Modal State
@@ -37,7 +38,9 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         if (!res.ok) return;
         const all = await res.json();
         if (Array.isArray(all)) {
-          setBusiness(all.find(b => b.id === activeWorkspaceId) || all[0] || null);
+          const found = all.find(b => b.id === activeWorkspaceId) || all[0] || null;
+          setBusiness(found);
+          if (found?.publishingMode) setPublishingMode(found.publishingMode);
         }
       } catch { /* preview falls back to a neutral placeholder */ }
     })();
@@ -51,6 +54,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         if (data.success) {
           setAutoApproveActive(data.autoApprove);
           setFrequencyHours(data.intervalHours);
+          if (data.publishingMode) setPublishingMode(data.publishingMode);
         }
       }
     } catch (err) { console.error('Failed to fetch settings'); }
@@ -98,6 +102,20 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
       showToast('Frequency updated successfully');
     } catch (err) {
       console.error('Failed to update frequency', err);
+    }
+  };
+
+  const handlePublishingModeChange = async (mode) => {
+    setPublishingMode(mode);
+    try {
+      await authFetch(`${API_BASE}/marketing/settings/publishing-mode`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({ publishingMode: mode })
+      }, token);
+      showToast(`Publishing mode updated to: ${mode === 'PUBLIC' ? 'Public (Direct Publish)' : mode === 'PRIVATE' ? 'Private / Unlisted' : 'Send to TikTok Drafts / Review Queue'}`);
+    } catch (err) {
+      console.error('Failed to update publishing mode', err);
     }
   };
 
@@ -251,6 +269,59 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 </span>
               </label>
               <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Auto-Approve</span>
+            </div>
+
+            {/* Publishing Visibility Mode Control */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(0,0,0,0.3)', padding: '0.35rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>Mode:</span>
+              <button
+                type="button"
+                onClick={() => handlePublishingModeChange('PUBLIC')}
+                style={{
+                  background: publishingMode === 'PUBLIC' ? 'rgba(16,185,129,0.2)' : 'transparent',
+                  color: publishingMode === 'PUBLIC' ? '#10b981' : 'var(--text-muted)',
+                  border: publishingMode === 'PUBLIC' ? '1px solid #10b981' : '1px solid transparent',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: 6,
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                🌐 Public
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePublishingModeChange('PRIVATE')}
+                style={{
+                  background: publishingMode === 'PRIVATE' ? 'rgba(245,158,11,0.2)' : 'transparent',
+                  color: publishingMode === 'PRIVATE' ? '#f59e0b' : 'var(--text-muted)',
+                  border: publishingMode === 'PRIVATE' ? '1px solid #f59e0b' : '1px solid transparent',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: 6,
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                🔒 Private
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePublishingModeChange('DRAFT_REVIEW')}
+                style={{
+                  background: publishingMode === 'DRAFT_REVIEW' ? 'rgba(59,130,246,0.2)' : 'transparent',
+                  color: publishingMode === 'DRAFT_REVIEW' ? '#60a5fa' : 'var(--text-muted)',
+                  border: publishingMode === 'DRAFT_REVIEW' ? '1px solid #3b82f6' : '1px solid transparent',
+                  padding: '0.25rem 0.5rem',
+                  borderRadius: 6,
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                📱 TikTok Drafts
+              </button>
             </div>
 
             {/* Run Manually button. It is a manual trigger for the same cycle the

@@ -130,6 +130,8 @@ class BusinessProfile(Base):
     postingStartHour = Column(Integer, nullable=True)  # 0-23, local
     postingEndHour = Column(Integer, nullable=True)    # 0-23, local
     postingTimezone = Column(String, nullable=True)    # IANA, e.g. Asia/Kolkata
+    # Publishing Visibility & Draft Review Mode (PUBLIC | PRIVATE | DRAFT_REVIEW)
+    publishingMode = Column(String, default="PUBLIC", nullable=True)
     creativeGenerationIntervalHours = Column(Integer, default=2, nullable=False)
     autoGenerateCreatives = Column(Boolean, default=True, nullable=False)
     # AI Brand Context Fields

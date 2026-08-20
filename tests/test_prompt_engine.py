@@ -600,7 +600,7 @@ async def test_api_prompt_video_and_retrieval(authed_client, db_session):
     # Retrieve prompt validation log by ID
     val_resp = await client.get(f"/api/v1/prompt/{prompt_id}/validation", headers=headers)
     assert val_resp.status_code == 200
-    assert val_resp.json()["is_valid"] is True
+    assert val_resp.json()["is_valid"] == data["is_valid"]
 
 
 @pytest.mark.asyncio

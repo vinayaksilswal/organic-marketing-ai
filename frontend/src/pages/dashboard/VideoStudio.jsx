@@ -3,24 +3,83 @@ import { API_BASE, authFetch } from '../../config';
 import {
   Sparkles, Film, Copy, Check, Wand2, Package, Building2,
   AlertTriangle, Settings, Video, Image as ImageIcon,
-  Upload, Trash2, RefreshCw, Clock, Send
+  Upload, Trash2, RefreshCw, Clock, Send, Flame, Zap,
+  Layers, Volume2, Calendar, Radio, CheckCircle2, ArrowRight,
+  TrendingUp, Shield, BarChart3, HelpCircle
 } from 'lucide-react';
+import ViralValidator from '../../components/ViralValidator';
+import PostShipStudio from '../../components/PostShipStudio';
+
+const FACELESS_TOPIC_PRESETS = [
+  { id: 'scary_stories', title: 'Scary Stories', tagline: 'Chilling urban legends & paranormal mysteries', icon: '👻', badge: 'VIRAL SUSPENSE' },
+  { id: 'jokes', title: 'Jokes & Comedy', tagline: 'Hilarious stand-up & relatable everyday humor', icon: '😂', badge: 'HIGH ENGAGEMENT' },
+  { id: 'life_pro_tips', title: 'Life Pro Tips', tagline: 'Psychology hacks & unfair life advantages', icon: '💡', badge: 'HIGH SAVES' },
+  { id: 'today_i_learned', title: 'Today I Learned', tagline: 'Mind-blowing historical & real-world facts', icon: '🧠', badge: 'HIGH SHARES' },
+  { id: 'you_should_know', title: 'You Should Know', tagline: 'Crucial safety advice & hidden life secrets', icon: '⚠️', badge: 'MUST WATCH' },
+  { id: 'custom', title: 'Custom Topic', tagline: 'Write your own custom niche or storyline', icon: '✍️', badge: 'FULL CONTROL' },
+];
+
+const VISUAL_STYLE_PRESETS = [
+  { id: 'cinematic_realism', name: 'Cinematic Realism', icon: '🎬', desc: '8K Photorealistic 35mm film, moody lighting' },
+  { id: 'dark_cyberpunk', name: 'Cyberpunk Anime', icon: '🎨', desc: 'Neon reflections, cel-shaded anime aesthetic' },
+  { id: 'retro_comic', name: 'Retro Comic', icon: '🕹️', desc: 'Vintage halftone dots, bold ink action lines' },
+  { id: 'vintage_film', name: 'Vintage 35mm', icon: '📸', desc: 'Warm analog grain, kodachrome film stock' },
+  { id: 'gameplay_motion', name: '3D Gaming Motion', icon: '🎮', desc: 'Unreal Engine 5 hyper-smooth 3D backdrop' },
+  { id: 'pixar_claymation', name: 'Minimal 3D Pixar', icon: '🪄', desc: 'Whimsical 3D character, soft bounce light' },
+];
+
+const VOICE_PERSONA_PRESETS = [
+  { id: 'adam_storyteller', name: 'Adam', tone: 'Deep Storyteller & Mystery Narrator', gender: 'Male', speed: '0.95x' },
+  { id: 'rachel_viral', name: 'Rachel', tone: 'Energetic & Engaging Viral Host', gender: 'Female', speed: '1.10x' },
+  { id: 'marcus_authority', name: 'Marcus', tone: 'Sophisticated & Authoritative Guide', gender: 'Male', speed: '1.00x' },
+  { id: 'bella_relatable', name: 'Bella', tone: 'Warm & Friendly Conversationalist', gender: 'Female', speed: '1.05x' },
+  { id: 'shadow_whisper', name: 'Shadow Whisper', tone: 'Chilling Suspense & Mystery Voice', gender: 'Atmospheric', speed: '0.90x' },
+];
+
+const SCHEDULE_PRESETS = [
+  { id: 'daily', label: 'Once a Day (Daily)', desc: '1 Short every day at 6:00 PM peak engagement', days: [0,1,2,3,4,5,6] },
+  { id: 'three_times_week', label: '3x a Week (Mon/Wed/Fri)', desc: 'Consistent cadence on Mon, Wed, Fri', days: [0,2,4] },
+  { id: 'growth_blast', label: 'Twice a Day (Growth Blast)', desc: '2 Shorts/day at 12 PM and 7 PM', days: [0,1,2,3,4,5,6] },
+  { id: 'custom', label: 'Custom Days', desc: 'Choose your own active posting days', days: [0,1,2,3,4,5,6] },
+];
 
 const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
+  // Main Studio Mode: 'faceless' | 'validator' | 'brand'
+  const [studioTab, setStudioTab] = useState('faceless');
+
+  // Faceless Shorts State
+  const [selectedTopic, setSelectedTopic] = useState('scary_stories');
+  const [customTopicText, setCustomTopicText] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState('cinematic_realism');
+  const [selectedVoice, setSelectedVoice] = useState('adam_storyteller');
+  const [facelessDuration, setFacelessDuration] = useState(20);
+  const [schedulePreset, setSchedulePreset] = useState('daily');
+  const [publishingMode, setPublishingMode] = useState('PUBLIC'); // 'PUBLIC' | 'PRIVATE' | 'DRAFT_REVIEW'
+  const [generatingFaceless, setGeneratingFaceless] = useState(false);
+  const [facelessPackage, setFacelessPackage] = useState(null);
+  const [activatingAutopilot, setActivatingAutopilot] = useState(false);
+  const [autopilotActive, setAutopilotActive] = useState(false);
+
+  // Brand/Product Studio State
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
   const [products, setProducts] = useState([]);
   const [productId, setProductId] = useState('');
   const [business, setBusiness] = useState(null);
   const [videoKeySet, setVideoKeySet] = useState(false);
-  // 10s is the default because it is what every generator supports and
-  // what a Reel audience actually finishes. Longer is offered, not urged.
   const [duration, setDuration] = useState(10);
   const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const fileInputRef = React.useRef(null);
 
-  // Prompt history for this business, and the attach-a-video flow that turns
-  // a prompt into something the scheduler can actually post.
+  // Video API Config State
+  const [showVideoConfig, setShowVideoConfig] = useState(false);
+  const [videoProvider, setVideoProvider] = useState('json2video');
+  const [videoKey, setVideoKey] = useState('');
+  const [videoEndpoint, setVideoEndpoint] = useState('');
+  const [savingVideoConfig, setSavingVideoConfig] = useState(false);
+
+  // History State
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [historyError, setHistoryError] = useState(null);
@@ -42,7 +101,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
       }
       const all = await res.json();
       const rows = (Array.isArray(all) ? all : []).filter(
-        m => m.promptType === 'video' || m.prompt || m.generationStatus
+        m => m.promptType === 'video' || m.prompt || m.generationStatus || m.meta?.faceless_package
       );
       setHistory(rows);
       setHistoryError(null);
@@ -54,153 +113,103 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   }, [activeWorkspaceId, token]);
 
-  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
-  /**
-   * Attach a rendered video to the prompt that produced it.
-   *
-   * This is the step that moves an asset into the posting cycle. A prompt row
-   * carries no file, so the scheduler skips it. PATCHing the file onto the SAME
-   * row keeps the prompt as the asset's base caption, which is what the caption
-   * writer reads at posting time. Uploading the video as a separate row instead
-   * — which this page used to do — threw that context away.
-   */
-  const attachVideo = async (mediaId, file) => {
-    if (!file) return;
-    setAttachingId(mediaId);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await authFetch(`${API_BASE}/marketing/media/${mediaId}`, {
-        method: 'PATCH',
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-        body: fd,
-      }, token);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || `Upload failed (error ${res.status})`);
-
-      showToast('Video attached. This asset is now in the posting rotation.');
-      await fetchHistory();
-    } catch (err) {
-      showToast(err.message, true);
-    } finally {
-      setAttachingId(null);
-      setAttachTargetId(null);
-      if (attachInputRef.current) attachInputRef.current.value = '';
-    }
-  };
-
-  const deletePrompt = async (mediaId) => {
-    if (!window.confirm('Delete this prompt and its media?')) return;
-    try {
-      const res = await authFetch(`${API_BASE}/marketing/media/${mediaId}`, {
-        method: 'DELETE',
-        headers: { 'X-Workspace-Id': activeWorkspaceId },
-      }, token);
-      if (!res.ok) throw new Error(`Could not delete (error ${res.status})`);
-      showToast('Deleted.');
-      await fetchHistory();
-    } catch (err) {
-      showToast(err.message, true);
-    }
-  };
-
-  // Load the active business, its catalog, and whether a render key exists
+  // Load business & video config
   useEffect(() => {
     if (!activeWorkspaceId) return;
-    let cancelled = false;
-
     (async () => {
       try {
-        const [bizRes, prodRes, cfgRes] = await Promise.all([
-          authFetch(`${API_BASE}/businesses`, {}, token),
-          authFetch(`${API_BASE}/ecommerce/products`, { headers: { 'X-Workspace-Id': activeWorkspaceId } }, token).catch(() => null),
-          authFetch(`${API_BASE}/video/config`, { headers: { 'X-Workspace-Id': activeWorkspaceId } }, token).catch(() => null),
-        ]);
-        if (cancelled) return;
+        const res = await authFetch(`${API_BASE}/businesses`, {}, token);
+        if (res.ok) {
+          const all = await res.json();
+          if (Array.isArray(all)) {
+            const found = all.find(b => b.id === activeWorkspaceId) || all[0] || null;
+            setBusiness(found);
+            if (found?.publishingMode) setPublishingMode(found.publishingMode);
+            if (found?.businessModel === 'Faceless Channel') setAutopilotActive(true);
+          }
+        }
+      } catch {}
 
-        if (bizRes?.ok) {
-          const all = await bizRes.json();
-          setBusiness(Array.isArray(all) ? all.find(b => b.id === activeWorkspaceId) || null : null);
+      try {
+        const res = await authFetch(`${API_BASE}/marketing/products`, {
+          headers: { 'X-Workspace-Id': activeWorkspaceId },
+        }, token);
+        if (res.ok) {
+          const d = await res.json();
+          setProducts(Array.isArray(d) ? d : []);
         }
-        if (prodRes?.ok) {
-          const p = await prodRes.json();
-          setProducts(Array.isArray(p) ? p : (p?.data || []));
-        }
-        if (cfgRes?.ok) {
-          const c = await cfgRes.json();
-          setVideoKeySet(Boolean(c?.data?.apiKey));
-        }
-      } catch {
-        /* non-fatal: the page still works without catalog or key info */
-      }
+      } catch {}
     })();
-
-    return () => { cancelled = true; };
   }, [activeWorkspaceId, token]);
 
-  const [analyzing, setAnalyzing] = useState(false);
-  const [showVideoConfig, setShowVideoConfig] = useState(false);
-  const [videoProvider, setVideoProvider] = useState('json2video');
-  const [videoKey, setVideoKey] = useState('');
-  const [videoEndpoint, setVideoEndpoint] = useState('');
-  const [savingVideoConfig, setSavingVideoConfig] = useState(false);
+  // 1-Click Generate Faceless Short
+  const handleGenerateFaceless = async () => {
+    if (!activeWorkspaceId) return showToast('Select a channel workspace first.', true);
+    setGeneratingFaceless(true);
+    setFacelessPackage(null);
 
-  const saveVideoConfig = async () => {
-    if (!activeWorkspaceId) return showToast('Select a business first.', true);
-    setSavingVideoConfig(true);
     try {
-      const res = await authFetch(`${API_BASE}/video/config`, {
+      const res = await authFetch(`${API_BASE}/creatives/faceless-generate`, {
         method: 'POST',
         headers: { 'X-Workspace-Id': activeWorkspaceId },
         body: JSON.stringify({
-          provider: videoProvider,
-          apiKey: videoKey,
-          endpoint: videoEndpoint || null,
+          topic_id: selectedTopic,
+          custom_topic: selectedTopic === 'custom' ? customTopicText : null,
+          visual_style_id: selectedStyle,
+          voice_id: selectedVoice,
+          duration_seconds: facelessDuration,
+          publishing_mode: publishingMode,
+          channel_name: business?.name || 'Faceless Viral Shorts',
+          schedule_to_queue: false,
         }),
       }, token);
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || d.message || 'Could not save the video API settings');
-      }
-      showToast('Video API saved. Generated prompts will now render to video automatically.');
-      if (videoKey) setVideoKeySet(true);
-      setVideoKey('');
-      setShowVideoConfig(false);
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Generation failed');
+
+      setFacelessPackage(data.package);
+      showToast('Faceless Short Generated Successfully! 🚀');
+      await fetchHistory();
     } catch (err) {
       showToast(err.message, true);
     } finally {
-      setSavingVideoConfig(false);
+      setGeneratingFaceless(false);
     }
   };
 
-  /**
-   * Build the brand profile. Onboarding runs this automatically, but if that
-   * attempt failed — a rate limit, a dropped background task — the workspace
-   * was stuck without one forever and every caption and video prompt came out
-   * generic, with no way for the user to retry. The endpoint existed; nothing
-   * in the UI called it.
-   */
-  const buildBrandProfile = async () => {
-    if (!activeWorkspaceId) return showToast('Select a business first.', true);
-    setAnalyzing(true);
+  // 1-Click Activate Auto-Pilot Schedule
+  const handleActivateAutopilot = async () => {
+    if (!activeWorkspaceId) return showToast('Select a channel workspace first.', true);
+    setActivatingAutopilot(true);
     try {
-      const res = await authFetch(`${API_BASE}/creatives/re-analyze`, {
+      const res = await authFetch(`${API_BASE}/creatives/faceless-autopilot`, {
         method: 'POST',
         headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          schedule_preset: schedulePreset,
+          publishing_mode: publishingMode,
+          auto_approve: true,
+        }),
       }, token);
+
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || data.message || 'Brand analysis failed');
-      showToast('Brand profile built. Captions and prompts will now be specific to this business.');
-      setBusiness(b => (b ? { ...b, brandAnalysisComplete: true } : b));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Could not activate Auto-Pilot');
+
+      setAutopilotActive(true);
+      showToast('🚀 Auto-Pilot Activated! We write, voice, caption & post on your schedule.');
     } catch (err) {
       showToast(err.message, true);
     } finally {
-      setAnalyzing(false);
+      setActivatingAutopilot(false);
     }
   };
 
-  const generate = async () => {
+  // Brand prompt generation
+  const generateBrandPrompt = async () => {
     if (!activeWorkspaceId) return showToast('Select a business first.', true);
     setGenerating(true);
     setResult(null);
@@ -216,10 +225,6 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
       setResult(data);
       showToast(data.message || 'Writing your prompt — it will appear below shortly.');
       await fetchHistory();
-      // The prompt is written by a background task now, so watch the row until
-      // it settles instead of holding the request open (which used to exceed
-      // the server timeout and surface as a bogus CORS error).
-      startPolling(data.mediaId);
     } catch (err) {
       showToast(err.message, true);
     } finally {
@@ -227,601 +232,758 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   };
 
-  const startPolling = useCallback((mediaId) => {
-    if (!mediaId) return;
-    let tries = 0;
-    const tick = async () => {
-      tries += 1;
-      const rows = await fetchHistory();
-      const row = (rows || []).find(m => m.id === mediaId);
-
-      if (row?.generationStatus === 'READY') {
-        showToast('Your prompt is ready.');
-        return;
-      }
-      if (row?.generationStatus === 'FAILED') {
-        showToast(row.generationError || 'Generation failed.', true);
-        return;
-      }
-      // ~5 minutes of polling, then stop and let the row speak for itself.
-      if (tries < 60) setTimeout(tick, 5000);
-    };
-    setTimeout(tick, 4000);
-  }, [fetchHistory, showToast]);
-
-  // Attaches to the prompt row just generated, so the prompt stays as the
-  // asset's description rather than the video landing as an unlabelled file.
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!result?.mediaId) {
-      showToast('Generate a prompt first.', true);
-      return;
-    }
-    setUploading(true);
-    try {
-      await attachVideo(result.mediaId, file);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const card = { background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(11, 16, 32, 0.07)', borderRadius: 12, padding: '1.1rem' };
+  const card = { background: '#121217', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 14, padding: '1.25rem' };
 
   return (
     <div className="view">
-      <div className="container" style={{ padding: '3rem 0', maxWidth: 860 }}>
-        <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ margin: 0, fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-            <Film color="var(--primary-color)" size={30} /> AI Video Studio
-          </h1>
-          <p className="text-muted" style={{ margin: '0.3rem 0 0 0', fontSize: '0.95rem' }}>
-            One click. The AI reads this business's brand profile and writes a production-ready
-            video prompt, then saves it to your media library.
-          </p>
+      <div className="container" style={{ padding: '2.5rem 0', maxWidth: 960 }}>
+        {/* Main Header */}
+        <div style={{ marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.85rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 900, color: '#fff' }}>
+              <Film color="#f97316" size={28} /> AI Video &amp; Shorts Studio
+            </h1>
+            <p className="text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.88rem' }}>
+              Faceless Shorts on Auto-Pilot, Algorithmic View Prediction &amp; Brand Video Generation.
+            </p>
+          </div>
+
+          {/* 3-Tab Studio Switcher */}
+          <div style={{
+            display: 'inline-flex',
+            background: '#181820',
+            padding: '0.25rem',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <button
+              onClick={() => setStudioTab('faceless')}
+              style={{
+                background: studioTab === 'faceless' ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' : 'none',
+                color: studioTab === 'faceless' ? '#fff' : '#a1a1aa',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Zap size={14} /> Faceless Auto-Pilot
+            </button>
+            <button
+              onClick={() => setStudioTab('validator')}
+              style={{
+                background: studioTab === 'validator' ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' : 'none',
+                color: studioTab === 'validator' ? '#fff' : '#a1a1aa',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Flame size={14} /> Viral Validator
+            </button>
+            <button
+              onClick={() => setStudioTab('postship')}
+              style={{
+                background: studioTab === 'postship' ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'none',
+                color: studioTab === 'postship' ? '#fff' : '#a1a1aa',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Send size={14} /> PostShip (X, LI, Reddit)
+            </button>
+            <button
+              onClick={() => setStudioTab('brand')}
+              style={{
+                background: studioTab === 'brand' ? 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' : 'none',
+                color: studioTab === 'brand' ? '#fff' : '#a1a1aa',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Building2 size={14} /> Brand Ads
+            </button>
+          </div>
         </div>
 
         {!activeWorkspaceId ? (
-          <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-            <Building2 size={26} color="var(--primary-color)" style={{ marginBottom: '0.9rem' }} />
+          <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center', background: '#121217', borderRadius: 16 }}>
+            <Building2 size={32} color="#f97316" style={{ marginBottom: '0.9rem' }} />
             <p style={{ margin: 0, color: 'var(--text-muted)' }}>
-              Select a business from the sidebar to generate a video for it.
+              Select a channel or business from the sidebar to launch video automation.
             </p>
           </div>
         ) : (
           <>
-            {/* The one-click panel */}
-            <div className="glass-panel" style={{ padding: '2rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.35rem' }}>
-                {business?.logoUrl ? (
-                  <img src={business.logoUrl} alt="" style={{ width: 44, height: 44, borderRadius: 11, objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ width: 44, height: 44, borderRadius: 11, background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff' }}>
-                    {(business?.name || 'B').charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: '1.05rem' }}>{business?.name || 'Active business'}</div>
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    {business?.businessModel || 'General'}
-                    {business?.brandAnalysisComplete ? ' · brand profile ready' : ' · no brand profile yet'}
-                  </div>
-                </div>
-              </div>
-
-              {business && !business.brandAnalysisComplete && (
-                <div style={{ ...card, marginBottom: '1.25rem', borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
-                    <AlertTriangle size={16} color="#f59e0b" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 600, color: '#fcd34d', marginBottom: '0.3rem' }}>
-                        No brand profile for this business
+            {/* ========================================================================= */}
+            {/* TAB 1: FACELESS SHORTS ON AUTO-PILOT */}
+            {/* ========================================================================= */}
+            {studioTab === 'faceless' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {/* Hero Header Card */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(249,115,22,0.12) 0%, rgba(234,88,12,0.02) 100%)',
+                  border: '1px solid rgba(249,115,22,0.3)',
+                  borderRadius: 16,
+                  padding: '1.35rem 1.5rem',
+                }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                    <div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.6rem', borderRadius: 20, background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '0.35rem' }}>
+                        <Zap size={12} color="#f97316" />
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#f97316', letterSpacing: '.06em' }}>
+                          Faceless Short Videos on Auto-Pilot
+                        </span>
                       </div>
-                      <p style={{ margin: '0 0 0.85rem', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                        Without it the AI has no stored sense of your tone, audience or content
-                        themes, so captions and video prompts come out generic. Building it reads
-                        your website and takes about a minute.
+                      <h2 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: '#fff' }}>
+                        Pick a topic, pick a voice, pick a schedule.
+                      </h2>
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: '#d4d4d8' }}>
+                        We write, voice, caption, and post every video for you. Connect your YouTube, TikTok, &amp; Reels and let the AI run your channel.
                       </p>
-                      <button className="btn btn-primary" onClick={buildBrandProfile} disabled={analyzing}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-                        {analyzing
-                          ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Analysing your site…</>
-                          : <><Sparkles size={14} /> Build brand profile</>}
-                      </button>
                     </div>
-                  </div>
-                </div>
-              )}
 
-              {/* Product is optional, and only meaningful with a catalog */}
-              {products.length > 0 && (
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    <Package size={13} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />
-                    Product <span style={{ color: 'var(--text-muted)' }}>(optional)</span>
-                  </label>
-                  <select
-                    value={productId}
-                    onChange={e => setProductId(e.target.value)}
-                    style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
-                  >
-                    <option value="">Let the AI choose from my catalog</option>
-                    {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.title}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Length. The generators take 8-30s now, and the prompt is
-                  written to a different beat plan for each: the hook stays 3s
-                  and the end card 2s whatever the length, so what actually
-                  changes is how many beats sit between them. */}
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
-                  Video length
-                </label>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {[8, 10, 15, 20, 30].map((sec) => {
-                    const on = duration === sec;
-                    return (
-                      <button
-                        key={sec}
-                        type="button"
-                        onClick={() => setDuration(sec)}
-                        aria-pressed={on}
-                        style={{
-                          flex: '1 1 60px', minHeight: 44, borderRadius: 10, cursor: 'pointer',
-                          fontFamily: 'var(--font-family-body)', fontWeight: 700, fontSize: '0.9rem',
-                          background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
-                          color: on ? '#fff' : 'var(--text-main)',
-                          border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
-                          transition: 'background .16s, color .16s, border-color .16s',
-                        }}
-                      >
-                        {sec}s
-                      </button>
-                    );
-                  })}
-                </div>
-                <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '0.45rem', lineHeight: 1.5 }}>
-                  3s hook and a 2s end card at every length — {duration <= 10 ? 'one beat' : `${Math.ceil((duration - 5) / 8)} beats`} in between, each timed in the prompt.
-                </p>
-              </div>
-
-              <button
-                onClick={generate}
-                disabled={generating}
-                className="btn btn-primary"
-                style={{ width: '100%', padding: '0.95rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.55rem' }}
-              >
-                {generating
-                  ? <><span className="spinner" style={{ width: 16, height: 16 }} /> Generating…</>
-                  : <><Wand2 size={18} /> Generate Video Prompt</>}
-              </button>
-
-              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.8rem', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
-                {videoKeySet ? (
-                  <><Video size={13} color="#10b981" /> Video rendering connected — renders are queued and saved to your media library automatically.</>
-                ) : (
-                  <><Settings size={13} /> No video API connected, so only the prompt is produced.</>
-                )}
-                <button onClick={() => setShowVideoConfig(v => !v)}
-                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                  {showVideoConfig ? 'Hide' : videoKeySet ? 'Change' : 'Connect a video API'}
-                </button>
-              </div>
-
-              {showVideoConfig && (
-                <div style={{ ...card, marginTop: '1rem' }}>
-                  <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.92rem' }}>Video generation API</h4>
-                  <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    With a key set, generated prompts are rendered to video and saved straight to
-                    this business’s media library — no manual step.
-                  </p>
-                  <div style={{ display: 'grid', gap: '0.7rem' }}>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Provider</label>
-                      <select value={videoProvider} onChange={e => setVideoProvider(e.target.value)}
-                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.88rem', appearance: 'auto' }}>
-                        <option value="json2video">JSON2Video</option>
-                        <option value="custom">Other (custom endpoint)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>API key</label>
-                      <input type="password" value={videoKey} onChange={e => setVideoKey(e.target.value)}
-                        placeholder={videoKeySet ? '••••••••  (leave blank to keep current)' : 'Paste your API key'}
-                        style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.88rem' }} />
-                    </div>
-                    {videoProvider === 'custom' && (
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Endpoint URL</label>
-                        <input type="url" value={videoEndpoint} onChange={e => setVideoEndpoint(e.target.value)}
-                          placeholder="https://api.example.com/v1/render"
-                          style={{ width: '100%', padding: '0.6rem 0.75rem', borderRadius: 8, background: 'rgba(11, 16, 32, 0.04)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.88rem' }} />
-                      </div>
-                    )}
-                    <button className="btn btn-primary" onClick={saveVideoConfig} disabled={savingVideoConfig}
-                      style={{ padding: '0.55rem 1rem', fontSize: '0.85rem', width: 'fit-content' }}>
-                      {savingVideoConfig ? 'Saving…' : 'Save'}
+                    <button
+                      onClick={handleActivateAutopilot}
+                      disabled={activatingAutopilot}
+                      className="btn"
+                      style={{
+                        background: autopilotActive ? '#10b981' : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                        color: autopilotActive ? '#000' : '#fff',
+                        border: 'none',
+                        fontWeight: 800,
+                        padding: '0.65rem 1.25rem',
+                        borderRadius: 10,
+                        fontSize: '0.84rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        boxShadow: '0 4px 14px rgba(249,115,22,0.35)',
+                      }}
+                    >
+                      {activatingAutopilot ? <RefreshCw className="spin" size={15} /> : <CheckCircle2 size={15} />}
+                      {autopilotActive ? 'Auto-Pilot Active (Posting Scheduled)' : 'Activate Auto-Pilot Channel'}
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Result. The prompt is written by a background task, so read the
-                live row rather than the response — which no longer carries it. */}
-            {result && (() => {
-              const row = history.find(m => m.id === result.mediaId) || {};
-              const genStatus = row.generationStatus;
-              const promptText = row.prompt || row.caption || '';
-              const pending = genStatus === 'PENDING' || (!promptText && genStatus !== 'FAILED');
-              const failed = genStatus === 'FAILED';
-              return (
-              <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {pending ? <span className="spinner" style={{ width: 15, height: 15 }} />
-                    : failed ? <AlertTriangle size={17} color="#f87171" />
-                    : <Check size={17} color="#10b981" />}
-                  <h3 style={{ margin: 0, fontSize: '1.02rem' }}>
-                    {pending ? `Writing a prompt for “${result.subject}”…`
-                      : failed ? `Could not write a prompt for “${result.subject}”`
-                      : `Prompt for “${result.subject}”`}
-                  </h3>
-                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', padding: '0.18rem 0.55rem', borderRadius: 999, background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)', fontWeight: 600 }}>
-                    {result.usedProduct ? 'PRODUCT' : 'BRAND'}
-                  </span>
-                </div>
-
-                <div style={{ padding: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.55rem' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      Video prompt
-                      <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
-                        Saved to this business's media library
-                      </span>
-                    </label>
-                    {promptText && (
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => { navigator.clipboard.writeText(promptText); showToast('Prompt copied to clipboard'); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.42rem 0.85rem', fontSize: '0.82rem' }}
-                      >
-                        <Copy size={14} /> Copy
-                      </button>
-                    )}
+                {/* STEP 1: PICK A TOPIC (5 Ready-Made + Custom) */}
+                <div style={card}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.9rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>1</span>
+                      5 Ready-Made Topics (or bring your own)
+                    </h3>
+                    <span style={{ fontSize: '0.72rem', color: '#a1a1aa' }}>High-retention algorithm optimized</span>
                   </div>
 
-                  {/* An empty textarea reads as "it generated nothing". Show
-                      what is actually happening instead. */}
-                  {pending ? (
-                    <div style={{ ...card, display: 'flex', alignItems: 'center', gap: '0.7rem', minHeight: 110 }}>
-                      <span className="spinner" style={{ width: 16, height: 16 }} />
-                      <div style={{ fontSize: '0.87rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
-                        Writing the prompt — this can take up to a minute. You can
-                        leave this page and it will still finish.
-                      </div>
-                    </div>
-                  ) : failed ? (
-                    <div style={{ ...card, borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', fontSize: '0.87rem', color: '#fca5a5', lineHeight: 1.55 }}>
-                        <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 2 }} />
-                        {row.generationError || 'Generation failed. Please try again.'}
-                      </div>
-                      <button className="btn btn-secondary" onClick={generate} disabled={generating}
-                        style={{ marginTop: '0.85rem', padding: '0.45rem 0.9rem', fontSize: '0.82rem' }}>
-                        Try again
-                      </button>
-                    </div>
-                  ) : (
-                    <textarea
-                      value={promptText}
-                      readOnly
-                      onFocus={e => e.target.select()}
-                      style={{ width: '100%', minHeight: 150, padding: '1rem', fontSize: '0.9rem', lineHeight: 1.6, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(11, 16, 32, 0.07)', borderRadius: 9, color: '#e4e4e7', resize: 'vertical' }}
-                    />
-                  )}
-
-                  {/* Render outcome — absence of a key is normal, not an error */}
-                  {result.render?.status === 'queued' && (
-                    <div style={{ ...card, marginTop: '1.1rem', borderColor: 'rgba(16,185,129,0.25)', background: 'rgba(16,185,129,0.06)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: '#6ee7b7' }}>
-                        <Video size={15} /> Video render queued. It will appear in Media &amp; Catalog when it finishes.
-                      </div>
-                    </div>
-                  )}
-                  {result.render?.status === 'failed' && (
-                    <div style={{ ...card, marginTop: '1.1rem', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: '#fca5a5' }}>
-                        <AlertTriangle size={15} /> {result.render.detail} The prompt above was still saved.
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Manual upload path — only once there is a prompt to render */}
-                  {promptText && !pending && !failed && (
-                    <div style={{ ...card, marginTop: '1.1rem', borderStyle: 'dashed' }}>
-                      <h5 style={{ margin: '0 0 0.4rem 0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <ImageIcon size={14} /> Made the video elsewhere?
-                      </h5>
-                      <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                        Paste the prompt into Veo, Flow, Seed Dance or Runway, then upload the result
-                        here. It attaches to this prompt — so the prompt becomes the video's
-                        description, and the caption writer knows what is on screen.
-                      </p>
-                      <input type="file" accept="video/*" ref={fileInputRef} onChange={handleUpload} style={{ display: 'none' }} />
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-                      >
-                        {uploading
-                          ? <><span className="spinner" style={{ width: 13, height: 13 }} /> Uploading…</>
-                          : <><Sparkles size={14} /> Upload video to media</>}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              );
-            })()}
-
-            {/* One hidden input drives every row's attach button. */}
-            <input
-              type="file"
-              accept="video/*,image/*"
-              ref={attachInputRef}
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (f && attachTargetId) attachVideo(attachTargetId, f);
-              }}
-              style={{ display: 'none' }}
-            />
-
-            {/* PROMPT LOG */}
-            <div className="glass-panel" style={{ padding: 0, overflow: 'hidden', marginTop: '1.5rem' }}>
-              <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                <Clock size={16} color="var(--primary-color)" />
-                <h3 style={{ margin: 0, fontSize: '1.02rem' }}>Generated prompts</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {history.length > 0 && `${history.length} total`}
-                </span>
-                <button
-                  onClick={fetchHistory}
-                  title="Refresh"
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: 4 }}
-                >
-                  <RefreshCw size={14} />
-                </button>
-              </div>
-
-              {loadingHistory ? (
-                <div style={{ padding: '2.5rem', textAlign: 'center' }}>
-                  <span className="spinner" style={{ width: 20, height: 20 }} />
-                </div>
-              ) : historyError ? (
-                <div style={{ padding: '2rem', textAlign: 'center' }}>
-                  <AlertTriangle size={20} color="#f87171" />
-                  <p style={{ margin: '0.6rem 0 0.9rem', fontSize: '0.87rem', color: '#fca5a5' }}>{historyError}</p>
-                  <button className="btn btn-secondary" onClick={fetchHistory} style={{ padding: '0.42rem 0.9rem', fontSize: '0.82rem' }}>
-                    Retry
-                  </button>
-                </div>
-              ) : history.length === 0 ? (
-                <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
-                  No prompts yet. Generate one above and it will appear here.
-                </div>
-              ) : (
-                history.map(item => {
-                  const live = item.postable === true;
-                  const busy = attachingId === item.id;
-                  const open = expandedId === item.id;
-                  const text = item.prompt || item.caption || '';
-                  // A row with no prompt used to render as an empty card with
-                  // buttons and no explanation. "Writing" is only honest for a
-                  // little while — past that the run is gone (a restart, or a
-                  // task that died) and saying otherwise leaves the user
-                  // waiting on something that will never arrive.
-                  const gen = item.generationStatus;
-                  const ageMins = item.createdAt
-                    ? (Date.now() - new Date(item.createdAt).getTime()) / 60000
-                    : 0;
-                  const stalled = !text && gen !== 'FAILED' && ageMins > 12;
-                  const isGenerating = !stalled && !text && gen !== 'FAILED';
-                  const genFailed = gen === 'FAILED' || stalled;
-                  return (
-                    <div key={item.id} style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.05)' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem' }}>
-                        {/* Thumbnail only once a real file is attached */}
-                        <div style={{ width: 46, height: 46, borderRadius: 9, background: 'rgba(11, 16, 32, 0.04)', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {live && item.mimeType?.startsWith('video/') ? (
-                            <video src={item.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
-                          ) : live ? (
-                            <img src={item.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <Film size={17} color="rgba(255,255,255,0.3)" />
-                          )}
-                        </div>
-
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.65rem' }}>
+                    {FACELESS_TOPIC_PRESETS.map((t) => {
+                      const isSel = selectedTopic === t.id;
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => setSelectedTopic(t.id)}
+                          style={{
+                            padding: '0.85rem 1rem',
+                            borderRadius: 10,
+                            background: isSel ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${isSel ? '#f97316' : 'rgba(255,255,255,0.08)'}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                            <span style={{ fontSize: '1.25rem' }}>{t.icon}</span>
                             <span style={{
-                              fontSize: '0.68rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: 4,
-                              background: genFailed ? 'rgba(239,68,68,0.15)'
-                                : isGenerating ? 'rgba(148,163,184,0.15)'
-                                : live ? 'rgba(16,185,129,0.15)' : 'rgba(251,191,36,0.15)',
-                              color: genFailed ? '#f87171'
-                                : isGenerating ? '#94a3b8'
-                                : live ? 'var(--success)' : '#fbbf24',
+                              fontSize: '0.62rem',
+                              fontWeight: 800,
+                              padding: '0.1rem 0.4rem',
+                              borderRadius: 4,
+                              background: isSel ? '#f97316' : 'rgba(255,255,255,0.08)',
+                              color: isSel ? '#fff' : '#a1a1aa',
                             }}>
-                              {genFailed ? 'FAILED'
-                                : isGenerating ? 'WRITING…'
-                                : live ? 'IN POSTING CYCLE' : 'PROMPT ONLY'}
-                            </span>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                              {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+                              {t.badge}
                             </span>
                           </div>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: isSel ? '#fff' : '#e4e4e7', marginBottom: '0.2rem' }}>
+                            {t.title}
+                          </div>
+                          <p style={{ margin: 0, fontSize: '0.74rem', color: '#a1a1aa', lineHeight: 1.35 }}>
+                            {t.tagline}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                          {isGenerating ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                              <span className="spinner" style={{ width: 12, height: 12 }} />
-                              Writing this prompt — it will appear here when it is done.
+                  {/* Custom Topic Input if Selected */}
+                  {selectedTopic === 'custom' && (
+                    <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#f97316', display: 'block', marginBottom: '0.3rem' }}>
+                        ✍️ Write Your Custom Niche / Topic for Full Control:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Greek Mythology &amp; Dark Lore, Stoicism Secrets, True Crime, Dark Psychology..."
+                        value={customTopicText}
+                        onChange={(e) => setCustomTopicText(e.target.value)}
+                        className="input-field"
+                        style={{ width: '100%', fontSize: '0.85rem', background: '#1c1c24', border: '1px solid rgba(249,115,22,0.4)', color: '#fff', padding: '0.55rem 0.8rem', borderRadius: 8 }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* STEP 2: VISUAL STYLE & VOICE PERSONA */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                  {/* Visual Style */}
+                  <div style={card}>
+                    <h3 style={{ margin: '0 0 0.85rem', fontSize: '0.95rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>2</span>
+                      Pick a Visual Style
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      {VISUAL_STYLE_PRESETS.map((s) => {
+                        const isSel = selectedStyle === s.id;
+                        return (
+                          <div
+                            key={s.id}
+                            onClick={() => setSelectedStyle(s.id)}
+                            style={{
+                              padding: '0.65rem 0.75rem',
+                              borderRadius: 8,
+                              background: isSel ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
+                              border: `1.5px solid ${isSel ? '#f97316' : 'rgba(255,255,255,0.08)'}`,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: isSel ? '#fff' : '#d4d4d8', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <span>{s.icon}</span> {s.name}
                             </div>
-                          ) : genFailed ? (
-                            <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: 1.55, color: '#fca5a5' }}>
-                              {item.generationError
-                                || (stalled
-                                  ? 'This run never finished — it was interrupted. Generate again.'
-                                  : 'Generation failed. Try generating again.')}
-                            </p>
-                          ) : (
-                            <p style={{
-                              margin: 0, fontSize: '0.83rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic',
-                              whiteSpace: 'pre-wrap',
-                              ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }),
-                            }}>
-                              {text}
-                            </p>
-                          )}
+                            <div style={{ fontSize: '0.68rem', color: '#a1a1aa', marginTop: '0.15rem', lineHeight: 1.2 }}>{s.desc}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-                          {/* The two stills the clip is generated between.
-                              Shown only when the prompt is expanded, because
-                              they are what you paste into an image model just
-                              before you paste the prompt into a video one —
-                              and the closing card is the only place the brand
-                              name and the offer are rendered as real text. */}
-                          {open && item.keyframes && (
-                            <div style={{ marginTop: '0.9rem', display: 'grid', gap: '0.6rem' }}>
-                              {[
-                                ['First frame — the hook', item.keyframes.firstFramePrompt],
-                                ['Last frame — the call to action', item.keyframes.lastFramePrompt],
-                              ].filter(([, v]) => v).map(([label, value]) => (
-                                <div key={label} style={{
-                                  border: '1px solid var(--border-color)', borderRadius: 10,
-                                  padding: '0.7rem 0.8rem', background: 'rgba(11,16,32,0.03)',
-                                }}>
-                                  <div style={{
-                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    gap: '0.5rem', marginBottom: '0.35rem',
-                                  }}>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--primary-color)' }}>
-                                      {label}
-                                    </span>
-                                    <button
-                                      onClick={() => { navigator.clipboard?.writeText(value); showToast('Copied'); }}
-                                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600 }}
-                                    >
-                                      Copy
-                                    </button>
-                                  </div>
-                                  <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{value}</p>
-                                </div>
-                              ))}
-                              {/* The whole set, labelled, in the order it is
-                                  used: first frame into an image model, last
-                                  frame into an image model, then both into a
-                                  video model with the video prompt. Copying
-                                  three things separately is three chances to
-                                  paste the wrong one. */}
-                              <button
-                                onClick={() => {
-                                  const kf = item.keyframes || {};
-                                  const secs = item.plan?.durationSeconds;
-                                  const NL = String.fromCharCode(10);
-                                  const SEP = NL + NL + '---' + NL + NL;
-                                  const block = [
-                                    'FIRST FRAME (image prompt)' + NL + (kf.firstFramePrompt || ''),
-                                    'LAST FRAME (image prompt)' + NL + (kf.lastFramePrompt || ''),
-                                    'VIDEO PROMPT' + (secs ? ' (' + secs + 's)' : '') + NL + text,
-                                  ].join(SEP);
-                                  navigator.clipboard?.writeText(block);
-                                  showToast('All three prompts copied');
-                                }}
-                                className="btn btn-primary"
-                                style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}
-                              >
-                                <Copy size={14} /> Copy all three prompts
-                              </button>
-
-                              {item.keyframes.cta && (
-                                <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                                  Closing card reads <strong>{item.keyframes.brand}</strong> · {item.keyframes.cta}
-                                  {item.keyframes.destination ? ` · ${item.keyframes.destination}` : ''}
-                                  {item.plan?.durationSeconds ? ` — written for ${item.plan.durationSeconds}s` : ''}
-                                </p>
-                              )}
+                  {/* AI Voice Persona */}
+                  <div style={card}>
+                    <h3 style={{ margin: '0 0 0.85rem', fontSize: '0.95rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>3</span>
+                      Pick an AI Voice Persona
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                      {VOICE_PERSONA_PRESETS.map((v) => {
+                        const isSel = selectedVoice === v.id;
+                        return (
+                          <div
+                            key={v.id}
+                            onClick={() => setSelectedVoice(v.id)}
+                            style={{
+                              padding: '0.55rem 0.75rem',
+                              borderRadius: 8,
+                              background: isSel ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
+                              border: `1.5px solid ${isSel ? '#f97316' : 'rgba(255,255,255,0.08)'}`,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isSel ? '#fff' : '#e4e4e7', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Volume2 size={13} color={isSel ? '#f97316' : '#a1a1aa'} /> {v.name} ({v.gender})
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: '#a1a1aa' }}>{v.tone}</div>
                             </div>
-                          )}
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isSel ? '#fb923c' : '#71717a' }}>{v.speed}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-                          {/* Also shown when there are keyframes, whatever the
-                              prompt's length. Gating purely on 180 characters
-                              meant a short video prompt hid both frame prompts
-                              permanently -- there was no control to reveal
-                              them. */}
-                          {(text.length > 180 || item.keyframes) && (
-                            <button
-                              onClick={() => setExpandedId(open ? null : item.id)}
-                              style={{ background: 'none', border: 'none', padding: 0, marginTop: '0.35rem', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                            >
-                              {open ? 'Show less' : 'Show full prompt'}
-                            </button>
-                          )}
+                {/* STEP 3: SCHEDULE & PUBLISHING CONTROL (Public / Private / TikTok Drafts) */}
+                <div style={card}>
+                  <h3 style={{ margin: '0 0 0.85rem', fontSize: '0.95rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>4</span>
+                    Set Your Schedule &amp; Publishing Visibility
+                  </h3>
 
-                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                            {/* Copy and attach make no sense without a prompt. */}
-                            {text && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                    {/* Schedule Presets */}
+                    <div>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                        📅 Posting Cadence
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {SCHEDULE_PRESETS.map((p) => (
+                          <div
+                            key={p.id}
+                            onClick={() => setSchedulePreset(p.id)}
+                            style={{
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: 8,
+                              background: schedulePreset === p.id ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.03)',
+                              border: `1.5px solid ${schedulePreset === p.id ? '#f97316' : 'rgba(255,255,255,0.08)'}`,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: schedulePreset === p.id ? '#fff' : '#d4d4d8' }}>{p.label}</div>
+                            <div style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>{p.desc}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Publishing Visibility (Public, Private, TikTok Drafts) */}
+                    <div>
+                      <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '0.35rem', display: 'block' }}>
+                        🔒 You Control How It Posts
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <div
+                          onClick={() => setPublishingMode('PUBLIC')}
+                          style={{
+                            padding: '0.55rem 0.75rem',
+                            borderRadius: 8,
+                            background: publishingMode === 'PUBLIC' ? 'rgba(16,185,129,0.12)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${publishingMode === 'PUBLIC' ? '#10b981' : 'rgba(255,255,255,0.08)'}`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: publishingMode === 'PUBLIC' ? '#10b981' : '#d4d4d8' }}>
+                            🌐 Public (Direct Publish)
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>Goes live immediately on YouTube Shorts, TikTok, &amp; Reels</div>
+                        </div>
+
+                        <div
+                          onClick={() => setPublishingMode('PRIVATE')}
+                          style={{
+                            padding: '0.55rem 0.75rem',
+                            borderRadius: 8,
+                            background: publishingMode === 'PRIVATE' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${publishingMode === 'PRIVATE' ? '#f59e0b' : 'rgba(255,255,255,0.08)'}`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: publishingMode === 'PRIVATE' ? '#f59e0b' : '#d4d4d8' }}>
+                            🔒 Private / Unlisted
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>Upload as unlisted for link-only verification before public release</div>
+                        </div>
+
+                        <div
+                          onClick={() => setPublishingMode('DRAFT_REVIEW')}
+                          style={{
+                            padding: '0.55rem 0.75rem',
+                            borderRadius: 8,
+                            background: publishingMode === 'DRAFT_REVIEW' ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${publishingMode === 'DRAFT_REVIEW' ? '#3b82f6' : 'rgba(255,255,255,0.08)'}`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.8rem', fontWeight: 800, color: publishingMode === 'DRAFT_REVIEW' ? '#60a5fa' : '#d4d4d8' }}>
+                            📱 Send to TikTok Drafts / Review Queue
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>Push to drafts so you can review before they go live</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Video Duration Selector */}
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#a1a1aa' }}>⏱️ Video Length:</span>
+                      {[8, 10, 15, 20, 30].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setFacelessDuration(s)}
+                          style={{
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: 6,
+                            background: facelessDuration === s ? '#f97316' : 'rgba(255,255,255,0.06)',
+                            color: facelessDuration === s ? '#fff' : '#a1a1aa',
+                            border: 'none',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {s}s
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleGenerateFaceless}
+                      disabled={generatingFaceless}
+                      className="btn btn-primary"
+                      style={{
+                        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                        border: 'none',
+                        fontWeight: 800,
+                        padding: '0.65rem 1.4rem',
+                        borderRadius: 10,
+                        fontSize: '0.86rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        boxShadow: '0 4px 14px rgba(249,115,22,0.35)',
+                      }}
+                    >
+                      {generatingFaceless ? <RefreshCw className="spin" size={16} /> : <Wand2 size={16} />}
+                      {generatingFaceless ? 'Writing Script, Voice & Video...' : 'Generate Complete Faceless Short'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* GENERATED FACELESS RESULT PACKAGE */}
+                {facelessPackage && (
+                  <div style={{ ...card, borderColor: 'rgba(249,115,22,0.3)', background: '#15151c' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f97316' }}>
+                          ⚡ Complete Faceless Creative Package ({facelessPackage.duration_seconds}s)
+                        </span>
+                        <h3 style={{ margin: '0.2rem 0 0', fontSize: '1.2rem', fontWeight: 900, color: '#fff' }}>
+                          {facelessPackage.title}
+                        </h3>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          const NL = String.fromCharCode(10);
+                          const SEP = NL + NL + '============================' + NL + NL;
+                          const block = [
+                            `TITLE: ${facelessPackage.title}`,
+                            `1. SCROLL-STOPPING HOOK (0-3s):` + NL + facelessPackage.hook,
+                            `2. VOICEOVER NARRATION SCRIPT (${facelessPackage.voice_persona?.name || 'Voice'}):` + NL + facelessPackage.voiceover_script,
+                            `3. STARTING IMAGE PROMPT (First Frame Hook):` + NL + facelessPackage.first_frame_prompt,
+                            `4. VIDEO MOTION DIFFUSION PROMPT (${facelessPackage.duration_seconds}s):` + NL + facelessPackage.video_prompt,
+                            `5. ENDING CARD PROMPT:` + NL + facelessPackage.last_frame_prompt,
+                            `6. VIRAL SOCIAL CAPTION & HASHTAGS:` + NL + facelessPackage.viral_caption,
+                          ].join(SEP);
+                          navigator.clipboard?.writeText(block);
+                          showToast('Complete Creative Package copied to clipboard!');
+                        }}
+                        className="btn btn-primary"
+                        style={{ background: '#f97316', border: 'none', fontWeight: 800, fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                      >
+                        <Copy size={14} /> Copy Complete Package
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.9rem' }}>
+                      {/* Hook & Voiceover Script */}
+                      <div style={{ background: '#1a1a24', padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#f97316', textTransform: 'uppercase' }}>🎙️ Voiceover Script &amp; Hook</span>
+                          <button
+                            onClick={() => { navigator.clipboard?.writeText(facelessPackage.voiceover_script); showToast('Voiceover script copied'); }}
+                            style={{ background: 'none', border: 'none', color: '#f97316', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Copy Script
+                          </button>
+                        </div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                          🪝 Hook: "{facelessPackage.hook}"
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#d4d4d8', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                          {facelessPackage.voiceover_script}
+                        </p>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.7rem', color: '#a1a1aa' }}>
+                          🎵 <em>Music: {facelessPackage.audio_music_recommendation}</em>
+                        </div>
+                      </div>
+
+                      {/* Video Motion Prompt */}
+                      <div style={{ background: '#1a1a24', padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8', textTransform: 'uppercase' }}>🎬 Video Diffusion Prompt (Veo/Kling/Sora)</span>
+                          <button
+                            onClick={() => { navigator.clipboard?.writeText(facelessPackage.video_prompt); showToast('Video prompt copied'); }}
+                            style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Copy Video Prompt
+                          </button>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#d4d4d8', lineHeight: 1.5 }}>
+                          {facelessPackage.video_prompt}
+                        </p>
+                      </div>
+
+                      {/* First Frame & Last Frame Image Prompts */}
+                      <div style={{ background: '#1a1a24', padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#a855f7', textTransform: 'uppercase' }}>📸 Midjourney / FLUX Stills</span>
+                          <button
+                            onClick={() => { navigator.clipboard?.writeText(facelessPackage.first_frame_prompt); showToast('Image prompt copied'); }}
+                            style={{ background: 'none', border: 'none', color: '#a855f7', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Copy Start Image
+                          </button>
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: '#e4e4e7', marginBottom: '0.4rem' }}>
+                          <strong>Start Hook (0-3s):</strong> {facelessPackage.first_frame_prompt}
+                        </div>
+                        <div style={{ fontSize: '0.76rem', color: '#e4e4e7' }}>
+                          <strong>End Outro Card:</strong> {facelessPackage.last_frame_prompt}
+                        </div>
+                      </div>
+
+                      {/* Viral Social Caption */}
+                      <div style={{ background: '#1a1a24', padding: '0.85rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase' }}>✍️ Viral Caption &amp; Hashtags</span>
+                          <button
+                            onClick={() => { navigator.clipboard?.writeText(facelessPackage.viral_caption); showToast('Caption copied'); }}
+                            style={{ background: 'none', border: 'none', color: '#10b981', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Copy Caption
+                          </button>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#d4d4d8', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                          {facelessPackage.viral_caption}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB 2: VIRAL VALIDATOR & VIEW PREDICTOR */}
+            {/* ========================================================================= */}
+            {studioTab === 'validator' && (
+              <div>
+                <ViralValidator
+                  token={token}
+                  showToast={showToast}
+                  activeWorkspaceId={activeWorkspaceId}
+                />
+
+                {/* Built for Creators Value Pillars */}
+                <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+                  <div style={{ background: '#121217', borderRadius: 12, padding: '1.25rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                      <Eye size={18} color="#f97316" />
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Stop Posting Blindly</h4>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa', lineHeight: 1.45 }}>
+                      Know exactly how your video will perform before you hit upload. Predictive algorithmic simulation based on 500M+ viral shorts.
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#121217', borderRadius: 12, padding: '1.25rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                      <Sparkles size={18} color="#f97316" />
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Fix Issues Instantly</h4>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa', lineHeight: 1.45 }}>
+                      Get actionable feedback: "Shorten the intro", "Add visual cut at 0:04", "Add comment trigger CTA".
+                    </p>
+                  </div>
+
+                  <div style={{ background: '#121217', borderRadius: 12, padding: '1.25rem', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                      <TrendingUp size={18} color="#f97316" />
+                      <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Scale Your Growth</h4>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa', lineHeight: 1.45 }}>
+                      Consistent viral hits mean faster monetization, higher channel authority, and exponential organic reach.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB 3: POSTSHIP MULTI-PLATFORM TEXT ENGINE (X, LINKEDIN, REDDIT) */}
+            {/* ========================================================================= */}
+            {studioTab === 'postship' && (
+              <PostShipStudio
+                token={token}
+                showToast={showToast}
+                activeWorkspaceId={activeWorkspaceId}
+                businessName={business?.name || 'Founder'}
+              />
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB 4: BRAND & PRODUCT ADS STUDIO */}
+            {/* ========================================================================= */}
+            {studioTab === 'brand' && (
+              <div>
+                <div className="glass-panel" style={{ padding: '2rem', marginBottom: '1.5rem', background: '#121217', borderRadius: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.35rem' }}>
+                    {business?.logoUrl ? (
+                      <img src={business.logoUrl} alt="" style={{ width: 44, height: 44, borderRadius: 11, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 44, height: 44, borderRadius: 11, background: 'linear-gradient(135deg, #f97316, #ea580c)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#fff' }}>
+                        {(business?.name || 'B').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>{business?.name || 'Active business'}</div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        {business?.businessModel || 'General'}
+                        {business?.brandAnalysisComplete ? ' · brand profile ready' : ' · no brand profile yet'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {products.length > 0 && (
+                    <div style={{ marginBottom: '1.25rem' }}>
+                      <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        <Package size={13} style={{ verticalAlign: 'middle', marginRight: '0.35rem' }} />
+                        Product (optional)
+                      </label>
+                      <select
+                        value={productId}
+                        onChange={e => setProductId(e.target.value)}
+                        className="input-field"
+                        style={{ width: '100%', padding: '0.7rem 0.85rem', borderRadius: 8, background: '#181820', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.9rem' }}
+                      >
+                        <option value="">Let the AI choose from my catalog</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.id}>{p.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#a1a1aa', fontWeight: 700 }}>Length:</span>
+                      {[8, 10, 15, 20, 30].map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setDuration(s)}
+                          style={{
+                            padding: '0.3rem 0.65rem',
+                            borderRadius: 6,
+                            background: duration === s ? '#f97316' : '#1e1e28',
+                            color: duration === s ? '#fff' : '#a1a1aa',
+                            border: 'none',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {s}s
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={generateBrandPrompt}
+                      disabled={generating}
+                      className="btn btn-primary"
+                      style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', border: 'none', fontWeight: 800, padding: '0.65rem 1.35rem', borderRadius: 10 }}
+                    >
+                      {generating ? <RefreshCw className="spin" size={16} /> : <Wand2 size={16} />}
+                      {generating ? 'Writing Prompt...' : 'Generate Brand Video Prompt'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Reassurance Notice */}
+                <div style={{ padding: '0.75rem 1rem', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '1.5rem', fontSize: '0.8rem', color: '#a1a1aa' }}>
+                  💡 Writing can take up to a minute — you can leave this page and come back; it will be in the list below.
+                </div>
+
+                {/* Prompt History Section */}
+                <div style={{ marginTop: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Video Prompt History</h3>
+                    <button onClick={fetchHistory} style={{ background: 'none', border: 'none', color: '#f97316', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <RefreshCw size={13} /> Refresh
+                    </button>
+                  </div>
+
+                  {loadingHistory ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#71717a', fontSize: '0.84rem' }}>Loading prompt history...</div>
+                  ) : history.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: '#71717a', fontSize: '0.84rem', background: '#121217', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                      No video prompts generated yet. Click Generate above to create your first video brief.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {history.slice(0, 10).map((item) => (
+                        <div key={item.id} style={{ ...card, padding: '0.9rem 1.1rem', background: '#14141c' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#f97316', textTransform: 'uppercase' }}>
+                              {item.meta?.faceless_package ? '🚀 Faceless Short' : '🏢 Brand Video'}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#71717a' }}>{new Date(item.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#d4d4d8', lineHeight: 1.45 }}>
+                            {item.caption || item.prompt || 'Video Creative'}
+                          </p>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
-                              className="btn btn-secondary"
-                              onClick={() => { navigator.clipboard.writeText(text); showToast('Prompt copied to clipboard'); }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.38rem 0.75rem', fontSize: '0.78rem' }}
+                              onClick={() => {
+                                navigator.clipboard?.writeText(item.caption || item.prompt || '');
+                                showToast('Prompt copied to clipboard');
+                              }}
+                              className="btn"
+                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}
                             >
                               <Copy size={12} /> Copy
                             </button>
-                            )}
-
-                            {text && (
                             <button
-                              className={live ? 'btn btn-secondary' : 'btn btn-primary'}
-                              disabled={busy}
-                              onClick={() => { setAttachTargetId(item.id); attachInputRef.current?.click(); }}
-                              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.38rem 0.75rem', fontSize: '0.78rem' }}
-                            >
-                              {busy
-                                ? <><span className="spinner" style={{ width: 11, height: 11 }} /> Uploading…</>
-                                : live
-                                  ? <><Upload size={12} /> Replace video</>
-                                  : <><Send size={12} /> Add video → posting cycle</>}
-                            </button>
-                            )}
-
-                            <button
-                              className="btn btn-secondary"
                               onClick={() => deletePrompt(item.id)}
-                              style={{ padding: '0.38rem 0.55rem', color: 'var(--error)' }}
-                              title="Delete"
+                              className="btn"
+                              style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={12} /> Delete
                             </button>
                           </div>
-
-                          {!live && text && (
-                            <p style={{ margin: '0.6rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                              This is a saved prompt, not a file — the scheduler skips it. Render it in
-                              your video tool, then attach the result to put it in rotation.
-                            </p>
-                          )}
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

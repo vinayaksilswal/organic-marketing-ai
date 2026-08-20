@@ -229,6 +229,7 @@ async def generate_video_prompt(
             created_at=pv.createdAt,
             is_valid=validation.is_valid,
             validation_errors=validation.errors,
+            errors=validation.errors,
         )
 
 

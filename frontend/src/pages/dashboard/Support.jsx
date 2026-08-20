@@ -107,158 +107,229 @@ const Support = ({ token, showToast }) => {
     }
   };
 
-  return (
-    <div className="container" style={{ padding: '2.5rem 0', maxWidth: 860 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.4rem' }}>
-        <LifeBuoy size={26} color="var(--primary-color)" />
-        <h1 style={{ margin: 0 }}>Support</h1>
-      </div>
-      <p style={{ marginBottom: '2rem', color: 'var(--text-muted)' }}>
-        Tell us what is wrong and we will fix it. Replies appear here, not in your inbox.
-      </p>
+  const [activeSupportTab, setActiveSupportTab] = useState('tickets'); // 'tickets' | 'reviews'
 
-      {/* Report */}
-      <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.02rem', marginBottom: '1rem' }}>Report something</h3>
-        <form onSubmit={submitTicket}>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-            {CATEGORIES.map(([key, label]) => {
-              const on = category === key;
+  return (
+    <div className="container" style={{ padding: '2rem 0 3rem', maxWidth: 880 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '0.3rem' }}>
+            <LifeBuoy size={26} color="var(--primary-color)" />
+            <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800 }}>Support &amp; Reviews</h1>
+          </div>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.92rem' }}>
+            Direct enterprise assistance, ticket tracking, and verified customer reviews.
+          </p>
+        </div>
+
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', background: 'rgba(11,16,32,0.05)', padding: '0.25rem', borderRadius: 10, border: '1px solid var(--border-color)' }}>
+          <button
+            onClick={() => setActiveSupportTab('tickets')}
+            style={{
+              padding: '0.45rem 0.95rem',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              background: activeSupportTab === 'tickets' ? 'var(--primary-color)' : 'transparent',
+              color: activeSupportTab === 'tickets' ? '#fff' : 'var(--text-muted)',
+              transition: 'background 0.15s, color 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <MessageSquare size={15} /> Support Tickets ({tickets.length})
+          </button>
+          <button
+            onClick={() => setActiveSupportTab('reviews')}
+            style={{
+              padding: '0.45rem 0.95rem',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              background: activeSupportTab === 'reviews' ? 'var(--primary-color)' : 'transparent',
+              color: activeSupportTab === 'reviews' ? '#fff' : 'var(--text-muted)',
+              transition: 'background 0.15s, color 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <Star size={15} /> Reviews &amp; Rating {review?.rating ? `(${review.rating}★)` : ''}
+          </button>
+        </div>
+      </div>
+
+      {activeSupportTab === 'tickets' ? (
+        <>
+          {/* Report New Ticket */}
+          <div className="glass-panel" style={{ padding: '1.75rem', marginBottom: '1.5rem', borderRadius: 14 }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>Open a New Ticket</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1.1rem' }}>
+              Report a bug, request a feature, or ask a question. Response SLA is under 24 hours.
+            </p>
+            <form onSubmit={submitTicket}>
+              <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                {CATEGORIES.map(([key, label]) => {
+                  const on = category === key;
+                  return (
+                    <button
+                      key={key} type="button" onClick={() => setCategory(key)} aria-pressed={on}
+                      style={{
+                        minHeight: 38, padding: '0 0.85rem', borderRadius: 8, cursor: 'pointer',
+                        fontWeight: 650, fontSize: '0.82rem',
+                        background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
+                        color: on ? '#fff' : 'var(--text-main)',
+                        border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                        transition: 'background 0.15s, color 0.15s',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <input
+                value={subject} onChange={(e) => setSubject(e.target.value)}
+                placeholder="One line: what happened or what do you need?"
+                style={{
+                  width: '100%', minHeight: 44, padding: '0.7rem 0.85rem', marginBottom: '0.75rem',
+                  borderRadius: 10, border: '1px solid var(--border-color)', fontSize: '0.92rem',
+                  background: 'rgba(11, 16, 32, 0.03)', color: 'var(--text-main)',
+                }}
+              />
+              <textarea
+                value={body} onChange={(e) => setBody(e.target.value)}
+                placeholder="What were you doing, what did you expect, and what happened instead? Workspace or account details help."
+                rows={4}
+                style={{
+                  width: '100%', padding: '0.75rem 0.85rem', marginBottom: '1rem',
+                  borderRadius: 10, border: '1px solid var(--border-color)',
+                  fontSize: '0.92rem', fontFamily: 'inherit', resize: 'vertical',
+                  background: 'rgba(11, 16, 32, 0.03)', color: 'var(--text-main)',
+                }}
+              />
+              <button
+                type="submit" className="btn btn-primary" disabled={sending}
+                style={{ minHeight: 42, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', fontWeight: 650 }}
+              >
+                {sending ? <span className="spinner" style={{ width: 15, height: 15 }} /> : <Send size={15} />}
+                {sending ? 'Submitting…' : 'Submit Ticket'}
+              </button>
+            </form>
+          </div>
+
+          {/* Ticket History */}
+          <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Your Open &amp; Past Tickets</h3>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{tickets.length} total</span>
+            </div>
+            {loading ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center' }}><span className="spinner" style={{ width: 20, height: 20 }} /></div>
+            ) : !tickets.length ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' }}>
+                <CheckCircle2 size={24} color="#10b981" style={{ marginBottom: '0.5rem', opacity: 0.7 }} />
+                <div>No active tickets. All systems operational.</div>
+              </div>
+            ) : tickets.map((t) => {
+              const look = STATUS_LOOK[t.status] || STATUS_LOOK.open;
+              const { Icon } = look;
               return (
-                <button
-                  key={key} type="button" onClick={() => setCategory(key)} aria-pressed={on}
-                  style={{
-                    minHeight: 40, padding: '0 0.85rem', borderRadius: 9, cursor: 'pointer',
-                    fontWeight: 650, fontSize: '0.84rem',
-                    background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
-                    color: on ? '#fff' : 'var(--text-main)',
-                    border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
-                  }}
-                >
-                  {label}
-                </button>
+                <div key={t.id} style={{
+                  border: '1px solid var(--border-color)', borderRadius: 12,
+                  padding: '1rem 1.15rem', marginBottom: '0.85rem', background: 'rgba(11, 16, 32, 0.02)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+                    <Icon size={16} color={look.colour} />
+                    <span style={{ fontWeight: 750, fontSize: '0.94rem', color: 'var(--text-main)' }}>{t.subject}</span>
+                    <span style={{
+                      fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.04em',
+                      textTransform: 'uppercase', color: look.colour, background: `${look.colour}18`,
+                      padding: '0.15rem 0.5rem', borderRadius: 4,
+                    }}>{look.label}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                      {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55, whiteSpace: 'pre-wrap', color: 'var(--text-main)' }}>{t.body}</p>
+                  {t.reply && (
+                    <div style={{
+                      marginTop: '0.85rem', padding: '0.85rem 1rem', borderRadius: 10,
+                      background: 'rgba(109,40,217,0.06)', border: '1px solid rgba(109,40,217,0.2)',
+                    }}>
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--primary-color)', marginBottom: '0.35rem' }}>
+                        Support Team Response
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.86rem', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{t.reply}</p>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
-
-          <input
-            value={subject} onChange={(e) => setSubject(e.target.value)}
-            placeholder="One line: what happened?"
-            style={{
-              width: '100%', minHeight: 44, padding: '0.7rem 0.85rem', marginBottom: '0.7rem',
-              borderRadius: 10, border: '1px solid var(--border-color)', fontSize: '0.95rem',
-            }}
-          />
-          <textarea
-            value={body} onChange={(e) => setBody(e.target.value)}
-            placeholder="What were you doing, what did you expect, and what happened instead? Workspace name helps."
-            rows={5}
-            style={{
-              width: '100%', padding: '0.7rem 0.85rem', marginBottom: '0.9rem',
-              borderRadius: 10, border: '1px solid var(--border-color)',
-              fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical',
-            }}
-          />
-          <button
-            type="submit" className="btn btn-primary" disabled={sending}
-            style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            {sending ? <span className="spinner" style={{ width: 15, height: 15 }} /> : <Send size={16} />}
-            {sending ? 'Sending…' : 'Send'}
-          </button>
-        </form>
-      </div>
-
-      {/* History */}
-      <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.02rem', marginBottom: '1rem' }}>Your reports</h3>
-        {loading ? (
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>Loading…</p>
-        ) : !tickets.length ? (
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-            Nothing reported yet.
+        </>
+      ) : (
+        /* Customer Reviews & Feedback */
+        <div className="glass-panel" style={{ padding: '1.75rem', borderRadius: 14 }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>Platform Review &amp; Feedback</h3>
+          <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+            {review?.isApproved
+              ? 'Your verified review is live on our review wall. Contact support if you need to update it.'
+              : 'Share your feedback and experience with Organiflo. We read every submission to improve the platform.'}
           </p>
-        ) : tickets.map((t) => {
-          const look = STATUS_LOOK[t.status] || STATUS_LOOK.open;
-          const { Icon } = look;
-          return (
-            <div key={t.id} style={{
-              border: '1px solid var(--border-color)', borderRadius: 11,
-              padding: '0.9rem', marginBottom: '0.7rem',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
-                <Icon size={15} color={look.colour} />
-                <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>{t.subject}</span>
-                <span style={{
-                  fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.05em',
-                  textTransform: 'uppercase', color: look.colour,
-                }}>{look.label}</span>
-                <span style={{ marginLeft: 'auto', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
-                  {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{t.body}</p>
-              {t.reply && (
-                <div style={{
-                  marginTop: '0.75rem', padding: '0.7rem 0.85rem', borderRadius: 9,
-                  background: 'rgba(109,40,217,0.06)', border: '1px solid rgba(109,40,217,0.18)',
-                }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--primary-color)', marginBottom: '0.3rem' }}>
-                    Our reply
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{t.reply}</p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
 
-      {/* Review */}
-      <div className="glass-panel" style={{ padding: '1.5rem' }}>
-        <h3 style={{ fontSize: '1.02rem', marginBottom: '0.4rem' }}>How is it going?</h3>
-        <p style={{ fontSize: '0.86rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          {review?.isApproved
-            ? 'Your review is published. Contact support to change it.'
-            : 'We read every one of these. Nothing is shown publicly unless we ask you first.'}
-        </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n} type="button" aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                onClick={() => !review?.isApproved && setRating(n)}
+                disabled={review?.isApproved}
+                style={{
+                  width: 44, height: 44, borderRadius: 10, cursor: review?.isApproved ? 'default' : 'pointer',
+                  background: n <= rating ? 'rgba(245, 158, 11, 0.15)' : 'rgba(11, 16, 32, 0.04)',
+                  border: `1px solid ${n <= rating ? '#f59e0b' : 'var(--border-color)'}`,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'transform 0.15s, background 0.15s',
+                }}
+                onMouseEnter={e => { if (!review?.isApproved) e.currentTarget.style.transform = 'scale(1.1)'; }}
+                onMouseLeave={e => { if (!review?.isApproved) e.currentTarget.style.transform = 'none'; }}
+              >
+                <Star size={20} color={n <= rating ? '#f59e0b' : 'var(--text-muted)'}
+                      fill={n <= rating ? '#f59e0b' : 'none'} />
+              </button>
+            ))}
+            <span style={{ marginLeft: '0.5rem', fontWeight: 700, fontSize: '0.9rem', color: rating ? '#f59e0b' : 'var(--text-muted)' }}>
+              {rating === 5 ? 'Exceptional (5/5)' : rating === 4 ? 'Great (4/5)' : rating === 3 ? 'Good (3/5)' : rating > 0 ? 'Needs Improvement' : 'Select a rating'}
+            </span>
+          </div>
 
-        <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.9rem' }}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n} type="button" aria-label={`${n} star${n > 1 ? 's' : ''}`}
-              onClick={() => !review?.isApproved && setRating(n)}
-              disabled={review?.isApproved}
-              style={{
-                width: 44, height: 44, borderRadius: 10, cursor: review?.isApproved ? 'default' : 'pointer',
-                background: 'transparent', border: '1px solid var(--border-color)',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Star size={19} color={n <= rating ? '#f59e0b' : 'var(--text-muted)'}
-                    fill={n <= rating ? '#f59e0b' : 'none'} />
+          <textarea
+            value={reviewBody} onChange={(e) => setReviewBody(e.target.value)}
+            disabled={review?.isApproved}
+            placeholder="What results or time savings has Organiflo delivered for your business? Specific feedback helps most."
+            rows={4}
+            style={{
+              width: '100%', padding: '0.85rem', marginBottom: '1.1rem',
+              borderRadius: 10, border: '1px solid var(--border-color)',
+              fontSize: '0.92rem', fontFamily: 'inherit', resize: 'vertical',
+              background: 'rgba(11, 16, 32, 0.03)', color: 'var(--text-main)',
+            }}
+          />
+          {!review?.isApproved && (
+            <button onClick={submitReview} className="btn btn-primary" disabled={savingReview || !rating}
+                    style={{ minHeight: 42, padding: '0.6rem 1.35rem', fontWeight: 650 }}>
+              {savingReview ? 'Saving…' : review ? 'Update Review' : 'Submit Review'}
             </button>
-          ))}
+          )}
         </div>
-
-        <textarea
-          value={reviewBody} onChange={(e) => setReviewBody(e.target.value)}
-          disabled={review?.isApproved}
-          placeholder="What is it doing for you? Specifics help more than praise."
-          rows={3}
-          style={{
-            width: '100%', padding: '0.7rem 0.85rem', marginBottom: '0.9rem',
-            borderRadius: 10, border: '1px solid var(--border-color)',
-            fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical',
-          }}
-        />
-        {!review?.isApproved && (
-          <button onClick={submitReview} className="btn btn-primary" disabled={savingReview}
-                  style={{ minHeight: 44 }}>
-            {savingReview ? 'Saving…' : review ? 'Update review' : 'Send review'}
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 };

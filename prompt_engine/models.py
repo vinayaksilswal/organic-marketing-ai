@@ -52,6 +52,7 @@ class PromptCreateResponse(BaseModel):
     created_at: datetime = Field(..., alias="createdAt")
     is_valid: bool = Field(..., description="Result of validation step")
     validation_errors: List[str] = Field(default_factory=list, description="Any validation failures")
+    errors: List[str] = Field(default_factory=list, description="Validation failure messages")
 
     model_config = {"populate_by_name": True}
 

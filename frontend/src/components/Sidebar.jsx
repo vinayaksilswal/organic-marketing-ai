@@ -28,41 +28,43 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
       position: 'fixed',
       left: 0,
       top: 0,
-      background: 'rgba(255, 255, 255, 0.92)',
+      background: 'rgba(255, 255, 255, 0.94)',
       backdropFilter: 'blur(16px)',
       borderRight: '1px solid var(--border-color)',
-      padding: '1.5rem 1.25rem',
+      padding: '1.1rem 1rem',
       display: 'flex',
       flexDirection: 'column',
+      boxSizing: 'border-box',
+      overflow: 'hidden',
       zIndex: 1000,
-      boxShadow: '4px 0 24px rgba(0, 0, 0, 0.4)'
+      boxShadow: '4px 0 24px rgba(0, 0, 0, 0.04)'
     }}>
       {/* Brand Header */}
       <div className="nav-brand" style={{ 
-        marginBottom: '1.75rem', 
+        marginBottom: '0.85rem', 
         display: 'flex', 
         alignItems: 'center', 
         gap: '0.75rem',
         fontSize: '1.2rem',
         fontWeight: '700',
         color: 'var(--text-main)',
-        letterSpacing: '-0.02em'
+        letterSpacing: '-0.02em',
+        flexShrink: 0,
       }}>
-        {/* The mark carries its own gradient, so it does not need the tinted
-            tile it used to sit inside — that was standing in for a logo. */}
-        <Logo size={44} showWordmark />
+        <Logo size={38} showWordmark />
       </div>
       
       {/* Multi-Tenant Workspace Selector */}
       <div style={{ 
-        marginBottom: '1.75rem',
-        padding: '0.85rem',
+        marginBottom: '0.85rem',
+        padding: '0.65rem 0.75rem',
         background: 'rgba(11, 16, 32, 0.03)',
-        borderRadius: '12px',
-        border: '1px solid rgba(11, 16, 32, 0.06)'
+        borderRadius: '10px',
+        border: '1px solid rgba(11, 16, 32, 0.06)',
+        flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', margin: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+          <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '700', margin: 0 }}>
             Active Business
           </p>
           <button 
@@ -79,12 +81,12 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
           onChange={(e) => onWorkspaceChange(e.target.value)}
           style={{ 
             width: '100%', 
-            padding: '0.5rem 0.6rem', 
-            borderRadius: '8px', 
+            padding: '0.42rem 0.55rem', 
+            borderRadius: '6px', 
             background: 'var(--bg-dark)', 
             color: 'var(--text-main)', 
             border: '1px solid var(--border-color)',
-            fontSize: '0.85rem',
+            fontSize: '0.82rem',
             fontWeight: '500',
             cursor: 'pointer',
             outline: 'none'
@@ -99,54 +101,93 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         </select>
       </div>
 
-      {/* Navigation Links */}
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
-        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.5rem 0.5rem', fontWeight: '700' }}>
-          Core Modules
-        </p>
+      {/* Navigation Links - Scrollable container with minHeight: 0 */}
+      <nav className="sidebar-nav" style={{
+        flex: '1 1 0%',
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        paddingRight: '3px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.15rem',
+      }}>
+        <div className="sidebar-section-title" style={{ marginTop: '0.1rem' }}>
+          Core Platform
+        </div>
         
         <NavLink to="/dashboard" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <LayoutDashboard size={18} /> Overview
+          <LayoutDashboard size={16} /> <span>Overview</span>
         </NavLink>
 
         <NavLink to="/dashboard/workspaces" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Building2 size={18} /> Businesses
+          <Building2 size={16} /> <span>Businesses</span>
+          {workspaces.length > 0 && (
+            <span className="sidebar-badge" style={{ background: 'rgba(139,92,246,0.12)', color: 'var(--primary-color)' }}>
+              {workspaces.length}
+            </span>
+          )}
         </NavLink>
 
         <NavLink to="/dashboard/video-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Video size={18} /> AI Video Studio
+          <Video size={16} /> <span>AI Video Studio</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)' }}>
+            8s-30s
+          </span>
         </NavLink>
 
         <NavLink to="/dashboard/media-catalog" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <ImageIcon size={18} /> Media & Catalog
+          <ImageIcon size={16} /> <span>Media & Catalog</span>
         </NavLink>
 
+        <div className="sidebar-section-title">
+          Publishing Engine
+        </div>
+
         <NavLink to="/dashboard/social-scheduler" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Send size={18} /> Social Scheduler
+          <Send size={16} /> <span>Social Scheduler</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--success)' }}>
+            Auto
+          </span>
         </NavLink>
 
         <NavLink to="/dashboard/email-suite" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Mail size={18} /> Email Suite
+          <Mail size={16} /> <span>Email Suite</span>
         </NavLink>
 
+        <div className="sidebar-section-title">
+          System & Support
+        </div>
+
         <NavLink to="/dashboard/team" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Users size={18} /> Team & Roles
+          <Users size={16} /> <span>Team & Roles</span>
         </NavLink>
         <NavLink to="/dashboard/billing" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <CreditCard size={18} /> Plan & Billing
+          <CreditCard size={16} /> <span>Plan & Billing</span>
         </NavLink>
         <NavLink to="/dashboard/support" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <LifeBuoy size={18} /> Support
+          <LifeBuoy size={16} /> <span>Support & Reviews</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+            24/7
+          </span>
         </NavLink>
       </nav>
 
       {/* User Profile Footer */}
-      <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-color), #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.9rem', color: '#fff' }}>
+      <div style={{ 
+        marginTop: 'auto', 
+        paddingTop: '0.75rem', 
+        borderTop: '1px solid var(--border-color)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '0.65rem',
+        flexShrink: 0,
+      }}>
+        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary-color), #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.9rem', color: '#fff', flexShrink: 0 }}>
           {user?.email?.[0].toUpperCase() || 'U'}
         </div>
         <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user?.email}</p>
+          <p style={{ margin: 0, fontSize: '0.83rem', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{user?.email}</p>
           <span
             onClick={() => navigate('/dashboard/billing')}
             title="View plan and usage"
@@ -156,9 +197,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
           </span>
         </div>
 
-        {/* There was no way to sign out anywhere in the product. onLogout was
-            passed down and never wired to anything, which on a shared machine
-            means the next person is already logged in as you. */}
+        {/* Sign out */}
         <button
           onClick={() => {
             if (window.confirm('Sign out of Organiflo?')) onLogout?.();

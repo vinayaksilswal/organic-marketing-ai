@@ -212,6 +212,7 @@ async def get_marketing_settings(request: Request) -> dict[str, Any]:
             "success": True,
             "autoApprove": state.autoApprove if state else False,
             "intervalHours": (profile.postIntervalHours if profile else None) or 2,
+            "publishingMode": getattr(profile, "publishingMode", "PUBLIC") or "PUBLIC",
             "socialConnected": connected,
             "blockedReason": None if connected else (
                 "No Facebook or Instagram account is connected to this business, "
@@ -243,6 +244,38 @@ async def toggle_auto_approve(
             f"Auto-approve set to {state.autoApprove} for workspace {workspace_id} by user {user_id}"
         )
         return {"success": True, "autoApprove": state.autoApprove}
+
+
+class PublishingModeUpdate(BaseModel):
+    # PUBLIC | PRIVATE | DRAFT_REVIEW
+    publishingMode: str
+
+
+@router.post("/settings/publishing-mode")
+async def update_publishing_mode(
+    data: PublishingModeUpdate,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Configure whether scheduled videos post publicly, as private/unlisted, or send to TikTok/platform drafts for review."""
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="Select a business first.")
+
+    mode = data.publishingMode.upper().strip()
+    if mode not in ("PUBLIC", "PRIVATE", "DRAFT_REVIEW"):
+        raise HTTPException(status_code=400, detail="Publishing mode must be PUBLIC, PRIVATE, or DRAFT_REVIEW.")
+
+    async with get_tenant_session(workspace_id) as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="That business could not be found.")
+
+        profile.publishingMode = mode
+        await session.commit()
+
+        logger.info(f"Publishing mode for {profile.name} set to {mode} by {user_id}")
+        return {"success": True, "publishingMode": profile.publishingMode}
 
 
 class IntervalUpdate(BaseModel):
@@ -279,6 +312,7 @@ async def update_interval(
         logger.info(
             f"Posting interval for {profile.name} set to {data.intervalHours}h by {user_id}"
         )
+        return {"success": True, "intervalHours": profile.postIntervalHours}
         return {"success": True, "intervalHours": profile.postIntervalHours}
 
 _BANNED_CAPTION_PHRASES = (
@@ -1914,14 +1948,25 @@ def _is_branded(media) -> bool:
 async def get_workspace_media(request: Request) -> Any:
     """List media assets (uploaded and AI rendered) for the active workspace."""
     workspace_id = request.headers.get("x-workspace-id")
+    from services.keyframes import fallback_keyframes_for_prompt
+
     async with get_tenant_session(workspace_id) as session:
+        biz_name = "Organiflo"
         if workspace_id:
+            biz = await session.get(BusinessProfile, workspace_id)
+            if biz and biz.name:
+                biz_name = biz.name
             stmt = select(Media).where(Media.businessProfileId == workspace_id).order_by(Media.createdAt.desc())
         else:
             stmt = select(Media).order_by(Media.createdAt.desc())
         media_list = (await session.execute(stmt)).scalars().all()
-        return [
-            {
+        
+        result_items = []
+        for m in media_list:
+            kf = m.keyframes
+            if not kf and (m.promptType == 'video' or m.prompt or m.caption):
+                kf = fallback_keyframes_for_prompt(m.prompt or m.caption or "", brand_name=biz_name)
+            result_items.append({
                 "id": m.id,
                 "filename": m.filename,
                 "mimeType": m.mimeType,
@@ -1937,6 +1982,8 @@ async def get_workspace_media(request: Request) -> Any:
                 "postable": _is_postable(m),
                 "generationStatus": m.generationStatus,
                 "generationError": m.generationError,
+                "keyframes": kf,
+                "plan": m.plan,
                 # Two things a bulk import can silently leave undone, so the
                 # catalog can show them rather than the user discovering it in
                 # a published post.
@@ -1947,9 +1994,9 @@ async def get_workspace_media(request: Request) -> Any:
                 # folder's carousel.
                 "folderId": m.folderId,
                 "folderPosition": m.folderPosition or 0,
-            }
-            for m in media_list
-        ]
+            })
+        return result_items
+
 
 
 # Instagram publishes at most 10 items in one carousel and rejects the whole

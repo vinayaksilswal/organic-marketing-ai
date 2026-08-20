@@ -920,3 +920,296 @@ async def refresh_brand_intelligence(
             "rebuilt": built,
             "usedForPrompts": to_scene_context(intel),
         }
+
+
+# =============================================================================
+# Faceless Short Videos on Auto-Pilot & Algorithm Analyzer Endpoints
+# =============================================================================
+class FacelessGenerateRequest(BaseModel):
+    topic_id: str = "scary_stories"
+    custom_topic: Optional[str] = None
+    visual_style_id: str = "cinematic_realism"
+    voice_id: str = "adam_storyteller"
+    duration_seconds: int = 20
+    publishing_mode: str = "PUBLIC"
+    channel_name: Optional[str] = None
+    schedule_to_queue: bool = False
+
+
+class FacelessAutopilotRequest(BaseModel):
+    schedule_preset: str = "daily"
+    custom_days: Optional[List[int]] = None
+    publishing_mode: str = "PUBLIC"
+    auto_approve: bool = False
+    platforms: Optional[List[str]] = None
+
+
+class AnalyzeAlgorithmRequest(BaseModel):
+    content_text: Optional[str] = None
+    media_id: Optional[str] = None
+    media_url: Optional[str] = None
+    niche: Optional[str] = None
+    platform: str = "YouTube Shorts / TikTok / Reels"
+
+
+@router.get("/faceless-presets")
+async def get_faceless_presets_endpoint(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Return all ready-made viral topics, visual styles, voice personas, publishing modes, and schedule presets."""
+    from services.faceless_service import get_faceless_presets, PUBLISHING_MODES
+
+    presets = get_faceless_presets()
+    presets["publishing_modes"] = list(PUBLISHING_MODES.values())
+    return {"success": True, **presets}
+
+
+@router.post("/faceless-generate")
+async def generate_faceless_short_endpoint(
+    data: FacelessGenerateRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Generate a complete Faceless Short video package with hook, voiceover script, keyframe prompts, and viral caption."""
+    from services.faceless_service import generate_faceless_short
+    from services import billing_service as billing
+
+    # Quota check
+    allowed, why = await billing.check_quota(user_id, "prompts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    async with AsyncSessionLocal() as session:
+        profile = None
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            profile = (await session.execute(
+                select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            )).scalars().first()
+
+        channel_name = data.channel_name or (profile.name if profile else "Faceless Viral Shorts")
+
+    # Generate complete creative package
+    package = await generate_faceless_short(
+        topic_id=data.topic_id,
+        custom_topic=data.custom_topic,
+        visual_style_id=data.visual_style_id,
+        voice_id=data.voice_id,
+        duration_seconds=data.duration_seconds,
+        channel_name=channel_name,
+    )
+
+    # Save to media library
+    if profile:
+        async with AsyncSessionLocal() as session:
+            media_row = Media(
+                userId=user_id,
+                businessProfileId=profile.id,
+                type="image",
+                url="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1080&q=80",
+                caption=package.get("viral_caption") or package.get("title"),
+                meta={
+                    "faceless_package": package,
+                    "publishing_mode": data.publishing_mode,
+                    "topic_id": data.topic_id,
+                    "visual_style_id": data.visual_style_id,
+                    "voice_id": data.voice_id,
+                },
+            )
+            session.add(media_row)
+
+            # Auto-schedule into Social Scheduler if requested
+            if data.schedule_to_queue:
+                from database import SocialPost, utc_now
+                post_row = SocialPost(
+                    userId=user_id,
+                    businessProfileId=profile.id,
+                    platform="YOUTUBE",
+                    type="AUTO",
+                    status="SCHEDULED" if data.publishing_mode == "PUBLIC" else "DRAFT",
+                    caption=package.get("viral_caption") or package.get("title"),
+                    mediaUrls=[media_row.url],
+                    scheduledAt=utc_now(),
+                )
+                session.add(post_row)
+
+            await session.commit()
+            await session.refresh(media_row)
+            package["saved_media_id"] = media_row.id
+
+    return {
+        "success": True,
+        "package": package,
+    }
+
+
+@router.post("/faceless-autopilot")
+async def configure_faceless_autopilot(
+    data: FacelessAutopilotRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Configure auto-pilot scheduling days, frequency, and publishing visibility."""
+    from services.faceless_service import SCHEDULE_PRESETS
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="Select a business first.")
+
+    preset = SCHEDULE_PRESETS.get(data.schedule_preset, SCHEDULE_PRESETS["daily"])
+    active_days = data.custom_days if data.schedule_preset == "custom" and data.custom_days else preset["days"]
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found.")
+
+        profile.postingDays = active_days
+        profile.postIntervalHours = preset["interval_hours"]
+        profile.publishingMode = data.publishing_mode.upper().strip()
+        profile.businessModel = "Faceless Channel"
+
+        # Update marketing state
+        state = (await session.execute(
+            select(MarketingState).where(MarketingState.businessProfileId == workspace_id)
+        )).scalars().first()
+        if state:
+            state.autoApprove = data.auto_approve
+            state.postIntervalHours = preset["interval_hours"]
+
+        await session.commit()
+
+        logger.info(
+            f"Faceless Auto-Pilot active for {profile.name}: {data.schedule_preset} "
+            f"({len(active_days)} days/wk), mode={profile.publishingMode}, autoApprove={data.auto_approve}"
+        )
+
+        return {
+            "success": True,
+            "message": "Auto-Pilot Channel schedule activated successfully.",
+            "schedule_preset": data.schedule_preset,
+            "postingDays": active_days,
+            "intervalHours": profile.postIntervalHours,
+            "publishingMode": profile.publishingMode,
+            "autoApprove": data.auto_approve,
+        }
+
+
+@router.post("/analyze-algorithm")
+async def analyze_algorithm_endpoint(
+    data: AnalyzeAlgorithmRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Analyze short-form content or media video, compute 5 radar metrics, predict view potential, and output Fix-The-Fail optimizations."""
+    from services.faceless_service import analyze_short_form_content
+
+    content_to_analyze = (data.content_text or "").strip()
+    media_url = data.media_url
+
+    if data.media_id:
+        async with AsyncSessionLocal() as session:
+            media_item = await session.get(Media, data.media_id)
+            if media_item:
+                media_url = media_item.url or media_url
+                if not content_to_analyze:
+                    content_to_analyze = media_item.caption or (
+                        media_item.meta.get("faceless_package", {}).get("voiceover_script")
+                        if isinstance(media_item.meta, dict) else ""
+                    ) or "Short-form vertical video demonstration"
+
+    if not content_to_analyze or len(content_to_analyze) < 3:
+        content_to_analyze = "High energy vertical short video with fast hook, problem agitation, and call to action."
+
+    analysis = await analyze_short_form_content(
+        content_text=content_to_analyze,
+        niche=data.niche,
+        platform=data.platform,
+        media_url=media_url,
+    )
+
+    return {
+        "success": True,
+        "analysis": analysis,
+    }
+
+
+# =============================================================================
+# PostShip Multi-Platform Repurposing (X, LinkedIn, Reddit)
+# =============================================================================
+class PostShipGenerateRequest(BaseModel):
+    input_text: str
+    url: Optional[str] = None
+    schedule_to_queue: bool = False
+
+
+@router.post("/postship-generate")
+async def generate_postship_endpoint(
+    data: PostShipGenerateRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Generate 3 native, platform-optimized social posts for X (Twitter), LinkedIn, and Reddit from a single ship line or idea."""
+    from services.postship_service import generate_postship_bundle
+    from services import billing_service as billing
+
+    if not data.input_text or len(data.input_text.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Please enter an idea, ship line, or URL to generate posts.")
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    async with AsyncSessionLocal() as session:
+        profile = None
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            profile = (await session.execute(
+                select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            )).scalars().first()
+
+        business_name = profile.name if profile else "Founder"
+        industry = profile.industry or profile.businessModel if profile else "Tech"
+
+    bundle = await generate_postship_bundle(
+        input_text=data.input_text,
+        url=data.url,
+        business_name=business_name,
+        industry=industry,
+    )
+
+    # If user requests scheduling, schedule posts in the SocialPost queue
+    if data.schedule_to_queue and profile:
+        async with AsyncSessionLocal() as session:
+            from database import SocialPost, utc_now
+            # X post
+            x_post = SocialPost(
+                userId=user_id,
+                businessProfileId=profile.id,
+                platform="TWITTER",
+                type="AUTO",
+                status="SCHEDULED",
+                caption=bundle.get("x_post", {}).get("content"),
+                scheduledAt=utc_now(),
+            )
+            session.add(x_post)
+            # LinkedIn post
+            li_post = SocialPost(
+                userId=user_id,
+                businessProfileId=profile.id,
+                platform="LINKEDIN",
+                type="AUTO",
+                status="SCHEDULED",
+                caption=bundle.get("linkedin_post", {}).get("content"),
+                scheduledAt=utc_now(),
+            )
+            session.add(li_post)
+            await session.commit()
+
+    return {
+        "success": True,
+        "bundle": bundle,
+    }
+
+

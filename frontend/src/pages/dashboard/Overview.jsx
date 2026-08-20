@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Activity,
   BarChart3, Clock, RefreshCw, Image as ImageIcon, AlertTriangle,
-  Building2, Sparkles, XCircle, LogOut
+  Building2, Sparkles, XCircle, LogOut, Flame, Zap, Send, ArrowRight
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../config';
+import PostShipStudio from '../../components/PostShipStudio';
 
 /**
  * Command Center — a read-only status view.
@@ -76,8 +77,9 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  const panel = { background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: '1.5rem' };
+  const panel = { background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 14, padding: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' };
   const muted = { color: 'var(--text-muted)' };
+  const [postFilter, setPostFilter] = useState('ALL'); // 'ALL' | 'POSTED' | 'SCHEDULED' | 'FAILED'
 
   const connected = [
     connection?.hasFacebook && { icon: <Facebook size={14} color="#60a5fa" />, label: connection.fbPageName || 'Facebook Page' },
@@ -92,207 +94,487 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
   const live = canPublish && hasMedia;
 
   const blockers = [
-    !canPublish && { text: 'No social account connected', where: 'Businesses → Edit → Social Accounts' },
-    !hasMedia && { text: 'No media in this business’s catalog', where: 'Media & Catalog' },
-    business && !business.brandAnalysisComplete && { text: 'Brand profile still building — captions will be generic', where: null },
+    !canPublish && { text: 'No social account connected', where: 'Businesses → Edit → Social Accounts', action: () => navigate('/dashboard/workspaces') },
+    !hasMedia && { text: 'No media in this business’s catalog', where: 'Media & Catalog', action: () => navigate('/dashboard/media-catalog') },
+    business && !business.brandAnalysisComplete && { text: 'Brand profile still building — captions will be generic', where: 'AI Video Studio', action: () => navigate('/dashboard/video-studio') },
   ].filter(Boolean);
 
-  const Stat = ({ icon, label, value, hint }) => (
-    <div style={{ ...panel, display: 'flex', alignItems: 'center', gap: '1.15rem' }}>
-      <div style={{ background: 'rgba(139,92,246,0.1)', padding: '0.9rem', borderRadius: 12, display: 'flex' }}>{icon}</div>
+  const Stat = ({ icon, label, value, hint, color = 'var(--primary-color)' }) => (
+    <div style={{
+      ...panel,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '1.15rem',
+      position: 'relative',
+      overflow: 'hidden',
+      transition: 'transform 0.2s, box-shadow 0.2s',
+    }}>
+      <div style={{
+        background: `linear-gradient(135deg, ${color}20, ${color}08)`,
+        border: `1px solid ${color}30`,
+        padding: '0.85rem',
+        borderRadius: 12,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        {icon}
+      </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: '0.85rem', ...muted }}>{label}</div>
+        <div style={{ fontSize: '0.83rem', fontWeight: 600, ...muted }}>{label}</div>
         {loading
-          ? <div style={{ width: 52, height: 30, borderRadius: 6, background: 'rgba(11, 16, 32, 0.06)', marginTop: 4 }} />
-          : <div style={{ fontSize: '1.85rem', fontWeight: 700, lineHeight: 1.2 }}>{value ?? 0}</div>}
-        {hint && <div style={{ fontSize: '0.75rem', ...muted }}>{hint}</div>}
+          ? <div style={{ width: 52, height: 28, borderRadius: 6, background: 'rgba(11, 16, 32, 0.06)', marginTop: 4 }} />
+          : <div style={{ fontSize: '1.75rem', fontWeight: 800, lineHeight: 1.2, color: 'var(--text-main)' }}>{value ?? 0}</div>}
+        {hint && <div style={{ fontSize: '0.74rem', ...muted, marginTop: '0.15rem' }}>{hint}</div>}
       </div>
     </div>
   );
 
   const statusColor = live ? '#10b981' : '#f59e0b';
 
+  const filteredPosts = recentPosts.filter(p => {
+    if (postFilter === 'ALL') return true;
+    if (postFilter === 'POSTED') return p.status === 'POSTED' || p.status === 'PUBLISHED';
+    if (postFilter === 'FAILED') return p.status === 'FAILED';
+    if (postFilter === 'SCHEDULED') return p.status === 'SCHEDULED' || p.status === 'DRAFT' || p.status === 'PENDING';
+    return true;
+  });
+
   return (
     <div className="view">
-      <div className="container" style={{ padding: '2.5rem 0 3rem' }}>
+      <div className="container" style={{ padding: '2rem 0 3rem', maxWidth: 1100 }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.75rem' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '2.25rem' }}>Command Center</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-              <span style={{ ...muted, fontSize: '0.95rem' }}>{business?.name || 'No business selected'} —</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.2rem 0.65rem', borderRadius: 999, background: `${statusColor}22`, color: statusColor, fontSize: '0.78rem', fontWeight: 700 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor }} />
-                {live ? 'AUTOMATION LIVE' : 'NOT PUBLISHING'}
+            <h1 style={{ margin: 0, fontSize: '2.1rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Command Center</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ ...muted, fontSize: '0.92rem', fontWeight: 550 }}>{business?.name || 'No business selected'}</span>
+              <span style={{ color: 'var(--text-muted)' }}>•</span>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.2rem 0.65rem',
+                borderRadius: 999,
+                background: `${statusColor}18`,
+                border: `1px solid ${statusColor}40`,
+                color: statusColor,
+                fontSize: '0.76rem',
+                fontWeight: 750,
+                letterSpacing: '0.02em',
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor }} />
+                {live ? 'AUTONOMOUS POSTING ACTIVE' : 'NEEDS SETUP'}
               </span>
             </div>
           </div>
-          {/* Stacked, so the destructive action is never where the muscle
-              memory for Refresh lands. */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '0.55rem' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
             <button onClick={load} disabled={refreshing} className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}>
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', fontSize: '0.85rem', fontWeight: 600 }}>
               <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} /> Refresh
             </button>
             <button
               onClick={handleLogout}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                padding: '0.5rem 0.9rem', fontSize: '0.85rem', fontWeight: 600,
-                cursor: 'pointer', borderRadius: 12,
+                padding: '0.5rem 0.95rem', fontSize: '0.85rem', fontWeight: 600,
+                cursor: 'pointer', borderRadius: 10,
                 color: '#f87171',
-                background: 'rgba(239,68,68,0.10)',
-                border: '1px solid rgba(239,68,68,0.32)',
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.25)',
                 transition: 'background .18s, border-color .18s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(239,68,68,0.18)';
-                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.55)';
+                e.currentTarget.style.background = 'rgba(239,68,68,0.16)';
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(239,68,68,0.10)';
-                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.32)';
+                e.currentTarget.style.background = 'rgba(239,68,68,0.08)';
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)';
               }}
             >
-              <LogOut size={14} /> Log out
+              <LogOut size={14} /> Sign out
             </button>
           </div>
         </div>
 
-        {/* Blockers — the reason it is not publishing, stated plainly */}
+        {/* Quick Action Hub */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '0.85rem',
+          marginBottom: '1.75rem',
+        }}>
+          <button
+            onClick={() => navigate('/dashboard/video-studio')}
+            style={{
+              padding: '0.9rem 1.1rem',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(234, 88, 12, 0.04))',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#f97316'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'; }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: '#f97316', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Zap size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Faceless Auto-Pilot</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>5 Topics · 8s–30s Shorts</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/dashboard/video-studio')}
+            style={{
+              padding: '0.9rem 1.1rem',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.04))',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#ef4444'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)'; }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: '#ef4444', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Flame size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Viral Validator</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>5-Metric Radar &amp; Prediction</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/dashboard/social-scheduler')}
+            style={{
+              padding: '0.9rem 1.1rem',
+              borderRadius: 12,
+              background: 'rgba(11, 16, 32, 0.03)',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--primary-color)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Clock size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Social Scheduler</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Public, Private &amp; TikTok Drafts</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/dashboard/workspaces')}
+            style={{
+              padding: '0.9rem 1.1rem',
+              borderRadius: 12,
+              background: 'rgba(11, 16, 32, 0.03)',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--primary-color)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Building2 size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Channels &amp; Meta</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Connect Facebook &amp; Instagram</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/dashboard/support')}
+            style={{
+              padding: '0.9rem 1.1rem',
+              borderRadius: 12,
+              background: 'rgba(11, 16, 32, 0.03)',
+              border: '1px solid var(--border-color)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              cursor: 'pointer',
+              textAlign: 'left',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--primary-color)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
+          >
+            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Activity size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Support &amp; Reviews</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>24/7 SLA &amp; Feedback</div>
+            </div>
+          </button>
+        </div>
+
+        {/* Embedded PostShip Multi-Platform Engine */}
+        <PostShipStudio
+          token={token}
+          showToast={showToast}
+          activeWorkspaceId={activeWorkspaceId}
+          businessName={business?.name || 'Founder'}
+        />
+
+        {/* Blockers / Setup Checklist */}
         {!loading && blockers.length > 0 && (
-          <div style={{ ...panel, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)', marginBottom: '1.5rem' }}>
+          <div style={{ ...panel, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.04)', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
               <AlertTriangle size={16} color="#f59e0b" />
               <strong style={{ fontSize: '0.95rem', color: '#fcd34d' }}>
-                {canPublish && hasMedia ? 'Worth attending to' : 'Automation cannot publish yet'}
+                {canPublish && hasMedia ? 'Action Items' : 'Automation Checklist — Action Required'}
               </strong>
             </div>
-            <ul style={{ margin: 0, paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {blockers.map((b, i) => (
-                <li key={i} style={{ fontSize: '0.87rem', color: 'var(--text-muted)' }}>
-                  {b.text}{b.where && <span style={{ ...muted }}> — {b.where}</span>}
-                </li>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.87rem', color: 'var(--text-main)', padding: '0.4rem 0' }}>
+                  <span>• {b.text}</span>
+                  {b.action && (
+                    <button
+                      onClick={b.action}
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--primary-color)',
+                        fontWeight: 650, cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline'
+                      }}
+                    >
+                      {b.where} →
+                    </button>
+                  )}
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 
-        {/* Counts */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
-          <Stat icon={<Activity size={22} color="var(--primary-color)" />} label="Posts published" value={stats?.posts} />
-          <Stat icon={<BarChart3 size={22} color="var(--secondary-color)" />} label="Campaigns" value={stats?.campaigns} />
-          <Stat icon={<ImageIcon size={22} color="#10b981" />} label="Media assets" value={mediaCount} />
-          <Stat icon={<Building2 size={22} color="#f59e0b" />} label="Businesses" value={stats?.workspaces} />
+        {/* Core Metric Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <Stat icon={<Activity size={20} color="var(--primary-color)" />} label="Posts Published" value={stats?.posts} color="var(--primary-color)" />
+          <Stat icon={<BarChart3 size={20} color="#6366f1" />} label="Campaigns" value={stats?.campaigns} color="#6366f1" />
+          <Stat icon={<ImageIcon size={20} color="#10b981" />} label="Media Library Assets" value={mediaCount} color="#10b981" />
+          <Stat icon={<Building2 size={20} color="#f59e0b" />} label="Active Workspaces" value={stats?.workspaces} color="#f59e0b" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1fr) 2fr', gap: '1.5rem', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) 2fr', gap: '1.5rem', alignItems: 'start' }}>
 
-          {/* Status column */}
+          {/* Left Column: Channels & Automation Engine */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div style={panel}>
-              <h3 style={{ margin: '0 0 1rem', fontSize: '1rem' }}>Connected accounts</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700 }}>Connected Channels</h3>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Meta Graph API</span>
+              </div>
               {connected.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   {connected.map((c, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.87rem' }}>
-                      <CheckCircle2 size={14} color="#10b981" />
+                    <div key={i} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      fontSize: '0.87rem',
+                      padding: '0.5rem 0.65rem',
+                      borderRadius: 8,
+                      background: 'rgba(11, 16, 32, 0.03)',
+                      border: '1px solid rgba(11, 16, 32, 0.05)',
+                    }}>
+                      <CheckCircle2 size={15} color="#10b981" />
                       {c.icon}
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.label}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 550 }}>{c.label}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: 'var(--text-muted)' }}>
-                  <XCircle size={14} color="#f87171" /> None connected
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.87rem', color: 'var(--text-muted)', padding: '0.5rem 0' }}>
+                  <XCircle size={15} color="#f87171" /> No accounts connected yet
                 </div>
               )}
-              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(11, 16, 32, 0.06)', fontSize: '0.78rem', ...muted }}>
-                Managed in{' '}
+              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(11, 16, 32, 0.06)', fontSize: '0.8rem', ...muted, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Manage connections:</span>
                 <button onClick={() => navigate('/dashboard/workspaces')}
-                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', font: 'inherit' }}>
-                  Businesses
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 650, font: 'inherit' }}>
+                  Businesses →
                 </button>
               </div>
             </div>
 
             <div style={panel}>
-              <h3 style={{ margin: '0 0 1rem', fontSize: '1rem' }}>Automation</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={muted}>Scheduler</span>
-                  <span style={{ color: schedulerStatus?.schedulerRunning ? '#10b981' : '#f87171', fontWeight: 600 }}>
-                    {schedulerStatus?.schedulerRunning ? 'Running' : 'Stopped'}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700 }}>Autonomous Engine</h3>
+                <span style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  padding: '0.15rem 0.45rem',
+                  borderRadius: 4,
+                  background: schedulerStatus?.schedulerRunning ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: schedulerStatus?.schedulerRunning ? 'var(--success)' : 'var(--error)',
+                }}>
+                  {schedulerStatus?.schedulerRunning ? 'ACTIVE' : 'STOPPED'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.86rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={muted}>Engine Status</span>
+                  <span style={{ color: schedulerStatus?.schedulerRunning ? '#10b981' : '#f87171', fontWeight: 650 }}>
+                    {schedulerStatus?.schedulerRunning ? 'Continuous Running' : 'Paused'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={muted}>Auto-approve</span>
-                  <span style={{ color: schedulerStatus?.autoApprove ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
-                    {schedulerStatus?.autoApprove ? 'On — publishes directly' : 'Off — queues drafts'}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={muted}>Approval Mode</span>
+                  <span style={{ color: schedulerStatus?.autoApprove ? '#10b981' : '#f59e0b', fontWeight: 650 }}>
+                    {schedulerStatus?.autoApprove ? 'Auto-Publish' : 'Review Required'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={muted}>Posts every</span>
-                  <span style={{ fontWeight: 600 }}>{business?.postIntervalHours ?? 2}h</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={muted}>Publishing Cadence</span>
+                  <span style={{ fontWeight: 650 }}>Every {business?.postIntervalHours ?? 2} Hours</span>
                 </div>
                 {schedulerStatus?.nextRunAt && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={muted}>Next run</span>
-                    <span style={{ fontWeight: 600 }}>{new Date(schedulerStatus.nextRunAt).toLocaleTimeString()}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={muted}>Next Autonomous Post</span>
+                    <span style={{ fontWeight: 650, color: 'var(--primary-color)' }}>{new Date(schedulerStatus.nextRunAt).toLocaleTimeString()}</span>
                   </div>
                 )}
+              </div>
+              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(11, 16, 32, 0.06)', textAlign: 'right' }}>
+                <button
+                  onClick={() => navigate('/dashboard/social-scheduler')}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 650 }}
+                >
+                  Adjust Cadence &amp; Settings →
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Recent activity */}
+          {/* Right Column: Delivery Log & Post Review Queue */}
           <div style={{ ...panel, padding: 0, overflow: 'hidden' }}>
-            <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Clock size={16} color="var(--primary-color)" />
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Recent posts</h3>
-              <span style={{ marginLeft: 'auto', fontSize: '0.78rem', ...muted }}>{recentPosts.length} shown</span>
+            <div style={{ padding: '1.15rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={17} color="var(--primary-color)" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Post Delivery Log &amp; Reviews</h3>
+              </div>
+
+              {/* Filter Pills */}
+              <div style={{ display: 'flex', gap: '0.35rem', background: 'rgba(11,16,32,0.04)', padding: '0.2rem', borderRadius: 8 }}>
+                {['ALL', 'POSTED', 'SCHEDULED', 'FAILED'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setPostFilter(f)}
+                    style={{
+                      border: 'none',
+                      background: postFilter === f ? 'var(--primary-color)' : 'transparent',
+                      color: postFilter === f ? '#fff' : 'var(--text-muted)',
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: 6,
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'background 0.15s, color 0.15s',
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {loading ? (
-              <div style={{ padding: '3rem', textAlign: 'center' }}><span className="spinner" style={{ width: 20, height: 20 }} /></div>
-            ) : recentPosts.length === 0 ? (
-              <div style={{ padding: '3rem 2rem', textAlign: 'center', fontSize: '0.9rem', ...muted }}>
-                <Sparkles size={22} style={{ marginBottom: '0.75rem', opacity: 0.5 }} />
-                <div>Nothing published yet.</div>
+              <div style={{ padding: '3rem', textAlign: 'center' }}><span className="spinner" style={{ width: 22, height: 22 }} /></div>
+            ) : filteredPosts.length === 0 ? (
+              <div style={{ padding: '3.5rem 2rem', textAlign: 'center', fontSize: '0.9rem', ...muted }}>
+                <Sparkles size={24} style={{ marginBottom: '0.75rem', opacity: 0.6, color: 'var(--primary-color)' }} />
+                <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>No posts match this filter</div>
                 <div style={{ fontSize: '0.82rem', marginTop: '0.35rem' }}>
-                  Posts appear here once the automation runs.
+                  Posts will appear here as the autonomous marketing loop publishes and schedules content.
                 </div>
               </div>
             ) : (
               <div>
-                {recentPosts.slice(0, 8).map((p, i) => {
-                  const ok = p.status === 'POSTED';
+                {filteredPosts.slice(0, 8).map((p, i) => {
+                  const ok = p.status === 'POSTED' || p.status === 'PUBLISHED';
                   const failed = p.status === 'FAILED';
+                  const scheduled = p.status === 'SCHEDULED' || p.status === 'PENDING' || p.status === 'DRAFT';
                   const color = ok ? '#10b981' : failed ? '#f87171' : '#f59e0b';
                   return (
-                    <div key={p.id || i} style={{ display: 'flex', gap: '0.85rem', padding: '0.9rem 1.5rem', borderBottom: '1px solid rgba(11, 16, 32, 0.04)' }}>
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, marginTop: 7, flexShrink: 0 }} />
+                    <div key={p.id || i} style={{
+                      display: 'flex',
+                      gap: '0.95rem',
+                      padding: '1rem 1.5rem',
+                      borderBottom: '1px solid rgba(11, 16, 32, 0.04)',
+                      transition: 'background 0.15s',
+                    }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, marginTop: 6, flexShrink: 0 }} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: '0.86rem', lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {p.caption || 'No caption'}
+                        <div style={{ fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', color: 'var(--text-main)' }}>
+                          {p.caption || 'AI Generated Creative Asset'}
                         </div>
-                        <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.3rem', fontSize: '0.74rem', ...muted, flexWrap: 'wrap' }}>
-                          <span style={{ color, fontWeight: 600 }}>{p.status}</span>
-                          <span>{p.platform}</span>
+                        <div style={{ display: 'flex', gap: '0.65rem', marginTop: '0.35rem', fontSize: '0.75rem', ...muted, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{
+                            color,
+                            fontWeight: 750,
+                            padding: '0.1rem 0.45rem',
+                            borderRadius: 4,
+                            background: `${color}15`,
+                            fontSize: '0.7rem',
+                            letterSpacing: '0.04em',
+                          }}>
+                            {p.status}
+                          </span>
+                          <span style={{ fontWeight: 600 }}>{p.platform || 'INSTAGRAM / FACEBOOK'}</span>
                           {p.scheduledAt && <span>{new Date(p.scheduledAt).toLocaleString()}</span>}
                         </div>
                         {failed && p.errorLog && (
-                          <div style={{ fontSize: '0.74rem', color: '#fca5a5', marginTop: '0.25rem' }}>{p.errorLog}</div>
+                          <div style={{
+                            fontSize: '0.76rem',
+                            color: '#fca5a5',
+                            marginTop: '0.4rem',
+                            padding: '0.4rem 0.65rem',
+                            borderRadius: 6,
+                            background: 'rgba(239,68,68,0.06)',
+                            border: '1px solid rgba(239,68,68,0.2)',
+                            lineHeight: 1.4,
+                          }}>
+                            {p.errorLog}
+                          </div>
                         )}
                       </div>
                     </div>
                   );
                 })}
-                <div style={{ padding: '0.85rem 1.5rem', textAlign: 'center' }}>
+                <div style={{ padding: '1rem 1.5rem', textAlign: 'center', background: 'rgba(11, 16, 32, 0.015)' }}>
                   <button onClick={() => navigate('/dashboard/social-scheduler')}
-                    style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.83rem', fontWeight: 600 }}>
-                    View full delivery log
+                    style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.86rem', fontWeight: 700 }}>
+                    Open Social Scheduler &amp; Review Calendar →
                   </button>
                 </div>
               </div>

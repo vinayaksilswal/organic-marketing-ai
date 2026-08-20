@@ -318,3 +318,39 @@ async def build_keyframes(
             "totalSeconds": TOTAL_SECONDS,
         },
     }
+
+
+def fallback_keyframes_for_prompt(
+    prompt: str,
+    brand_name: str = "Organiflo",
+    brand_colors: Optional[list] = None,
+) -> dict:
+    """Synchronous fallback keyframes generator from an existing prompt text."""
+    prompt = (prompt or "").strip()
+    first_sentence = prompt.split(".")[0] if prompt else "Editorial portrait caught mid-action"
+    ground = _colour_words(brand_colors)
+    brand = brand_name or "Organiflo"
+    first_frame = (
+        f"Editorial photograph, vertical 9:16, {first_sentence}, "
+        f"natural ambient lighting, shallow depth of field, photographic, sharp focus, no text"
+    )
+    last_frame = (
+        f"A minimal vertical 9:16 end card, flat solid {ground} background, no photograph and no objects, "
+        f'nothing else in frame: the brand name "{brand}" in large bold clean sans-serif type, centred, '
+        f'below it the words "Start free at {brand}" in medium weight, smaller, centred. Generous even margins, '
+        f"all text horizontally centred and vertically centred as one block, crisp high-contrast lettering, "
+        f"sharp focus, clean typography, poster design"
+    )
+    return {
+        "firstFramePrompt": first_frame,
+        "lastFramePrompt": last_frame,
+        "brand": brand,
+        "cta": f"Start free at {brand}",
+        "destination": f"{_handle_from(brand)}.com" if brand else "",
+        "timing": {
+            "hookSeconds": HOOK_SECONDS,
+            "outroSeconds": OUTRO_SECONDS,
+            "totalSeconds": TOTAL_SECONDS,
+        },
+    }
+
