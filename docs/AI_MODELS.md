@@ -32,13 +32,13 @@ falling through on rate limits and 404s:
 
 1. `z-ai/glm-5.2:free` — 256K context, **text-only**
 2. `nvidia/nemotron-3-ultra-550b-a55b:free` — 550B MoE, 1M context
-2. `nvidia/nemotron-3-super-120b-a12b:free` — 120B MoE
-3. `inclusionai/ling-3.0-flash:free` — 124B MoE
-4. `google/gemma-4-31b-it:free`
-5. `google/gemma-4-26b-a4b-it:free`
-6. `openai/gpt-oss-20b:free`
-7. `nvidia/nemotron-3-nano-30b-a3b:free`
-8. **Gemini 2.0 Flash direct** — only if `GEMINI_API_KEY` is set
+3. `nvidia/nemotron-3-super-120b-a12b:free` — 120B MoE
+4. `inclusionai/ling-3.0-flash:free` — 124B MoE
+5. `google/gemma-4-31b-it:free`
+6. `google/gemma-4-26b-a4b-it:free`
+7. `openai/gpt-oss-20b:free`
+8. `nvidia/nemotron-3-nano-30b-a3b:free`
+9. **Gemini 2.0 Flash direct** — only if `GEMINI_API_KEY` is set
 
 The chain is refreshed hourly from OpenRouter's live catalogue rather than
 trusted as written. An earlier hardcoded chain listed four models that had all
