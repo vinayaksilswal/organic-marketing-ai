@@ -95,6 +95,17 @@ class Settings(BaseSettings):
     # OpenRouter API (LLM — AI copy generation & chatbot)
     # =========================================================================
     openrouter_api_key: str | None = None
+    # Which model writes marketing copy, and what it falls back to.
+    #
+    # Both are env overrides so the quality of every caption, brand analysis
+    # and video prompt in the product can be raised by changing a variable and
+    # restarting -- no deploy, no code edit, and no risk of the two lists
+    # drifting apart in a hurry. Empty means "use the built-in chain".
+    #
+    #   AI_PRIMARY_MODEL=anthropic/claude-sonnet-4
+    #   AI_MODEL_CHAIN=anthropic/claude-sonnet-4,openai/gpt-4o-mini
+    ai_primary_model: str | None = None
+    ai_model_chain: str | None = None
     # Direct Gemini access, used as a fallback when OpenRouter's free tier
     # rate-limits so creative generation degrades instead of failing.
     gemini_api_key: str | None = None

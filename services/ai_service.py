@@ -42,7 +42,13 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # google/gemma-2-9b-it:free — Used for marketing copy generation (free tier)
 # google/gemma-2-9b-it:free was retired by OpenRouter and returned 404 on every
 # call, so the default model for all marketing copy was silently dead.
-MARKETING_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+# Overridable from the environment: see settings.ai_primary_model. Paying for
+# a stronger model is the single highest-leverage quality change available to
+# this product, and it should not require a code change to make.
+MARKETING_MODEL = (
+    (settings.ai_primary_model or "").strip()
+    or "nvidia/nemotron-3-ultra-550b-a55b:free"
+)
 
 # Shared timeout for LLM API calls (LLMs can be slow)
 LLM_TIMEOUT = httpx.Timeout(60.0, connect=15.0)
@@ -193,6 +199,20 @@ _model_cache: dict[str, Any] = {"models": None, "fetched_at": 0.0}
 _MODEL_CACHE_TTL = 3600  # seconds
 
 
+def _configured_chain() -> list[str] | None:
+    """An explicit chain from the environment, if one is set.
+
+    When present it wins outright and the OpenRouter free-catalogue refresh is
+    skipped entirely -- an operator who has paid for specific models does not
+    want a discovery step quietly appending free ones behind them.
+    """
+    raw = (settings.ai_model_chain or "").strip()
+    if not raw:
+        return None
+    models = [m.strip() for m in raw.split(",") if m.strip()]
+    return models or None
+
+
 async def _free_models() -> list[str]:
     """The free models OpenRouter currently offers, cached for an hour.
 
@@ -200,6 +220,11 @@ async def _free_models() -> list[str]:
     longer silently break the fallback chain. Falls back to FREE_MODEL_CHAIN if
     the catalogue cannot be reached.
     """
+    # An explicitly configured chain wins outright, and skips discovery.
+    configured = _configured_chain()
+    if configured:
+        return configured
+
     now = time.time()
     if _model_cache["models"] and now - _model_cache["fetched_at"] < _MODEL_CACHE_TTL:
         return _model_cache["models"]
@@ -224,6 +249,7 @@ async def _free_models() -> list[str]:
         logger.warning(f"Could not refresh OpenRouter model list, using defaults: {e}")
 
     return FREE_MODEL_CHAIN
+
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 GEMINI_MODEL = "gemini-2.0-flash"

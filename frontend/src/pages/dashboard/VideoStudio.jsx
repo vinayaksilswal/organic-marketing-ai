@@ -501,9 +501,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     <div style={{ ...card, display: 'flex', alignItems: 'center', gap: '0.7rem', minHeight: 110 }}>
                       <span className="spinner" style={{ width: 16, height: 16 }} />
                       <div style={{ fontSize: '0.87rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
-                        Writing the prompt. Free AI providers queue under load, so this
-                        can take up to a minute — you can leave this page and it will
-                        still finish.
+                        Writing the prompt — this can take up to a minute. You can
+                        leave this page and it will still finish.
                       </div>
                     </div>
                   ) : failed ? (
