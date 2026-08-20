@@ -718,6 +718,26 @@ async def init_db() -> AsyncEngine:
         async with asyncio.timeout(30.0):
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+
+                # Defensive column migrations for existing databases
+                columns_to_add = [
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "publishingMode" VARCHAR DEFAULT \'PUBLIC\'',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postingDays" JSON',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postingStartHour" INTEGER',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postingEndHour" INTEGER',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "postingTimezone" VARCHAR',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "automationPaused" BOOLEAN DEFAULT FALSE',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "hashtagSets" JSON',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "provenOffers" JSON',
+                    'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "paypalOrderId" VARCHAR',
+                    'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN DEFAULT FALSE',
+                ]
+                for stmt in columns_to_add:
+                    try:
+                        await conn.execute(text(stmt))
+                    except Exception as col_err:
+                        logger.debug(f"Column migration skipped: {col_err}")
+
         logger.info("SQLAlchemy ORM tables initialized successfully")
     except Exception as e:
         logger.error(f"Table initialization failed or timed out: {e}")

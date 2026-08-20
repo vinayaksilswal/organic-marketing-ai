@@ -108,7 +108,8 @@ const Auth = ({ onLogin, showToast }) => {
           navigate('/dashboard');
         }
       } else {
-         throw new Error('Failed to fetch user data');
+        const errJson = await userRes?.json().catch(() => ({}));
+        throw new Error(errJson?.detail || 'Failed to fetch user data. Please try again.');
       }
     } catch (err) {
       if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
