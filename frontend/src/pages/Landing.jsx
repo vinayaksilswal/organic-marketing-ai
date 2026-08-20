@@ -753,7 +753,7 @@ const Landing = () => {
       {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 1: FACELESS SHORT VIDEOS ON AUTO-PILOT */}
       {/* ========================================================================= */}
-      <section style={{ background: '#0a0d14', color: '#fff', padding: '5rem 0' }}>
+      <section className="reveal" style={{ background: 'linear-gradient(180deg, rgba(249,115,22,0.05), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -773,10 +773,10 @@ const Landing = () => {
             }}>
               <Zap size={13} color="#f97316" /> Autonomous Channel Growth
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               Faceless Short Videos on Auto-Pilot
             </h2>
-            <p style={{ fontSize: '1.05rem', color: '#94a3b8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
               Pick a topic, pick a voice, pick a schedule. We write the hook, voiceover, keyframe image prompt, video diffusion prompt, and post every video for you.
             </p>
           </div>
@@ -804,8 +804,8 @@ const Landing = () => {
                     <span style={{ fontSize: '1.6rem' }}>{t.icon}</span>
                     <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 6, background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>{t.badge}</span>
                   </div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', marginBottom: '0.35rem' }}>{t.title}</div>
-                  <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.45, margin: 0 }}>{t.desc}</p>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--ink)', marginBottom: '0.35rem' }}>{t.title}</div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', lineHeight: 1.45, margin: 0 }}>{t.desc}</p>
                 </div>
               </div>
             ))}
@@ -813,32 +813,32 @@ const Landing = () => {
 
           {/* 3 Pipeline Pillars (Visual Styles, Voices, Timed Video) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="glass" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#f97316' }}>
                 <Film size={18} />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>6 Visual Styles</h3>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--ink)' }}>6 Visual Styles</h3>
               </div>
-              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
                 Cinematic Realism (8K 35mm film), Cyberpunk Anime, Retro Comic, Vintage 35mm Film, 3D Gaming Motion, and Minimal 3D Pixar.
               </p>
             </div>
 
-            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="glass" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#38bdf8' }}>
                 <Volume2 size={18} />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>5 AI Voice Personas</h3>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--ink)' }}>5 AI Voice Personas</h3>
               </div>
-              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
                 Adam (Deep Storyteller), Rachel (Energetic Host), Marcus (Authoritative Guide), Bella (Warm Conversationalist), and Shadow Whisper.
               </p>
             </div>
 
-            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="glass" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#10b981' }}>
                 <Clock size={18} />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>8s to 30s Timed Scripts</h3>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--ink)' }}>8s to 30s Timed Scripts</h3>
               </div>
-              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
                 Front-loaded 0-3s scroll-stopping hooks with timed pacing cues, Midjourney start frames, and Kling/Veo diffusion prompts.
               </p>
             </div>
@@ -849,7 +849,7 @@ const Landing = () => {
       {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 2: VIRAL VALIDATOR & ALGORITHM PREDICTOR */}
       {/* ========================================================================= */}
-      <section style={{ background: '#07090e', color: '#fff', padding: '5rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <section className="reveal" style={{ background: 'linear-gradient(180deg, rgba(37,99,235,0.05), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -869,10 +869,10 @@ const Landing = () => {
             }}>
               <Flame size={13} color="#f87171" /> Algorithmic View Prediction
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               Stop Guessing. Predict Views Before You Hit Upload.
             </h2>
-            <p style={{ fontSize: '1.05rem', color: '#94a3b8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
               We reverse-engineered the viral code across 500M+ shorts. We score your content on the 5 metrics that actually trigger the algorithm.
             </p>
           </div>
@@ -893,42 +893,42 @@ const Landing = () => {
                 border: '1px solid rgba(255,255,255,0.08)',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>{m.title}</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--ink)' }}>{m.title}</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#10b981' }}>{m.score}%</span>
                 </div>
-                <p style={{ fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.45, margin: 0 }}>{m.desc}</p>
+                <p style={{ fontSize: '0.76rem', color: 'var(--ink-soft)', lineHeight: 1.45, margin: 0 }}>{m.desc}</p>
               </div>
             ))}
           </div>
 
           {/* 3 Creator Value Pillars */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="glass" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#f87171' }}>
                 <Eye size={18} />
-                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#fff' }}>Stop Posting Blindly</h3>
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: 'var(--ink)' }}>Stop Posting Blindly</h3>
               </div>
-              <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
                 Know exactly how your video will perform before you hit upload.
               </p>
             </div>
 
-            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="glass" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#f59e0b' }}>
                 <Sparkles size={18} />
-                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#fff' }}>Fix Issues Instantly</h3>
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: 'var(--ink)' }}>Fix Issues Instantly</h3>
               </div>
-              <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
                 Actionable feedback: "Shorten the intro", "Add visual cut at 0:04", "Boost audio".
               </p>
             </div>
 
-            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="glass" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#10b981' }}>
                 <TrendingUp size={18} />
-                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#fff' }}>Scale Your Growth</h3>
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: 'var(--ink)' }}>Scale Your Growth</h3>
               </div>
-              <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
                 Consistent viral hits mean faster monetization and exponential organic reach.
               </p>
             </div>
@@ -939,7 +939,7 @@ const Landing = () => {
       {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 3: POSTSHIP MULTI-PLATFORM REPURPOSING */}
       {/* ========================================================================= */}
-      <section style={{ background: '#0a0d14', color: '#fff', padding: '5rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <section className="reveal" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.045), rgba(37,99,235,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -959,10 +959,10 @@ const Landing = () => {
             }}>
               <Send size={13} color="#60a5fa" /> PostShip Multi-Platform Engine
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               One click. Every platform, natively.
             </h2>
-            <p style={{ fontSize: '1.05rem', color: '#94a3b8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
               The same ship line or product URL, rewritten for how each platform actually reads — not copy-pasted three times.
             </p>
           </div>
