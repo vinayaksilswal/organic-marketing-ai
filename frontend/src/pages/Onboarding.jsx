@@ -169,6 +169,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
             
             <div className="selection-grid">
               {[
+                { name: 'Faceless Channel', icon: '🎬' },
                 { name: 'AI Influencer', icon: '🤖' },
                 { name: 'SaaS', icon: '💻' },
                 { name: 'E-commerce', icon: '🛒' },

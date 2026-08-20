@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Facebook, Instagram, Twitter, Linkedin, Activity,
   BarChart3, Clock, RefreshCw, Image as ImageIcon, AlertTriangle,
-  Building2, Sparkles, XCircle, LogOut, Flame, Zap, Send, ArrowRight
+  Building2, Sparkles, XCircle, LogOut, Send, ArrowRight
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../config';
-import PostShipStudio from '../../components/PostShipStudio';
 
 /**
  * Command Center — a read-only status view.
@@ -200,152 +199,6 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
             </button>
           </div>
         </div>
-
-        {/* Quick Action Hub */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '0.85rem',
-          marginBottom: '1.75rem',
-        }}>
-          <button
-            onClick={() => navigate('/dashboard/video-studio')}
-            style={{
-              padding: '0.9rem 1.1rem',
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(234, 88, 12, 0.04))',
-              border: '1px solid rgba(249, 115, 22, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'transform 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#f97316'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.3)'; }}
-          >
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: '#f97316', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Zap size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Faceless Auto-Pilot</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>5 Topics · 8s–30s Shorts</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/dashboard/video-studio')}
-            style={{
-              padding: '0.9rem 1.1rem',
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(220, 38, 38, 0.04))',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'transform 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#ef4444'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)'; }}
-          >
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: '#ef4444', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Flame size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Viral Validator</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>5-Metric Radar &amp; Prediction</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/dashboard/social-scheduler')}
-            style={{
-              padding: '0.9rem 1.1rem',
-              borderRadius: 12,
-              background: 'rgba(11, 16, 32, 0.03)',
-              border: '1px solid var(--border-color)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'transform 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--primary-color)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-          >
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Clock size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Social Scheduler</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Public, Private &amp; TikTok Drafts</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/dashboard/workspaces')}
-            style={{
-              padding: '0.9rem 1.1rem',
-              borderRadius: 12,
-              background: 'rgba(11, 16, 32, 0.03)',
-              border: '1px solid var(--border-color)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'transform 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--primary-color)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-          >
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Building2 size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Channels &amp; Meta</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Connect Facebook &amp; Instagram</div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => navigate('/dashboard/support')}
-            style={{
-              padding: '0.9rem 1.1rem',
-              borderRadius: 12,
-              background: 'rgba(11, 16, 32, 0.03)',
-              border: '1px solid var(--border-color)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'transform 0.15s, border-color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--primary-color)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border-color)'; }}
-          >
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Activity size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>Support &amp; Reviews</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>24/7 SLA &amp; Feedback</div>
-            </div>
-          </button>
-        </div>
-
-        {/* Embedded PostShip Multi-Platform Engine */}
-        <PostShipStudio
-          token={token}
-          showToast={showToast}
-          activeWorkspaceId={activeWorkspaceId}
-          businessName={business?.name || 'Founder'}
-        />
 
         {/* Blockers / Setup Checklist */}
         {!loading && blockers.length > 0 && (

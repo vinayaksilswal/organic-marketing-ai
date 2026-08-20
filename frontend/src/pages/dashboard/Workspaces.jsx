@@ -454,6 +454,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
                   {[
+                    { name: 'Faceless Channel', icon: '🎬', desc: 'Faceless viral video brand — AI creates hooks, voiceovers, Midjourney first frames, Kling/Veo diffusion prompts, and captions' },
                     { name: 'AI Influencer', icon: '🤖' }, { name: 'SaaS', icon: '💻' },
                     { name: 'E-commerce', icon: '🛒' }, { name: 'Creator', icon: '🎨' },
                     { name: 'Local Business', icon: '🏪' }, { name: 'Agency', icon: '🤝' },
@@ -535,7 +536,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <label style={labelStyle}>Business Model</label>
                         <select value={editData.businessModel} onChange={e => setEditData({...editData, businessModel: e.target.value})}
                           style={{ ...inputStyle, appearance: 'auto' }}>
-                          {['SaaS', 'E-commerce', 'Creator', 'AI Influencer', 'Social Page', 'Local Business', 'Agency', 'General'].map(m => (
+                          {['Faceless Channel', 'SaaS', 'E-commerce', 'Creator', 'AI Influencer', 'Social Page', 'Local Business', 'Agency', 'General'].map(m => (
                             <option key={m} value={m}>{m}</option>
                           ))}
                         </select>

@@ -686,6 +686,8 @@ const Landing = () => {
           <CardRail
             interval={3900}
             items={[
+              { key: 'faceless', icon: <Zap size={18} />, title: 'Faceless Channel', colour: '#f97316',
+                body: 'Dedicated faceless video brand on auto-pilot. Generates 8s–30s scroll-stopping hooks, voiceover scripts, Midjourney start frames, Kling/Veo motion diffusion prompts, outro cards, and publishes directly to YouTube Shorts, TikTok, & Reels.' },
               { key: 'saas', icon: <MonitorSmartphone size={18} />, title: 'SaaS & Data', colour: 'var(--blue)',
                 body: 'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.' },
               { key: 'ecom', icon: <ShoppingBag size={18} />, title: 'E-commerce', colour: 'var(--violet)',

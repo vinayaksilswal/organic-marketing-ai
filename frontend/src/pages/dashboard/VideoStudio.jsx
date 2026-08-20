@@ -367,9 +367,53 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       <h2 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: '#fff' }}>
                         Pick a topic, pick a voice, pick a schedule.
                       </h2>
-                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: '#d4d4d8' }}>
+                      <p style={{ margin: '0.25rem 0 0.6rem', fontSize: '0.84rem', color: '#d4d4d8' }}>
                         We write, voice, caption, and post every video for you. Connect your YouTube, TikTok, &amp; Reels and let the AI run your channel.
                       </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        {business?.businessModel === 'Faceless Channel' ? (
+                          <span style={{ fontSize: '0.74rem', padding: '0.2rem 0.6rem', borderRadius: 6, background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.4)', color: '#f97316', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            🎬 Dedicated Faceless Video Channel
+                          </span>
+                        ) : (
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await authFetch(`${API_BASE}/businesses/${activeWorkspaceId}`, {
+                                  method: 'PATCH',
+                                  body: JSON.stringify({ businessModel: 'Faceless Channel' })
+                                }, token);
+                                if (res.ok) {
+                                  setBusiness(prev => ({ ...prev, businessModel: 'Faceless Channel' }));
+                                  setAutopilotActive(true);
+                                  showToast('Workspace converted to Faceless Channel! Video prompt auto-pilot enabled. 🚀');
+                                }
+                              } catch (err) {
+                                showToast(err.message, true);
+                              }
+                            }}
+                            style={{
+                              background: 'rgba(255,255,255,0.06)',
+                              border: '1px solid rgba(249,115,22,0.4)',
+                              color: '#f97316',
+                              borderRadius: 8,
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.76rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <Sparkles size={12} /> Convert Business Type to "Faceless Channel"
+                          </button>
+                        )}
+                        <span style={{ fontSize: '0.74rem', color: '#a1a1aa' }}>
+                          Active: <strong>{business?.name || 'Workspace'}</strong> ({business?.businessModel || 'General'})
+                        </span>
+                      </div>
                     </div>
 
                     <button

@@ -55,7 +55,7 @@ TOTAL_SECONDS = 10.0
 
 # Deliberately narrow. A creator or influencer account often does sell
 # something, so forcing "Follow for more" would overwrite a real offer.
-_PAGE_MODELS = {"social page", "social_page", "page"}
+_PAGE_MODELS = {"social page", "social_page", "page", "faceless channel", "faceless_channel", "faceless"}
 _SHOP_MODELS = {"e-commerce", "ecommerce", "e commerce", "retail", "dtc", "shop"}
 
 
