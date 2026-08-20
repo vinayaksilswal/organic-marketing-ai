@@ -568,6 +568,26 @@ async def execute_due_scheduled_posts() -> None:
         logger.error(f"[SCHEDULED POSTS] Loop exception: {e}")
 
 
+async def _run_media_sweep() -> None:
+    """Daily sweep, never raising into the scheduler.
+
+    A job that throws takes its next run with it in some APScheduler
+    configurations, and a catalog check failing must never be the reason
+    posting stops.
+    """
+    try:
+        from services.media_health import sweep
+
+        result = await sweep()
+        if result["retired"]:
+            logger.warning(
+                f"[MEDIA SWEEP] Retired {result['retired']} asset(s) whose files "
+                f"are gone; {result['unreachable']} could not be checked."
+            )
+    except Exception as e:
+        logger.error(f"[MEDIA SWEEP] failed: {e}")
+
+
 def create_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler AsyncIOScheduler instance."""
     scheduler = AsyncIOScheduler(timezone="UTC")
@@ -610,6 +630,20 @@ def create_scheduler() -> AsyncIOScheduler:
         trigger=IntervalTrigger(hours=24),
         id="post_cleanup",
         name="Daily Post Cleanup",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Retire assets whose files no longer exist. Daily, and deliberately not
+    # more often: it is an outbound probe against a CDN, and the failures it
+    # must NOT act on -- rate limits, timeouts -- are exactly what hammering
+    # one would produce.
+    scheduler.add_job(
+        _run_media_sweep,
+        trigger=IntervalTrigger(hours=24),
+        id="media_health_sweep",
+        name="Daily Media Reachability Sweep",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
