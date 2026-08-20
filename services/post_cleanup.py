@@ -36,6 +36,8 @@ from typing import Any, Dict, List, Optional
 import httpx
 from loguru import logger
 
+from services.post_protection import is_protected
+
 GRAPH = "https://graph.facebook.com/v21.0"
 
 # Seven days, reduced from fifteen.
@@ -138,6 +140,7 @@ async def find_underperformers(
 
     candidates = []
     unmeasurable = 0
+    protected = 0
 
     for post in posts:
         try:
@@ -172,6 +175,14 @@ async def find_underperformers(
         if views is None:
             # Cannot read the numbers, so cannot justify deleting it.
             unmeasurable += 1
+            continue
+
+        # The same floor every deletion path answers to. MIN_VIEWS alone is
+        # this module's own rule; is_protected is the product's, and it is
+        # checked here too so no single threshold change can quietly put
+        # performing posts back in range.
+        if is_protected(views):
+            protected += 1
             continue
         if views >= MIN_VIEWS:
             continue

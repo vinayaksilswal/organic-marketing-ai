@@ -47,6 +47,35 @@ def urls_in(caption: str):
     return URL_PATTERN.findall(text)
 
 
+from services.post_protection import is_protected, refusal_reason
+
+
+async def _read_views(client, media_id: str, token: str):
+    """Views for one post, or None when they cannot be read.
+
+    None is protective here: a post that cannot be measured cannot be shown to
+    have failed, and this script deletes irreversibly.
+    """
+    try:
+        body = (await client.get(
+            f"{GRAPH}/{media_id}/insights",
+            params={"access_token": token, "metric": "views,reach"},
+        )).json()
+    except Exception:
+        return None
+    if not body or "error" in body:
+        return None
+    values = {
+        row.get("name"): (row.get("values") or [{}])[0].get("value")
+        for row in body.get("data", [])
+    }
+    for metric in ("views", "reach"):
+        v = values.get(metric)
+        if isinstance(v, int):
+            return v
+    return None
+
+
 async def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--apply", action="store_true")
@@ -63,7 +92,7 @@ async def main() -> None:
             .order_by(BusinessProfile.name)
         )).all()
 
-    total_found = total_deleted = 0
+    total_found = total_deleted = total_protected = 0
 
     async with httpx.AsyncClient(timeout=90) as client:
         for profile, conn in rows:
@@ -101,6 +130,20 @@ async def main() -> None:
             for post, found in offenders:
                 print(f"  {post.get('permalink')}")
                 print(f"    urls: {', '.join(sorted(set(found))[:4])}")
+
+                # Reach outranks every other reason to delete.
+                #
+                # This script used to match on caption text and nothing else,
+                # and it deleted fifty-four posts in one run -- including a
+                # reel that had reached four thousand views. A link in the
+                # caption of a post that worked is a caption problem, and the
+                # answer to a caption problem is never to destroy the reach.
+                views = await _read_views(client, post["id"], token)
+                if is_protected(views):
+                    print(f"    KEPT — {refusal_reason(views)}")
+                    total_protected += 1
+                    continue
+
                 if not args.apply:
                     continue
 
