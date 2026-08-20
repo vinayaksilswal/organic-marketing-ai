@@ -569,7 +569,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
                 return (
                   <div key={p.id} style={{
-                    background: '#15151c',
+                    background: 'rgba(11,16,32,0.04)',
                     borderRadius: 12,
                     border: '1px solid rgba(249,115,22,0.25)',
                     padding: '1rem',
@@ -580,7 +580,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   }}>
                     <div style={{ display: 'flex', gap: '0.85rem' }}>
                       {mediaUrl ? (
-                        <div style={{ width: 68, height: 68, borderRadius: 8, overflow: 'hidden', background: '#000', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                        <div style={{ width: 68, height: 68, borderRadius: 8, overflow: 'hidden', background: '#000', flexShrink: 0, border: '1px solid var(--border-color)', position: 'relative' }}>
                           {isVideo ? (
                             <>
                               <video src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -603,20 +603,20 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.1rem 0.45rem', borderRadius: 4, background: '#f97316', color: '#fff' }}>
                             {p.platform || 'BOTH'}
                           </span>
-                          <span style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                             Scheduled
                           </span>
                         </div>
                         <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fcd34d', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                           <Clock size={12} /> {dateFormatted}
                         </div>
-                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.76rem', color: '#d4d4d8', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.76rem', color: 'var(--text-main)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {p.caption || 'No caption provided'}
                         </p>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.65rem' }}>
                       <button
                         onClick={() => handleCancelScheduledPost(p.id)}
                         style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
@@ -961,14 +961,14 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           </div>
                         ) : (
                           /* Feed post */
-                          <div style={{ width: '100%', maxWidth: 350, background: '#111', borderRadius: 12, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                          <div style={{ width: '100%', maxWidth: 350, background: '#111', color: '#fff', borderRadius: 12, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                             <div style={{ padding: '0.7rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                               <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--primary-color),var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
                                 {(business?.name || 'B').charAt(0).toUpperCase()}
                               </div>
                               <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{handle}</span>
                               <div style={{ marginLeft: 'auto', display: 'flex', gap: 3 }}>
-                                {[0, 1, 2].map(i => <div key={i} style={{ width: 3.5, height: 3.5, background: 'var(--text-muted)', borderRadius: '50%' }} />)}
+                                {[0, 1, 2].map(i => <div key={i} style={{ width: 3.5, height: 3.5, background: 'rgba(255,255,255,0.65)', borderRadius: '50%' }} />)}
                               </div>
                             </div>
 
@@ -977,7 +977,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                             </div>
 
                             <div style={{ padding: '0.7rem 0.75rem' }}>
-                              <div style={{ display: 'flex', gap: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                              <div style={{ display: 'flex', gap: '0.9rem', marginBottom: '0.5rem', color: '#fff' }}>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
@@ -1004,15 +1004,15 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         {isScheduleModalOpen && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setIsScheduleModalOpen(false); }}>
-            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: '#121218', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(249,115,22,0.3)' }}>
                     <Clock size={20} />
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>Schedule Post from Media</h3>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa' }}>Pick an asset from your library, set the exact date &amp; time, and Organiflo will publish it automatically.</p>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>Pick an asset from your library, set the exact date &amp; time, and Organiflo will publish it automatically.</p>
                   </div>
                 </div>
                 <button onClick={() => setIsScheduleModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
@@ -1031,12 +1031,12 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                       placeholder="https://.../video.mp4 or image.jpg"
                       value={scheduleMediaUrl}
                       onChange={e => setScheduleMediaUrl(e.target.value)}
-                      style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: 8, background: '#000', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                      style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: 8, background: '#000', border: '1px solid var(--border-color)', color: '#fff', fontSize: '0.85rem' }}
                     />
                   </div>
                 ) : (
                   <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem', maxHeight: 180, overflowY: 'auto', padding: '0.5rem', background: '#0a0a0f', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem', maxHeight: 180, overflowY: 'auto', padding: '0.5rem', background: 'rgba(11,16,32,0.03)', borderRadius: 10, border: '1px solid var(--border-color)' }}>
                       {mediaList.map(m => {
                         const isSel = scheduleMediaId === m.id || scheduleMediaUrl === m.url;
                         const isVid = m.url && (m.url.endsWith('.mp4') || m.url.includes('/video/'));
@@ -1052,7 +1052,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                               aspectRatio: '1/1',
                               borderRadius: 8,
                               overflow: 'hidden',
-                              border: isSel ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.1)',
+                              border: isSel ? '2px solid #f97316' : '1px solid var(--border-color)',
                               cursor: 'pointer',
                               position: 'relative',
                               background: '#000',
@@ -1085,7 +1085,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                         placeholder="Or paste custom media URL..."
                         value={scheduleMediaUrl}
                         onChange={e => { setScheduleMediaUrl(e.target.value); setScheduleMediaId(''); }}
-                        style={{ width: '100%', padding: '0.45rem 0.75rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.78rem' }}
+                        style={{ width: '100%', padding: '0.45rem 0.75rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.78rem' }}
                       />
                     </div>
                   </div>
@@ -1129,8 +1129,8 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     width: '100%',
                     padding: '0.7rem',
                     borderRadius: 8,
-                    background: '#0a0a0f',
-                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(11,16,32,0.03)',
+                    border: '1px solid var(--border-color)',
                     color: '#fff',
                     fontSize: '0.85rem',
                     lineHeight: 1.45,
@@ -1148,7 +1148,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   <select
                     value={schedulePlatform}
                     onChange={e => setSchedulePlatform(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem', appearance: 'auto' }}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem', appearance: 'auto' }}
                   >
                     <option value="BOTH">Instagram &amp; Facebook (Both)</option>
                     <option value="INSTAGRAM">Instagram Only (Reels / Feed)</option>
@@ -1165,13 +1165,13 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                       type="date"
                       value={scheduleDate}
                       onChange={e => setScheduleDate(e.target.value)}
-                      style={{ flex: 1, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                      style={{ flex: 1, padding: '0.55rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem' }}
                     />
                     <input
                       type="time"
                       value={scheduleTime}
                       onChange={e => setScheduleTime(e.target.value)}
-                      style={{ width: 110, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                      style={{ width: 110, padding: '0.55rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem' }}
                     />
                   </div>
                 </div>
@@ -1179,7 +1179,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
               {/* QUICK DATE SHORTCUT PRESETS */}
               <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.74rem', color: '#a1a1aa' }}>Quick Times:</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Quick Times:</span>
                 {[
                   { label: 'Today 6 PM', getDt: () => { const d = new Date(); return { date: d.toISOString().split('T')[0], time: '18:00' }; } },
                   { label: 'Tomorrow 12 PM', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 1); return { date: d.toISOString().split('T')[0], time: '12:00' }; } },
@@ -1196,8 +1196,8 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     }}
                     style={{
                       background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: '#d4d4d8',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-main)',
                       borderRadius: 6,
                       padding: '0.2rem 0.55rem',
                       fontSize: '0.72rem',
@@ -1210,7 +1210,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 ))}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button className="btn btn-secondary" onClick={() => setIsScheduleModalOpen(false)} disabled={schedulingPost}>
                   Cancel
                 </button>

@@ -1115,7 +1115,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                                 {item.promptType === 'video' ? 'Video prompt' : 'AI prompt'}
                               </summary>
                               <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
-                                <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.55, color: '#d4d4d8', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+                                <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.55, color: 'var(--text-main)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
                                   {item.prompt}
                                 </p>
                                 <button
@@ -1349,22 +1349,22 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         {scheduleItem && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setScheduleItem(null); }}>
-            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: '#121218', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Clock size={20} />
                   </div>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>Schedule One-Time Post</h3>
-                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa' }}>Set exact release date and time for this creative asset.</p>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>Set exact release date and time for this creative asset.</p>
                   </div>
                 </div>
                 <button onClick={() => setScheduleItem(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
               </div>
 
               {/* MEDIA PREVIEW */}
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', background: '#0a0a0f', padding: '0.75rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', background: 'rgba(11,16,32,0.03)', padding: '0.75rem', borderRadius: 10, border: '1px solid var(--border-color)', alignItems: 'center' }}>
                 <div style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: '#000', flexShrink: 0 }}>
                   {(scheduleItem.mimeType || '').startsWith('video/') || scheduleItem.filename?.endsWith('.mp4') ? (
                     <video src={scheduleItem.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1376,7 +1376,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {scheduleItem.filename}
                   </div>
-                  <div style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: '0.2rem' }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                     {scheduleItem.tags?.join(', ') || 'Creative Asset'}
                   </div>
                 </div>
@@ -1413,7 +1413,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   value={scheduleCaption}
                   onChange={e => setScheduleCaption(e.target.value)}
                   placeholder="Post caption..."
-                  style={{ width: '100%', padding: '0.7rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.7rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem' }}
                 />
               </div>
 
@@ -1424,7 +1424,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   <select
                     value={schedulePlatform}
                     onChange={e => setSchedulePlatform(e.target.value)}
-                    style={{ width: '100%', padding: '0.6rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem', appearance: 'auto' }}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem', appearance: 'auto' }}
                   >
                     <option value="BOTH">Instagram &amp; Facebook (Both)</option>
                     <option value="INSTAGRAM">Instagram Only (Reels / Feed)</option>
@@ -1438,13 +1438,13 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                       type="date"
                       value={scheduleDate}
                       onChange={e => setScheduleDate(e.target.value)}
-                      style={{ flex: 1, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                      style={{ flex: 1, padding: '0.55rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem' }}
                     />
                     <input
                       type="time"
                       value={scheduleTime}
                       onChange={e => setScheduleTime(e.target.value)}
-                      style={{ width: 100, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                      style={{ width: 100, padding: '0.55rem', borderRadius: 8, background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontSize: '0.85rem' }}
                     />
                   </div>
                 </div>
@@ -1452,7 +1452,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
               {/* QUICK PRESETS */}
               <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.72rem', color: '#a1a1aa' }}>Presets:</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Presets:</span>
                 {[
                   { label: 'Today 6 PM', getDt: () => { const d = new Date(); return { date: d.toISOString().split('T')[0], time: '18:00' }; } },
                   { label: 'Tomorrow 12 PM', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 1); return { date: d.toISOString().split('T')[0], time: '12:00' }; } },
@@ -1466,14 +1466,14 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                       setScheduleDate(res.date);
                       setScheduleTime(res.time);
                     }}
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#d4d4d8', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     {p.label}
                   </button>
                 ))}
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                 <button className="btn btn-secondary" onClick={() => setScheduleItem(null)} disabled={scheduling}>Cancel</button>
                 <button
                   onClick={handleConfirmSchedule}

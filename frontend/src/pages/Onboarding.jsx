@@ -349,8 +349,33 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
                 Skip to Dashboard
               </button>
             </div>
-            <p style={{ marginTop: '1rem', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
-              Brand intelligence active · Autonomous marketing ready to scale
+            {/* The free ceiling, stated now rather than discovered later.
+                A limit met without warning reads as the product breaking; the
+                same limit met after being told reads as the moment to upgrade,
+                which is the only difference between a churn and a sale. No
+                card is asked for here on purpose -- nothing has been proven
+                yet, and the upgrade has to be earned by the work landing. */}
+            <div style={{
+              marginTop: '1.25rem', padding: '0.9rem 1rem', borderRadius: 12,
+              background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)',
+              textAlign: 'left',
+            }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                What free covers
+              </div>
+              <p style={{ margin: '0 0 0.6rem', fontSize: '0.87rem', lineHeight: 1.55 }}>
+                <strong>5 published posts</strong> and <strong>3 creative briefs</strong> a
+                month, for one business. Enough to see whether the writing sounds
+                like you before you decide anything.
+              </p>
+              <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                A business posting daily needs about 60 a month. That is the $17
+                plan, and you can move to it the day you run out — not before.
+              </p>
+            </div>
+
+            <p style={{ marginTop: '0.9rem', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+              No card needed to start · Cancel any time
             </p>
           </div>
         )}

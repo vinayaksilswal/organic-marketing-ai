@@ -223,7 +223,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 padding: '0.2rem 0.65rem',
                 borderRadius: 20,
                 background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: '1px solid var(--border-color)',
                 fontSize: '0.72rem',
                 fontWeight: 800,
                 color: '#fff',
@@ -460,7 +460,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               
               {/* CARD 1: FIRST FRAME IMAGE PROMPT */}
               <div style={{
-                background: '#121217',
+                background: 'rgba(11,16,32,0.03)',
                 borderRadius: 14,
                 border: '1px solid rgba(59, 130, 246, 0.35)',
                 padding: '1.25rem',
@@ -469,20 +469,20 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 justifyContent: 'space-between',
               }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       🖼️ Image Prompt 1: First Frame Still (0:00)
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: '#a1a1aa', fontWeight: 700 }}>Starting Look</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Starting Look</span>
                   </div>
 
-                  <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#e4e4e7', lineHeight: 1.5, fontFamily: 'monospace, sans-serif' }}>
+                  <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5, fontFamily: 'monospace, sans-serif' }}>
                     {activePrompts.firstFrame}
                   </p>
                 </div>
 
-                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Midjourney / Flux / Ideogram</span>
+                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Midjourney / Flux / Ideogram</span>
                   <button
                     onClick={() => copyToClipboard(activePrompts.firstFrame, 'img1', 'First Frame Image Prompt')}
                     className="btn"
@@ -508,7 +508,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
               {/* CARD 2: VIDEO MOTION PROMPT */}
               <div style={{
-                background: '#121217',
+                background: 'rgba(11,16,32,0.03)',
                 borderRadius: 14,
                 border: '1px solid rgba(249, 115, 22, 0.4)',
                 padding: '1.25rem',
@@ -518,7 +518,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 boxShadow: '0 4px 20px rgba(249,115,22,0.15)',
               }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#f97316', textTransform: 'uppercase', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       🎥 Video Prompt: Motion &amp; Action (0-10s)
                     </span>
@@ -530,8 +530,8 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   </p>
                 </div>
 
-                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Kling / Runway Gen-3 / Luma / Sora</span>
+                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Kling / Runway Gen-3 / Luma / Sora</span>
                   <button
                     onClick={() => copyToClipboard(activePrompts.videoPrompt, 'vid', 'Video Motion Prompt')}
                     className="btn"
@@ -557,7 +557,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
               {/* CARD 3: LAST FRAME IMAGE PROMPT (OUTRO CTA) */}
               <div style={{
-                background: '#121217',
+                background: 'rgba(11,16,32,0.03)',
                 borderRadius: 14,
                 border: '1px solid rgba(16, 185, 129, 0.35)',
                 padding: '1.25rem',
@@ -566,20 +566,20 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 justifyContent: 'space-between',
               }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       🖼️ Image Prompt 2: Last Frame Outro (End)
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: '#a1a1aa', fontWeight: 700 }}>Brand &amp; CTA Still</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>Brand &amp; CTA Still</span>
                   </div>
 
-                  <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#e4e4e7', lineHeight: 1.5, fontFamily: 'monospace, sans-serif' }}>
+                  <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: 'var(--text-main)', lineHeight: 1.5, fontFamily: 'monospace, sans-serif' }}>
                     {activePrompts.lastFrame}
                   </p>
                 </div>
 
-                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.7rem', color: '#71717a' }}>Readable Brand Offer</span>
+                <div style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Readable Brand Offer</span>
                   <button
                     onClick={() => copyToClipboard(activePrompts.lastFrame, 'img2', 'Last Frame Image Prompt')}
                     className="btn"
@@ -642,9 +642,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   <div
                     key={item.id}
                     style={{
-                      background: '#121217',
+                      background: 'rgba(11,16,32,0.03)',
                       borderRadius: 14,
-                      border: '1px solid rgba(255,255,255,0.08)',
+                      border: '1px solid var(--border-color)',
                       padding: '1.25rem',
                       transition: 'all 0.2s ease',
                     }}
@@ -658,17 +658,17 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                           {item.filename || `Video Brief — ${businessName}`}
                         </span>
                       </div>
-                      <span style={{ fontSize: '0.72rem', color: '#71717a' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                         {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
                       </span>
                     </div>
 
                     {/* Core Video Motion Snippet */}
-                    <div style={{ background: '#090a0f', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', marginBottom: '0.75rem' }}>
+                    <div style={{ background: 'rgba(11,16,32,0.03)', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
                       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fb923c', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>
                         🎥 Video Motion Prompt:
                       </span>
-                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#d4d4d8', lineHeight: 1.45 }}>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
                         {item.prompt || item.caption}
                       </p>
                     </div>
@@ -692,7 +692,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                       <button
                         onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                        style={{ background: 'none', border: 'none', color: '#a1a1aa', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
                       >
                         {isExpanded ? '▲ Hide 2 Image Keyframe Prompts' : '▼ View 2 Image Keyframe Prompts'}
                       </button>
@@ -704,7 +704,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             copyToClipboard(full, `hist-${item.id}`, 'Creative Bundle');
                           }}
                           className="btn"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6 }}
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: 'rgba(11,16,32,0.06)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: 6 }}
                         >
                           <Copy size={11} /> {copiedKey === `hist-${item.id}` ? 'Copied!' : 'Copy All 3 Prompts'}
                         </button>
