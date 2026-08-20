@@ -508,7 +508,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <Clock size={18} color="#f97316" />
-              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#fff', fontWeight: 800 }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-main)', fontWeight: 800 }}>
                 One-Time Scheduled Releases ({scheduledPosts.length})
               </h2>
               <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.55rem', borderRadius: 12, background: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 700 }}>
@@ -1011,16 +1011,16 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     <Clock size={20} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>Schedule Post from Media</h3>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>Schedule Post from Media</h3>
                     <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>Pick an asset from your library, set the exact date &amp; time, and Organiflo will publish it automatically.</p>
                   </div>
                 </div>
-                <button onClick={() => setIsScheduleModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
+                <button onClick={() => setIsScheduleModalOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-main)', cursor: 'pointer' }}><X size={20} /></button>
               </div>
 
               {/* STEP 1: SELECT MEDIA FROM CATALOG */}
               <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
                   1. Select Media Creative from Library
                 </label>
                 {mediaList.length === 0 ? (
@@ -1095,7 +1095,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               {/* STEP 2: CAPTION & AI WRITER */}
               <div style={{ marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>
                     2. Post Caption &amp; Hashtags
                   </label>
                   <button
@@ -1131,7 +1131,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     borderRadius: 8,
                     background: 'rgba(11,16,32,0.03)',
                     border: '1px solid var(--border-color)',
-                    color: '#fff',
+                    color: 'var(--text-main)',
                     fontSize: '0.85rem',
                     lineHeight: 1.45,
                     resize: 'vertical'
@@ -1142,7 +1142,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               {/* STEP 3: TARGET PLATFORMS & DATE/TIME */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
                     3. Target Platform
                   </label>
                   <select
@@ -1157,7 +1157,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem' }}>
                     4. Pick Date &amp; Time
                   </label>
                   <div style={{ display: 'flex', gap: '0.4rem' }}>

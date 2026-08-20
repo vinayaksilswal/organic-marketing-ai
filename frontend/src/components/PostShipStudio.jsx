@@ -35,25 +35,99 @@ export default function PostShipStudio({ token, showToast, activeWorkspaceId }) 
   const [scheduling, setScheduling] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
 
-  // Bundle defaults reflecting the active business
+  // The preview shown before anything is generated.
+  //
+  // It used to be one builder's story with the business name substituted in,
+  // which reads as nonsense for anyone who is not a software founder: a
+  // skincare shop was shown "a render race that only appeared with 2+ tabs
+  // open" and asked how other builders at their store debug it. The sample
+  // now follows the business model, the same way the closing CTA does.
+  const sampleFor = (model) => {
+    const m = (model || '').toLowerCase();
+    if (m.includes('commerce') || m.includes('retail') || m.includes('shop')) {
+      return {
+        x: `restocked the one thing people kept emailing about.
+
+sold out in nine days last time. we made twice as many.
+
+that is the whole update.`,
+        hook: 'We sold out in nine days and it taught us more than the launch did.',
+        li: `We sold out in nine days and it taught us more than the launch did.
+
+Every email after that asked the same question, so we stopped guessing and made twice as many.
+
+Listening beats forecasting, every time.`,
+        sub: 'r/smallbusiness',
+        title: 'Sold out in nine days. The emails afterwards were the real product research.',
+        body: `We launched expecting a slow month and ran out in nine days.
+
+The useful part was not the sales, it was that every email afterwards asked the same question. That told us what to make next.
+
+How do you decide restock quantities?`,
+      };
+    }
+    if (m.includes('page') || m.includes('creator') || m.includes('influencer')) {
+      return {
+        x: `posted every day for thirty days.
+
+the one that worked was the one i almost deleted.
+
+post it anyway.`,
+        hook: 'I posted every day for thirty days. The best one was the one I almost deleted.',
+        li: `I posted every day for thirty days.
+
+The post that reached the most people was the one I nearly deleted for being too simple.
+
+Taste is a bad predictor of reach. Volume is a good one.`,
+        sub: 'r/NewTubers',
+        title: 'Thirty days of posting: the winner was the one I almost deleted',
+        body: `I committed to thirty days. The post that outperformed everything was the simplest one, which I nearly cut for being obvious.
+
+Has anyone else found their instincts are backwards on this?`,
+      };
+    }
+    return {
+      x: `shipped the boring feature today.
+
+three weeks on the clever one: four people used it. this took an afternoon and it is the one people thank us for.
+
+build the boring thing.`,
+      hook: 'Three weeks on the clever feature. Four people used it.',
+      li: `Three weeks on the clever feature. Four people used it.
+
+Then we shipped the boring one in an afternoon, and it is the change people actually write in to thank us for.
+
+Build the boring thing that works.`,
+      sub: 'r/SideProject',
+      title: 'Three weeks on the clever feature. Four people used it.',
+      body: `We spent three weeks on the feature we were proud of and four people touched it.
+
+The afternoon feature is the one support hears about. I keep relearning this.
+
+How do you decide what is worth building?`,
+    };
+  };
+
+  const sample = sampleFor(currentWorkspace?.businessModel || industry);
+
   const [bundle, setBundle] = useState({
     x_post: {
       handle: cleanHandle,
       display_name: businessName,
-      content: `shipped writing styles today.\n\nthe bug that almost stopped me: a render race that only appeared with 2+ tabs open. 3 hours, 1 line fix.\n\nit's always one line.`,
+      content: sample.x,
       metrics_estimate: { likes: '310', retweets: '48', replies: '12', views: '21K' }
     },
     linkedin_post: {
       author_name: businessName,
       headline: `Founder at ${businessName}`,
-      hook_line: 'Three weeks on workspace auth. Four people used it.',
-      content: `Three weeks on workspace auth. Four people used it.\n\nThen I shipped autosave in an afternoon — 40 lines — and it's the change people actually thank me for.\n\nBuild the boring thing that works for ${businessName}.`,
+      hook_line: sample.hook,
+      content: sample.li,
       metrics_estimate: { reactions: '47', comments: '6' }
     },
     reddit_post: {
-      subreddit: 'r/SideProject',
-      title: 'Spent 3 hours on a bug that was one line. Every time.',
-      body: `Render race that only showed up with 2+ tabs open. Logs looked fine. The fix was one line — it's always one line.\n\nCurious how other builders at ${businessName} track these down?`,
+      subreddit: sample.sub,
+      title: sample.title,
+      body: sample.body,
       metrics_estimate: { upvotes: '248', comments: '32' }
     }
   });

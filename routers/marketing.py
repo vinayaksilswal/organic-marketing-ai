@@ -1487,6 +1487,140 @@ class PostFromMediaRequest(BaseModel):
     scheduledAt: Optional[datetime] = None
     isOneTimeSchedule: bool = False
 
+class RecurringScheduleRequest(BaseModel):
+    mediaId: Optional[str] = None
+    mediaUrl: Optional[str] = None
+    mediaUrls: Optional[List[str]] = None
+    customCaption: Optional[str] = None
+    platform: str = "BOTH"
+    # "weekly" -> daysOfWeek, "monthly" -> dayOfMonth
+    repeat: str = "weekly"
+    daysOfWeek: Optional[List[int]] = None   # 0 = Monday
+    dayOfMonth: Optional[int] = None         # 1-28
+    timeOfDay: str = "18:00"                 # HH:MM, workspace local
+    occurrences: int = 8
+
+
+@router.post("/posts/schedule-recurring")
+async def schedule_recurring_posts(
+    data: RecurringScheduleRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Repeat one asset on a rule, by materialising the next few occurrences.
+
+    Deliberately NOT a second scheduling engine. Every occurrence is written as
+    an ordinary one-time SocialPost, so it inherits the publish path, the
+    calendar, the delivery log and the cancel button that already work. A
+    parallel recurring runner would be a second thing that can post to a
+    customer's account, and the first one took long enough to make reliable.
+
+    Materialising a fixed number rather than an open-ended rule is the same
+    trade: a rule that runs forever keeps posting after a customer stops
+    looking, and this stops on its own unless they come back and extend it.
+    Capped at 31 so a slip of the keyboard cannot fill a year.
+
+    Day of month is limited to 1-28 because 29-31 do not exist in every month,
+    and silently moving a post to the 28th of February is a surprise nobody
+    asked for.
+    """
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    try:
+        hh, mm = (data.timeOfDay or "18:00").split(":")
+        hour, minute = int(hh), int(mm)
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
+    except Exception:
+        raise HTTPException(status_code=400, detail="Time must be HH:MM, 00:00 to 23:59.")
+
+    count = max(1, min(int(data.occurrences or 8), 31))
+
+    async with get_tenant_session(workspace_id) as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        target_urls = data.mediaUrls or []
+        caption = (data.customCaption or "").strip()
+        if data.mediaId:
+            media = await session.get(Media, data.mediaId)
+            if not media or media.businessProfileId != workspace_id:
+                raise HTTPException(status_code=404, detail="That asset is not in this workspace")
+            if media.url:
+                target_urls = [media.url]
+            caption = caption or (media.caption or "")
+        elif data.mediaUrl:
+            target_urls = [data.mediaUrl]
+
+        if not target_urls:
+            raise HTTPException(status_code=400, detail="Choose an asset to schedule.")
+
+        # The customer's clock, not the server's. "Post at 6pm" means their 6pm.
+        from services.posting_window import _tz
+
+        tz = _tz(getattr(profile, "postingTimezone", None))
+        now_local = datetime.now(timezone.utc).astimezone(tz)
+
+        slots: list[datetime] = []
+        if (data.repeat or "weekly").lower() == "monthly":
+            day = int(data.dayOfMonth or 1)
+            if not (1 <= day <= 28):
+                raise HTTPException(status_code=400, detail="Day of month must be between 1 and 28.")
+            year, month = now_local.year, now_local.month
+            while len(slots) < count:
+                try:
+                    candidate = now_local.replace(
+                        year=year, month=month, day=day,
+                        hour=hour, minute=minute, second=0, microsecond=0,
+                    )
+                except ValueError:
+                    candidate = None
+                if candidate and candidate > now_local:
+                    slots.append(candidate)
+                month += 1
+                if month > 12:
+                    month, year = 1, year + 1
+        else:
+            days = sorted({int(d) for d in (data.daysOfWeek or []) if 0 <= int(d) <= 6})
+            if not days:
+                raise HTTPException(status_code=400, detail="Pick at least one day of the week.")
+            probe = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            # 53 weeks of candidates is more than the 31-occurrence cap can use.
+            for _ in range(371):
+                if probe > now_local and probe.weekday() in days:
+                    slots.append(probe)
+                    if len(slots) >= count:
+                        break
+                probe += timedelta(days=1)
+
+        if not slots:
+            raise HTTPException(status_code=400, detail="That rule produces no future dates.")
+
+        created = []
+        for when in slots:
+            post = SocialPost(
+                businessProfileId=workspace_id,
+                platform=data.platform,
+                type="ONE_TIME",
+                caption=caption,
+                mediaUrls=target_urls,
+                scheduledAt=when.astimezone(timezone.utc),
+                status="SCHEDULED",
+            )
+            session.add(post)
+            created.append(when)
+        await session.commit()
+
+    return {
+        "success": True,
+        "created": len(created),
+        "message": f"{len(created)} posts scheduled, first on {created[0].strftime('%d %b at %H:%M')}.",
+        "occurrences": [w.isoformat() for w in created],
+    }
+
+
 @router.post("/posts/from-media")
 async def create_post_from_media(
     data: PostFromMediaRequest,
