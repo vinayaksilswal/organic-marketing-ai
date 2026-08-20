@@ -77,7 +77,7 @@ export default function SystemBanner() {
       <div style={{ flex: 1, lineHeight: 1.45 }}>
         <strong>{unreachable ? 'Backend unavailable' : 'Backend out of date'}</strong>
         {' — '}{detail}
-        {unreachable && ' Free-tier servers sleep when idle; the first request can take up to a minute.'}
+        {unreachable && ' Cloud instance is initializing; the first request can take a few moments.'}
       </div>
       <button
         onClick={check}

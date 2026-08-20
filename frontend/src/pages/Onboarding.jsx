@@ -325,22 +325,31 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
               ))}
             </div>
 
-            <button
-              className="btn btn-primary btn-large"
-              style={{ width: '100%', minHeight: 48 }}
-              onClick={() => navigate('/dashboard/workspaces')}
-            >
-              Connect your accounts <ArrowRight size={17} />
-            </button>
-            <button
-              className="btn btn-secondary"
-              style={{ width: '100%', marginTop: '0.6rem', minHeight: 44 }}
-              onClick={() => navigate('/dashboard')}
-            >
-              Skip to dashboard
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <button
+                className="btn btn-primary btn-large"
+                style={{ width: '100%', minHeight: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                onClick={() => navigate('/dashboard/video-studio')}
+              >
+                <Sparkles size={18} /> Generate Your First AI Video <ArrowRight size={17} />
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                onClick={() => navigate('/dashboard/workspaces')}
+              >
+                <Building2 size={16} /> Connect Social Accounts (Meta / TikTok)
+              </button>
+              <button
+                className="btn"
+                style={{ width: '100%', minHeight: 38, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.85rem' }}
+                onClick={() => navigate('/dashboard')}
+              >
+                Skip to Dashboard
+              </button>
+            </div>
             <p style={{ marginTop: '1rem', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
-              You are on the free plan. Upgrade any time from Billing — no card needed to start.
+              Brand intelligence active · Autonomous marketing ready to scale
             </p>
           </div>
         )}
