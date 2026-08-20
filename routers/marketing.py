@@ -1290,6 +1290,35 @@ async def edit_social_post(
             "postedAt": existing.postedAt.isoformat() if existing.postedAt else None,
         }
 
+class MediaCaptionGenRequest(BaseModel):
+    mediaId: Optional[str] = None
+    mediaUrl: Optional[str] = None
+    topic: Optional[str] = None
+
+@router.post("/posts/generate-media-caption")
+async def generate_media_caption(
+    data: MediaCaptionGenRequest,
+    request: Request,
+) -> dict[str, Any]:
+    """Generate an AI caption for any media asset based on brand voice."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        profile = None
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+        biz_name = profile.name if profile else "Our Brand"
+        industry = profile.industry or profile.businessModel or "General"
+        tone = profile.toneOfVoice or "Engaging"
+        topic = data.topic or "Brand highlight"
+        
+        prompt = (
+            f"Write a high-converting, engaging social media caption for {biz_name} in {industry}. "
+            f"Tone: {tone}. Topic: {topic}. Include an engaging opening hook, value-driven body, "
+            f"a clear call to action, and 3-5 trending relevant hashtags."
+        )
+        caption = await generate_campaign_variation(prompt)
+        return {"success": True, "caption": _strip_urls(caption)}
+
 @router.post("/posts/generate-caption")
 async def api_generate_caption(
     request: Request,
@@ -1451,30 +1480,36 @@ async def create_manual_social_post(
 class PostFromMediaRequest(BaseModel):
     mediaId: Optional[str] = None
     mediaUrl: Optional[str] = None
+    mediaUrls: Optional[List[str]] = None
     customCaption: Optional[str] = None
     platform: str = "BOTH"
     status: str = "POSTED"
+    scheduledAt: Optional[datetime] = None
+    isOneTimeSchedule: bool = False
 
 @router.post("/posts/from-media")
 async def create_post_from_media(
     data: PostFromMediaRequest,
     request: Request,
 ) -> dict[str, Any]:
-    """Create and publish a social post directly from a Media Library asset."""
+    """Create, schedule, or publish a social post directly from a Media Library asset."""
     workspace_id = request.headers.get("x-workspace-id")
     
     async with get_tenant_session(workspace_id) as session:
-        target_url = data.mediaUrl
+        target_urls = data.mediaUrls or []
+        if not target_urls and data.mediaUrl:
+            target_urls = [data.mediaUrl]
         target_tags = []
 
         if data.mediaId:
             media_item = await session.get(Media, data.mediaId)
             if media_item:
-                target_url = media_item.url
+                if not target_urls:
+                    target_urls = [media_item.url]
                 target_tags = media_item.tags or []
 
-        if not target_url:
-            raise HTTPException(status_code=400, detail="Either mediaId or mediaUrl must be provided")
+        if not target_urls:
+            raise HTTPException(status_code=400, detail="Either mediaId, mediaUrl, or mediaUrls must be provided")
 
         # Determine caption
         caption = data.customCaption
@@ -1489,14 +1524,43 @@ async def create_post_from_media(
             base_prompt = f"Automated social post for {biz_name}. Topic: {topic}. High engagement, emojis, hashtags."
             caption = await generate_campaign_variation(base_prompt)
 
-        # Create SocialPost draft
+        sched_dt = data.scheduledAt or datetime.now(timezone.utc)
+
+        # Check if this is a one-time scheduled post for the future
+        if data.isOneTimeSchedule or data.status == "SCHEDULED":
+            post = SocialPost(
+                businessProfileId=workspace_id,
+                platform=data.platform,
+                type="ONE_TIME",
+                caption=caption,
+                mediaUrls=target_urls,
+                scheduledAt=sched_dt,
+                status="SCHEDULED",
+            )
+            session.add(post)
+            await session.commit()
+            await session.refresh(post)
+            return {
+                "success": True,
+                "message": f"Post successfully scheduled for {sched_dt.isoformat()}",
+                "post": {
+                    "id": post.id,
+                    "caption": post.caption,
+                    "mediaUrls": post.mediaUrls,
+                    "platform": post.platform,
+                    "status": "SCHEDULED",
+                    "scheduledAt": post.scheduledAt.isoformat() if post.scheduledAt else None,
+                }
+            }
+
+        # Create SocialPost draft or direct publish
         post = SocialPost(
             businessProfileId=workspace_id,
             platform=data.platform,
             type="MEDIA_CATALOG",
             caption=caption,
-            mediaUrls=[target_url],
-            scheduledAt=datetime.now(),
+            mediaUrls=target_urls,
+            scheduledAt=sched_dt,
             status="DRAFT" if data.status == "DRAFT" else "POSTED",
         )
         session.add(post)
@@ -1506,25 +1570,25 @@ async def create_post_from_media(
         if data.status == "DRAFT":
             return {"success": True, "post": {"id": post.id, "caption": post.caption, "mediaUrls": post.mediaUrls, "status": "DRAFT"}}
 
-        # Post to Facebook & Instagram & Twitter & LinkedIn
+        # Direct Publish to Facebook & Instagram & Twitter & LinkedIn
         fb_post_id, ig_post_id = None, None
         errors = []
 
         if data.platform in ("FACEBOOK", "BOTH"):
             try:
-                fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=[target_url])
+                fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=target_urls)
             except Exception as e:
                 errors.append(f"FB: {str(e)}")
 
         if data.platform in ("INSTAGRAM", "BOTH"):
             try:
-                ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=[target_url])
+                ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=target_urls)
             except Exception as e:
                 errors.append(f"IG: {str(e)}")
 
         # Update post record
         post.status = "POSTED" if not errors or fb_post_id or ig_post_id else "FAILED"
-        post.postedAt = datetime.now()
+        post.postedAt = datetime.now(timezone.utc)
         post.fbPostId = fb_post_id
         post.igPostId = ig_post_id
         post.errorLog = " | ".join(errors) if errors else None
@@ -1537,6 +1601,93 @@ async def create_post_from_media(
                 "caption": post.caption,
                 "mediaUrls": post.mediaUrls,
                 "status": post.status,
+            },
+            "errors": errors,
+        }
+
+@router.get("/posts/scheduled")
+async def get_scheduled_posts(request: Request) -> List[dict[str, Any]]:
+    """List all upcoming one-time scheduled posts for this workspace."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        stmt = (
+            select(SocialPost)
+            .where(
+                and_(
+                    SocialPost.businessProfileId == workspace_id,
+                    SocialPost.status == "SCHEDULED",
+                )
+            )
+            .order_by(SocialPost.scheduledAt.asc())
+        )
+        res = await session.execute(stmt)
+        scheduled_posts = res.scalars().all()
+        return [
+            {
+                "id": p.id,
+                "caption": p.caption,
+                "mediaUrls": p.mediaUrls or [],
+                "platform": p.platform,
+                "status": p.status,
+                "scheduledAt": p.scheduledAt.isoformat() if p.scheduledAt else None,
+                "type": p.type,
+                "createdAt": p.createdAt.isoformat() if p.createdAt else None,
+            }
+            for p in scheduled_posts
+        ]
+
+@router.delete("/posts/scheduled/{post_id}")
+async def cancel_scheduled_post(post_id: str, request: Request) -> dict[str, Any]:
+    """Cancel a scheduled post."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        post = await session.get(SocialPost, post_id)
+        if not post or post.businessProfileId != workspace_id:
+            raise HTTPException(status_code=404, detail="Scheduled post not found")
+        await session.delete(post)
+        await session.commit()
+        return {"success": True, "message": "Scheduled post cancelled successfully"}
+
+@router.post("/posts/scheduled/{post_id}/publish-now")
+async def publish_scheduled_post_now(post_id: str, request: Request) -> dict[str, Any]:
+    """Immediately publish a scheduled post without waiting for its scheduled time."""
+    workspace_id = request.headers.get("x-workspace-id")
+    async with get_tenant_session(workspace_id) as session:
+        post = await session.get(SocialPost, post_id)
+        if not post or post.businessProfileId != workspace_id:
+            raise HTTPException(status_code=404, detail="Scheduled post not found")
+        
+        target_urls = post.mediaUrls or []
+        caption = post.caption or ""
+        fb_post_id, ig_post_id = None, None
+        errors = []
+
+        if post.platform in ("FACEBOOK", "BOTH"):
+            try:
+                fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=target_urls)
+            except Exception as e:
+                errors.append(f"FB: {str(e)}")
+
+        if post.platform in ("INSTAGRAM", "BOTH"):
+            try:
+                ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=target_urls)
+            except Exception as e:
+                errors.append(f"IG: {str(e)}")
+
+        post.status = "POSTED" if not errors or fb_post_id or ig_post_id else "FAILED"
+        post.postedAt = datetime.now(timezone.utc)
+        post.fbPostId = fb_post_id
+        post.igPostId = ig_post_id
+        post.errorLog = " | ".join(errors) if errors else None
+        await session.commit()
+
+        return {
+            "success": True,
+            "message": "Post published successfully",
+            "post": {
+                "id": post.id,
+                "status": post.status,
+                "postedAt": post.postedAt.isoformat(),
             },
             "errors": errors,
         }

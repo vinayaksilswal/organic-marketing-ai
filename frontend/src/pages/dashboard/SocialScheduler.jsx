@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE, authFetch } from '../../config';
-import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw, CalendarDays } from 'lucide-react';
+import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw, CalendarDays, Sparkles, Plus } from 'lucide-react';
 import PostCalendar from '../../components/PostCalendar';
 
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
@@ -26,10 +26,24 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [editCaption, setEditCaption] = useState('');
   const [editMedia, setEditMedia] = useState(null);
 
+  // One-Time Media Scheduling State
+  const [scheduledPosts, setScheduledPosts] = useState([]);
+  const [loadingScheduled, setLoadingScheduled] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleMediaId, setScheduleMediaId] = useState('');
+  const [scheduleMediaUrl, setScheduleMediaUrl] = useState('');
+  const [scheduleCaption, setScheduleCaption] = useState('');
+  const [schedulePlatform, setSchedulePlatform] = useState('BOTH');
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('18:00');
+  const [generatingCaption, setGeneratingCaption] = useState(false);
+  const [schedulingPost, setSchedulingPost] = useState(false);
+
   useEffect(() => {
     fetchSettings();
     fetchPosts();
     fetchMedia();
+    fetchScheduledPosts();
     // The preview shows the real business name and handle rather than a
     // hardcoded "Organiflo", so it reflects what will actually be published.
     (async () => {
@@ -45,6 +59,136 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
       } catch { /* preview falls back to a neutral placeholder */ }
     })();
   }, [activeWorkspaceId]);
+
+  const fetchScheduledPosts = async () => {
+    setLoadingScheduled(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/posts/scheduled`, {
+        headers: { 'X-Workspace-Id': activeWorkspaceId }
+      }, token);
+      if (res.ok) setScheduledPosts(await res.json());
+    } catch {}
+    finally { setLoadingScheduled(false); }
+  };
+
+  const openScheduleModal = (mediaItem = null) => {
+    if (mediaItem) {
+      setScheduleMediaId(mediaItem.id || '');
+      setScheduleMediaUrl(mediaItem.url || '');
+      setScheduleCaption(mediaItem.caption || '');
+    } else if (mediaList.length > 0) {
+      setScheduleMediaId(mediaList[0].id || '');
+      setScheduleMediaUrl(mediaList[0].url || '');
+      setScheduleCaption(mediaList[0].caption || '');
+    } else {
+      setScheduleMediaId('');
+      setScheduleMediaUrl('');
+      setScheduleCaption('');
+    }
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setScheduleDate(tomorrow.toISOString().split('T')[0]);
+    setScheduleTime('18:00');
+    setIsScheduleModalOpen(true);
+  };
+
+  const handleGenerateMediaCaption = async () => {
+    setGeneratingCaption(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/posts/generate-media-caption`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          mediaId: scheduleMediaId || null,
+          mediaUrl: scheduleMediaUrl || null,
+          topic: business?.name || 'Brand Spotlight'
+        })
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.caption) {
+        setScheduleCaption(data.caption);
+        showToast('AI caption generated! ✨');
+      } else {
+        throw new Error(data.detail || 'Could not generate caption');
+      }
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setGeneratingCaption(false);
+    }
+  };
+
+  const handleSaveOneTimeSchedule = async () => {
+    if (!scheduleMediaUrl && !scheduleMediaId) {
+      return showToast('Please select or provide a media asset to schedule', true);
+    }
+    if (!scheduleDate || !scheduleTime) {
+      return showToast('Please select date and time for the scheduled post', true);
+    }
+
+    setSchedulingPost(true);
+    try {
+      const schedDt = new Date(`${scheduleDate}T${scheduleTime}:00`);
+      const res = await authFetch(`${API_BASE}/marketing/posts/from-media`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          mediaId: scheduleMediaId || null,
+          mediaUrl: scheduleMediaUrl || null,
+          customCaption: scheduleCaption,
+          platform: schedulePlatform,
+          scheduledAt: schedDt.toISOString(),
+          isOneTimeSchedule: true,
+          status: 'SCHEDULED',
+        })
+      }, token);
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Failed to schedule post');
+
+      showToast(`Post scheduled for ${scheduleDate} at ${scheduleTime}! 🚀`);
+      setIsScheduleModalOpen(false);
+      fetchScheduledPosts();
+      fetchPosts();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSchedulingPost(false);
+    }
+  };
+
+  const handleCancelScheduledPost = async (postId) => {
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/posts/scheduled/${postId}`, {
+        method: 'DELETE',
+        headers: { 'X-Workspace-Id': activeWorkspaceId }
+      }, token);
+      if (res.ok) {
+        showToast('Scheduled post cancelled.');
+        fetchScheduledPosts();
+        fetchPosts();
+      }
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
+
+  const handlePublishScheduledNow = async (postId) => {
+    try {
+      showToast('Publishing scheduled post now...', false);
+      const res = await authFetch(`${API_BASE}/marketing/posts/scheduled/${postId}/publish-now`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId }
+      }, token);
+      if (res.ok) {
+        showToast('Post published live! 🚀');
+        fetchScheduledPosts();
+        fetchPosts();
+      }
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -324,6 +468,26 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               </button>
             </div>
 
+            {/* Schedule One-Time Media Post Button */}
+            <button
+              className="btn btn-primary"
+              onClick={() => openScheduleModal()}
+              style={{
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                color: '#fff',
+                fontWeight: 700,
+                padding: '0.6rem 1.15rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                border: 'none',
+                boxShadow: '0 4px 14px rgba(249, 115, 22, 0.3)',
+                cursor: 'pointer',
+              }}
+            >
+              <Clock size={16} /> + Schedule One-Time Post
+            </button>
+
             {/* Run Manually button. It is a manual trigger for the same cycle the
                 scheduler runs on its own, and calling it "Run Automation" read as
                 if it switched the automation on -- so people pressed it to enable
@@ -337,6 +501,152 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               {runningLoop ? <span className="spinner"></span> : <>⚡ Run Manually</>}
             </button>
           </div>
+        </div>
+
+        {/* ONE-TIME SCHEDULED POSTS SECTION */}
+        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid rgba(249, 115, 22, 0.25)', background: 'rgba(249, 115, 22, 0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Clock size={18} color="#f97316" />
+              <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#fff', fontWeight: 800 }}>
+                One-Time Scheduled Releases ({scheduledPosts.length})
+              </h2>
+              <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.55rem', borderRadius: 12, background: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 700 }}>
+                Publishes at exact set date/time
+              </span>
+            </div>
+
+            <button
+              onClick={() => openScheduleModal()}
+              style={{
+                background: 'rgba(249,115,22,0.15)',
+                color: '#f97316',
+                border: '1px solid rgba(249,115,22,0.4)',
+                borderRadius: 8,
+                padding: '0.4rem 0.85rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <Plus size={14} /> Schedule Post from Media
+            </button>
+          </div>
+
+          {loadingScheduled ? (
+            <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)' }}>
+              <span className="spinner" style={{ width: 16, height: 16, marginRight: 8 }} /> Loading scheduled releases...
+            </div>
+          ) : scheduledPosts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'rgba(11, 16, 32, 0.02)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.1)' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(249,115,22,0.1)', color: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
+                <Clock size={22} />
+              </div>
+              <h4 style={{ margin: '0 0 0.3rem', fontSize: '0.95rem' }}>No One-Time Posts Scheduled</h4>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: 460, margin: '0 auto 1rem' }}>
+                Want to post a specific video or image on an exact day and time? Pick any creative from your Media Catalog to schedule a one-time release.
+              </p>
+              <button
+                className="btn btn-primary"
+                onClick={() => openScheduleModal()}
+                style={{ background: '#f97316', border: 'none', fontSize: '0.82rem', fontWeight: 700, padding: '0.5rem 1.1rem' }}
+              >
+                + Pick Media &amp; Set Time
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+              {scheduledPosts.map(p => {
+                const schedDate = p.scheduledAt ? new Date(p.scheduledAt) : null;
+                const dateFormatted = schedDate ? schedDate.toLocaleString(undefined, {
+                  weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+                }) : 'Pending';
+                const mediaUrl = p.mediaUrls?.[0] || '';
+                const isVideo = mediaUrl && (mediaUrl.endsWith('.mp4') || mediaUrl.includes('/video/'));
+
+                return (
+                  <div key={p.id} style={{
+                    background: '#15151c',
+                    borderRadius: 12,
+                    border: '1px solid rgba(249,115,22,0.25)',
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                  }}>
+                    <div style={{ display: 'flex', gap: '0.85rem' }}>
+                      {mediaUrl ? (
+                        <div style={{ width: 68, height: 68, borderRadius: 8, overflow: 'hidden', background: '#000', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+                          {isVideo ? (
+                            <>
+                              <video src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <div style={{ position: 'absolute', bottom: 2, right: 2, background: 'rgba(0,0,0,0.7)', borderRadius: 4, padding: '1px 3px' }}>
+                                <Video size={10} color="#fff" />
+                              </div>
+                            </>
+                          ) : (
+                            <img src={mediaUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ width: 68, height: 68, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <ImageIcon size={24} color="var(--text-muted)" />
+                        </div>
+                      )}
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '0.1rem 0.45rem', borderRadius: 4, background: '#f97316', color: '#fff' }}>
+                            {p.platform || 'BOTH'}
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: '#a1a1aa' }}>
+                            Scheduled
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#fcd34d', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <Clock size={12} /> {dateFormatted}
+                        </div>
+                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.76rem', color: '#d4d4d8', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {p.caption || 'No caption provided'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem' }}>
+                      <button
+                        onClick={() => handleCancelScheduledPost(p.id)}
+                        style={{ background: 'none', border: 'none', color: '#f87171', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handlePublishScheduledNow(p.id)}
+                        style={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '0.3rem 0.75rem',
+                          fontSize: '0.76rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Send size={12} /> Publish Now
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* SCHEDULE — the month, with every post on the day it went out.
@@ -686,6 +996,246 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* ONE-TIME MEDIA SCHEDULE MODAL */}
+        {isScheduleModalOpen && (
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
+            onClick={e => { if (e.target === e.currentTarget) setIsScheduleModalOpen(false); }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: '#121218', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(249,115,22,0.3)' }}>
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>Schedule Post from Media</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa' }}>Pick an asset from your library, set the exact date &amp; time, and Organiflo will publish it automatically.</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsScheduleModalOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
+              </div>
+
+              {/* STEP 1: SELECT MEDIA FROM CATALOG */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                  1. Select Media Creative from Library
+                </label>
+                {mediaList.length === 0 ? (
+                  <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.1)', textAlign: 'center' }}>
+                    <p style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>No media in library yet. Paste a direct image/video URL below:</p>
+                    <input
+                      type="url"
+                      placeholder="https://.../video.mp4 or image.jpg"
+                      value={scheduleMediaUrl}
+                      onChange={e => setScheduleMediaUrl(e.target.value)}
+                      style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: 8, background: '#000', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem', maxHeight: 180, overflowY: 'auto', padding: '0.5rem', background: '#0a0a0f', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+                      {mediaList.map(m => {
+                        const isSel = scheduleMediaId === m.id || scheduleMediaUrl === m.url;
+                        const isVid = m.url && (m.url.endsWith('.mp4') || m.url.includes('/video/'));
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => {
+                              setScheduleMediaId(m.id);
+                              setScheduleMediaUrl(m.url);
+                              if (m.caption && !scheduleCaption) setScheduleCaption(m.caption);
+                            }}
+                            style={{
+                              aspectRatio: '1/1',
+                              borderRadius: 8,
+                              overflow: 'hidden',
+                              border: isSel ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.1)',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              background: '#000',
+                              boxShadow: isSel ? '0 0 10px rgba(249,115,22,0.4)' : 'none',
+                            }}
+                          >
+                            {isVid ? (
+                              <video src={m.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                            {isVid && (
+                              <div style={{ position: 'absolute', top: 3, right: 3, background: 'rgba(0,0,0,0.7)', borderRadius: 4, padding: '1px 3px' }}>
+                                <Video size={10} color="#fff" />
+                              </div>
+                            )}
+                            {isSel && (
+                              <div style={{ position: 'absolute', inset: 0, background: 'rgba(249,115,22,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CheckCircle2 size={20} color="#fff" />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* URL Fallback */}
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <input
+                        type="url"
+                        placeholder="Or paste custom media URL..."
+                        value={scheduleMediaUrl}
+                        onChange={e => { setScheduleMediaUrl(e.target.value); setScheduleMediaId(''); }}
+                        style={{ width: '100%', padding: '0.45rem 0.75rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '0.78rem' }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* STEP 2: CAPTION & AI WRITER */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>
+                    2. Post Caption &amp; Hashtags
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateMediaCaption}
+                    disabled={generatingCaption}
+                    style={{
+                      background: 'rgba(249,115,22,0.15)',
+                      border: '1px solid rgba(249,115,22,0.4)',
+                      color: '#f97316',
+                      borderRadius: 6,
+                      padding: '0.2rem 0.6rem',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    {generatingCaption ? <RefreshCw className="spin" size={12} /> : <Sparkles size={12} />}
+                    {generatingCaption ? 'Writing...' : '✨ Write AI Caption'}
+                  </button>
+                </div>
+                <textarea
+                  rows={4}
+                  value={scheduleCaption}
+                  onChange={e => setScheduleCaption(e.target.value)}
+                  placeholder="Write engaging caption with hook, value, and #hashtags..."
+                  style={{
+                    width: '100%',
+                    padding: '0.7rem',
+                    borderRadius: 8,
+                    background: '#0a0a0f',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                    lineHeight: 1.45,
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {/* STEP 3: TARGET PLATFORMS & DATE/TIME */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                    3. Target Platform
+                  </label>
+                  <select
+                    value={schedulePlatform}
+                    onChange={e => setSchedulePlatform(e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem', appearance: 'auto' }}
+                  >
+                    <option value="BOTH">Instagram &amp; Facebook (Both)</option>
+                    <option value="INSTAGRAM">Instagram Only (Reels / Feed)</option>
+                    <option value="FACEBOOK">Facebook Page Only</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>
+                    4. Pick Date &amp; Time
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={e => setScheduleDate(e.target.value)}
+                      style={{ flex: 1, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                    />
+                    <input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={e => setScheduleTime(e.target.value)}
+                      style={{ width: 110, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* QUICK DATE SHORTCUT PRESETS */}
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.74rem', color: '#a1a1aa' }}>Quick Times:</span>
+                {[
+                  { label: 'Today 6 PM', getDt: () => { const d = new Date(); return { date: d.toISOString().split('T')[0], time: '18:00' }; } },
+                  { label: 'Tomorrow 12 PM', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 1); return { date: d.toISOString().split('T')[0], time: '12:00' }; } },
+                  { label: 'Tomorrow 6 PM', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 1); return { date: d.toISOString().split('T')[0], time: '18:00' }; } },
+                  { label: 'In 2 Days (Peak)', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 2); return { date: d.toISOString().split('T')[0], time: '19:00' }; } },
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const res = preset.getDt();
+                      setScheduleDate(res.date);
+                      setScheduleTime(res.time);
+                    }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: '#d4d4d8',
+                      borderRadius: 6,
+                      padding: '0.2rem 0.55rem',
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+                <button className="btn btn-secondary" onClick={() => setIsScheduleModalOpen(false)} disabled={schedulingPost}>
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveOneTimeSchedule}
+                  disabled={schedulingPost}
+                  className="btn btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    border: 'none',
+                    fontWeight: 800,
+                    padding: '0.65rem 1.4rem',
+                    borderRadius: 8,
+                    fontSize: '0.88rem',
+                    boxShadow: '0 4px 14px rgba(249,115,22,0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {schedulingPost ? <RefreshCw className="spin" size={15} /> : <Clock size={15} />}
+                  {schedulingPost ? 'Scheduling Post...' : 'Schedule One-Time Post 🚀'}
+                </button>
+              </div>
             </div>
           </div>
         )}

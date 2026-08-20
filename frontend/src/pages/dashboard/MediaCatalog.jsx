@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
-import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music, ShieldAlert, Folder, FolderPlus, FolderOpen, Layers } from 'lucide-react';
+import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music, ShieldAlert, Folder, FolderPlus, FolderOpen, Layers, Clock, Send } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [mediaList, setMediaList] = useState([]);
@@ -36,7 +36,14 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
   const [openFolder, setOpenFolder] = useState(null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [folderBusy, setFolderBusy] = useState(false);
+  // One-time scheduling modal state
+  const [scheduleItem, setScheduleItem] = useState(null);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('18:00');
+  const [schedulePlatform, setSchedulePlatform] = useState('BOTH');
+  const [scheduleCaption, setScheduleCaption] = useState('');
+  const [scheduling, setScheduling] = useState(false);
+  const [generatingCaption, setGeneratingCaption] = useState(false);
 
   useEffect(() => {
     fetchMedia();
@@ -554,6 +561,74 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
       await fetchMedia();
     } catch (err) {
       showToast(err.message, true);
+    }
+  };
+
+  const handleOpenSchedule = (item) => {
+    setScheduleItem(item);
+    setScheduleCaption(item.caption || item.prompt || '');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setScheduleDate(tomorrow.toISOString().split('T')[0]);
+    setScheduleTime('18:00');
+    setSchedulePlatform('BOTH');
+  };
+
+  const handleGenerateCaption = async () => {
+    if (!scheduleItem) return;
+    setGeneratingCaption(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/posts/generate-media-caption`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          mediaId: scheduleItem.id,
+          mediaUrl: scheduleItem.url,
+          topic: scheduleItem.caption || 'Product Spotlight'
+        })
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.caption) {
+        setScheduleCaption(data.caption);
+        showToast('AI caption generated! ✨');
+      }
+    } catch {
+      showToast('Could not generate caption', true);
+    } finally {
+      setGeneratingCaption(false);
+    }
+  };
+
+  const handleConfirmSchedule = async () => {
+    if (!scheduleItem || !scheduleDate || !scheduleTime) {
+      return showToast('Please select date and time', true);
+    }
+    setScheduling(true);
+    try {
+      const schedDt = new Date(`${scheduleDate}T${scheduleTime}:00`);
+      const res = await authFetch(`${API_BASE}/marketing/posts/from-media`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          mediaId: scheduleItem.id,
+          mediaUrl: scheduleItem.url,
+          customCaption: scheduleCaption,
+          platform: schedulePlatform,
+          scheduledAt: schedDt.toISOString(),
+          isOneTimeSchedule: true,
+          status: 'SCHEDULED',
+        })
+      }, token);
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Failed to schedule');
+
+      showToast(`Post scheduled for ${scheduleDate} at ${scheduleTime}! 🚀`);
+      setScheduleItem(null);
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setScheduling(false);
     }
   };
 
@@ -1082,10 +1157,30 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                           {item.createdAt ? new Date(item.createdAt).toISOString().split('T')[0] : '2026-07-20'}
                         </td>
                         <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => setPreviewMedia(item)}>PREVIEW</button>
-                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => handleEditMedia(item)}>EDIT</button>
-                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', fontSize: '0.75rem', fontWeight: '600' }} onClick={() => handleToggleActive(item)}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {!isAudio && (
+                              <button
+                                className="btn btn-primary"
+                                style={{
+                                  padding: '0.4rem 0.65rem',
+                                  fontSize: '0.74rem',
+                                  fontWeight: '800',
+                                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                                  border: 'none',
+                                  color: '#fff',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  boxShadow: '0 2px 8px rgba(249,115,22,0.25)',
+                                }}
+                                onClick={() => handleOpenSchedule(item)}
+                              >
+                                <Clock size={12} /> SCHEDULE
+                              </button>
+                            )}
+                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.74rem', fontWeight: '600' }} onClick={() => setPreviewMedia(item)}>PREVIEW</button>
+                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.74rem', fontWeight: '600' }} onClick={() => handleEditMedia(item)}>EDIT</button>
+                            <button className="btn btn-secondary" style={{ padding: '0.4rem 0.65rem', fontSize: '0.74rem', fontWeight: '600' }} onClick={() => handleToggleActive(item)}>
                               {inactive ? 'ACTIVATE' : 'DEACTIVATE'}
                             </button>
                             <button className="btn btn-secondary" style={{ padding: '0.4rem', color: 'var(--error)' }} onClick={() => handleDeleteMedia(item.id)}>
@@ -1246,6 +1341,162 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* SCHEDULE ONE-TIME POST MODAL */}
+        {scheduleItem && (
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
+            onClick={e => { if (e.target === e.currentTarget) setScheduleItem(null); }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: '#121218', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Clock size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>Schedule One-Time Post</h3>
+                    <p style={{ margin: 0, fontSize: '0.78rem', color: '#a1a1aa' }}>Set exact release date and time for this creative asset.</p>
+                  </div>
+                </div>
+                <button onClick={() => setScheduleItem(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
+              </div>
+
+              {/* MEDIA PREVIEW */}
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', background: '#0a0a0f', padding: '0.75rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', alignItems: 'center' }}>
+                <div style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', background: '#000', flexShrink: 0 }}>
+                  {(scheduleItem.mimeType || '').startsWith('video/') || scheduleItem.filename?.endsWith('.mp4') ? (
+                    <video src={scheduleItem.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <img src={scheduleItem.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {scheduleItem.filename}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#a1a1aa', marginTop: '0.2rem' }}>
+                    {scheduleItem.tags?.join(', ') || 'Creative Asset'}
+                  </div>
+                </div>
+              </div>
+
+              {/* CAPTION */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>Post Caption</label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateCaption}
+                    disabled={generatingCaption}
+                    style={{
+                      background: 'rgba(249,115,22,0.15)',
+                      border: '1px solid rgba(249,115,22,0.4)',
+                      color: '#f97316',
+                      borderRadius: 6,
+                      padding: '0.2rem 0.6rem',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    {generatingCaption ? <RefreshCw className="spin" size={12} /> : <Sparkles size={12} />}
+                    {generatingCaption ? 'Generating...' : '✨ AI Caption'}
+                  </button>
+                </div>
+                <textarea
+                  rows={4}
+                  value={scheduleCaption}
+                  onChange={e => setScheduleCaption(e.target.value)}
+                  placeholder="Post caption..."
+                  style={{ width: '100%', padding: '0.7rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              {/* PLATFORM & DATE/TIME */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>Platform</label>
+                  <select
+                    value={schedulePlatform}
+                    onChange={e => setSchedulePlatform(e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem', appearance: 'auto' }}
+                  >
+                    <option value="BOTH">Instagram &amp; Facebook (Both)</option>
+                    <option value="INSTAGRAM">Instagram Only (Reels / Feed)</option>
+                    <option value="FACEBOOK">Facebook Page Only</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#fff', marginBottom: '0.4rem' }}>Date &amp; Time</label>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={e => setScheduleDate(e.target.value)}
+                      style={{ flex: 1, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                    />
+                    <input
+                      type="time"
+                      value={scheduleTime}
+                      onChange={e => setScheduleTime(e.target.value)}
+                      style={{ width: 100, padding: '0.55rem', borderRadius: 8, background: '#0a0a0f', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: '0.85rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* QUICK PRESETS */}
+              <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.72rem', color: '#a1a1aa' }}>Presets:</span>
+                {[
+                  { label: 'Today 6 PM', getDt: () => { const d = new Date(); return { date: d.toISOString().split('T')[0], time: '18:00' }; } },
+                  { label: 'Tomorrow 12 PM', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 1); return { date: d.toISOString().split('T')[0], time: '12:00' }; } },
+                  { label: 'Tomorrow 6 PM', getDt: () => { const d = new Date(); d.setDate(d.getDate() + 1); return { date: d.toISOString().split('T')[0], time: '18:00' }; } },
+                ].map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const res = p.getDt();
+                      setScheduleDate(res.date);
+                      setScheduleTime(res.time);
+                    }}
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#d4d4d8', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+                <button className="btn btn-secondary" onClick={() => setScheduleItem(null)} disabled={scheduling}>Cancel</button>
+                <button
+                  onClick={handleConfirmSchedule}
+                  disabled={scheduling}
+                  className="btn btn-primary"
+                  style={{
+                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    border: 'none',
+                    fontWeight: 800,
+                    padding: '0.65rem 1.4rem',
+                    borderRadius: 8,
+                    fontSize: '0.88rem',
+                    boxShadow: '0 4px 14px rgba(249,115,22,0.35)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {scheduling ? <RefreshCw className="spin" size={15} /> : <Clock size={15} />}
+                  {scheduling ? 'Scheduling...' : 'Confirm Schedule 🚀'}
+                </button>
+              </div>
             </div>
           </div>
         )}

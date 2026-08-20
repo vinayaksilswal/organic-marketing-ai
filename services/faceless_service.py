@@ -373,6 +373,12 @@ Channel Name: {channel_name}
 
     data = _parse_json(raw_response)
 
+    # Ensure critical fields exist
+    if not data.get("title"):
+        data["title"] = data.get("video_title") or f"The Secret of {topic_info['title']}"
+    if not data.get("video_prompt"):
+        data["video_prompt"] = f"Vertical 9:16 cinematic slow push-in shot, {topic_info['title']} {style_info.get('image_modifier', '')}, 4k resolution"
+
     # Attach metadata
     data["topic"] = topic_info
     data["visual_style"] = style_info

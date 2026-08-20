@@ -522,6 +522,52 @@ def is_post_due(hours_since_last: float, interval_hours: float,
     return hours_since_last >= max(interval_hours - grace, 0)
 
 
+async def execute_due_scheduled_posts() -> None:
+    """Finds all one-time scheduled posts due for publishing and publishes them."""
+    now = utc_now()
+    try:
+        from services.social_service import post_to_facebook, post_to_instagram
+
+        async with AsyncSessionLocal() as session:
+            stmt = select(SocialPost).where(
+                SocialPost.status == "SCHEDULED",
+                SocialPost.scheduledAt <= now
+            )
+            res = await session.execute(stmt)
+            due_posts = res.scalars().all()
+
+            for post in due_posts:
+                workspace_id = post.businessProfileId
+                target_urls = post.mediaUrls or []
+                caption = post.caption or ""
+                fb_post_id, ig_post_id = None, None
+                errors = []
+
+                if post.platform in ("FACEBOOK", "BOTH"):
+                    try:
+                        fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=target_urls)
+                    except Exception as e:
+                        errors.append(f"FB: {str(e)}")
+
+                if post.platform in ("INSTAGRAM", "BOTH"):
+                    try:
+                        ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=target_urls)
+                    except Exception as e:
+                        errors.append(f"IG: {str(e)}")
+
+                post.status = "POSTED" if not errors or fb_post_id or ig_post_id else "FAILED"
+                post.postedAt = utc_now()
+                post.fbPostId = fb_post_id
+                post.igPostId = ig_post_id
+                post.errorLog = " | ".join(errors) if errors else None
+                logger.info(f"[SCHEDULED POST] Processed post {post.id} for {workspace_id} -> {post.status}")
+
+            if due_posts:
+                await session.commit()
+    except Exception as e:
+        logger.error(f"[SCHEDULED POSTS] Loop exception: {e}")
+
+
 def create_scheduler() -> AsyncIOScheduler:
     """Create and configure the APScheduler AsyncIOScheduler instance."""
     scheduler = AsyncIOScheduler(timezone="UTC")
@@ -533,6 +579,16 @@ def create_scheduler() -> AsyncIOScheduler:
         name="Marketing Loop",
         replace_existing=True,
         # A tick that overruns must not queue a second copy behind it.
+        max_instances=1,
+        coalesce=True,
+    )
+
+    scheduler.add_job(
+        execute_due_scheduled_posts,
+        trigger=IntervalTrigger(minutes=1),
+        id="scheduled_posts_loop",
+        name="1-Minute Scheduled Posts Publisher",
+        replace_existing=True,
         max_instances=1,
         coalesce=True,
     )
@@ -561,7 +617,7 @@ def create_scheduler() -> AsyncIOScheduler:
 
     logger.info(
         f"APScheduler initialized (Marketing Loop: {MARKETING_LOOP_MINUTES}m, "
-        f"Creative Loop: 2h, Post Cleanup: 24h)"
+        f"Scheduled Posts: 1m, Creative Loop: 2h, Post Cleanup: 24h)"
     )
     return scheduler
 
