@@ -17,8 +17,8 @@ Nothing in the interface names any of this. See `tests/test_no_provider_leaks.py
 
 | What | Model | File |
 |---|---|---|
-| Captions, brand analysis, marketing copy | `nvidia/nemotron-3-ultra-550b-a55b:free` | `services/ai_service.py` |
-| Video prompt — text | `google/gemma-4-31b-it:free` | `services/video_pipeline_service.py` |
+| Captions, brand analysis, marketing copy | `z-ai/glm-5.2:free` | `services/ai_service.py` |
+| Video prompt — text | `z-ai/glm-5.2:free` | `services/video_pipeline_service.py` |
 | Video prompt — image understanding | `nvidia/nemotron-nano-12b-v2-vl:free` | `services/video_pipeline_service.py` |
 | Bulk media captioning (vision) | `nvidia/nemotron-nano-12b-v2-vl:free` + gemma fallbacks | `services/bulk_ingest.py` |
 | Keyframe prompts (first/last frame) | inherits the marketing chain | `services/keyframes.py` |
@@ -30,7 +30,8 @@ Nothing in the interface names any of this. See `tests/test_no_provider_leaks.py
 `services/ai_service.py` does not call one model. A request walks a chain,
 falling through on rate limits and 404s:
 
-1. `nvidia/nemotron-3-ultra-550b-a55b:free` — 550B MoE, 1M context
+1. `z-ai/glm-5.2:free` — 256K context, **text-only**
+2. `nvidia/nemotron-3-ultra-550b-a55b:free` — 550B MoE, 1M context
 2. `nvidia/nemotron-3-super-120b-a12b:free` — 120B MoE
 3. `inclusionai/ling-3.0-flash:free` — 124B MoE
 4. `google/gemma-4-31b-it:free`
@@ -46,6 +47,31 @@ was ever tried — the fallback existed and did nothing.
 
 Models are excluded by slug when they are unsuited to marketing copy: safety
 classifiers, code-only, vision-only.
+
+### Text-only is not a footnote
+
+GLM 5.2 accepts text and nothing else. It leads the text chain and appears in
+no vision path, because a text-only model handed an image does not error — it
+invents, and an invented product description poisons every prompt built from
+it. `video_pipeline_service.VISION_MODEL` and `bulk_ingest.VISION_MODELS` stay
+VL models. A test asserts no `glm` slug leaks into either.
+
+### The bench
+
+A model answering 429 or 5xx is skipped for five minutes rather than retried on
+every request. Without it a dead preferred model costs a full failed
+round-trip on every call — measured at 3.5s versus 0.8s once benched.
+
+If benching would empty the chain it is ignored and everything is tried: a
+stale bench must never be why nothing gets written. Only capacity failures
+bench; a 400 or 401 fails identically everywhere, and benching those would hide
+a broken key behind a slow degrade.
+
+**As of 2026-08-20, `z-ai/glm-5.2:free` returns 429 on every request** —
+"Provider returned error" — so nemotron is doing the work in practice. The
+wiring is correct and GLM takes over the moment the provider accepts traffic.
+Paying for `z-ai/glm-5.2` (no `:free`) via `AI_PRIMARY_MODEL` would deliver it
+today.
 
 ---
 
