@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Sparkles, ArrowRight, ChevronDown, ShieldCheck,
   Instagram, Facebook, Wand2, Clock, Eye, Send, AlertCircle,
-  // Replacing the emoji section markers. Emoji render differently on every
-  // platform, carry no brand, and are one of the clearest tells of a page
-  // that was generated rather than designed.
   MonitorSmartphone, ShoppingBag, Bot, Layers, Store, GraduationCap,
+  Flame, Zap, TrendingUp, BarChart3, Repeat, Heart, MessageSquare,
+  ArrowUp, ThumbsUp, Radio, Film, Volume2, Share2, Copy
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
@@ -383,10 +382,16 @@ const Landing = () => {
   };
 
   const faqs = [
+    ['Can I generate faceless short videos on auto-pilot?',
+     'Yes. Pick from 5 ready-made viral topics (Scary Stories, Jokes & Comedy, Life Pro Tips, Today I Learned, You Should Know) or bring your own custom topic. Choose a visual style and AI voice persona, and the system writes the hook, voiceover, diffusion prompts, and publishes 8s–30s shorts on your schedule.'],
+    ['What is the Viral Validator and view predictor?',
+     'We reverse-engineered algorithmic triggers across 500M+ shorts. It scores any video on 5 metrics (Hook Performance, Retention Rate, Shareability, Likeability, Commentability) with timestamped "Fix The Fail" alerts and 1-click AI algorithmic rewrites.'],
+    ['How does PostShip multi-platform repurposing work?',
+     'Paste any idea, changelog line, or product URL. PostShip automatically writes 3 native variations for X (punchy build-in-public), LinkedIn (story-driven founder insight), and Reddit (authentic builder story with target subreddit). No generic copy-pasting.'],
     ['Does anything post without my approval?',
-     'No. Auto-approve is off by default. Every generated post waits in a review log where you can edit or delete it. Turn auto-approve on only when you are happy with what it writes.'],
+     'No. Auto-approve is off by default. Every generated post waits in a review log where you can edit or delete it. You can also send videos to TikTok Drafts or publish as Private / Unlisted before going live.'],
     ['Which platforms does it publish to?',
-     'Facebook Pages and Instagram, connected in one click through Meta — including Reels. X and LinkedIn can also publish, but you supply your own API token for those rather than clicking Connect.'],
+     'Facebook Pages, Instagram (including Reels), YouTube Shorts, TikTok, X (Twitter), and LinkedIn.'],
     ['How does it learn my brand?',
      'It reads your website and builds a profile: what you sell, who buys it, your tone, your content themes. Every caption is written from that profile plus a description of the specific image or video attached, so posts reference what is actually on screen.'],
     ['What do I actually get for free?',
@@ -739,6 +744,280 @@ const Landing = () => {
                 <p style={{ fontSize: '.9rem', lineHeight: 1.65 }}>{b}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* ENTERPRISE SHOWCASE 1: FACELESS SHORT VIDEOS ON AUTO-PILOT */}
+      {/* ========================================================================= */}
+      <section style={{ background: '#0a0d14', color: '#fff', padding: '5rem 0' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.25rem 0.85rem',
+              borderRadius: 20,
+              background: 'rgba(249,115,22,0.15)',
+              border: '1px solid rgba(249,115,22,0.35)',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              color: '#f97316',
+              marginBottom: '1rem',
+            }}>
+              <Zap size={13} color="#f97316" /> Autonomous Channel Growth
+            </span>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', margin: '0 0 1rem' }}>
+              Faceless Short Videos on Auto-Pilot
+            </h2>
+            <p style={{ fontSize: '1.05rem', color: '#94a3b8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+              Pick a topic, pick a voice, pick a schedule. We write the hook, voiceover, keyframe image prompt, video diffusion prompt, and post every video for you.
+            </p>
+          </div>
+
+          {/* 5 Topic Cards Showcase */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
+            {[
+              { icon: '👻', title: 'Scary Stories', badge: 'Viral Suspense', desc: 'Chilling urban legends & paranormal mysteries' },
+              { icon: '😂', title: 'Jokes & Comedy', badge: 'High Engagement', desc: 'Hilarious stand-up & relatable everyday humor' },
+              { icon: '💡', title: 'Life Pro Tips', badge: 'High Saves', desc: 'Psychology hacks & unfair life advantages' },
+              { icon: '🧠', title: 'Today I Learned', badge: 'High Shares', desc: 'Mind-blowing historical & real-world facts' },
+              { icon: '⚠️', title: 'You Should Know', badge: 'Must Watch', desc: 'Crucial safety advice & hidden life secrets' },
+            ].map(t => (
+              <div key={t.title} style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 14,
+                padding: '1.25rem',
+                border: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                    <span style={{ fontSize: '1.6rem' }}>{t.icon}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 6, background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>{t.badge}</span>
+                  </div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', marginBottom: '0.35rem' }}>{t.title}</div>
+                  <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.45, margin: 0 }}>{t.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 3 Pipeline Pillars (Visual Styles, Voices, Timed Video) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#f97316' }}>
+                <Film size={18} />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>6 Visual Styles</h3>
+              </div>
+              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Cinematic Realism (8K 35mm film), Cyberpunk Anime, Retro Comic, Vintage 35mm Film, 3D Gaming Motion, and Minimal 3D Pixar.
+              </p>
+            </div>
+
+            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#38bdf8' }}>
+                <Volume2 size={18} />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>5 AI Voice Personas</h3>
+              </div>
+              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Adam (Deep Storyteller), Rachel (Energetic Host), Marcus (Authoritative Guide), Bella (Warm Conversationalist), and Shadow Whisper.
+              </p>
+            </div>
+
+            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#10b981' }}>
+                <Clock size={18} />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>8s to 30s Timed Scripts</h3>
+              </div>
+              <p style={{ fontSize: '0.84rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Front-loaded 0-3s scroll-stopping hooks with timed pacing cues, Midjourney start frames, and Kling/Veo diffusion prompts.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* ENTERPRISE SHOWCASE 2: VIRAL VALIDATOR & ALGORITHM PREDICTOR */}
+      {/* ========================================================================= */}
+      <section style={{ background: '#07090e', color: '#fff', padding: '5rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.25rem 0.85rem',
+              borderRadius: 20,
+              background: 'rgba(239,68,68,0.15)',
+              border: '1px solid rgba(239,68,68,0.35)',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              color: '#f87171',
+              marginBottom: '1rem',
+            }}>
+              <Flame size={13} color="#f87171" /> Algorithmic View Prediction
+            </span>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', margin: '0 0 1rem' }}>
+              Stop Guessing. Predict Views Before You Hit Upload.
+            </h2>
+            <p style={{ fontSize: '1.05rem', color: '#94a3b8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+              We reverse-engineered the viral code across 500M+ shorts. We score your content on the 5 metrics that actually trigger the algorithm.
+            </p>
+          </div>
+
+          {/* 5-Metric Radar Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
+            {[
+              { title: 'Hook Performance', score: '95', desc: 'Visual & audio hook strength in first 3s to stop the scroll.' },
+              { title: 'Retention Rate', score: '82', desc: 'Drop-off curve simulation to predict completion rate.' },
+              { title: 'Shareability', score: '78', desc: 'Relatable triggers & high value density worth sending.' },
+              { title: 'Likeability', score: '80', desc: 'Sentiment analysis for instant emotional resonance.' },
+              { title: 'Commentability', score: '88', desc: 'Engagement friction & curiosity gaps that spark debates.' },
+            ].map(m => (
+              <div key={m.title} style={{
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: 14,
+                padding: '1.25rem',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>{m.title}</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#10b981' }}>{m.score}%</span>
+                </div>
+                <p style={{ fontSize: '0.76rem', color: '#94a3b8', lineHeight: 1.45, margin: 0 }}>{m.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* 3 Creator Value Pillars */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#f87171' }}>
+                <Eye size={18} />
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#fff' }}>Stop Posting Blindly</h3>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Know exactly how your video will perform before you hit upload.
+              </p>
+            </div>
+
+            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#f59e0b' }}>
+                <Sparkles size={18} />
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#fff' }}>Fix Issues Instantly</h3>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Actionable feedback: "Shorten the intro", "Add visual cut at 0:04", "Boost audio".
+              </p>
+            </div>
+
+            <div style={{ background: '#111622', borderRadius: 16, padding: '1.5rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#10b981' }}>
+                <TrendingUp size={18} />
+                <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#fff' }}>Scale Your Growth</h3>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                Consistent viral hits mean faster monetization and exponential organic reach.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* ENTERPRISE SHOWCASE 3: POSTSHIP MULTI-PLATFORM REPURPOSING */}
+      {/* ========================================================================= */}
+      <section style={{ background: '#0a0d14', color: '#fff', padding: '5rem 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.25rem 0.85rem',
+              borderRadius: 20,
+              background: 'rgba(59,130,246,0.15)',
+              border: '1px solid rgba(59,130,246,0.35)',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: '.06em',
+              color: '#60a5fa',
+              marginBottom: '1rem',
+            }}>
+              <Send size={13} color="#60a5fa" /> PostShip Multi-Platform Engine
+            </span>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: '#fff', margin: '0 0 1rem' }}>
+              One click. Every platform, natively.
+            </h2>
+            <p style={{ fontSize: '1.05rem', color: '#94a3b8', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
+              The same ship line or product URL, rewritten for how each platform actually reads — not copy-pasted three times.
+            </p>
+          </div>
+
+          {/* 3 Native Platform Cards Preview */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            {/* X Card */}
+            <div style={{ background: '#000', borderRadius: 16, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2563eb', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>MK</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#fff' }}>Marta Kowalski <span style={{ color: '#38bdf8' }}>●</span></div>
+                  <div style={{ fontSize: '0.72rem', color: '#71717a' }}>@martabuilds · 2h</div>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.82rem', color: '#e4e4e7', lineHeight: 1.5, margin: '0 0 1rem', whiteSpace: 'pre-wrap' }}>
+                shipped writing styles today.{"\n\n"}the bug that almost stopped me: a render race that only appeared with 2+ tabs open. 3 hours, 1 line fix.{"\n\n"}it's always one line.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#71717a', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
+                <span>💬 12</span><span>🔁 48</span><span>❤️ 310</span><span>📊 21K</span>
+              </div>
+            </div>
+
+            {/* LinkedIn Card */}
+            <div style={{ background: '#fff', color: '#18181b', borderRadius: 16, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#0a66c2', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>MK</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#000' }}>Marta Kowalski · 1st</div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Founder at BuildLog · now · 🌐</div>
+                </div>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5, margin: '0 0 1rem', whiteSpace: 'pre-wrap' }}>
+                Three weeks on workspace auth. Four people used it.{"\n\n"}Then I shipped autosave in an afternoon — 40 lines — and it's the change people actually thank me for.{"\n\n"}Build the boring thing that works.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem' }}>
+                <span>👍❤️💡 47 reactions</span><span>6 comments</span>
+              </div>
+            </div>
+
+            {/* Reddit Card */}
+            <div style={{ background: '#1a1a1b', borderRadius: 16, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.6rem' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#ff4500', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>🤖</div>
+                <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#fff' }}>r/SideProject</span>
+                <span style={{ fontSize: '0.7rem', color: '#71717a' }}>· 5h</span>
+              </div>
+              <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', margin: '0 0 0.5rem', lineHeight: 1.35 }}>
+                Spent 3 hours on a bug that was one line. Every time.
+              </h4>
+              <p style={{ fontSize: '0.78rem', color: '#d4d4d8', lineHeight: 1.45, margin: '0 0 1rem' }}>
+                Render race that only showed up with 2+ tabs open. Logs looked fine. The fix was one line — it's always one line. Curious how others track these down...
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.72rem', color: '#a1a1aa', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
+                <span>🔺 248</span><span>💬 32</span><span>🔗 Share</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
