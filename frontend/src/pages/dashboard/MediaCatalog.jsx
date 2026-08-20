@@ -1114,7 +1114,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                                 <Sparkles size={11} />
                                 {item.promptType === 'video' ? 'Video prompt' : 'AI prompt'}
                               </summary>
-                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
+                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(11,16,32,0.04)', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
                                 <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.55, color: 'var(--text-main)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
                                   {item.prompt}
                                 </p>
@@ -1290,7 +1290,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
         {purgeOpen && (
           <div className="modal-overlay" onClick={() => !purging && setPurgeOpen(false)} style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+            position: 'fixed', inset: 0, background: 'rgba(11,16,32,0.04)', zIndex: 1000,
             display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
           }}>
             <div onClick={e => e.stopPropagation()} className="glass-panel" style={{ maxWidth: 460, width: '100%', padding: '1.5rem' }}>
@@ -1347,7 +1347,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
         {/* SCHEDULE ONE-TIME POST MODAL */}
         {scheduleItem && (
-          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(11,16,32,0.04)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setScheduleItem(null); }}>
             <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>

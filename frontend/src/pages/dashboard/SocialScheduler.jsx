@@ -4,6 +4,27 @@ import { API_BASE, authFetch } from '../../config';
 import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw, CalendarDays, Sparkles, Plus } from 'lucide-react';
 import PostCalendar from '../../components/PostCalendar';
 
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+const labelSm = {
+  display: 'block', fontSize: '0.78rem', fontWeight: 700,
+  color: 'var(--text-muted)', marginBottom: '0.4rem',
+};
+
+const inputSm = {
+  width: '100%', padding: '0.6rem 0.7rem', borderRadius: 9,
+  border: '1px solid var(--border-color)', background: 'rgba(11,16,32,0.03)',
+  color: 'var(--text-main)', fontSize: '0.88rem', minHeight: 44,
+};
+
+const chipStyle = (on) => ({
+  minHeight: 40, padding: '0 0.85rem', borderRadius: 9, cursor: 'pointer',
+  fontSize: '0.82rem', fontWeight: 650,
+  background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
+  color: on ? '#fff' : 'var(--text-main)',
+  border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
+});
+
 const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const navigate = useNavigate();
   const [previewTab, setPreviewTab] = useState('feed'); // 'reels' | 'feed' | 'profile'
@@ -38,6 +59,51 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
   const [scheduleTime, setScheduleTime] = useState('18:00');
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [schedulingPost, setSchedulingPost] = useState(false);
+
+  // Repeat rule. Kept beside the one-time state because it schedules the same
+  // asset through the same modal picker -- only the dates differ.
+  const [repeatOpen, setRepeatOpen] = useState(false);
+  const [repeatMode, setRepeatMode] = useState('weekly');   // 'weekly' | 'monthly'
+  const [repeatDays, setRepeatDays] = useState([0, 2, 4]);  // Mon, Wed, Fri
+  const [repeatDayOfMonth, setRepeatDayOfMonth] = useState(1);
+  const [repeatTime, setRepeatTime] = useState('18:00');
+  const [repeatCount, setRepeatCount] = useState(8);
+  const [repeatMediaId, setRepeatMediaId] = useState('');
+  const [savingRepeat, setSavingRepeat] = useState(false);
+
+  const submitRepeat = async () => {
+    if (!repeatMediaId) return showToast('Choose an asset to repeat.', true);
+    if (repeatMode === 'weekly' && repeatDays.length === 0) {
+      return showToast('Pick at least one day of the week.', true);
+    }
+    setSavingRepeat(true);
+    try {
+      const res = await authFetch(`${API_BASE}/marketing/posts/schedule-recurring`, {
+        method: 'POST',
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          mediaId: repeatMediaId,
+          platform: schedulePlatform,
+          repeat: repeatMode,
+          daysOfWeek: repeatMode === 'weekly' ? repeatDays : null,
+          dayOfMonth: repeatMode === 'monthly' ? Number(repeatDayOfMonth) : null,
+          timeOfDay: repeatTime,
+          occurrences: Number(repeatCount),
+        }),
+      }, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || data.message || 'Could not schedule that.');
+      showToast(data.message || `${data.created} posts scheduled.`);
+      setRepeatOpen(false);
+      setRepeatMediaId('');
+      await fetchScheduledPosts();
+      await fetchPosts();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSavingRepeat(false);
+    }
+  };
 
   useEffect(() => {
     fetchSettings();
@@ -391,7 +457,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             {/* Posting frequency is owned by Businesses -> Edit -> Automation.
                 Two controls writing the same setting was a source of confusion
                 about which one actually applied. */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(11,16,32,0.04)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <Clock size={15} className="text-muted" />
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 Posts every <strong style={{ color: 'var(--text-main)' }}>{frequencyHours}h</strong>
@@ -405,7 +471,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             </div>
 
             {/* Auto Approve Toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.3)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(11,16,32,0.04)', padding: '0.5rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <label style={{ position: 'relative', display: 'inline-block', width: '40px', height: '22px' }}>
                  <input type="checkbox" checked={autoApproveActive} onChange={(e) => handleAutoApproveChange(e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
                 <span style={{ position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: autoApproveActive ? 'var(--success)' : 'rgba(255,255,255,0.2)', transition: '.4s', borderRadius: '34px' }}>
@@ -416,7 +482,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             </div>
 
             {/* Publishing Visibility Mode Control */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(0,0,0,0.3)', padding: '0.35rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(11,16,32,0.04)', padding: '0.35rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>Mode:</span>
               <button
                 type="button"
@@ -468,26 +534,6 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               </button>
             </div>
 
-            {/* Schedule One-Time Media Post Button */}
-            <button
-              className="btn btn-primary"
-              onClick={() => openScheduleModal()}
-              style={{
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                color: '#fff',
-                fontWeight: 700,
-                padding: '0.6rem 1.15rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                border: 'none',
-                boxShadow: '0 4px 14px rgba(249, 115, 22, 0.3)',
-                cursor: 'pointer',
-              }}
-            >
-              <Clock size={16} /> + Schedule One-Time Post
-            </button>
-
             {/* Run Manually button. It is a manual trigger for the same cycle the
                 scheduler runs on its own, and calling it "Run Automation" read as
                 if it switched the automation on -- so people pressed it to enable
@@ -501,6 +547,25 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               {runningLoop ? <span className="spinner"></span> : <>⚡ Run Manually</>}
             </button>
           </div>
+        </div>
+
+        {/* SCHEDULE — the month, with every post on the day it went out.
+            A table answers "what happened last?"; the questions people
+            actually have about a schedule are shape questions: is anything
+            going out tomorrow, did Tuesday publish, why is there a gap. */}
+        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(11, 16, 32, 0.02)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+            <CalendarDays size={18} color="var(--primary-color)" />
+            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Posting calendar</h2>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Click any post to preview or edit it
+            </span>
+          </div>
+          {postsLoading ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading the schedule…</p>
+          ) : (
+            <PostCalendar posts={posts} onSelect={handleEditDraft} />
+          )}
         </div>
 
         {/* ONE-TIME SCHEDULED POSTS SECTION */}
@@ -584,7 +649,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           {isVideo ? (
                             <>
                               <video src={mediaUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              <div style={{ position: 'absolute', bottom: 2, right: 2, background: 'rgba(0,0,0,0.7)', borderRadius: 4, padding: '1px 3px' }}>
+                              <div style={{ position: 'absolute', bottom: 2, right: 2, background: 'rgba(11,16,32,0.04)', borderRadius: 4, padding: '1px 3px' }}>
                                 <Video size={10} color="#fff" />
                               </div>
                             </>
@@ -649,22 +714,100 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
           )}
         </div>
 
-        {/* SCHEDULE — the month, with every post on the day it went out.
-            A table answers "what happened last?"; the questions people
-            actually have about a schedule are shape questions: is anything
-            going out tomorrow, did Tuesday publish, why is there a gap. */}
-        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(11, 16, 32, 0.02)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
-            <CalendarDays size={18} color="var(--primary-color)" />
-            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Posting calendar</h2>
+        {/* REPEAT A POST.
+            Its own section rather than a mode inside the one-time dialog: a
+            date and a rule are different decisions, and folding them into one
+            form makes both harder to read. Occurrences are materialised as
+            ordinary scheduled posts, so everything below on this page already
+            knows how to show and cancel them. */}
+        <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: repeatOpen ? '1.25rem' : 0 }}>
+            <RefreshCw size={18} color="var(--primary-color)" />
+            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Repeat a post</h2>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Click any post to preview or edit it
+              Certain weekdays, or a day of the month
             </span>
+            <button
+              onClick={() => setRepeatOpen(o => !o)}
+              className="btn btn-secondary"
+              style={{ marginLeft: 'auto', minHeight: 38, fontSize: '0.82rem', fontWeight: 700 }}
+            >
+              {repeatOpen ? 'Close' : '+ Set up a repeat'}
+            </button>
           </div>
-          {postsLoading ? (
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Loading the schedule…</p>
-          ) : (
-            <PostCalendar posts={posts} onSelect={handleEditDraft} />
+
+          {repeatOpen && (
+            <div style={{ display: 'grid', gap: '1.1rem' }}>
+              <div>
+                <label style={labelSm}>Asset</label>
+                <select value={repeatMediaId} onChange={e => setRepeatMediaId(e.target.value)} style={inputSm}>
+                  <option value="">Choose from your media…</option>
+                  {mediaList.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {(m.caption || m.filename || 'Untitled').slice(0, 70)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={labelSm}>Repeats</label>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {[['weekly', 'Certain weekdays'], ['monthly', 'A day each month']].map(([k, lbl]) => (
+                    <button key={k} type="button" onClick={() => setRepeatMode(k)}
+                            style={chipStyle(repeatMode === k)}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
+
+              {repeatMode === 'weekly' ? (
+                <div>
+                  <label style={labelSm}>On these days</label>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    {DAY_LABELS.map((d, i) => (
+                      <button key={d} type="button"
+                              onClick={() => setRepeatDays(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i].sort())}
+                              style={{ ...chipStyle(repeatDays.includes(i)), minWidth: 52 }}>{d}</button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label style={labelSm}>Day of the month</label>
+                  <select value={repeatDayOfMonth} onChange={e => setRepeatDayOfMonth(e.target.value)} style={{ ...inputSm, maxWidth: 200 }}>
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <small style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    Stops at 28 — later dates do not exist in every month, and quietly moving a post is worse than not offering it.
+                  </small>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 150px' }}>
+                  <label style={labelSm}>Time</label>
+                  <input type="time" value={repeatTime} onChange={e => setRepeatTime(e.target.value)} style={inputSm} />
+                </div>
+                <div style={{ flex: '1 1 150px' }}>
+                  <label style={labelSm}>How many</label>
+                  <select value={repeatCount} onChange={e => setRepeatCount(e.target.value)} style={inputSm}>
+                    {[4, 8, 12, 20, 31].map(n => <option key={n} value={n}>{n} posts</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <button onClick={submitRepeat} disabled={savingRepeat} className="btn btn-primary"
+                        style={{ minHeight: 44, fontWeight: 700 }}>
+                  {savingRepeat ? 'Scheduling…' : 'Schedule the repeats'}
+                </button>
+                <small style={{ display: 'block', marginTop: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  These appear above as normal scheduled posts, so you can cancel any single one.
+                </small>
+              </div>
+            </div>
           )}
         </div>
 
@@ -856,7 +999,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 </div>
 
                 {/* Right Side: Preview */}
-                <div style={{ flex: 1, padding: '1.5rem', background: 'rgba(0,0,0,0.5)', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ flex: 1, padding: '1.5rem', background: 'rgba(11,16,32,0.04)', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   
                   {(() => {
                     const isVideo = !!editMedia && (editMedia.includes('video') || /\.(mp4|mov|webm)$/i.test(editMedia));
@@ -1065,7 +1208,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                               <img src={m.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             )}
                             {isVid && (
-                              <div style={{ position: 'absolute', top: 3, right: 3, background: 'rgba(0,0,0,0.7)', borderRadius: 4, padding: '1px 3px' }}>
+                              <div style={{ position: 'absolute', top: 3, right: 3, background: 'rgba(11,16,32,0.04)', borderRadius: 4, padding: '1px 3px' }}>
                                 <Video size={10} color="#fff" />
                               </div>
                             )}

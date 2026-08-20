@@ -498,7 +498,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
         {/* EDIT MODAL */}
         {editModalOpen && (
-          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(11,16,32,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setEditModalOpen(false); }}>
             <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 680, maxHeight: '90vh', overflow: 'auto', padding: 0 }}>
               {/* Header */}
