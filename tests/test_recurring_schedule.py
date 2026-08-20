@@ -66,6 +66,17 @@ def test_a_rule_with_no_days_is_refused_rather_than_guessed():
     assert "Pick at least one day of the week" in SRC
 
 
+def test_the_names_the_endpoint_uses_are_actually_imported():
+    """This shipped with timedelta used and never imported, so every weekly
+    rule raised NameError at runtime while every structural test still passed
+    -- reading source for the right strings proves the shape, never that it
+    runs."""
+    from routers import marketing as m
+
+    assert hasattr(m, "timedelta"), "timedelta is used in the weekly loop"
+    assert hasattr(m, "datetime") and hasattr(m, "timezone")
+
+
 def test_a_bad_time_is_refused_with_a_usable_message():
     assert "Time must be HH:MM" in SRC
 
