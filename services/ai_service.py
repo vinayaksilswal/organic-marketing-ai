@@ -47,7 +47,7 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # this product, and it should not require a code change to make.
 MARKETING_MODEL = (
     (settings.ai_primary_model or "").strip()
-    or "nvidia/nemotron-3-ultra-550b-a55b:free"
+    or "z-ai/glm-5.2:free"
 )
 
 # Shared timeout for LLM API calls (LLMs can be slow)
@@ -183,6 +183,13 @@ FREE_MODEL_CHAIN = [
     # falls through on rate limits, so leading with the best model costs
     # nothing when it is busy but noticeably improves caption quality when it
     # is not.
+    #
+    # GLM 5.2 leads. Text-only and 256K context, which is ample here -- the
+    # longest thing this service is ever handed is a scraped page plus a brand
+    # profile. It is deliberately NOT used for vision anywhere: services that
+    # read an image keep a VL model, because a text-only model handed a picture
+    # does not fail, it invents.
+    "z-ai/glm-5.2:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",      # 550B MoE, 1M ctx
     "nvidia/nemotron-3-super-120b-a12b:free",      # 120B MoE
     "inclusionai/ling-3.0-flash:free",             # 124B MoE
@@ -194,6 +201,32 @@ FREE_MODEL_CHAIN = [
 
 # Models unsuited to marketing copy: safety classifiers, code-only, vision-only.
 _MODEL_EXCLUDE = ("content-safety", "-code", "-vl", "guard")
+
+# Models the provider is currently refusing, and when they may be tried
+# again. A model that answers 429 on every call still costs a full round-trip
+# on every request before the chain falls through -- with the preferred model
+# down that is a fixed latency tax on every caption the product writes. This
+# skips it for a few minutes instead, and lets it back in on its own.
+#
+# Deliberately in-memory and short: a restart clears it, and a provider that
+# has recovered should not stay benched because of one bad minute.
+_benched: dict[str, float] = {}
+_BENCH_SECONDS = 300.0
+
+
+def _bench(model: str) -> None:
+    _benched[model] = time.time() + _BENCH_SECONDS
+
+
+def _is_benched(model: str) -> bool:
+    until = _benched.get(model)
+    if until is None:
+        return False
+    if time.time() >= until:
+        _benched.pop(model, None)
+        return False
+    return True
+
 
 _model_cache: dict[str, Any] = {"models": None, "fetched_at": 0.0}
 _MODEL_CACHE_TTL = 3600  # seconds
@@ -299,6 +332,13 @@ async def _call_openrouter(
     available = await _free_models()
     chain = [model] + [m for m in available if m != model]
 
+    # Drop anything the provider refused recently. If that would empty the
+    # chain, ignore the bench entirely and try everything -- a stale bench must
+    # never be the reason nothing gets written.
+    live = [m for m in chain if not _is_benched(m)]
+    if live:
+        chain = live
+
     for candidate in chain:
         try:
             result = await _call_openrouter_once(
@@ -342,6 +382,10 @@ async def _call_openrouter(
                 break
             # Log the reason, not just the exception class. "unavailable
             # (KeyError)" told us nothing across dozens of production calls.
+            # Capacity failures bench the model briefly so the next request
+            # does not pay the same failed round-trip again.
+            if status == 429 or (isinstance(status, int) and status >= 500):
+                _bench(candidate)
             logger.warning(
                 f"LLM model {candidate} unavailable "
                 f"({status or type(e).__name__}): {str(e)[:250]}; trying next"

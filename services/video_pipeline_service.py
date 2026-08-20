@@ -23,8 +23,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from config import settings
 from services.ai_service import LLM_TIMEOUT, MARKETING_MODEL
 
+# Vision stays a VL model: a text-only model handed an image does not fail,
+# it invents, and an invented product description poisons every prompt built
+# from it.
 VISION_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
-TEXT_MODEL = "google/gemma-4-31b-it:free"
+TEXT_MODEL = "z-ai/glm-5.2:free"
 
 async def scrape_product_url(url: str) -> str:
     """Smart URL Scraper using jina.ai"""

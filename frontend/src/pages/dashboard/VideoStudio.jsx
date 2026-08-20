@@ -722,6 +722,32 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                                   <p style={{ margin: 0, fontSize: '0.78rem', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{value}</p>
                                 </div>
                               ))}
+                              {/* The whole set, labelled, in the order it is
+                                  used: first frame into an image model, last
+                                  frame into an image model, then both into a
+                                  video model with the video prompt. Copying
+                                  three things separately is three chances to
+                                  paste the wrong one. */}
+                              <button
+                                onClick={() => {
+                                  const kf = item.keyframes || {};
+                                  const secs = item.plan?.durationSeconds;
+                                  const NL = String.fromCharCode(10);
+                                  const SEP = NL + NL + '---' + NL + NL;
+                                  const block = [
+                                    'FIRST FRAME (image prompt)' + NL + (kf.firstFramePrompt || ''),
+                                    'LAST FRAME (image prompt)' + NL + (kf.lastFramePrompt || ''),
+                                    'VIDEO PROMPT' + (secs ? ' (' + secs + 's)' : '') + NL + text,
+                                  ].join(SEP);
+                                  navigator.clipboard?.writeText(block);
+                                  showToast('All three prompts copied');
+                                }}
+                                className="btn btn-primary"
+                                style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}
+                              >
+                                <Copy size={14} /> Copy all three prompts
+                              </button>
+
                               {item.keyframes.cta && (
                                 <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                                   Closing card reads <strong>{item.keyframes.brand}</strong> · {item.keyframes.cta}
@@ -732,7 +758,12 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             </div>
                           )}
 
-                          {text.length > 180 && (
+                          {/* Also shown when there are keyframes, whatever the
+                              prompt's length. Gating purely on 180 characters
+                              meant a short video prompt hid both frame prompts
+                              permanently -- there was no control to reveal
+                              them. */}
+                          {(text.length > 180 || item.keyframes) && (
                             <button
                               onClick={() => setExpandedId(open ? null : item.id)}
                               style={{ background: 'none', border: 'none', padding: 0, marginTop: '0.35rem', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
