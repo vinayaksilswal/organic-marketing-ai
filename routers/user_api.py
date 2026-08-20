@@ -69,90 +69,98 @@ class SocialConnectionUpdate(BaseModel):
 
 @router.get("")
 async def get_current_user(request: Request, user_id: str = Depends(verify_user)):
-    async with AsyncSessionLocal() as session:
-        workspace_id = request.headers.get("x-workspace-id")
+    try:
+        async with AsyncSessionLocal() as session:
+            workspace_id = request.headers.get("x-workspace-id")
 
-        stmt = (
-            select(User)
-            .where(User.id == user_id)
-            .options(
-                selectinload(User.businessProfiles),
-                selectinload(User.socialConnections),
+            stmt = (
+                select(User)
+                .where(User.id == user_id)
+                .options(
+                    selectinload(User.businessProfiles),
+                    selectinload(User.socialConnections),
+                )
             )
-        )
-        res = await session.execute(stmt)
-        user = res.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        if not user.businessProfiles or len(user.businessProfiles) == 0:
-            default_profile = BusinessProfile(
-                userId=user.id,
-                name="Default Workspace",
-                websiteUrl="https://organicmarketing.ai",
-                description="Default automated growth & marketing workspace",
-                businessModel="SaaS",
-            )
-            session.add(default_profile)
-            await session.commit()
-
-            stmt = select(User).where(User.id == user_id).options(
-                selectinload(User.businessProfiles),
-                selectinload(User.socialConnections),
-            ).execution_options(populate_existing=True)
             res = await session.execute(stmt)
             user = res.scalar_one_or_none()
 
-        profiles_data = [
-            {
-                "id": bp.id,
-                "name": bp.name or "Default Workspace",
-                "websiteUrl": bp.websiteUrl,
-                "description": bp.description,
-                "businessModel": bp.businessModel or "General",
-                "postIntervalHours": bp.postIntervalHours,
-                "automationPaused": bool(getattr(bp, "automationPaused", False)),
-                "postingDays": bp.postingDays,
-                "postingStartHour": bp.postingStartHour,
-                "postingEndHour": bp.postingEndHour,
-                "postingTimezone": bp.postingTimezone,
-                "industry": bp.industry,
-                "targetAudience": bp.targetAudience,
-                "toneOfVoice": bp.toneOfVoice,
-                "contentPillars": bp.contentPillars,
-                "suggestedHashtags": bp.suggestedHashtags,
-                "brandAnalysisComplete": bp.brandAnalysisComplete,
-                "createdAt": bp.createdAt.isoformat() if bp.createdAt else None,
-            }
-            for bp in user.businessProfiles
-        ]
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
 
-        social_data = None
-        active_conn = next(
-            (c for c in user.socialConnections if c.businessProfileId == workspace_id),
-            user.socialConnections[0] if user.socialConnections else None,
-        )
-        if active_conn:
-            social_data = {
-                "id": active_conn.id,
-                "fbPageId": active_conn.fbPageId,
-                "fbPageName": active_conn.fbPageName,
-                "igAccountId": active_conn.igAccountId,
-                "igAccountName": active_conn.igAccountName,
-                "hasTwitter": bool(active_conn.twitterAccessToken),
-                "hasLinkedin": bool(active_conn.linkedinAccessToken),
-            }
+            if not user.businessProfiles or len(user.businessProfiles) == 0:
+                default_profile = BusinessProfile(
+                    userId=user.id,
+                    name="Default Workspace",
+                    websiteUrl="https://organicmarketing.ai",
+                    description="Default automated growth & marketing workspace",
+                    businessModel="SaaS",
+                )
+                session.add(default_profile)
+                await session.commit()
 
-        return {
-            "id": user.id,
-            "email": user.email,
-            "subscriptionStatus": user.subscriptionStatus,
-            "businessProfile": profiles_data[0] if profiles_data else None,
-            "businessProfiles": profiles_data,
-            "socialConnection": social_data,
-            "createdAt": user.createdAt.isoformat() if user.createdAt else None,
-        }
+                stmt = select(User).where(User.id == user_id).options(
+                    selectinload(User.businessProfiles),
+                    selectinload(User.socialConnections),
+                ).execution_options(populate_existing=True)
+                res = await session.execute(stmt)
+                user = res.scalar_one_or_none()
+
+            profiles_data = []
+            for bp in (user.businessProfiles or []):
+                created_str = bp.createdAt.isoformat() if getattr(bp, "createdAt", None) else None
+                profiles_data.append({
+                    "id": str(bp.id),
+                    "name": getattr(bp, "name", None) or "Default Workspace",
+                    "websiteUrl": getattr(bp, "websiteUrl", None),
+                    "description": getattr(bp, "description", None),
+                    "businessModel": getattr(bp, "businessModel", None) or "General",
+                    "postIntervalHours": getattr(bp, "postIntervalHours", 2),
+                    "automationPaused": bool(getattr(bp, "automationPaused", False)),
+                    "publishingMode": getattr(bp, "publishingMode", "PUBLIC") or "PUBLIC",
+                    "postingDays": getattr(bp, "postingDays", None),
+                    "postingStartHour": getattr(bp, "postingStartHour", None),
+                    "postingEndHour": getattr(bp, "postingEndHour", None),
+                    "postingTimezone": getattr(bp, "postingTimezone", None),
+                    "industry": getattr(bp, "industry", None),
+                    "targetAudience": getattr(bp, "targetAudience", None),
+                    "toneOfVoice": getattr(bp, "toneOfVoice", None),
+                    "contentPillars": getattr(bp, "contentPillars", None) or [],
+                    "suggestedHashtags": getattr(bp, "suggestedHashtags", None) or [],
+                    "brandAnalysisComplete": bool(getattr(bp, "brandAnalysisComplete", False)),
+                    "createdAt": created_str,
+                })
+
+            social_data = None
+            connections = getattr(user, "socialConnections", None) or []
+            active_conn = next(
+                (c for c in connections if getattr(c, "businessProfileId", None) == workspace_id),
+                connections[0] if connections else None,
+            )
+            if active_conn:
+                social_data = {
+                    "id": str(active_conn.id),
+                    "fbPageId": getattr(active_conn, "fbPageId", None),
+                    "fbPageName": getattr(active_conn, "fbPageName", None),
+                    "igAccountId": getattr(active_conn, "igAccountId", None),
+                    "igAccountName": getattr(active_conn, "igAccountName", None),
+                    "hasTwitter": bool(getattr(active_conn, "twitterAccessToken", None)),
+                    "hasLinkedin": bool(getattr(active_conn, "linkedinAccessToken", None)),
+                }
+
+            return {
+                "id": str(user.id),
+                "email": user.email,
+                "subscriptionStatus": getattr(user, "subscriptionStatus", "INACTIVE"),
+                "businessProfile": profiles_data[0] if profiles_data else None,
+                "businessProfiles": profiles_data,
+                "socialConnection": social_data,
+                "createdAt": user.createdAt.isoformat() if getattr(user, "createdAt", None) else None,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in get_current_user: {e}")
+        raise HTTPException(status_code=500, detail=f"User profile error: {str(e)}")
 
 @router.post("/business-profile")
 async def update_business_profile_post(
@@ -392,52 +400,57 @@ async def activate_subscription(data: SubscribeRequest, request: Request, user_i
 @businesses_router.get("/")
 async def get_user_businesses(request: Request, user_id: str = Depends(verify_user)):
     """List all business profiles (workspaces) with their social connections."""
-    async with AsyncSessionLocal() as session:
-        stmt = (
-            select(BusinessProfile)
-            .options(selectinload(BusinessProfile.socialconnections))
-            .where(BusinessProfile.userId == user_id)
-            .order_by(BusinessProfile.createdAt.asc())
-        )
-        res = await session.execute(stmt)
-        bps = res.scalars().all()
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = (
+                select(BusinessProfile)
+                .options(selectinload(BusinessProfile.socialconnections))
+                .where(BusinessProfile.userId == user_id)
+                .order_by(BusinessProfile.createdAt.asc())
+            )
+            res = await session.execute(stmt)
+            bps = res.scalars().all()
 
-        # New users start with zero businesses — the UI shows an empty state
-        # prompting them to create their first one. Never auto-create.
-        result = []
-        for bp in bps:
-            sc = bp.socialconnections[0] if bp.socialconnections else None
-            result.append({
-                "id": bp.id,
-                "name": bp.name or "Default Workspace",
-                "websiteUrl": bp.websiteUrl,
-                "description": bp.description,
-                "businessModel": bp.businessModel or "General",
-                "logoUrl": bp.logoUrl,
-                "productCatalogUrl": bp.productCatalogUrl,
-                "influencerReferenceUrl": bp.influencerReferenceUrl,
-                "niche": bp.niche,
-                "primaryOffer": bp.primaryOffer,
-                "postIntervalHours": bp.postIntervalHours,
-                "automationPaused": bool(getattr(bp, "automationPaused", False)),
-                "creativeGenerationIntervalHours": bp.creativeGenerationIntervalHours,
-                "autoGenerateCreatives": bp.autoGenerateCreatives,
-                "brandAnalysisComplete": bp.brandAnalysisComplete,
-                "industry": bp.industry,
-                "targetAudience": bp.targetAudience,
-                "toneOfVoice": bp.toneOfVoice,
-                "createdAt": bp.createdAt.isoformat() if bp.createdAt else None,
-                "socialConnection": {
-                    "fbPageId": sc.fbPageId,
-                    "fbPageName": sc.fbPageName,
-                    "igAccountId": sc.igAccountId,
-                    "igAccountName": sc.igAccountName,
-                    "hasTwitter": bool(sc.twitterAccessToken),
-                    "hasLinkedin": bool(sc.linkedinAccessToken),
-                    "hasFacebook": bool(sc.fbAccessToken),
-                } if sc else None,
-            })
-        return result
+            result = []
+            for bp in bps:
+                conns = getattr(bp, "socialconnections", None) or []
+                sc = conns[0] if conns else None
+                created_str = bp.createdAt.isoformat() if getattr(bp, "createdAt", None) else None
+                result.append({
+                    "id": str(bp.id),
+                    "name": getattr(bp, "name", None) or "Default Workspace",
+                    "websiteUrl": getattr(bp, "websiteUrl", None),
+                    "description": getattr(bp, "description", None),
+                    "businessModel": getattr(bp, "businessModel", None) or "General",
+                    "logoUrl": getattr(bp, "logoUrl", None),
+                    "productCatalogUrl": getattr(bp, "productCatalogUrl", None),
+                    "influencerReferenceUrl": getattr(bp, "influencerReferenceUrl", None),
+                    "niche": getattr(bp, "niche", None),
+                    "primaryOffer": getattr(bp, "primaryOffer", None),
+                    "postIntervalHours": getattr(bp, "postIntervalHours", 2),
+                    "automationPaused": bool(getattr(bp, "automationPaused", False)),
+                    "publishingMode": getattr(bp, "publishingMode", "PUBLIC") or "PUBLIC",
+                    "creativeGenerationIntervalHours": getattr(bp, "creativeGenerationIntervalHours", 2),
+                    "autoGenerateCreatives": bool(getattr(bp, "autoGenerateCreatives", True)),
+                    "brandAnalysisComplete": bool(getattr(bp, "brandAnalysisComplete", False)),
+                    "industry": getattr(bp, "industry", None),
+                    "targetAudience": getattr(bp, "targetAudience", None),
+                    "toneOfVoice": getattr(bp, "toneOfVoice", None),
+                    "createdAt": created_str,
+                    "socialConnection": {
+                        "fbPageId": getattr(sc, "fbPageId", None),
+                        "fbPageName": getattr(sc, "fbPageName", None),
+                        "igAccountId": getattr(sc, "igAccountId", None),
+                        "igAccountName": getattr(sc, "igAccountName", None),
+                        "hasTwitter": bool(getattr(sc, "twitterAccessToken", None)),
+                        "hasLinkedin": bool(getattr(sc, "linkedinAccessToken", None)),
+                        "hasFacebook": bool(getattr(sc, "fbAccessToken", None)),
+                    } if sc else None,
+                })
+            return result
+    except Exception as e:
+        logger.exception(f"Error in get_user_businesses: {e}")
+        raise HTTPException(status_code=500, detail=f"Businesses query error: {str(e)}")
 
 @businesses_router.post("")
 @businesses_router.post("/")

@@ -30,6 +30,7 @@ from sqlalchemy import (
     UniqueConstraint,
     select,
     func,
+    text,
 )
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -729,14 +730,47 @@ async def init_db() -> AsyncEngine:
                     'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "automationPaused" BOOLEAN DEFAULT FALSE',
                     'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "hashtagSets" JSON',
                     'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "provenOffers" JSON',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandColors" JSON DEFAULT \'[]\'',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandFonts" JSON DEFAULT \'[]\'',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "industry" VARCHAR',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "targetAudience" TEXT',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "toneOfVoice" VARCHAR',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "contentPillars" JSON DEFAULT \'[]\'',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "suggestedHashtags" JSON DEFAULT \'[]\'',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "primaryOffer" TEXT',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandIntelligence" JSON',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandIntelligenceAt" TIMESTAMP WITH TIME ZONE',
+                    'ALTER TABLE "BusinessProfile" ADD COLUMN IF NOT EXISTS "brandAnalysisComplete" BOOLEAN DEFAULT FALSE',
                     'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "paypalOrderId" VARCHAR',
                     'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN DEFAULT FALSE',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "fbPageCategory" VARCHAR',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "fbUserId" VARCHAR',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessToken" TEXT',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessSecret" TEXT',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinAccessToken" TEXT',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR',
+                    'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "errorLog" TEXT',
+                    'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "twitterPostId" VARCHAR',
+                    'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "linkedinPostId" VARCHAR',
+                    'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "mediaUrls" JSON DEFAULT \'[]\'',
+                    'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "postedAt" TIMESTAMP WITH TIME ZONE',
+                    'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "keyframes" JSON',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "plan" JSON',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "generationStatus" VARCHAR',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "generationError" TEXT',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "caption" TEXT',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT TRUE',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "hasAudio" BOOLEAN',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "folderId" VARCHAR',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "folderOrder" INTEGER',
+                    'ALTER TABLE "Media" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR',
                 ]
                 for stmt in columns_to_add:
                     try:
                         await conn.execute(text(stmt))
                     except Exception as col_err:
-                        logger.debug(f"Column migration skipped: {col_err}")
+                        logger.debug(f"Column migration notice ({stmt}): {col_err}")
 
         logger.info("SQLAlchemy ORM tables initialized successfully")
     except Exception as e:
