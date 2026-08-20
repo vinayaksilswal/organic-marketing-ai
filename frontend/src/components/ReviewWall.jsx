@@ -31,7 +31,7 @@ const ReviewWall = () => {
   if (!data) return null;
 
   return (
-    <section className="reveal">
+    <section>
       <div className="wrap">
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
           <span className="eyebrow">From customers</span>

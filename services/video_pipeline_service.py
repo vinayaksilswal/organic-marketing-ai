@@ -568,7 +568,7 @@ OUTPUT — valid JSON only. First character {{ and last character }}. No markdow
   "creative_format_used": "<assigned format name>",
   "variation_modifier_applied": "<assigned modifier name>",
   "product_type": "<product type from marketing intel>",
-  "prompt": "<one vertical ad of the length given in TIMED STRUCTURE, every range in that block described in order, {min_prompt_words}-{max_prompt_words} words, ONE camera move, ONE subject, ONE action, one short line of 2-6 words rendered large on a named surface with everything else defocused, the business name as a semi-transparent wordmark centred on the bottom edge for the whole clip, one audio clause, and the spoken words verbatim in double quotes. No list of negatives.>"
+  "prompt": "<the full timeline, reproduced EXACTLY in the block layout given above: one line per block reading TIME  ROLE, then an indented VISUAL line and an indented SCRIPT line with the spoken words in double quotes. Keep the indentation -- a person has to read this, find a block and edit one line. State subject, wardrobe, room and grade ONCE at the top, then never restate them. Close with one audio clause. No list of negatives.>"
 }}
 
 VOCABULARY WARNING — the prompt is read by a RENDERER, not by you. It must

@@ -29,10 +29,28 @@ def test_the_beats_account_for_every_second(duration):
 
 
 @pytest.mark.parametrize("duration", [8, 10, 15, 20, 30])
-def test_the_hook_and_the_end_card_never_stretch(duration):
+def test_the_hook_is_always_the_first_three_seconds(duration):
+    """The clip is cut into three-second blocks and the first one IS the scroll
+    decision, so it never grows with the length of the ad."""
     beats = vb.build_beats(duration)
-    assert beats[0]["seconds"] == vb.HOOK_SECONDS
-    assert beats[-1]["seconds"] == vb.OUTRO_SECONDS
+    assert beats[0]["seconds"] == vb.SEGMENT_SECONDS
+    assert beats[0]["name"] == "HOOK"
+
+
+@pytest.mark.parametrize("duration", [8, 10, 15, 20, 30])
+def test_the_last_block_asks_for_the_click(duration):
+    beats = vb.build_beats(duration)
+    assert "CTA" in beats[-1]["name"]
+    # The still card holds for the final two seconds inside that block.
+    assert beats[-1]["seconds"] >= vb.OUTRO_SECONDS
+
+
+@pytest.mark.parametrize("duration", [8, 10, 15, 20, 30])
+def test_every_block_is_three_seconds_or_a_folded_tail(duration):
+    """A stub shorter than two seconds is folded into the block before it --
+    below that a model renders a flash rather than a beat."""
+    for b in vb.build_beats(duration):
+        assert vb.MIN_TAIL_SECONDS <= b["seconds"] <= vb.SEGMENT_SECONDS + vb.MIN_TAIL_SECONDS
 
 
 @pytest.mark.parametrize("duration", [8, 10, 15, 20, 30])
@@ -65,11 +83,36 @@ def test_the_word_budget_grows_with_the_clip():
     assert vb.word_budget(30) > vb.word_budget(10) > vb.word_budget(8)
 
 
-def test_the_sheet_names_every_range_and_the_budget():
+def test_the_sheet_is_a_timeline_a_person_can_edit():
+    """The customer has to find the third block, change one line and paste it
+    into a video tool. A paragraph is unreviewable, and an unreviewable prompt
+    gets used unedited or not at all."""
     sheet = vb.beat_sheet(20)
-    assert "0-3s" in sheet and "20s" in sheet
-    assert "HOOK" in sheet and "OUTRO" in sheet
+    assert "0:00-0:03" in sheet, "blocks are not clock-labelled"
+    assert "HOOK" in sheet and "CTA" in sheet
+    assert "    VISUAL:" in sheet, "no indented VISUAL line to edit"
+    assert "    SCRIPT:" in sheet, "no indented SCRIPT line to edit"
     assert str(vb.word_budget(20)) in sheet
+
+
+def test_every_block_gets_its_own_visual_and_script():
+    sheet = vb.beat_sheet(30)
+    blocks = len(vb.build_beats(30))
+    assert sheet.count("VISUAL:") >= blocks
+    assert sheet.count("SCRIPT:") >= blocks
+
+
+def test_a_silent_block_still_has_a_script_line():
+    """Otherwise the model quietly drops the label and the timeline stops
+    being parseable by the person reading it."""
+    assert "(silence)" in vb.beat_sheet(30)
+
+
+def test_continuity_is_stated_once_not_per_block():
+    """Repeating a wardrobe description per block is how a model ends up
+    rendering two different people."""
+    sheet = vb.beat_sheet(30)
+    assert "CONTINUITY" in sheet
 
 
 def test_the_prompt_generator_takes_a_length():

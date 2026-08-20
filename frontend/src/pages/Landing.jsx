@@ -270,6 +270,31 @@ const styles = `
 }
 `;
 
+
+/* The ask, repeated where conviction happens.
+   The page ran 660 lines between the hero button and the pricing button, so a
+   reader persuaded by the problem or by the faceless engine had to scroll past
+   eight sections to act on it. Conviction decays over that distance. This is
+   the same destination and the same words -- repeating one ask keeps the
+   page's single-CTA discipline, whereas a second offer would split it. */
+const InlineCTA = ({ line, onStart }) => (
+  <section style={{ paddingTop: '1rem', paddingBottom: '1rem' }}>
+    <div className="wrap" style={{ textAlign: 'center' }}>
+      <div className="glass" style={{ padding: '1.9rem 1.5rem' }}>
+        <p style={{ fontSize: '1.05rem', fontWeight: 640, color: 'var(--ink)', marginBottom: '1.1rem' }}>
+          {line}
+        </p>
+        <button className="b b-primary" style={{ padding: '.95rem 2.1rem', fontSize: '1rem' }} onClick={onStart}>
+          Start free <ArrowRight size={16} />
+        </button>
+        <p style={{ fontSize: '.82rem', color: 'var(--ink-faint)', marginTop: '.8rem' }}>
+          Free plan · no card · nothing publishes until you allow it
+        </p>
+      </div>
+    </div>
+  </section>
+);
+
 const Landing = () => {
   const navigate = useNavigate();
   const [openFaq, setOpenFaq] = useState(null);
@@ -625,6 +650,11 @@ const Landing = () => {
         </div>
       </section>
 
+      <InlineCTA
+        line="Ten minutes to set up. Then it posts without you."
+        onStart={() => navigate('/auth')}
+      />
+
       {/* FEATURES */}
       <section style={{ background: 'linear-gradient(180deg, rgba(37,99,235,0.045), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
@@ -751,9 +781,14 @@ const Landing = () => {
       </section>
 
       {/* ========================================================================= */}
+      <InlineCTA
+        line="Your business, in its own words, on your schedule."
+        onStart={() => navigate('/auth')}
+      />
+
       {/* ENTERPRISE SHOWCASE 1: FACELESS SHORT VIDEOS ON AUTO-PILOT */}
       {/* ========================================================================= */}
-      <section className="reveal" style={{ background: 'linear-gradient(180deg, rgba(249,115,22,0.05), rgba(139,92,246,0.04))' }}>
+      <section style={{ background: 'linear-gradient(180deg, rgba(249,115,22,0.05), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -849,7 +884,7 @@ const Landing = () => {
       {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 2: VIRAL VALIDATOR & ALGORITHM PREDICTOR */}
       {/* ========================================================================= */}
-      <section className="reveal" style={{ background: 'linear-gradient(180deg, rgba(37,99,235,0.05), rgba(139,92,246,0.04))' }}>
+      <section style={{ background: 'linear-gradient(180deg, rgba(37,99,235,0.05), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -939,7 +974,7 @@ const Landing = () => {
       {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 3: POSTSHIP MULTI-PLATFORM REPURPOSING */}
       {/* ========================================================================= */}
-      <section className="reveal" style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.045), rgba(37,99,235,0.04))' }}>
+      <section style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.045), rgba(37,99,235,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -1024,6 +1059,11 @@ const Landing = () => {
         </div>
       </section>
 
+      <InlineCTA
+        line="All three engines are on the free plan. See what it writes for your business."
+        onStart={() => navigate('/auth')}
+      />
+
       {/* WHAT ELSE IS IN THERE.
           Six capabilities that shipped and were never sold. A visitor about to
           see a price is weighing whether $17 covers a toy or a tool, and every
@@ -1032,7 +1072,7 @@ const Landing = () => {
           Placed above the price because that is the question the price is
           answering. Every item here is a feature that exists in the schema;
           nothing on this list is aspirational. */}
-      <section className="reveal">
+      <section>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
             <span className="eyebrow">Included on every plan</span>

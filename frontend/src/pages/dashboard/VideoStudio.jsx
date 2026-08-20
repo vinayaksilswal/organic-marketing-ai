@@ -59,7 +59,11 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   const fetchProducts = useCallback(async () => {
     if (!activeWorkspaceId) return;
     try {
-      const res = await authFetch(`${API_BASE}/marketing/products`, {
+      // Products live on the ecommerce router. This called /marketing/products,
+      // which has never existed -- every workspace load fired a 404 and the
+      // product picker silently stayed empty, so a shop could only ever make
+      // creatives about the business in general and never about an item.
+      const res = await authFetch(`${API_BASE}/ecommerce/products`, {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       }, token);
       if (res.ok) {
