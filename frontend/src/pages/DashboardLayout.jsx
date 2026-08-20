@@ -15,6 +15,7 @@ import TeamManagement from './dashboard/TeamManagement';
 import Billing from './dashboard/Billing';
 import Support from './dashboard/Support';
 import AdminSupport from './dashboard/AdminSupport';
+import AccountInsights from './dashboard/AccountInsights';
 import { useWorkspace } from '../components/WorkspaceContext';
 import HelpWidget from '../components/HelpWidget';
 import SystemBanner from '../components/SystemBanner';
@@ -88,6 +89,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
           <Route path="/video-studio" element={<VideoStudio user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/viral-validator" element={<ViralValidatorPage user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/validator" element={<Navigate to="/dashboard/viral-validator" replace />} />
+          <Route path="/account-insights" element={<AccountInsights user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/media-catalog" element={<MediaCatalog user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/social-scheduler" element={<SocialScheduler user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/postship" element={<PostShip user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />

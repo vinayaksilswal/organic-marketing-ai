@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame } from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame , BarChart3 } from 'lucide-react';
 import { API_BASE, authFetch } from '../config';
 
 const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }) => {
@@ -141,6 +141,10 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
           <span className="sidebar-badge" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
             AI Radar
           </span>
+        </NavLink>
+
+        <NavLink to="/dashboard/account-insights" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <BarChart3 size={16} /> <span>Account Insights</span>
         </NavLink>
 
         <NavLink to="/dashboard/media-catalog" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>

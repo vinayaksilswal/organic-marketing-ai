@@ -2095,6 +2095,35 @@ def _is_branded(media) -> bool:
     return "_branded" in (media.url or "")
 
 
+@router.get("/account-insights")
+async def get_account_insights(request: Request) -> Any:
+    """Numbers for every social account connected to the active workspace.
+
+    Read-only and unmetered: this spends no model call, only a Graph read, so
+    charging a plan quota for looking at your own account would be charging
+    for nothing.
+
+    Never raises. A dashboard that 500s because one Graph call was refused is
+    worse than one that says which account it could not read -- the customer
+    can act on the second and not on the first.
+    """
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    from services.account_insights import for_workspace
+
+    try:
+        async with get_tenant_session(workspace_id) as session:
+            return await for_workspace(session, workspace_id)
+    except Exception as e:
+        logger.exception(f"Account insights failed for {workspace_id}")
+        return {
+            "accounts": [],
+            "note": f"Could not read your accounts right now ({type(e).__name__}). Try again shortly.",
+        }
+
+
 @router.get("/media")
 async def get_workspace_media(request: Request) -> Any:
     """List media assets (uploaded and AI rendered) for the active workspace."""
