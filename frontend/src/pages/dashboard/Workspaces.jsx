@@ -589,6 +589,95 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       </div>
                     )}
 
+                    {/* Faceless Channel Dedicated Settings */}
+                    {editData.businessModel === 'Faceless Channel' && (
+                      <div style={{ padding: '1.15rem', background: 'rgba(249,115,22,0.06)', borderRadius: 10, border: '1px solid rgba(249,115,22,0.25)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f97316', fontWeight: 800, fontSize: '0.86rem' }}>
+                          <Bot size={15} /> Faceless Channel Video Settings
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                          Configure your channel's viral niche, art direction style, and voice persona. The Brand Ads Video Studio will automatically use these settings to write your 2 image prompts + 1 video motion prompt briefs.
+                        </p>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div>
+                            <label style={labelStyle}>Niche / Topic Preset</label>
+                            <select
+                              value={editData.facelessTopic || 'scary_stories'}
+                              onChange={e => setEditData({ ...editData, facelessTopic: e.target.value })}
+                              style={{ ...inputStyle, appearance: 'auto' }}
+                            >
+                              <option value="scary_stories">👻 Scary Stories & Mystery Lore</option>
+                              <option value="jokes">😂 Jokes & Stand-Up Humor</option>
+                              <option value="life_pro_tips">💡 Life Pro Tips & Psychology Hacks</option>
+                              <option value="today_i_learned">🧠 Today I Learned & Real Facts</option>
+                              <option value="you_should_know">⚠️ You Should Know & Survival Advice</option>
+                              <option value="custom">✍️ Custom Niche / Topic</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Visual Art Style</label>
+                            <select
+                              value={editData.facelessStyle || 'cinematic_realism'}
+                              onChange={e => setEditData({ ...editData, facelessStyle: e.target.value })}
+                              style={{ ...inputStyle, appearance: 'auto' }}
+                            >
+                              <option value="cinematic_realism">🎬 Cinematic Realism (35mm Film)</option>
+                              <option value="dark_cyberpunk">🎨 Cyberpunk Anime (Neon Cel-Shaded)</option>
+                              <option value="retro_comic">🕹️ Retro Comic (Vintage Halftone)</option>
+                              <option value="vintage_film">📸 Vintage 35mm (Analog Warm Grain)</option>
+                              <option value="gameplay_motion">🎮 3D Gaming Motion (Unreal Engine 5)</option>
+                              <option value="pixar_claymation">🪄 Minimal 3D Pixar (Soft Bounce)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div>
+                            <label style={labelStyle}>AI Voice Persona</label>
+                            <select
+                              value={editData.facelessVoice || 'adam_storyteller'}
+                              onChange={e => setEditData({ ...editData, facelessVoice: e.target.value })}
+                              style={{ ...inputStyle, appearance: 'auto' }}
+                            >
+                              <option value="adam_storyteller">Adam (Deep Storyteller & Mystery)</option>
+                              <option value="rachel_viral">Rachel (High-Energy Viral Host)</option>
+                              <option value="marcus_authority">Marcus (Authoritative Guide)</option>
+                              <option value="bella_relatable">Bella (Warm & Relatable Conversation)</option>
+                              <option value="shadow_whisper">Shadow Whisper (Atmospheric Mystery)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Publishing Mode</label>
+                            <select
+                              value={editData.publishingMode || 'PUBLIC'}
+                              onChange={e => setEditData({ ...editData, publishingMode: e.target.value })}
+                              style={{ ...inputStyle, appearance: 'auto' }}
+                            >
+                              <option value="PUBLIC">Direct Publish (Auto Post)</option>
+                              <option value="PRIVATE">Private / Unlisted Review</option>
+                              <option value="DRAFT_REVIEW">Send to TikTok Drafts</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {editData.facelessTopic === 'custom' && (
+                          <div>
+                            <label style={labelStyle}>Custom Storyline / Niche Details</label>
+                            <input
+                              type="text"
+                              style={inputStyle}
+                              placeholder="e.g. Dark Greek Mythology, Stoicism Hacks, Real Cybercrime Cases..."
+                              value={editData.customTopic || ''}
+                              onChange={e => setEditData({ ...editData, customTopic: e.target.value })}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
                       <button className="btn btn-primary" onClick={handleSaveProfile} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         {saving ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <Save size={15} />} Save Profile

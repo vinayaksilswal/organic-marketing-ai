@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2, Sparkles, ArrowRight, ChevronDown, ShieldCheck,
   Instagram, Facebook, Wand2, Clock, Eye, Send, AlertCircle,
-  MonitorSmartphone, ShoppingBag, Bot, Layers, Store, GraduationCap,
+  MonitorSmartphone, ShoppingBag, Bot, Layers, Store, GraduationCap, Building2,
   Flame, Zap, TrendingUp, BarChart3, Repeat, Heart, MessageSquare,
   ArrowUp, ThumbsUp, Radio, Film, Volume2, Share2, Copy
 } from 'lucide-react';
@@ -1020,6 +1020,57 @@ const Landing = () => {
                 <span>🔺 248</span><span>💬 32</span><span>🔗 Share</span>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* WHAT ELSE IS IN THERE.
+          Six capabilities that shipped and were never sold. A visitor about to
+          see a price is weighing whether $17 covers a toy or a tool, and every
+          one of these is the difference -- control over WHEN it posts, a way to
+          stop it without losing anything, and a human to ask when it breaks.
+          Placed above the price because that is the question the price is
+          answering. Every item here is a feature that exists in the schema;
+          nothing on this list is aspirational. */}
+      <section className="reveal">
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
+            <span className="eyebrow">Included on every plan</span>
+            <h2 className="h2" style={{ margin: '1.1rem auto .9rem', maxWidth: 720 }}>
+              The parts nobody advertises, that decide whether you keep using it
+            </h2>
+            <p className="lede" style={{ maxWidth: 620, margin: '0 auto' }}>
+              Generating content is the easy half. These are the things that make
+              running it for six months survivable.
+            </p>
+          </div>
+
+          <div className="grid g3">
+            {[
+              [<Clock size={17} />, 'You choose the hours it posts',
+               'Pick the days and the time range, in your own timezone. A fixed interval drifts through the clock and starts posting at 3am; this does not.'],
+              [<Eye size={17} />, 'Nothing publishes unreviewed',
+               'Every post can sit as a draft until you approve it. Turn that off once you trust it, per business.'],
+              [<AlertCircle size={17} />, 'Pause without losing anything',
+               'Hold a business during a rebrand or a holiday. Your accounts stay connected, your catalog stays put, and nothing goes out.'],
+              [<Building2 size={17} />, 'Run more than one brand',
+               'Separate workspaces, each with its own voice, schedule, catalog and connected accounts. Add teammates to the ones they should see.'],
+              [<ShieldCheck size={17} />, 'Your accounts, your tokens',
+               'Connected through official Facebook and Instagram login. Revoke it from Meta at any time and posting simply stops.'],
+              [<Send size={17} />, 'A person answers you',
+               'Report a problem in the app and the reply lands on the same screen, with a status you can watch change. Not a ticket address that goes quiet.'],
+            ].map(([icon, title, body]) => (
+              <div key={title} className="glass" style={{ padding: '1.6rem' }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: 'rgba(109,40,217,0.09)', border: '1px solid rgba(109,40,217,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--violet)', marginBottom: '1rem',
+                }}>{icon}</div>
+                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 690 }}>{title}</h3>
+                <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

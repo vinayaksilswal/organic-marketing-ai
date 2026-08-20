@@ -14,7 +14,7 @@ Endpoints for managing AI-generated creatives:
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -1106,6 +1106,14 @@ async def analyze_algorithm_endpoint(
 ) -> dict[str, Any]:
     """Analyze short-form content or media video, compute 5 radar metrics, predict view potential, and output Fix-The-Fail optimizations."""
     from services.faceless_service import analyze_short_form_content
+    from services import billing_service as billing
+
+    # Metered. A scoring run is a model call like any other generation, and a
+    # validator that costs nothing to hammer is the cheapest way for a free
+    # account to spend someone else's API budget.
+    allowed, why = await billing.check_quota(user_id, "prompts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
 
     content_to_analyze = (data.content_text or "").strip()
     media_url = data.media_url
@@ -1113,6 +1121,12 @@ async def analyze_algorithm_endpoint(
     if data.media_id:
         async with AsyncSessionLocal() as session:
             media_item = await session.get(Media, data.media_id)
+            # A media id arrives in the BODY, so the router's workspace guard
+            # -- which checks the header -- does not cover it. Without this an
+            # account could score another tenant's asset and read its caption
+            # back in the response.
+            if media_item and media_item.userId != user_id:
+                raise HTTPException(status_code=404, detail="Media not found")
             if media_item:
                 media_url = media_item.url or media_url
                 if not content_to_analyze:
@@ -1130,6 +1144,8 @@ async def analyze_algorithm_endpoint(
         platform=data.platform,
         media_url=media_url,
     )
+
+    await billing.record_usage(user_id, "prompts")
 
     return {
         "success": True,
@@ -1159,6 +1175,13 @@ async def generate_postship_endpoint(
     if not data.input_text or len(data.input_text.strip()) < 3:
         raise HTTPException(status_code=400, detail="Please enter an idea, ship line, or URL to generate posts.")
 
+    # Metered. This writes three posts with a paid model call, and optionally
+    # scrapes a URL first -- the same shape of spend as any other generator
+    # here, and it was the only one costing money without counting it.
+    allowed, why = await billing.check_quota(user_id, "prompts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
     workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
     async with AsyncSessionLocal() as session:
         profile = None
@@ -1171,6 +1194,10 @@ async def generate_postship_endpoint(
 
         business_name = profile.name if profile else "Founder"
         industry = profile.industry or profile.businessModel if profile else "Tech"
+        # Carried out as a plain id. The object below is used after this
+        # session closes, and a detached instance is one lazy attribute away
+        # from raising in a path that has already been paid for.
+        profile_id = profile.id if profile else None
 
     bundle = await generate_postship_bundle(
         input_text=data.input_text,
@@ -1179,14 +1206,16 @@ async def generate_postship_endpoint(
         industry=industry,
     )
 
+    await billing.record_usage(user_id, "prompts")
+
     # If user requests scheduling, schedule posts in the SocialPost queue
-    if data.schedule_to_queue and profile:
+    if data.schedule_to_queue and profile_id:
         async with AsyncSessionLocal() as session:
             from database import SocialPost, utc_now
             # X post
             x_post = SocialPost(
                 userId=user_id,
-                businessProfileId=profile.id,
+                businessProfileId=profile_id,
                 platform="TWITTER",
                 type="AUTO",
                 status="SCHEDULED",
@@ -1197,7 +1226,7 @@ async def generate_postship_endpoint(
             # LinkedIn post
             li_post = SocialPost(
                 userId=user_id,
-                businessProfileId=profile.id,
+                businessProfileId=profile_id,
                 platform="LINKEDIN",
                 type="AUTO",
                 status="SCHEDULED",

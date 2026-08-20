@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut } from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame } from 'lucide-react';
 import { API_BASE, authFetch } from '../config';
 
 const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }) => {
@@ -130,9 +130,16 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         </NavLink>
 
         <NavLink to="/dashboard/video-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Video size={16} /> <span>AI Video Studio</span>
+          <Video size={16} /> <span>Brand Video Studio</span>
           <span className="sidebar-badge" style={{ background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)' }}>
-            8s-30s
+            2 Img + 1 Vid
+          </span>
+        </NavLink>
+
+        <NavLink to="/dashboard/viral-validator" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Flame size={16} /> <span>Viral Validator</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+            AI Radar
           </span>
         </NavLink>
 
@@ -148,6 +155,13 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
           <Send size={16} /> <span>Social Scheduler</span>
           <span className="sidebar-badge" style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--success)' }}>
             Auto
+          </span>
+        </NavLink>
+
+        <NavLink to="/dashboard/postship" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Sparkles size={16} /> <span>PostShip Multi-Platform</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>
+            X·LI·RD
           </span>
         </NavLink>
 

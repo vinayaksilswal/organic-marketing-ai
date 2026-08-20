@@ -5,8 +5,10 @@ import Logo from '../components/Logo';
 import Sidebar from '../components/Sidebar';
 import Overview from './dashboard/Overview';
 import VideoStudio from './dashboard/VideoStudio';
+import ViralValidatorPage from './dashboard/ViralValidatorPage';
 import MediaCatalog from './dashboard/MediaCatalog';
 import SocialScheduler from './dashboard/SocialScheduler';
+import PostShip from './dashboard/PostShip';
 import EmailSuite from './dashboard/EmailSuite';
 import Workspaces from './dashboard/Workspaces';
 import TeamManagement from './dashboard/TeamManagement';
@@ -84,8 +86,12 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
               localStorage and hard-reloading the page. */}
           <Route path="/" element={<Overview user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} onLogout={onLogout} />} />
           <Route path="/video-studio" element={<VideoStudio user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          <Route path="/viral-validator" element={<ViralValidatorPage user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          <Route path="/validator" element={<Navigate to="/dashboard/viral-validator" replace />} />
           <Route path="/media-catalog" element={<MediaCatalog user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/social-scheduler" element={<SocialScheduler user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          <Route path="/postship" element={<PostShip user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          <Route path="/repurpose" element={<Navigate to="/dashboard/postship" replace />} />
           <Route path="/email-suite" element={<EmailSuite user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/workspaces" element={<Workspaces user={user} token={token} showToast={showToast} updateAuth={updateAuth} />} />
           <Route path="/team" element={<TeamManagement user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
