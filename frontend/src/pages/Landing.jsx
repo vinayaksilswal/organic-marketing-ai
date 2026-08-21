@@ -727,7 +727,7 @@ const Landing = () => {
           <CardRail
             interval={3900}
             items={[
-              { key: 'faceless', icon: <Zap size={18} />, title: 'Faceless Channel', colour: '#f97316',
+              { key: 'faceless', icon: <Zap size={18} />, title: 'Faceless Channel', colour: 'var(--violet)',
                 body: 'Dedicated faceless video brand on auto-pilot. Generates 8s–30s scroll-stopping hooks, voiceover scripts, Midjourney start frames, Kling/Veo motion diffusion prompts, outro cards, and publishes directly to YouTube Shorts, & Reels.' },
               { key: 'saas', icon: <MonitorSmartphone size={18} />, title: 'SaaS & Data', colour: 'var(--blue)',
                 body: 'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.' },
@@ -1014,7 +1014,7 @@ photographic, sharp focus, no text
       {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 1: FACELESS SHORT VIDEOS ON AUTO-PILOT */}
       {/* ========================================================================= */}
-      <section style={{ background: 'linear-gradient(180deg, rgba(249,115,22,0.05), rgba(139,92,246,0.04))' }}>
+      <section style={{ background: 'linear-gradient(180deg, rgba(109, 40, 217,0.05), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
             <span style={{
@@ -1023,16 +1023,16 @@ photographic, sharp focus, no text
               gap: '0.4rem',
               padding: '0.25rem 0.85rem',
               borderRadius: 16,
-              background: 'rgba(249,115,22,0.15)',
-              border: '1px solid rgba(249,115,22,0.35)',
+              background: 'rgba(109, 40, 217,0.15)',
+              border: '1px solid rgba(109, 40, 217,0.35)',
               fontSize: '0.76rem',
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: '.06em',
-              color: '#f97316',
+              color: 'var(--violet)',
               marginBottom: '1rem',
             }}>
-              <Zap size={13} color="#f97316" /> Autonomous Channel Growth
+              <Zap size={13} color="var(--violet)" /> Autonomous Channel Growth
             </span>
             <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               Faceless Short Videos on Auto-Pilot
@@ -1063,7 +1063,7 @@ photographic, sharp focus, no text
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
                     <span style={{ fontSize: '1.6rem' }}>{t.icon}</span>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 8, background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>{t.badge}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 8, background: 'rgba(109, 40, 217,0.2)', color: 'var(--violet)' }}>{t.badge}</span>
                   </div>
                   <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--ink)', marginBottom: '0.35rem' }}>{t.title}</div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', lineHeight: 1.45, margin: 0 }}>{t.desc}</p>
@@ -1075,7 +1075,7 @@ photographic, sharp focus, no text
           {/* 3 Pipeline Pillars (Visual Styles, Voices, Timed Video) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
             <div className="glass" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: '#f97316' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', color: 'var(--violet)' }}>
                 <Film size={18} />
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--ink)' }}>6 Visual Styles</h3>
               </div>

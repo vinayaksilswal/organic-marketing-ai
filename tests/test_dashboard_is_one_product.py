@@ -75,3 +75,25 @@ def test_media_thumbnails_may_still_be_black():
     assert "background: '#000'" in src, (
         "media previews lost their black backing; video now letterboxes grey"
     )
+
+
+def test_no_off_token_orange_anywhere_in_the_frontend():
+    """The last five lived in the landing section advertising a tool that is
+    violet in the product — the page promised one colour and the app delivered
+    another. Orange is now defined nowhere, which is the point: a colour with
+    no token is a colour that drifts."""
+    stray = []
+    for f in sorted(ROOT.rglob("*.jsx")):
+        src = f.read_text(encoding="utf-8")
+        hits = [c for c in STRAY_COLOURS if c in src]
+        if hits:
+            stray.append(f"{f.relative_to(ROOT)}: {hits}")
+    assert not stray, "off-token colour reintroduced:\n" + "\n".join(stray)
+
+
+def test_the_landing_defines_the_token_it_uses():
+    """var(--violet) is the landing's own token. If the definition is ever
+    removed, every use of it silently falls back to an inherited colour rather
+    than failing loudly."""
+    src = (ROOT / "pages" / "Landing.jsx").read_text(encoding="utf-8")
+    assert "--violet:" in src, "the landing uses var(--violet) without defining it"
