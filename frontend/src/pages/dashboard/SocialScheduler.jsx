@@ -62,7 +62,9 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
   // Repeat rule. Kept beside the one-time state because it schedules the same
   // asset through the same modal picker -- only the dates differ.
-  const [repeatOpen, setRepeatOpen] = useState(false);
+
+  // Which of the four views is showing.
+  const [section, setSection] = useState('calendar');
   const [repeatMode, setRepeatMode] = useState('weekly');   // 'weekly' | 'monthly'
   const [repeatDays, setRepeatDays] = useState([0, 2, 4]);  // Mon, Wed, Fri
   const [repeatDayOfMonth, setRepeatDayOfMonth] = useState(1);
@@ -94,7 +96,6 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || data.message || 'Could not schedule that.');
       showToast(data.message || `${data.created} posts scheduled.`);
-      setRepeatOpen(false);
       setRepeatMediaId('');
       await fetchScheduledPosts();
       await fetchPosts();
@@ -549,10 +550,60 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
           </div>
         </div>
 
+        {/* One page, four jobs. Stacked end to end they made a single
+            column three screens tall, where finding the repeat rule meant
+            scrolling past the whole delivery log. Each is now its own view,
+            and the tab says how much is waiting inside it. */}
+        <div style={{
+          display: 'flex', gap: '0.35rem', marginBottom: '1.5rem', flexWrap: 'wrap',
+          borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem',
+        }}>
+          {[
+            { key: 'calendar', label: 'Calendar', icon: <CalendarDays size={15} />,
+              hint: 'Everything on the day it goes out' },
+            { key: 'once', label: 'One-time posts', icon: <Clock size={15} />,
+              count: scheduledPosts.length, hint: 'Schedule a single post for a date and time' },
+            { key: 'repeat', label: 'Repeating', icon: <RefreshCw size={15} />,
+              hint: 'Days of the week, or a date each month' },
+            { key: 'log', label: 'Delivery log', icon: null,
+              count: posts.length, hint: 'What was published, and why anything failed' },
+          ].map((t) => {
+            const active = section === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setSection(t.key)}
+                title={t.hint}
+                aria-current={active ? 'page' : undefined}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                  padding: '0.55rem 0.95rem', borderRadius: 10, cursor: 'pointer',
+                  fontSize: '0.88rem', fontWeight: active ? 700 : 500,
+                  border: '1px solid ' + (active ? 'var(--primary-color)' : 'transparent'),
+                  background: active ? 'rgba(99,102,241,0.10)' : 'transparent',
+                  color: active ? 'var(--primary-color)' : 'var(--text-muted)',
+                  transition: 'background .15s ease, color .15s ease',
+                }}
+              >
+                {t.icon}
+                {t.label}
+                {typeof t.count === 'number' && t.count > 0 && (
+                  <span style={{
+                    fontSize: '0.72rem', fontWeight: 700, padding: '0.05rem 0.4rem',
+                    borderRadius: 999, background: active ? 'var(--primary-color)' : 'var(--border-color)',
+                    color: active ? '#fff' : 'var(--text-muted)',
+                  }}>{t.count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {/* SCHEDULE — the month, with every post on the day it went out.
             A table answers "what happened last?"; the questions people
             actually have about a schedule are shape questions: is anything
             going out tomorrow, did Tuesday publish, why is there a gap. */}
+        {section === 'calendar' && (
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(11, 16, 32, 0.02)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
             <CalendarDays size={18} color="var(--primary-color)" />
@@ -567,8 +618,10 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             <PostCalendar posts={posts} onSelect={handleEditDraft} />
           )}
         </div>
+        )}
 
         {/* ONE-TIME SCHEDULED POSTS SECTION */}
+        {section === 'once' && (
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid rgba(249, 115, 22, 0.25)', background: 'rgba(249, 115, 22, 0.02)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -713,6 +766,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             </div>
           )}
         </div>
+        )}
 
         {/* REPEAT A POST.
             Its own section rather than a mode inside the one-time dialog: a
@@ -720,24 +774,17 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             form makes both harder to read. Occurrences are materialised as
             ordinary scheduled posts, so everything below on this page already
             knows how to show and cancel them. */}
+        {section === 'repeat' && (
         <div className="glass-panel" style={{ padding: '1.5rem', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: repeatOpen ? '1.25rem' : 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
             <RefreshCw size={18} color="var(--primary-color)" />
             <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Repeat a post</h2>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
               Certain weekdays, or a day of the month
             </span>
-            <button
-              onClick={() => setRepeatOpen(o => !o)}
-              className="btn btn-secondary"
-              style={{ marginLeft: 'auto', minHeight: 38, fontSize: '0.82rem', fontWeight: 700 }}
-            >
-              {repeatOpen ? 'Close' : '+ Set up a repeat'}
-            </button>
           </div>
 
-          {repeatOpen && (
-            <div style={{ display: 'grid', gap: '1.1rem' }}>
+          <div style={{ display: 'grid', gap: '1.1rem' }}>
               <div>
                 <label style={labelSm}>Asset</label>
                 <select value={repeatMediaId} onChange={e => setRepeatMediaId(e.target.value)} style={inputSm}>
@@ -807,11 +854,12 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   These appear above as normal scheduled posts, so you can cancel any single one.
                 </small>
               </div>
-            </div>
-          )}
+          </div>
         </div>
+        )}
 
         {/* LOGS SECTION */}
+        {section === 'log' && (
         <div className="glass-panel" style={{ overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: 'none', background: 'rgba(11, 16, 32, 0.02)' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
              <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Automation Logs</h2>
@@ -936,6 +984,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
             </tbody>
           </table>
         </div>
+        )}
 
         {/* SIDE-BY-SIDE EDIT MODAL */}
         {editingPost && (
