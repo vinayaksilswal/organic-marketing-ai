@@ -161,7 +161,7 @@ export default function HelpWidget() {
           height: '46px',
           borderRadius: '50%',
           background: 'linear-gradient(135deg, var(--primary-color), #7c3aed)',
-          color: '#fff',
+          color: 'var(--text-main)',
           border: 'none',
           display: 'flex',
           alignItems: 'center',

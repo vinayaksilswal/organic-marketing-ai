@@ -24,7 +24,7 @@ export default function CookieBanner() {
   if (!isVisible) return null;
 
   return (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, backgroundColor: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.1)', padding: '1rem', boxShadow: '0 -10px 40px rgba(0,0,0,0.5)', fontSize: '0.9rem' }}>
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, backgroundColor: '#0a0a0a', borderTop: '1px solid var(--border-color)', padding: '1rem', boxShadow: '0 -10px 40px rgba(0,0,0,0.5)', fontSize: '0.9rem' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1rem' }} className="cookie-banner-inner">
         <style>{`
           @media (min-width: 768px) {
@@ -45,7 +45,7 @@ export default function CookieBanner() {
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
           <button 
             onClick={handleDecline}
-            style={{ padding: '0.5rem 1rem', border: '1px solid var(--border-color)', color: '#fff', borderRadius: '4px', background: 'transparent', cursor: 'pointer', transition: '0.2s' }}
+            style={{ padding: '0.5rem 1rem', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '4px', background: 'transparent', cursor: 'pointer', transition: '0.2s' }}
             onMouseOver={e => e.target.style.background='rgba(11, 16, 32, 0.05)'} onMouseOut={e => e.target.style.background='transparent'}
           >
             Decline

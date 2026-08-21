@@ -421,9 +421,9 @@ How do you decide what is worth building?`,
         {/* CARD 1: X (TWITTER) NATIVE CARD */}
         {/* ========================================================================= */}
         <div style={{
-          background: '#090a0f',
+          background: 'rgba(11,16,32,0.03)',
           borderRadius: 16,
-          border: '1px solid rgba(255,255,255,0.12)',
+          border: '1px solid var(--border-color)',
           padding: '1.35rem',
           display: 'flex',
           flexDirection: 'column',
@@ -433,11 +433,11 @@ How do you decide what is worth building?`,
         }}>
           <div>
             {/* Header Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 𝕏 Native Build-In-Public Post
               </span>
-              <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>
                 Max 280 Chars
               </span>
             </div>
@@ -449,7 +449,7 @@ How do you decide what is worth building?`,
                 height: 38,
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-                color: '#fff',
+                color: 'var(--text-main)',
                 fontWeight: 800,
                 fontSize: '0.85rem',
                 display: 'flex',
@@ -461,19 +461,19 @@ How do you decide what is worth building?`,
               </div>
               <div style={{ lineHeight: 1.25, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <span style={{ fontWeight: 800, color: '#fff', fontSize: '0.88rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                  <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.88rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                     {bundle?.x_post?.display_name || businessName}
                   </span>
                   <span style={{ color: '#38bdf8', fontSize: '0.75rem' }}>●</span>
                 </div>
-                <span style={{ fontSize: '0.74rem', color: '#71717a' }}>{bundle?.x_post?.handle || cleanHandle} · 2h</span>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>{bundle?.x_post?.handle || cleanHandle} · 2h</span>
               </div>
             </div>
 
             {/* Post Content */}
             <p style={{
               fontSize: '0.86rem',
-              color: '#e4e4e7',
+              color: 'var(--text-main)',
               lineHeight: 1.55,
               whiteSpace: 'pre-wrap',
               margin: '0 0 1.25rem',
@@ -490,9 +490,9 @@ How do you decide what is worth building?`,
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingTop: '0.75rem',
-              borderTop: '1px solid rgba(255,255,255,0.08)',
+              borderTop: '1px solid var(--border-color)',
               fontSize: '0.74rem',
-              color: '#71717a',
+              color: 'var(--text-muted)',
               marginBottom: '0.85rem',
             }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><MessageSquare size={13} /> {bundle?.x_post?.metrics_estimate?.replies || '12'}</span>
@@ -515,7 +515,7 @@ How do you decide what is worth building?`,
                   fontWeight: 700,
                   padding: '0.35rem 0.75rem',
                   borderRadius: 8,
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  border: '1px solid var(--border-color)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -562,7 +562,7 @@ How do you decide what is worth building?`,
                 height: 38,
                 borderRadius: '50%',
                 background: '#0a66c2',
-                color: '#fff',
+                color: 'var(--text-main)',
                 fontWeight: 800,
                 fontSize: '0.85rem',
                 display: 'flex',
@@ -623,7 +623,7 @@ How do you decide what is worth building?`,
                 className="btn"
                 style={{
                   background: copiedKey === 'li' ? '#10b981' : '#0a66c2',
-                  color: '#fff',
+                  color: 'var(--text-main)',
                   fontSize: '0.76rem',
                   fontWeight: 700,
                   padding: '0.35rem 0.75rem',
@@ -648,7 +648,7 @@ How do you decide what is worth building?`,
         <div style={{
           background: '#12141a',
           borderRadius: 16,
-          border: '1px solid rgba(255,255,255,0.12)',
+          border: '1px solid var(--border-color)',
           padding: '1.35rem',
           display: 'flex',
           flexDirection: 'column',
@@ -658,11 +658,11 @@ How do you decide what is worth building?`,
         }}>
           <div>
             {/* Header Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fb923c', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 🤖 Reddit Community Post
               </span>
-              <span style={{ fontSize: '0.68rem', color: '#71717a', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>
                 Zero Fluff
               </span>
             </div>
@@ -678,16 +678,16 @@ How do you decide what is worth building?`,
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '0.75rem',
-                color: '#fff',
+                color: 'var(--text-main)',
                 fontWeight: 900,
                 flexShrink: 0,
               }}>
                 r/
               </div>
-              <span style={{ fontWeight: 800, color: '#fff', fontSize: '0.84rem' }}>
+              <span style={{ fontWeight: 800, color: 'var(--text-main)', fontSize: '0.84rem' }}>
                 {bundle?.reddit_post?.subreddit || 'r/SideProject'}
               </span>
-              <span style={{ fontSize: '0.72rem', color: '#71717a' }}>· 5h</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>· 5h</span>
             </div>
 
             {/* Reddit Title */}
@@ -695,7 +695,7 @@ How do you decide what is worth building?`,
               margin: '0 0 0.65rem',
               fontSize: '0.92rem',
               fontWeight: 800,
-              color: '#fff',
+              color: 'var(--text-main)',
               lineHeight: 1.35,
             }}>
               {bundle?.reddit_post?.title}
@@ -704,7 +704,7 @@ How do you decide what is worth building?`,
             {/* Reddit Body */}
             <p style={{
               fontSize: '0.82rem',
-              color: '#d4d4d8',
+              color: 'var(--text-main)',
               lineHeight: 1.5,
               whiteSpace: 'pre-wrap',
               margin: '0 0 1.25rem',
@@ -720,9 +720,9 @@ How do you decide what is worth building?`,
               alignItems: 'center',
               gap: '0.85rem',
               paddingTop: '0.75rem',
-              borderTop: '1px solid rgba(255,255,255,0.08)',
+              borderTop: '1px solid var(--border-color)',
               fontSize: '0.74rem',
-              color: '#a1a1aa',
+              color: 'var(--text-muted)',
               marginBottom: '0.85rem',
             }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.06)', padding: '0.2rem 0.5rem', borderRadius: 12 }}>
@@ -748,7 +748,7 @@ How do you decide what is worth building?`,
                 className="btn"
                 style={{
                   background: copiedKey === 'reddit' ? '#10b981' : '#ff4500',
-                  color: '#fff',
+                  color: 'var(--text-main)',
                   fontSize: '0.76rem',
                   fontWeight: 700,
                   padding: '0.35rem 0.75rem',

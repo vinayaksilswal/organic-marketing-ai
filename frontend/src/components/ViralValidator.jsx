@@ -220,9 +220,9 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
   const selectedMedia = mediaList.find((m) => m.id === selectedMediaId);
 
   return (
-    <div className="card" style={{ padding: '1.5rem', background: '#121217', borderRadius: 16, border: '1px solid rgba(249, 115, 22, 0.25)', marginBottom: '2rem' }}>
+    <div className="card" style={{ padding: '1.5rem', background: 'rgba(11,16,32,0.03)', borderRadius: 16, border: '1px solid rgba(249, 115, 22, 0.25)', marginBottom: '2rem' }}>
       {/* Header Banner */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '1rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
         <div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.6rem', borderRadius: 20, background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '0.4rem' }}>
             <Flame size={14} color="#f97316" />
@@ -230,10 +230,10 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
               Advanced Algorithmic AI Validator
             </span>
           </div>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: '#fff', letterSpacing: '-0.02em' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
             Viral Validator &amp; View Predictor
           </h2>
-          <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: '#a1a1aa' }}>
+          <p style={{ margin: '0.25rem 0 0', fontSize: '0.84rem', color: 'var(--text-muted)' }}>
             Stop guessing. Select any video from your media catalog to test, predict organic views, and optimize for the algorithm instantly.
           </p>
         </div>
@@ -261,14 +261,14 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
       {/* Input Selection Bar */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem', marginBottom: '1.25rem' }}>
         <div>
-          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
             🎬 Select Video from Media Catalog
           </label>
           <select
             value={selectedMediaId}
             onChange={(e) => handleMediaSelect(e.target.value)}
             className="input-field"
-            style={{ width: '100%', fontSize: '0.84rem', background: '#1c1c24', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: 8 }}
+            style={{ width: '100%', fontSize: '0.84rem', background: '#1c1c24', border: '1px solid var(--border-color)', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: 8 }}
           >
             <option value="">-- Choose from Media Library --</option>
             {mediaList.map((m, idx) => (
@@ -280,14 +280,14 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
         </div>
 
         <div>
-          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
             🎯 Target Platform
           </label>
           <select
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
             className="input-field"
-            style={{ width: '100%', fontSize: '0.84rem', background: '#1c1c24', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: 8 }}
+            style={{ width: '100%', fontSize: '0.84rem', background: '#1c1c24', border: '1px solid var(--border-color)', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: 8 }}
           >
             <option value="YouTube Shorts">YouTube Shorts (Search &amp; Shelf Algorithm)</option>
             <option value="TikTok">TikTok (For You Page Retention Velocity)</option>
@@ -297,7 +297,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
         </div>
 
         <div>
-          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+          <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
             🏷️ Content Niche / Angle
           </label>
           <input
@@ -306,14 +306,14 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
             value={niche}
             onChange={(e) => setNiche(e.target.value)}
             className="input-field"
-            style={{ width: '100%', fontSize: '0.84rem', background: '#1c1c24', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: 8 }}
+            style={{ width: '100%', fontSize: '0.84rem', background: '#1c1c24', border: '1px solid var(--border-color)', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: 8 }}
           />
         </div>
       </div>
 
       {/* Script / Hook Textarea (if testing custom or editing selected) */}
       <div style={{ marginBottom: '1.25rem' }}>
-        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
+        <label style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'block' }}>
           ✍️ Video Hook &amp; Script / Description to Validate
         </label>
         <textarea
@@ -322,13 +322,13 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Paste your video's 0-3s hook, voiceover script, or caption to test against the algorithm..."
           className="input-field"
-          style={{ width: '100%', fontSize: '0.84rem', background: '#181820', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '0.6rem 0.8rem', borderRadius: 8, resize: 'vertical' }}
+          style={{ width: '100%', fontSize: '0.84rem', background: '#181820', border: '1px solid var(--border-color)', color: '#fff', padding: '0.6rem 0.8rem', borderRadius: 8, resize: 'vertical' }}
         />
       </div>
 
       {/* Analysis Results View */}
       {analysis && (
-        <div style={{ background: '#181820', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', padding: '1.25rem' }}>
+        <div style={{ background: '#181820', borderRadius: 14, border: '1px solid var(--border-color)', padding: '1.25rem' }}>
           {/* Top Score Banner (Matches Viral Validator UI) */}
           <div style={{
             display: 'flex',
@@ -353,17 +353,17 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: '#121217',
+                background: 'rgba(11,16,32,0.03)',
                 boxShadow: '0 0 20px rgba(249,115,22,0.35)',
                 flexShrink: 0,
               }}>
-                <span style={{ fontSize: '1.45rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>{analysis.viral_score || 85}</span>
-                <span style={{ fontSize: '0.62rem', color: '#a1a1aa', fontWeight: 700 }}>/ 100</span>
+                <span style={{ fontSize: '1.45rem', fontWeight: 900, color: 'var(--text-main)', lineHeight: 1 }}>{analysis.viral_score || 85}</span>
+                <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontWeight: 700 }}>/ 100</span>
               </div>
 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>Viral Potential Score</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>Viral Potential Score</h3>
                   <span style={{
                     fontSize: '0.72rem',
                     fontWeight: 800,
@@ -375,7 +375,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                     {analysis.growth_tier || 'High Growth'}
                   </span>
                 </div>
-                <p style={{ margin: 0, fontSize: '0.84rem', color: '#d4d4d8' }}>
+                <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-main)' }}>
                   {analysis.percentile_summary || `Your video is performing better than ${analysis.viral_score || 85}% of content in this niche.`}
                 </p>
                 <div style={{ marginTop: '0.25rem', display: 'flex', gap: '0.75rem', fontSize: '0.75rem', color: '#f97316', fontWeight: 700 }}>
@@ -391,7 +391,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                 showToast('Viral Validator Report copied to clipboard!');
               }}
               className="btn"
-              style={{ background: '#27272a', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', fontSize: '0.8rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem' }}
+              style={{ background: 'rgba(11,16,32,0.06)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontSize: '0.8rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.9rem' }}
             >
               <Download size={14} /> Export Report
             </button>
@@ -404,7 +404,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
             <div style={{
               background: '#09090b',
               borderRadius: 14,
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid var(--border-color)',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
@@ -428,7 +428,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                   />
                 )
               ) : (
-                <div style={{ padding: '1rem', textAlign: 'center', color: '#71717a' }}>
+                <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
                   <Film size={36} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
                   <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>9:16 Vertical Ad / Short</div>
                   <div style={{ fontSize: '0.68rem', color: '#52525b', marginTop: '0.2rem' }}>Ready for render &amp; export</div>
@@ -445,7 +445,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                 background: 'rgba(0,0,0,0.75)',
                 backdropFilter: 'blur(6px)',
                 fontSize: '0.68rem',
-                color: '#e4e4e7',
+                color: 'var(--text-main)',
                 textAlign: 'center',
               }}>
                 ⏱️ Hook: 0-3s | 100% Stop Rate
@@ -454,22 +454,22 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
 
             {/* Column 2: 5-Axis Metric Analysis Radar Chart */}
             <div style={{
-              background: '#121217',
+              background: 'rgba(11,16,32,0.03)',
               borderRadius: 14,
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid var(--border-color)',
               padding: '1rem',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.86rem', fontWeight: 800, color: '#fff', textAlign: 'center', letterSpacing: '.04em', textTransform: 'uppercase' }}>
+              <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-main)', textAlign: 'center', letterSpacing: '.04em', textTransform: 'uppercase' }}>
                 Metric Analysis
               </h4>
               {renderRadarChart(analysis.metrics)}
 
               {/* 5 Metrics Micro Breakdown */}
-              <div style={{ width: '100%', marginTop: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.7rem', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem' }}>
+              <div style={{ width: '100%', marginTop: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', fontSize: '0.7rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.6rem' }}>
                 <div><strong style={{ color: '#fb923c' }}>🪝 Hook:</strong> {analysis.metrics?.hook || 88}/100</div>
                 <div><strong style={{ color: '#fb923c' }}>⏱️ Retention:</strong> {analysis.metrics?.retention || 82}/100</div>
                 <div><strong style={{ color: '#fb923c' }}>🚀 Shareability:</strong> {analysis.metrics?.shareability || 85}/100</div>
@@ -480,9 +480,9 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
 
             {/* Column 3: FIX THE FAIL (Timestamped Actionable Corrections) */}
             <div style={{
-              background: '#121217',
+              background: 'rgba(11,16,32,0.03)',
               borderRadius: 14,
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid var(--border-color)',
               padding: '1rem',
             }}>
               <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.86rem', fontWeight: 800, color: '#f97316', letterSpacing: '.04em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -502,10 +502,10 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                     background: 'rgba(255,255,255,0.03)',
                     borderLeft: `3px solid ${fail.severity?.includes('CRITICAL') ? '#ef4444' : fail.severity?.includes('HIGH') ? '#f97316' : '#eab308'}`,
                   }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#fff', marginBottom: '0.2rem' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.2rem' }}>
                       {fail.title}
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.74rem', color: '#a1a1aa', lineHeight: 1.4 }}>
+                    <p style={{ margin: 0, fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                       {fail.action}
                     </p>
                     <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
@@ -519,7 +519,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
                       }}>
                         {fail.severity}
                       </span>
-                      <span style={{ fontSize: '0.65rem', color: '#71717a', fontWeight: 700 }}>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 700 }}>
                         {fail.timestamp}
                       </span>
                     </div>
@@ -557,18 +557,18 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem', fontSize: '0.78rem' }}>
-                <div style={{ background: '#121217', padding: '0.65rem 0.8rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ background: 'rgba(11,16,32,0.03)', padding: '0.65rem 0.8rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <strong style={{ color: '#10b981', display: 'block', marginBottom: '0.2rem' }}>🪝 Algorithmic Hook (0-3s):</strong>
-                  <p style={{ margin: 0, color: '#fff', fontWeight: 600 }}>{analysis.optimized_rewrite.optimized_hook}</p>
+                  <p style={{ margin: 0, color: 'var(--text-main)', fontWeight: 600 }}>{analysis.optimized_rewrite.optimized_hook}</p>
                 </div>
 
-                <div style={{ background: '#121217', padding: '0.65rem 0.8rem', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ background: 'rgba(11,16,32,0.03)', padding: '0.65rem 0.8rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <strong style={{ color: '#10b981', display: 'block', marginBottom: '0.2rem' }}>🎙️ Full Timed Narration Script:</strong>
-                  <p style={{ margin: 0, color: '#e4e4e7', whiteSpace: 'pre-wrap' }}>{analysis.optimized_rewrite.optimized_script}</p>
+                  <p style={{ margin: 0, color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>{analysis.optimized_rewrite.optimized_script}</p>
                 </div>
               </div>
 
-              <div style={{ marginTop: '0.5rem', fontSize: '0.74rem', color: '#a1a1aa' }}>
+              <div style={{ marginTop: '0.5rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                 💡 <em>{analysis.optimized_rewrite.why_this_converts}</em>
               </div>
             </div>
