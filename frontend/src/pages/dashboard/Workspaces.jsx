@@ -61,6 +61,23 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
     window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
+  // The X round-trip lands back here with its own query flag.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const x = params.get('x');
+    if (!x) return;
+    const message = params.get('message');
+    if (x === 'connected') {
+      showToast(`Connected ${message || 'your X account'}. Posts will publish there too.`);
+      refreshWorkspaces();
+    } else if (x === 'cancelled') {
+      showToast(message || 'X connection cancelled.', true);
+    } else {
+      showToast(message || 'Could not connect X.', true);
+    }
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
   const loadPageChoices = async (t) => {
     try {
       const res = await authFetch(`${API_BASE}/meta/pages?token=${encodeURIComponent(t)}`, {}, token);
@@ -109,6 +126,26 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
     } catch (err) {
       showToast(err.message, true);
       setConnectingMeta(false);
+    }
+  };
+
+  // X publishing has existed in the worker for a long time and has never run,
+  // because nothing could put a token in the database. This is that missing
+  // half.
+  const [connectingX, setConnectingX] = useState(false);
+
+  const handleConnectX = async (workspaceId) => {
+    setConnectingX(true);
+    try {
+      const res = await authFetch(`${API_BASE}/x/connect?workspace_id=${encodeURIComponent(workspaceId)}`, {}, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authUrl) {
+        throw new Error(data.detail || data.message || 'X connection is unavailable right now.');
+      }
+      window.location.href = data.authUrl;
+    } catch (err) {
+      showToast(err.message, true);
+      setConnectingX(false);
     }
   };
 
@@ -772,6 +809,30 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                           </button>
                         </>
                       )}
+                    </div>
+
+                    {/* X (Twitter) */}
+                    <div style={{ padding: '1.25rem', background: 'rgba(11,16,32,0.03)', borderRadius: 10, border: '1px solid rgba(11, 16, 32, 0.06)' }}>
+                      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Twitter size={16} color="#0f172a" /> X (Twitter)
+                      </h4>
+                      <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        Sign in with X and posts go out to your account automatically. No tokens to copy.
+                      </p>
+                      <button
+                        onClick={() => handleConnectX(editWorkspaceId)}
+                        disabled={connectingX}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.55rem', width: '100%',
+                          justifyContent: 'center', padding: '0.7rem', borderRadius: 8,
+                          background: '#0f172a', color: '#fff', border: 'none', fontSize: '0.9rem',
+                          fontWeight: 600, cursor: connectingX ? 'wait' : 'pointer',
+                          opacity: connectingX ? 0.7 : 1, minHeight: 44,
+                        }}
+                      >
+                        <Twitter size={17} />
+                        {connectingX ? 'Redirecting to X…' : 'Connect X'}
+                      </button>
                     </div>
 
                     {/* LinkedIn */}

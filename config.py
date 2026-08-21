@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     # OpenRouter API (LLM — AI copy generation & chatbot)
     # =========================================================================
     openrouter_api_key: str | None = None
+    # X (Twitter) app credentials. The publishing code has existed for a
+    # long time and has never run, because nothing could put a user token
+    # in the database without these plus the connect flow.
+    twitter_api_key: str | None = None
+    twitter_api_secret: str | None = None
     # Which model writes marketing copy, and what it falls back to.
     #
     # Both are env overrides so the quality of every caption, brand analysis
