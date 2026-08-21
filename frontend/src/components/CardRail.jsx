@@ -205,7 +205,7 @@ const CardRail = ({ items, renderItem, interval = 3400 }) => {
                   height: 7,
                   borderRadius: 999,
                   background: index % total === i
-                    ? 'var(--blue, #2563eb)'
+                    ? 'var(--blue, var(--secondary-color))'
                     : 'rgba(120,120,140,0.28)',
                   transition: 'width .35s ease, background .35s ease',
                 }}

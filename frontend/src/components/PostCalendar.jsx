@@ -22,7 +22,7 @@ const STATUS = {
   POSTED:    { label: 'Published', colour: '#10b981', Icon: CheckCircle2 },
   FAILED:    { label: 'Failed',    colour: '#ef4444', Icon: XCircle },
   DRAFT:     { label: 'Draft',     colour: '#f59e0b', Icon: FileText },
-  SCHEDULED: { label: 'Scheduled', colour: '#3b82f6', Icon: Clock },
+  SCHEDULED: { label: 'Scheduled', colour: 'var(--secondary-color)', Icon: Clock },
 };
 
 const statusOf = (post) => STATUS[post.status] || STATUS.SCHEDULED;

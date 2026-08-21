@@ -52,7 +52,7 @@ const css = `
 }
 .omai-chip-av {
   width: 34px; height: 34px; border-radius: 999px; object-fit: cover; flex-shrink: 0;
-  background: linear-gradient(135deg, #6d28d9, #2563eb);
+  background: linear-gradient(135deg, #6d28d9, var(--secondary-color));
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: .84rem;
 }
@@ -64,7 +64,7 @@ const css = `
 const Chip = ({ account }) => {
   const [broken, setBroken] = useState(false);
   const Icon = account.platform === 'instagram' ? Instagram : Facebook;
-  const tint = account.platform === 'instagram' ? '#db2777' : '#2563eb';
+  const tint = account.platform === 'instagram' ? '#db2777' : 'var(--secondary-color)';
 
   return (
     <a

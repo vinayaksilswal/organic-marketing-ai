@@ -15,7 +15,7 @@ import { API_BASE, authFetch } from '../../config';
  */
 
 const STATUSES = ['open', 'in_progress', 'resolved'];
-const STATUS_COLOUR = { open: '#f59e0b', in_progress: '#3b82f6', resolved: '#059669' };
+const STATUS_COLOUR = { open: '#f59e0b', in_progress: 'var(--secondary-color)', resolved: '#059669' };
 
 const AdminSupport = ({ showToast, token }) => {
   const [tab, setTab] = useState('tickets');

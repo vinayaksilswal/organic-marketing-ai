@@ -70,7 +70,7 @@ const Logo = ({ size = 30, showWordmark = false, tagline = true, noTagline = fal
             fontWeight: 800,
             fontSize: size * 0.58,
             letterSpacing: '-.03em',
-            background: 'linear-gradient(100deg, #22d3ee, #3b82f6 46%, #8b5cf6)',
+            background: 'linear-gradient(100deg, #22d3ee, var(--secondary-color) 46%, #8b5cf6)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             WebkitTextFillColor: 'transparent',

@@ -419,9 +419,9 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
                   {/* Social accounts status */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {sc?.hasFacebook && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}><Facebook size={12} /> {sc.fbPageName || 'Connected'}</span>}
+                    {sc?.hasFacebook && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(37, 99, 235,0.12)', color: '#60a5fa' }}><Facebook size={12} /> {sc.fbPageName || 'Connected'}</span>}
                     {sc?.igAccountId && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(236,72,153,0.12)', color: '#f472b6' }}><Instagram size={12} /> {sc.igAccountName || 'Connected'}</span>}
-                    {sc?.hasLinkedin && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', color: '#93c5fd' }}><Linkedin size={12} /></span>}
+                    {sc?.hasLinkedin && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(37, 99, 235,0.12)', color: '#93c5fd' }}><Linkedin size={12} /></span>}
                     {sc?.hasTwitter && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(11, 16, 32, 0.08)', color: '#e5e7eb' }}><Twitter size={12} /></span>}
                     {!sc?.hasFacebook && (
                       <button
@@ -549,7 +549,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                   </div>
                 )}
                 {businessModel === 'AI Influencer' && (
-                  <div style={{ padding: '1rem', background: 'rgba(59,130,246,0.05)', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.2)', marginBottom: '1rem' }}>
+                  <div style={{ padding: '1rem', background: 'rgba(37, 99, 235,0.05)', borderRadius: '10px', border: '1px solid rgba(37, 99, 235,0.2)', marginBottom: '1rem' }}>
                     <label style={labelStyle}><Target size={13} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} /> Character Reference Image URL</label>
                     <input type="url" placeholder="https://example.com/character.jpg" value={influencerReferenceUrl} onChange={e => setInfluencerReferenceUrl(e.target.value)} style={inputStyle} />
                   </div>
@@ -661,8 +661,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
                     {/* Faceless Channel Dedicated Settings */}
                     {editData.businessModel === 'Faceless Channel' && (
-                      <div style={{ padding: '1.15rem', background: 'rgba(249,115,22,0.06)', borderRadius: 10, border: '1px solid rgba(249,115,22,0.25)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#f97316', fontWeight: 800, fontSize: '0.86rem' }}>
+                      <div style={{ padding: '1.15rem', background: 'rgba(109, 40, 217,0.06)', borderRadius: 10, border: '1px solid rgba(109, 40, 217,0.25)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary-color)', fontWeight: 800, fontSize: '0.86rem' }}>
                           <Bot size={15} /> Faceless Channel Video Settings
                         </div>
                         <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
@@ -781,7 +781,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </p>
 
                     {/* Facebook / Instagram — one-click OAuth */}
-                    <div style={{ padding: '1.25rem', background: 'rgba(59,130,246,0.05)', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.15)' }}>
+                    <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235,0.05)', borderRadius: '10px', border: '1px solid rgba(37, 99, 235,0.15)' }}>
                       <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Facebook size={16} color="#60a5fa" /> Meta — Facebook &amp; Instagram
                       </h4>
@@ -869,7 +869,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                     </div>
 
                     {/* LinkedIn */}
-                    <div style={{ padding: '1.25rem', background: 'rgba(59,130,246,0.03)', borderRadius: '10px', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
+                    <div style={{ padding: '1.25rem', background: 'rgba(37, 99, 235,0.03)', borderRadius: '10px', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Linkedin size={16} color="#93c5fd" /> LinkedIn
                       </h4>

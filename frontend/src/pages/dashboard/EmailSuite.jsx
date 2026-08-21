@@ -195,7 +195,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
       subject: 'Weekly AI & Growth Digest #42 📈',
       bodyText: 'Here are the top marketing insights and product updates for this week.',
       bodyHtml: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-        <h2 style="color: #3b82f6;">Weekly Marketing Digest 📈</h2>
+        <h2 style="color: var(--secondary-color);">Weekly Marketing Digest 📈</h2>
         <p style="font-size: 16px;">Catch up on the latest trends and automated marketing strategies:</p>
         <ul>
           <li>How AI video generation transforms engagement</li>
@@ -502,7 +502,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
               </div>
 
               <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(37, 99, 235, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <MousePointer size={24} color="var(--secondary-color)" />
                 </div>
                 <div>

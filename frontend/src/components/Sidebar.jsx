@@ -138,7 +138,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
 
         <NavLink to="/dashboard/viral-validator" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Flame size={16} /> <span>Viral Validator</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+          <span className="sidebar-badge" style={{ background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
             AI Radar
           </span>
         </NavLink>
@@ -164,7 +164,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
 
         <NavLink to="/dashboard/postship" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Sparkles size={16} /> <span>PostShip Multi-Platform</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>
+          <span className="sidebar-badge" style={{ background: 'rgba(37, 99, 235,0.15)', color: 'var(--secondary-color)' }}>
             X·LI·RD
           </span>
         </NavLink>
@@ -185,7 +185,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         </NavLink>
         <NavLink to="/dashboard/support" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <LifeBuoy size={16} /> <span>Support & Reviews</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+          <span className="sidebar-badge" style={{ background: 'rgba(37, 99, 235,0.12)', color: 'var(--secondary-color)' }}>
             24/7
           </span>
         </NavLink>

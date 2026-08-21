@@ -236,12 +236,49 @@ How do you decide what is worth building?`,
     .slice(0, 2)
     .toUpperCase() || 'OR';
 
-  const quickIdeas = [
-    `Shipped v2 with 10x faster background video processing`,
-    `Why 90% of SaaS onboarding funnels lose users on step 2`,
-    `3 mistakes we made scaling organic social traffic from zero`,
-    `The simple 1-line database fix that solved our multi-tenant race condition`
-  ];
+  // These used to be four hardcoded engineering anecdotes, offered to a
+  // florist and a clinic alike. sampleFor already shapes the output to the
+  // business; the prompts that start the process should match it, or the tool
+  // opens by suggesting somebody else's story.
+  const quickIdeasFor = (model) => {
+    const m = (model || '').toLowerCase();
+
+    if (m.includes('commerce') || m.includes('retail') || m.includes('shop')) {
+      return [
+        `The product ${businessName} sells most, and what people ask before buying it`,
+        `What we changed after reading a month of customer emails`,
+        `A restock that sold out, and what we got wrong about the quantity`,
+        `The question we get asked most, answered properly`,
+      ];
+    }
+
+    if (m.includes('page') || m.includes('creator') || m.includes('influencer')) {
+      return [
+        `The post that worked that I almost did not publish`,
+        `What thirty days of posting actually taught me`,
+        `The thing everyone asks me in the comments`,
+        `What I would tell myself before I started ${businessName}`,
+      ];
+    }
+
+    if (m.includes('local') || m.includes('service') || m.includes('clinic')) {
+      return [
+        `The mistake customers make before they call ${businessName}`,
+        `What actually happens on a first visit`,
+        `The question we answer every single week`,
+        `Why the cheapest option usually costs more`,
+      ];
+    }
+
+    return [
+      `What we shipped this week at ${businessName}, and why`,
+      `The step where people get stuck, and what we changed`,
+      `A mistake we made scaling, written up honestly`,
+      `The question customers ask before they sign up`,
+    ];
+  };
+
+  const quickIdeas = quickIdeasFor(currentWorkspace?.businessModel || industry);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -251,7 +288,7 @@ How do you decide what is worth building?`,
         background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%)',
         borderRadius: 14,
         padding: '1.75rem 2rem',
-        border: '1px solid rgba(59, 130, 246, 0.25)',
+        border: '1px solid rgba(37, 99, 235, 0.25)',
         display: 'flex',
         flexWrap: 'wrap',
         alignItems: 'center',
@@ -448,7 +485,7 @@ How do you decide what is worth building?`,
                 width: 38,
                 height: 38,
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+                background: 'linear-gradient(135deg, var(--secondary-color), var(--secondary-color))',
                 color: 'var(--text-main)',
                 fontWeight: 800,
                 fontSize: '0.85rem',
@@ -659,7 +696,7 @@ How do you decide what is worth building?`,
           <div>
             {/* Header Badge */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.65rem' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#fb923c', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 🤖 Reddit Community Post
               </span>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 700 }}>

@@ -22,7 +22,7 @@ const CATEGORIES = [
 
 const STATUS_LOOK = {
   open: { label: 'Open', colour: '#f59e0b', Icon: Clock },
-  in_progress: { label: 'We are on it', colour: '#3b82f6', Icon: MessageSquare },
+  in_progress: { label: 'We are on it', colour: 'var(--secondary-color)', Icon: MessageSquare },
   resolved: { label: 'Resolved', colour: '#059669', Icon: CheckCircle2 },
 };
 

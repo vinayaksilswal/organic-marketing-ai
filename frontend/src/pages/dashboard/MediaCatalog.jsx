@@ -673,7 +673,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
             <input
               type="text"
               className="input"
-              placeholder="e.g. Founder demos the scanner on a laptop in a dark office"
+              placeholder="e.g. Woman in a pottery studio holds a finished mug up to the light"
               value={baseCaption}
               onChange={(e) => setBaseCaption(e.target.value)}
               style={{ width: '100%', padding: '0.6rem 1rem', height: '42px', background: 'rgba(11, 16, 32, 0.03)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: '8px' }}
@@ -1165,13 +1165,13 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                                   padding: '0.4rem 0.65rem',
                                   fontSize: '0.74rem',
                                   fontWeight: '800',
-                                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                                  background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)',
                                   border: 'none',
                                   color: '#fff',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '0.25rem',
-                                  boxShadow: '0 2px 8px rgba(249,115,22,0.25)',
+                                  boxShadow: '0 2px 8px rgba(109, 40, 217,0.25)',
                                 }}
                                 onClick={() => handleOpenSchedule(item)}
                               >
@@ -1349,10 +1349,10 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         {scheduleItem && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(11,16,32,0.04)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setScheduleItem(null); }}>
-            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 14, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(109, 40, 217,0.35)', borderRadius: 14, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Clock size={20} />
                   </div>
                   <div>
@@ -1391,9 +1391,9 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                     onClick={handleGenerateCaption}
                     disabled={generatingCaption}
                     style={{
-                      background: 'rgba(249,115,22,0.15)',
-                      border: '1px solid rgba(249,115,22,0.4)',
-                      color: '#f97316',
+                      background: 'rgba(109, 40, 217,0.15)',
+                      border: '1px solid rgba(109, 40, 217,0.4)',
+                      color: 'var(--primary-color)',
                       borderRadius: 8,
                       padding: '0.2rem 0.6rem',
                       fontSize: '0.74rem',
@@ -1480,13 +1480,13 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                   disabled={scheduling}
                   className="btn btn-primary"
                   style={{
-                    background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)',
                     border: 'none',
                     fontWeight: 800,
                     padding: '0.65rem 1.4rem',
                     borderRadius: 8,
                     fontSize: '0.88rem',
-                    boxShadow: '0 4px 14px rgba(249,115,22,0.35)',
+                    boxShadow: '0 4px 14px rgba(109, 40, 217,0.35)',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '0.5rem',

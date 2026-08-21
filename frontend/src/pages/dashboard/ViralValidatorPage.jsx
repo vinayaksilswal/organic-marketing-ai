@@ -19,15 +19,15 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
           marginBottom: '2rem',
           flexWrap: 'wrap',
           gap: '1rem',
-          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.03) 100%)',
+          background: 'linear-gradient(135deg, rgba(109, 40, 217, 0.08) 0%, rgba(91, 33, 182, 0.03) 100%)',
           padding: '1.5rem 2rem',
           borderRadius: '14px',
-          border: '1px solid rgba(249, 115, 22, 0.25)',
+          border: '1px solid rgba(109, 40, 217, 0.25)',
         }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.65rem', borderRadius: 16, background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '0.5rem' }}>
-              <Flame size={13} color="#f97316" />
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f97316' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.65rem', borderRadius: 16, background: 'rgba(109, 40, 217,0.12)', border: '1px solid rgba(109, 40, 217,0.3)', marginBottom: '0.5rem' }}>
+              <Flame size={13} color="var(--primary-color)" />
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--primary-color)' }}>
                 Core Platform AI Engine
               </span>
             </div>
@@ -51,7 +51,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
         <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
           <div style={{ background: 'rgba(11,16,32,0.03)', borderRadius: 14, padding: '1.25rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-              <Eye size={18} color="#f97316" />
+              <Eye size={18} color="var(--primary-color)" />
               <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Stop Posting Blindly</h4>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
@@ -61,7 +61,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
 
           <div style={{ background: 'rgba(11,16,32,0.03)', borderRadius: 14, padding: '1.25rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-              <Sparkles size={18} color="#f97316" />
+              <Sparkles size={18} color="var(--primary-color)" />
               <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Timestamped Fix The Fail</h4>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
@@ -71,7 +71,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
 
           <div style={{ background: 'rgba(11,16,32,0.03)', borderRadius: 14, padding: '1.25rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-              <TrendingUp size={18} color="#f97316" />
+              <TrendingUp size={18} color="var(--primary-color)" />
               <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>10x Organic Velocity</h4>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>

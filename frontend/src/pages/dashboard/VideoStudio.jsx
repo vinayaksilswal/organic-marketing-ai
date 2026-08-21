@@ -190,10 +190,10 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
         
         {/* Header Section */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.03) 100%)',
+          background: 'linear-gradient(135deg, rgba(109, 40, 217, 0.08) 0%, rgba(91, 33, 182, 0.03) 100%)',
           borderRadius: 14,
           padding: '1.75rem 2rem',
-          border: '1px solid rgba(249, 115, 22, 0.25)',
+          border: '1px solid rgba(109, 40, 217, 0.25)',
           marginBottom: '2rem',
           display: 'flex',
           justifyContent: 'space-between',
@@ -209,11 +209,11 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 gap: '0.35rem',
                 padding: '0.2rem 0.65rem',
                 borderRadius: 16,
-                background: 'rgba(249,115,22,0.12)',
-                border: '1px solid rgba(249,115,22,0.3)',
+                background: 'rgba(109, 40, 217,0.12)',
+                border: '1px solid rgba(109, 40, 217,0.3)',
                 fontSize: '0.72rem',
                 fontWeight: 800,
-                color: '#f97316',
+                color: 'var(--primary-color)',
                 textTransform: 'uppercase',
                 letterSpacing: '.06em',
               }}>
@@ -249,7 +249,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
             disabled={generating}
             className="btn btn-primary"
             style={{
-              background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+              background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)',
               border: 'none',
               fontWeight: 800,
               padding: '0.75rem 1.4rem',
@@ -258,7 +258,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.5rem',
-              boxShadow: '0 4px 16px rgba(249,115,22,0.35)',
+              boxShadow: '0 4px 16px rgba(109, 40, 217,0.35)',
               cursor: 'pointer',
             }}
           >
@@ -326,9 +326,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       flex: 1,
                       padding: '0.5rem 0',
                       borderRadius: 8,
-                      background: duration === sec ? '#f97316' : 'rgba(11, 16, 32, 0.04)',
+                      background: duration === sec ? 'var(--primary-color)' : 'rgba(11, 16, 32, 0.04)',
                       color: duration === sec ? '#fff' : 'var(--text-main)',
-                      border: `1px solid ${duration === sec ? '#f97316' : 'var(--border-color)'}`,
+                      border: `1px solid ${duration === sec ? 'var(--primary-color)' : 'var(--border-color)'}`,
                       fontSize: '0.78rem',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -360,9 +360,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       flex: 1,
                       padding: '0.5rem 0',
                       borderRadius: 8,
-                      background: aspectRatio === ar.value ? '#f97316' : 'rgba(11, 16, 32, 0.04)',
+                      background: aspectRatio === ar.value ? 'var(--primary-color)' : 'rgba(11, 16, 32, 0.04)',
                       color: aspectRatio === ar.value ? '#fff' : 'var(--text-main)',
-                      border: `1px solid ${aspectRatio === ar.value ? '#f97316' : 'var(--border-color)'}`,
+                      border: `1px solid ${aspectRatio === ar.value ? 'var(--primary-color)' : 'var(--border-color)'}`,
                       fontSize: '0.74rem',
                       fontWeight: 800,
                       cursor: 'pointer',
@@ -387,7 +387,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               disabled={generating}
               className="btn btn-primary"
               style={{
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)',
                 border: 'none',
                 fontWeight: 800,
                 padding: '0.55rem 1.25rem',
@@ -428,7 +428,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
           <div style={{ marginBottom: '2.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: 4, height: 18, background: '#f97316', borderRadius: 2 }}></span>
+                <span style={{ width: 4, height: 18, background: 'var(--primary-color)', borderRadius: 2 }}></span>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
                   Generated Video Creative: 2 Image Prompts + 1 Video Prompt
                 </h3>
@@ -441,9 +441,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 }}
                 className="btn"
                 style={{
-                  background: copiedKey === 'all' ? 'rgba(16,185,129,0.15)' : 'rgba(249,115,22,0.12)',
-                  color: copiedKey === 'all' ? '#10b981' : '#f97316',
-                  border: `1px solid ${copiedKey === 'all' ? '#10b981' : 'rgba(249,115,22,0.3)'}`,
+                  background: copiedKey === 'all' ? 'rgba(16,185,129,0.15)' : 'rgba(109, 40, 217,0.12)',
+                  color: copiedKey === 'all' ? '#10b981' : 'var(--primary-color)',
+                  border: `1px solid ${copiedKey === 'all' ? '#10b981' : 'rgba(109, 40, 217,0.3)'}`,
                   fontSize: '0.8rem',
                   fontWeight: 800,
                   padding: '0.45rem 0.9rem',
@@ -466,7 +466,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               <div style={{
                 background: 'rgba(11,16,32,0.03)',
                 borderRadius: 14,
-                border: '1px solid rgba(59, 130, 246, 0.35)',
+                border: '1px solid rgba(37, 99, 235, 0.35)',
                 padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
@@ -491,9 +491,9 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     onClick={() => copyToClipboard(activePrompts.firstFrame, 'img1', 'First Frame Image Prompt')}
                     className="btn"
                     style={{
-                      background: copiedKey === 'img1' ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.15)',
+                      background: copiedKey === 'img1' ? 'rgba(16,185,129,0.2)' : 'rgba(37, 99, 235,0.15)',
                       color: copiedKey === 'img1' ? '#10b981' : '#60a5fa',
-                      border: '1px solid rgba(59,130,246,0.3)',
+                      border: '1px solid rgba(37, 99, 235,0.3)',
                       fontSize: '0.74rem',
                       fontWeight: 700,
                       padding: '0.3rem 0.7rem',
@@ -514,19 +514,19 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               <div style={{
                 background: 'rgba(11,16,32,0.03)',
                 borderRadius: 14,
-                border: '1px solid rgba(249, 115, 22, 0.4)',
+                border: '1px solid rgba(109, 40, 217, 0.4)',
                 padding: '1.25rem',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                boxShadow: '0 4px 20px rgba(249,115,22,0.15)',
+                boxShadow: '0 4px 20px rgba(109, 40, 217,0.15)',
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#f97316', textTransform: 'uppercase', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       🎥 Video Prompt: Motion &amp; Action (0-10s)
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: '#fb923c', fontWeight: 800 }}>Core Prompt</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--primary-color)', fontWeight: 800 }}>Core Prompt</span>
                   </div>
 
                   <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#fff', lineHeight: 1.55, fontFamily: 'monospace, sans-serif' }}>
@@ -540,7 +540,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     onClick={() => copyToClipboard(activePrompts.videoPrompt, 'vid', 'Video Motion Prompt')}
                     className="btn"
                     style={{
-                      background: copiedKey === 'vid' ? 'rgba(16,185,129,0.2)' : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                      background: copiedKey === 'vid' ? 'rgba(16,185,129,0.2)' : 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)',
                       color: '#fff',
                       border: 'none',
                       fontSize: '0.74rem',
@@ -622,7 +622,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
             </div>
             <button
               onClick={fetchHistory}
-              style={{ background: 'none', border: 'none', color: '#f97316', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              style={{ background: 'none', border: 'none', color: 'var(--primary-color)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
             >
               <RefreshCw size={13} /> Refresh Library
             </button>
@@ -655,7 +655,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, padding: '0.15rem 0.55rem', borderRadius: 8, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, padding: '0.15rem 0.55rem', borderRadius: 8, background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
                           🎥 2 Img + 1 Vid Creative
                         </span>
                         <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>
@@ -669,7 +669,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
                     {/* Core Video Motion Snippet */}
                     <div style={{ background: 'rgba(11,16,32,0.03)', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#fb923c', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--primary-color)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>
                         🎥 Video Motion Prompt:
                       </span>
                       <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
@@ -680,7 +680,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                     {/* Expandable 2 Image Prompts (First Frame + Last Frame) */}
                     {isExpanded && (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem', fontSize: '0.76rem' }}>
-                        <div style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', padding: '0.65rem 0.8rem', borderRadius: 8 }}>
+                        <div style={{ background: 'rgba(37, 99, 235,0.06)', border: '1px solid rgba(37, 99, 235,0.2)', padding: '0.65rem 0.8rem', borderRadius: 8 }}>
                           <strong style={{ color: '#60a5fa', display: 'block', marginBottom: '0.2rem' }}>🖼️ First Frame Image Prompt:</strong>
                           <p style={{ margin: 0, color: '#cbd5e1', lineHeight: 1.4 }}>{prompts.firstFrame}</p>
                         </div>
