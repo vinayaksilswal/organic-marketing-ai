@@ -1500,10 +1500,39 @@ photographic, sharp focus, no text
           <div className="brand" style={{ fontSize: '1rem' }}>
             <Logo size={40} showWordmark />
           </div>
-          <div style={{ display: 'flex', gap: '1.4rem', fontSize: '.85rem' }}>
+          <div style={{ display: 'flex', gap: '1.4rem', fontSize: '.85rem', alignItems: 'center' }}>
             <a href="/privacy" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>Privacy</a>
             <a href="/terms" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>Terms</a>
             <a href="/dpa" style={{ color: 'var(--ink-soft)', textDecoration: 'none' }}>DPA</a>
+
+            {/* Our own accounts. A tool that publishes for a living should be
+                willing to show where it publishes for itself — and the feed is
+                the closest thing to a live demo the page has.
+                rel="me" states the link is our own profile; noopener is the
+                usual protection on any target=_blank. */}
+            <span aria-hidden="true" style={{ color: 'var(--line)' }}>|</span>
+            <a
+              href="https://www.instagram.com/organiflo.ai/"
+              target="_blank"
+              rel="me noopener noreferrer"
+              aria-label="Organiflo on Instagram"
+              title="@organiflo.ai"
+              style={{
+                color: 'var(--ink-soft)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                // The icon stays 17px; the target around it is 44, which is
+                // the smallest thing a thumb reliably hits. Sizing a control
+                // to its own artwork is how footer icons become unusable on a
+                // phone.
+                width: 44,
+                height: 44,
+                margin: '-14px 0',
+              }}
+            >
+              <Instagram size={17} />
+            </a>
           </div>
           <span style={{ fontSize: '.82rem', color: 'var(--ink-faint)' }}>
             © {new Date().getFullYear()} Organiflo
