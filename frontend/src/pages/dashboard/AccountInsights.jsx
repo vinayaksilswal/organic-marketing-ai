@@ -50,7 +50,7 @@ const AccountCard = ({ account }) => {
             }}><Icon size={20} color={colour} /></div>}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 750, fontSize: '1.02rem' }}>{account.name || label}</span>
+            <span style={{ fontWeight: 800, fontSize: '1.02rem' }}>{account.name || label}</span>
             <Icon size={14} color={colour} />
           </div>
           {account.handle && (
@@ -59,7 +59,7 @@ const AccountCard = ({ account }) => {
         </div>
         {account.link && (
           <a href={account.link} target="_blank" rel="noreferrer"
-             style={{ fontSize: '0.78rem', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 650 }}>
+             style={{ fontSize: '0.78rem', color: 'var(--primary-color)', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
             Open <ExternalLink size={12} />
           </a>
         )}
@@ -120,13 +120,13 @@ const AccountCard = ({ account }) => {
                   <a key={p.id} href={p.permalink || '#'} target="_blank" rel="noreferrer"
                      style={{
                        display: 'flex', alignItems: 'center', gap: '0.6rem',
-                       padding: '0.45rem', borderRadius: 9, textDecoration: 'none',
+                       padding: '0.45rem', borderRadius: 10, textDecoration: 'none',
                        border: '1px solid var(--border-color)', color: 'inherit',
                      }}>
                     {p.thumbnail
                       ? <img src={p.thumbnail} alt="" width={38} height={38} loading="lazy"
-                             style={{ borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />
-                      : <div style={{ width: 38, height: 38, borderRadius: 7, background: 'rgba(11,16,32,0.05)', flexShrink: 0 }} />}
+                             style={{ borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                      : <div style={{ width: 38, height: 38, borderRadius: 8, background: 'rgba(11,16,32,0.05)', flexShrink: 0 }} />}
                     <span style={{ minWidth: 0, flex: 1 }}>
                       <span style={{ display: 'block', fontSize: '0.79rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {p.caption || <em style={{ color: 'var(--text-muted)' }}>No caption</em>}

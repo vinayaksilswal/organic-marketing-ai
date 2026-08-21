@@ -285,7 +285,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
         {!isCreating && businessList.length === 0 ? (
           <div className="glass-panel" style={{ padding: '4rem 2rem', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>
-            <div style={{ width: 64, height: 64, borderRadius: 18, margin: '0 auto 1.5rem', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 64, height: 64, borderRadius: 16, margin: '0 auto 1.5rem', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={28} color="var(--primary-color)" />
             </div>
             <h2 style={{ margin: '0 0 0.6rem 0', fontSize: '1.35rem' }}>Add your first business</h2>
@@ -309,27 +309,27 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                   position: 'relative', background: isActive ? 'rgba(168, 85, 247, 0.05)' : 'var(--bg-card)'
                 }}>
                   {isActive && (
-                    <span style={{ position: 'absolute', top: '0.85rem', right: '0.85rem', background: 'var(--primary-color)', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ position: 'absolute', top: '0.85rem', right: '0.85rem', background: 'var(--primary-color)', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '0.2rem 0.55rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                       <CheckCircle2 size={10} /> ACTIVE
                     </span>
                   )}
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                     {bp.logoUrl ? (
-                      <img src={bp.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                      <img src={bp.logoUrl} alt="" style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', border: '1px solid var(--border-color)' }} />
                     ) : (
-                      <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.2rem', color: '#fff' }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 10, background: 'linear-gradient(135deg, var(--primary-color), var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.2rem', color: '#fff' }}>
                         {bp.name ? bp.name.charAt(0).toUpperCase() : 'B'}
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h3 style={{ margin: 0, fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bp.name || 'My Business'}</h3>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.2rem' }}>
-                        <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '6px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '8px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)', fontWeight: 600 }}>
                           {bp.businessModel || 'General'}
                         </span>
                         {bp.brandAnalysisComplete && (
-                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '6px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 600 }}>
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '8px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontWeight: 600 }}>
                             AI Ready
                           </span>
                         )}
@@ -349,15 +349,15 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
 
                   {/* Social accounts status */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {sc?.hasFacebook && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}><Facebook size={12} /> {sc.fbPageName || 'Connected'}</span>}
-                    {sc?.igAccountId && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(236,72,153,0.12)', color: '#f472b6' }}><Instagram size={12} /> {sc.igAccountName || 'Connected'}</span>}
-                    {sc?.hasLinkedin && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(59,130,246,0.12)', color: '#93c5fd' }}><Linkedin size={12} /></span>}
-                    {sc?.hasTwitter && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(11, 16, 32, 0.08)', color: '#e5e7eb' }}><Twitter size={12} /></span>}
+                    {sc?.hasFacebook && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', color: '#60a5fa' }}><Facebook size={12} /> {sc.fbPageName || 'Connected'}</span>}
+                    {sc?.igAccountId && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(236,72,153,0.12)', color: '#f472b6' }}><Instagram size={12} /> {sc.igAccountName || 'Connected'}</span>}
+                    {sc?.hasLinkedin && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(59,130,246,0.12)', color: '#93c5fd' }}><Linkedin size={12} /></span>}
+                    {sc?.hasTwitter && <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '8px', background: 'rgba(11, 16, 32, 0.08)', color: '#e5e7eb' }}><Twitter size={12} /></span>}
                     {!sc?.hasFacebook && (
                       <button
                         onClick={() => handleConnectMeta(bp.id)}
                         disabled={connectingMeta}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: '6px', background: 'rgba(24,119,242,0.15)', border: '1px solid rgba(24,119,242,0.35)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600 }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: '8px', background: 'rgba(24,119,242,0.15)', border: '1px solid rgba(24,119,242,0.35)', color: '#60a5fa', cursor: 'pointer', fontWeight: 600 }}
                       >
                         <Facebook size={12} /> Connect
                       </button>
@@ -367,7 +367,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                   {bp.automationPaused && (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.4rem',
-                      fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: 6,
+                      fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: 8,
                       background: 'rgba(234,179,8,0.12)', color: '#facc15',
                       border: '1px solid rgba(234,179,8,0.3)',
                     }}>
@@ -658,7 +658,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                             >
                               <option value="PUBLIC">Direct Publish (Auto Post)</option>
                               <option value="PRIVATE">Private / Unlisted Review</option>
-                              <option value="DRAFT_REVIEW">Send to TikTok Drafts</option>
+                              <option value="DRAFT_REVIEW">Send to Review Queue</option>
                             </select>
                           </div>
                         </div>
@@ -845,8 +845,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                                 setEditData({ ...editData, postingDays: next.length === 7 ? null : next });
                               }}
                               style={{
-                                minWidth: 46, minHeight: 40, borderRadius: 9, cursor: 'pointer',
-                                fontSize: '0.8rem', fontWeight: 650,
+                                minWidth: 46, minHeight: 40, borderRadius: 10, cursor: 'pointer',
+                                fontSize: '0.8rem', fontWeight: 600,
                                 background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
                                 color: on ? '#fff' : 'var(--text-main)',
                                 border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,

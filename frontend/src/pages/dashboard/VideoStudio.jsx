@@ -191,7 +191,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
         {/* Header Section */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.03) 100%)',
-          borderRadius: 16,
+          borderRadius: 14,
           padding: '1.75rem 2rem',
           border: '1px solid rgba(249, 115, 22, 0.25)',
           marginBottom: '2rem',
@@ -208,7 +208,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 alignItems: 'center',
                 gap: '0.35rem',
                 padding: '0.2rem 0.65rem',
-                borderRadius: 20,
+                borderRadius: 16,
                 background: 'rgba(249,115,22,0.12)',
                 border: '1px solid rgba(249,115,22,0.3)',
                 fontSize: '0.72rem',
@@ -225,7 +225,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 alignItems: 'center',
                 gap: '0.35rem',
                 padding: '0.2rem 0.65rem',
-                borderRadius: 20,
+                borderRadius: 16,
                 background: 'rgba(255,255,255,0.06)',
                 border: '1px solid var(--border-color)',
                 fontSize: '0.72rem',
@@ -236,7 +236,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
               </span>
             </div>
 
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 900, margin: '0 0 0.35rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0 0 0.35rem', color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
               Brand Ads Video Prompt Studio
             </h1>
             <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)' }}>
@@ -268,7 +268,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
         </div>
 
         {/* Generator Controls Card */}
-        <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
+        <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
             
@@ -497,7 +497,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       fontSize: '0.74rem',
                       fontWeight: 700,
                       padding: '0.3rem 0.7rem',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -546,7 +546,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       fontSize: '0.74rem',
                       fontWeight: 800,
                       padding: '0.3rem 0.75rem',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -594,7 +594,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                       fontSize: '0.74rem',
                       fontWeight: 700,
                       padding: '0.3rem 0.7rem',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -655,7 +655,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 800, padding: '0.15rem 0.55rem', borderRadius: 6, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, padding: '0.15rem 0.55rem', borderRadius: 8, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
                           🎥 2 Img + 1 Vid Creative
                         </span>
                         <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fff' }}>
@@ -708,14 +708,14 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                             copyToClipboard(full, `hist-${item.id}`, 'Creative Bundle');
                           }}
                           className="btn"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: 'rgba(11,16,32,0.06)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: 6 }}
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: 'rgba(11,16,32,0.06)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: 8 }}
                         >
                           <Copy size={11} /> {copiedKey === `hist-${item.id}` ? 'Copied!' : 'Copy All 3 Prompts'}
                         </button>
                         <button
                           onClick={() => deletePrompt(item.id)}
                           className="btn"
-                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6 }}
+                          style={{ padding: '0.3rem 0.65rem', fontSize: '0.74rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8 }}
                         >
                           <Trash2 size={11} /> Delete
                         </button>

@@ -175,25 +175,42 @@ const CardRail = ({ items, renderItem, interval = 3400 }) => {
       </div>
 
       {canSlide && !stillness && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 7, marginTop: '1.6rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 0, marginTop: '1.2rem' }}>
           {items.map((item, i) => (
             <button
               key={item.key ?? i}
               aria-label={`Show card ${i + 1}`}
               onClick={() => setIndex(i)}
               style={{
-                width: index % total === i ? 22 : 7,
-                height: 7,
-                borderRadius: 99,
-                border: 'none',
+                // The tap target is 44px; the dot inside stays 7px. A control
+                // sized to its own artwork is 7px tall, which is unhittable on
+                // a phone -- and a dot that grew to 44px would read as a
+                // button rather than an indicator. Padding separates the two.
+                width: 30,
+                height: 44,
                 padding: 0,
+                border: 'none',
+                background: 'none',
                 cursor: 'pointer',
-                background: index % total === i
-                  ? 'var(--blue, #2563eb)'
-                  : 'rgba(120,120,140,0.28)',
-                transition: 'width .35s ease, background .35s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-            />
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  display: 'block',
+                  width: index % total === i ? 22 : 7,
+                  height: 7,
+                  borderRadius: 999,
+                  background: index % total === i
+                    ? 'var(--blue, #2563eb)'
+                    : 'rgba(120,120,140,0.28)',
+                  transition: 'width .35s ease, background .35s ease',
+                }}
+              />
+            </button>
           ))}
         </div>
       )}

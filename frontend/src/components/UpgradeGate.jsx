@@ -57,7 +57,7 @@ const UpgradeGate = () => {
         style={{
           background: 'var(--bg-card-hover)',
           border: '1px solid var(--border-color)',
-          borderRadius: 18,
+          borderRadius: 16,
           boxShadow: 'var(--shadow-xl)',
           padding: '2rem',
           width: '100%',
@@ -82,7 +82,7 @@ const UpgradeGate = () => {
         </button>
 
         <div style={{
-          width: 44, height: 44, borderRadius: 12,
+          width: 44, height: 44, borderRadius: 10,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(109, 40, 217, 0.10)',
           color: 'var(--primary-color)',

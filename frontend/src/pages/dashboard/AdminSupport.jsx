@@ -90,8 +90,8 @@ const AdminSupport = ({ showToast, token }) => {
   }
 
   const chip = (on) => ({
-    minHeight: 38, padding: '0 0.8rem', borderRadius: 9, cursor: 'pointer',
-    fontSize: '0.82rem', fontWeight: 650,
+    minHeight: 38, padding: '0 0.8rem', borderRadius: 10, cursor: 'pointer',
+    fontSize: '0.82rem', fontWeight: 600,
     background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
     color: on ? '#fff' : 'var(--text-main)',
     border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
@@ -145,7 +145,7 @@ const AdminSupport = ({ showToast, token }) => {
 
                 {t.reply && (
                   <div style={{
-                    padding: '0.6rem 0.8rem', borderRadius: 9, marginBottom: '0.7rem',
+                    padding: '0.6rem 0.8rem', borderRadius: 10, marginBottom: '0.7rem',
                     background: 'rgba(5,150,105,0.07)', border: '1px solid rgba(5,150,105,0.2)',
                   }}>
                     <div style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--success)', marginBottom: '0.25rem' }}>
@@ -161,7 +161,7 @@ const AdminSupport = ({ showToast, token }) => {
                   placeholder={t.reply ? 'Replace the reply…' : 'Reply to this customer…'}
                   rows={3}
                   style={{
-                    width: '100%', padding: '0.6rem 0.75rem', borderRadius: 9,
+                    width: '100%', padding: '0.6rem 0.75rem', borderRadius: 10,
                     border: '1px solid var(--border-color)', fontSize: '0.9rem',
                     fontFamily: 'inherit', resize: 'vertical', marginBottom: '0.6rem',
                   }}

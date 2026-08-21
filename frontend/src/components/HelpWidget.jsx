@@ -21,7 +21,7 @@ export default function HelpWidget() {
           width: '320px',
           background: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
-          borderRadius: '16px',
+          borderRadius: '14px',
           boxShadow: '0 20px 40px rgba(0,0,0,0.45)',
           overflow: 'hidden',
           display: 'flex',
@@ -80,7 +80,7 @@ export default function HelpWidget() {
                 <MessageSquare size={17} color="var(--primary-color)" />
               </div>
               <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 650, color: 'var(--text-main)' }}>Open Support Ticket</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-main)' }}>Open Support Ticket</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Direct assistance &amp; bug reports</div>
               </div>
             </button>
@@ -107,7 +107,7 @@ export default function HelpWidget() {
                 <Star size={17} color="#f59e0b" />
               </div>
               <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 650, color: 'var(--text-main)' }}>Platform Feedback &amp; Review</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-main)' }}>Platform Feedback &amp; Review</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Rate &amp; share your review</div>
               </div>
             </button>
@@ -134,7 +134,7 @@ export default function HelpWidget() {
                 <Sparkles size={17} color="var(--success)" />
               </div>
               <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 650, color: 'var(--text-main)' }}>AI Video Studio</div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-main)' }}>AI Video Studio</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Generate 8s–30s video briefs</div>
               </div>
             </button>

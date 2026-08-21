@@ -39,7 +39,12 @@ def test_publishing_modes():
     assert "PUBLIC" in PUBLISHING_MODES
     assert "PRIVATE" in PUBLISHING_MODES
     assert "DRAFT_REVIEW" in PUBLISHING_MODES
-    assert "TikTok Drafts" in PUBLISHING_MODES["DRAFT_REVIEW"]["label"]
+    # The mode survived the TikTok removal; only its branding went. Holding a
+    # post for a one-tap sign-off is useful whoever invented the idea.
+    assert "review" in PUBLISHING_MODES["DRAFT_REVIEW"]["label"].lower()
+    for mode in PUBLISHING_MODES.values():
+        blob = f"{mode.get('label', '')} {mode.get('description', '')}".lower()
+        assert "tiktok" not in blob, "TikTok is banned where this product is sold"
 
 
 @pytest.mark.asyncio

@@ -112,7 +112,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
         background: `linear-gradient(135deg, ${color}20, ${color}08)`,
         border: `1px solid ${color}30`,
         padding: '0.85rem',
-        borderRadius: 12,
+        borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -123,7 +123,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: '0.83rem', fontWeight: 600, ...muted }}>{label}</div>
         {loading
-          ? <div style={{ width: 52, height: 28, borderRadius: 6, background: 'rgba(11, 16, 32, 0.06)', marginTop: 4 }} />
+          ? <div style={{ width: 52, height: 28, borderRadius: 8, background: 'rgba(11, 16, 32, 0.06)', marginTop: 4 }} />
           : <div style={{ fontSize: '1.75rem', fontWeight: 800, lineHeight: 1.2, color: 'var(--text-main)' }}>{value ?? 0}</div>}
         {hint && <div style={{ fontSize: '0.74rem', ...muted, marginTop: '0.15rem' }}>{hint}</div>}
       </div>
@@ -161,7 +161,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                 border: `1px solid ${statusColor}40`,
                 color: statusColor,
                 fontSize: '0.76rem',
-                fontWeight: 750,
+                fontWeight: 800,
                 letterSpacing: '0.02em',
               }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor }} />
@@ -218,7 +218,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                       onClick={b.action}
                       style={{
                         background: 'none', border: 'none', color: 'var(--primary-color)',
-                        fontWeight: 650, cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline'
+                        fontWeight: 600, cursor: 'pointer', fontSize: '0.82rem', textDecoration: 'underline'
                       }}
                     >
                       {b.where} →
@@ -274,7 +274,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
               <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(11, 16, 32, 0.06)', fontSize: '0.8rem', ...muted, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Manage connections:</span>
                 <button onClick={() => navigate('/dashboard/workspaces')}
-                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 650, font: 'inherit' }}>
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary-color)', cursor: 'pointer', fontWeight: 600, font: 'inherit' }}>
                   Businesses →
                 </button>
               </div>
@@ -297,31 +297,31 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.86rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={muted}>Engine Status</span>
-                  <span style={{ color: schedulerStatus?.schedulerRunning ? '#10b981' : '#f87171', fontWeight: 650 }}>
+                  <span style={{ color: schedulerStatus?.schedulerRunning ? '#10b981' : '#f87171', fontWeight: 600 }}>
                     {schedulerStatus?.schedulerRunning ? 'Continuous Running' : 'Paused'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={muted}>Approval Mode</span>
-                  <span style={{ color: schedulerStatus?.autoApprove ? '#10b981' : '#f59e0b', fontWeight: 650 }}>
+                  <span style={{ color: schedulerStatus?.autoApprove ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
                     {schedulerStatus?.autoApprove ? 'Auto-Publish' : 'Review Required'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={muted}>Publishing Cadence</span>
-                  <span style={{ fontWeight: 650 }}>Every {business?.postIntervalHours ?? 2} Hours</span>
+                  <span style={{ fontWeight: 600 }}>Every {business?.postIntervalHours ?? 2} Hours</span>
                 </div>
                 {schedulerStatus?.nextRunAt && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={muted}>Next Autonomous Post</span>
-                    <span style={{ fontWeight: 650, color: 'var(--primary-color)' }}>{new Date(schedulerStatus.nextRunAt).toLocaleTimeString()}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{new Date(schedulerStatus.nextRunAt).toLocaleTimeString()}</span>
                   </div>
                 )}
               </div>
               <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid rgba(11, 16, 32, 0.06)', textAlign: 'right' }}>
                 <button
                   onClick={() => navigate('/dashboard/social-scheduler')}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 650 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
                 >
                   Adjust Cadence &amp; Settings →
                 </button>
@@ -348,7 +348,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                       background: postFilter === f ? 'var(--primary-color)' : 'transparent',
                       color: postFilter === f ? '#fff' : 'var(--text-muted)',
                       padding: '0.25rem 0.6rem',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       fontSize: '0.72rem',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -394,7 +394,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                         <div style={{ display: 'flex', gap: '0.65rem', marginTop: '0.35rem', fontSize: '0.75rem', ...muted, flexWrap: 'wrap', alignItems: 'center' }}>
                           <span style={{
                             color,
-                            fontWeight: 750,
+                            fontWeight: 800,
                             padding: '0.1rem 0.45rem',
                             borderRadius: 4,
                             background: `${color}15`,
@@ -412,7 +412,7 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                             color: '#fca5a5',
                             marginTop: '0.4rem',
                             padding: '0.4rem 0.65rem',
-                            borderRadius: 6,
+                            borderRadius: 8,
                             background: 'rgba(239,68,68,0.06)',
                             border: '1px solid rgba(239,68,68,0.2)',
                             lineHeight: 1.4,

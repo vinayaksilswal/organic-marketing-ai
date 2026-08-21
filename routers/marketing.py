@@ -257,7 +257,7 @@ async def update_publishing_mode(
     request: Request,
     user_id: str = Depends(verify_user),
 ) -> dict[str, Any]:
-    """Configure whether scheduled videos post publicly, as private/unlisted, or send to TikTok/platform drafts for review."""
+    """Configure whether scheduled videos post publicly, as private/unlisted, or send to Reels/platform drafts for review."""
     workspace_id = request.headers.get("x-workspace-id")
     if not workspace_id:
         raise HTTPException(status_code=400, detail="Select a business first.")

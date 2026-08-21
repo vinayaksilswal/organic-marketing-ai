@@ -949,7 +949,7 @@ class AnalyzeAlgorithmRequest(BaseModel):
     media_id: Optional[str] = None
     media_url: Optional[str] = None
     niche: Optional[str] = None
-    platform: str = "YouTube Shorts / TikTok / Reels"
+    platform: str = "YouTube Shorts / Reels / Reels"
 
 
 @router.get("/faceless-presets")

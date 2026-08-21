@@ -21,17 +21,17 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
           gap: '1rem',
           background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.08) 0%, rgba(234, 88, 12, 0.03) 100%)',
           padding: '1.5rem 2rem',
-          borderRadius: '16px',
+          borderRadius: '14px',
           border: '1px solid rgba(249, 115, 22, 0.25)',
         }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.65rem', borderRadius: 20, background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.65rem', borderRadius: 16, background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '0.5rem' }}>
               <Flame size={13} color="#f97316" />
               <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: '#f97316' }}>
                 Core Platform AI Engine
               </span>
             </div>
-            <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+            <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
               Viral Validator &amp; View Predictor
             </h1>
             <p style={{ margin: '0.35rem 0 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>

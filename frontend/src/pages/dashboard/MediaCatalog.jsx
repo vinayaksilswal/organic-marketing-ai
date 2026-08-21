@@ -959,7 +959,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                             title="Slide position in the carousel"
                             style={{
                               width: '100%', marginTop: 4, fontSize: '0.72rem',
-                              padding: '2px 4px', borderRadius: 5, cursor: 'pointer',
+                              padding: '2px 4px', borderRadius: 4, cursor: 'pointer',
                               background: 'rgba(11, 16, 32, 0.06)', color: 'inherit',
                               border: '1px solid var(--border-color)',
                             }}
@@ -1114,7 +1114,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                                 <Sparkles size={11} />
                                 {item.promptType === 'video' ? 'Video prompt' : 'AI prompt'}
                               </summary>
-                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '7px', background: 'rgba(11,16,32,0.04)', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
+                              <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.7rem', borderRadius: '8px', background: 'rgba(11,16,32,0.04)', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
                                 <p style={{ margin: 0, fontSize: '0.75rem', lineHeight: 1.55, color: 'var(--text-main)', fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
                                   {item.prompt}
                                 </p>
@@ -1200,7 +1200,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         {/* EDIT MODAL */}
         {editingMedia && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <div className="glass-panel" style={{ maxWidth: '500px', width: '100%', padding: '2rem', position: 'relative', borderRadius: '16px' }}>
+            <div className="glass-panel" style={{ maxWidth: '500px', width: '100%', padding: '2rem', position: 'relative', borderRadius: '14px' }}>
               <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1.25rem' }}>Edit asset</h3>
               <p style={{ margin: '0 0 1.5rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                 {editingMedia.filename}
@@ -1251,7 +1251,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                 <X size={24} />
               </button>
             </div>
-            <div className="glass-panel" style={{ maxWidth: '400px', width: '100%', position: 'relative', borderRadius: '16px', overflow: 'hidden' }}>
+            <div className="glass-panel" style={{ maxWidth: '400px', width: '100%', position: 'relative', borderRadius: '14px', overflow: 'hidden' }}>
               <div style={{ width: '100%', aspectRatio: '9/16', background: '#000', position: 'relative' }}>
                 {previewMedia.mimeType?.startsWith('video/') || previewMedia.filename?.endsWith('.mp4') ? (
                   <video controls autoPlay src={previewMedia.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1272,7 +1272,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         {/* Danger zone. Deliberately last, visually separate, and never a
             single click -- it deletes the catalog and the stored files. */}
         <div style={{
-          marginTop: '2rem', padding: '1.25rem 1.5rem', borderRadius: 12,
+          marginTop: '2rem', padding: '1.25rem 1.5rem', borderRadius: 10,
           border: '1px solid rgba(255,90,90,0.35)', background: 'rgba(255,60,60,0.04)',
         }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#ff8080', textTransform: 'uppercase' }}>
@@ -1349,7 +1349,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
         {scheduleItem && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(11,16,32,0.04)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setScheduleItem(null); }}>
-            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 620, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 14, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1394,7 +1394,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                       background: 'rgba(249,115,22,0.15)',
                       border: '1px solid rgba(249,115,22,0.4)',
                       color: '#f97316',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       padding: '0.2rem 0.6rem',
                       fontSize: '0.74rem',
                       fontWeight: 700,
@@ -1466,7 +1466,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
                       setScheduleDate(res.date);
                       setScheduleTime(res.time);
                     }}
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: 6, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-color)', color: 'var(--text-main)', borderRadius: 8, padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer' }}
                   >
                     {p.label}
                   </button>

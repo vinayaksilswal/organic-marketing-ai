@@ -222,7 +222,7 @@ export default function TeamManagement({ token, showToast, activeWorkspaceId }) 
                           </td>
                           <td style={{ padding: '0.9rem 1.5rem', textAlign: 'right' }}>
                             <button onClick={() => handleRemove(m)} title={`Remove ${m.email}`}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.35rem', borderRadius: 6, display: 'inline-flex' }}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.35rem', borderRadius: 8, display: 'inline-flex' }}
                               onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; }}
                               onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}>
                               <Trash2 size={15} />

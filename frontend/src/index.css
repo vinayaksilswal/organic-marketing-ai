@@ -218,7 +218,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
   align-items: center;
   justify-content: center;
   padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  border-radius: 10px;
   font-weight: 600;
   font-family: var(--font-family-body);
   font-size: 1rem;
@@ -306,12 +306,12 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   padding: 2.5rem;
-  border-radius: 24px;
+  border-radius: 16px;
   text-align: left;
   transition: all 0.4s ease;
 }
 /* Dashboard & Dashboard Layout */
-.dropzone { border: 2px dashed rgba(255,255,255,0.2); border-radius: 16px; padding: 3rem; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(0,0,0,0.2); margin-bottom: 2rem; }
+.dropzone { border: 2px dashed rgba(255,255,255,0.2); border-radius: 14px; padding: 3rem; text-align: center; cursor: pointer; transition: all 0.3s ease; background: rgba(0,0,0,0.2); margin-bottom: 2rem; }
 .dropzone:hover { border-color: var(--primary-color); background: rgba(168, 85, 247, 0.05); }
 .dropzone-icon { color: var(--primary-color); width: 48px; height: 48px; margin-bottom: 1rem; }
 
@@ -332,7 +332,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 .stat-card-icon {
   width: 64px;
   height: 64px;
-  border-radius: 16px;
+  border-radius: 14px;
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(59, 130, 246, 0.2));
   display: flex;
   align-items: center;
@@ -419,7 +419,7 @@ p { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 1.125rem; }
 .input-group { margin-bottom: 1.5rem; }
 .input-group label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-main); }
 input[type="email"], input[type="password"], input[type="url"], input[type="text"], textarea, select {
-  width: 100%; padding: 1rem 1.25rem; background-color: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-main); font-family: var(--font-family-body); font-size: 1rem; transition: all 0.3s ease; backdrop-filter: blur(8px);
+  width: 100%; padding: 1rem 1.25rem; background-color: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-main); font-family: var(--font-family-body); font-size: 1rem; transition: all 0.3s ease; backdrop-filter: blur(8px);
 }
 input:focus, textarea:focus, select:focus {
   outline: none; border-color: var(--primary-color); background-color: rgba(11, 16, 32, 0.05); box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.14);
@@ -427,7 +427,7 @@ input:focus, textarea:focus, select:focus {
 
 /* Toast Notifications */
 .message {
-  position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; border-radius: 12px; font-weight: 500; z-index: 1000; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; background: rgba(15, 15, 15, 0.9); border: 1px solid var(--border-color); backdrop-filter: blur(16px); box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 0.75rem;
+  position: fixed; bottom: 2rem; right: 2rem; padding: 1rem 1.5rem; border-radius: 10px; font-weight: 500; z-index: 1000; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; background: rgba(15, 15, 15, 0.9); border: 1px solid var(--border-color); backdrop-filter: blur(16px); box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 0.75rem;
 }
 .message.success { border-left: 4px solid var(--success); }
 .message.error { border-left: 4px solid var(--error); }
@@ -448,12 +448,12 @@ input:focus, textarea:focus, select:focus {
 .wizard-step.active { background: var(--primary-color); box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); }
 
 .selection-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-.selection-card { background: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); padding: 1.5rem 1rem; border-radius: 16px; text-align: center; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
+.selection-card { background: rgba(11, 16, 32, 0.03); border: 1px solid var(--border-color); padding: 1.5rem 1rem; border-radius: 14px; text-align: center; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
 .selection-card:hover { background: rgba(11, 16, 32, 0.08); border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
 .selection-card.selected { background: rgba(168, 85, 247, 0.1); border-color: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); }
 .selection-card-icon { display: block; font-size: 2rem; margin-bottom: 0.5rem; }
 
-.payment-box { background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 24px; padding: 2.5rem; text-align: center; }
+.payment-box { background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 16px; padding: 2.5rem; text-align: center; }
 
 .fade-in { animation: fadeIn 0.4s ease-out; }
 
@@ -487,7 +487,7 @@ input:focus, textarea:focus, select:focus {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   padding: 2.5rem;
-  border-radius: 20px;
+  border-radius: 16px;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
@@ -528,7 +528,7 @@ input:focus, textarea:focus, select:focus {
   margin: 0 auto;
   background: var(--bg-card);
   border: 1px solid var(--primary-color);
-  border-radius: 24px;
+  border-radius: 16px;
   padding: 3.5rem 2.5rem;
   box-shadow: 0 0 50px rgba(139, 92, 246, 0.15);
   position: relative;
@@ -604,7 +604,7 @@ input:focus, textarea:focus, select:focus {
 .selection-card {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 1.5rem;
   text-align: center;
   cursor: pointer;
@@ -626,7 +626,7 @@ input:focus, textarea:focus, select:focus {
 .payment-box {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-color);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 2.5rem;
   text-align: center;
 }
@@ -651,7 +651,7 @@ input:focus, textarea:focus, select:focus {
 
 .dropzone {
   border: 2px dashed var(--border-color);
-  border-radius: 16px;
+  border-radius: 14px;
   padding: 4rem 2rem;
   text-align: center;
   cursor: pointer;
@@ -675,7 +675,7 @@ input:focus, textarea:focus, select:focus {
 .media-item {
   aspect-ratio: 1;
   background: #000;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   position: relative;
   border: 1px solid var(--border-color);
@@ -687,7 +687,7 @@ input:focus, textarea:focus, select:focus {
 .mockup-container {
   margin: 4rem auto 0;
   max-width: 1000px;
-  border-radius: 20px;
+  border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--border-color);
   box-shadow: 0 30px 60px -12px rgba(0,0,0,0.8), 0 0 40px rgba(168, 85, 247, 0.15);
@@ -879,7 +879,7 @@ input:focus, textarea:focus, select:focus {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   padding: 2rem;
-  border-radius: 20px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -947,7 +947,7 @@ input:focus, textarea:focus, select:focus {
 
 .faq-item {
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(15,15,15,0.4);
   overflow: hidden;
   transition: all 0.3s ease;
@@ -1045,7 +1045,7 @@ input:focus, textarea:focus, select:focus {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-weight: 750;
+  font-weight: 800;
   margin: 0.45rem 0 0.15rem 0.45rem;
 }
 
@@ -1057,7 +1057,7 @@ input:focus, textarea:focus, select:focus {
 }
 .sidebar-nav::-webkit-scrollbar-thumb {
   background: rgba(11, 16, 32, 0.12);
-  border-radius: 99px;
+  border-radius: 999px;
 }
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
   background: rgba(109, 40, 217, 0.35);
@@ -1070,7 +1070,7 @@ input:focus, textarea:focus, select:focus {
   padding: 0.38rem 0.65rem;
   color: var(--text-muted);
   text-decoration: none;
-  border-radius: 7px;
+  border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 550;
   transition: all 0.18s ease;
@@ -1104,7 +1104,7 @@ input:focus, textarea:focus, select:focus {
 .mockup-container {
   max-width: 800px;
   margin: 3rem auto 0;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   border: 1px solid var(--border-color);
@@ -1211,7 +1211,7 @@ input:focus, textarea:focus, select:focus {
 
 .how-step {
   padding: 1.75rem;
-  border-radius: 18px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   transition: transform 0.25s ease, border-color 0.25s ease;
@@ -1239,7 +1239,7 @@ input:focus, textarea:focus, select:focus {
 .how-step-icon {
   width: 40px;
   height: 40px;
-  border-radius: 11px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1252,7 +1252,7 @@ input:focus, textarea:focus, select:focus {
 .hiw-visual {
   margin-top: auto;
   padding: 0.9rem;
-  border-radius: 11px;
+  border-radius: 10px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(11, 16, 32, 0.05);
   display: flex;
@@ -1336,7 +1336,7 @@ input:focus, textarea:focus, select:focus {
   background: rgba(11, 16, 32, 0.02);
   border: 1px solid rgba(11, 16, 32, 0.05);
   padding: 2.5rem;
-  border-radius: 20px;
+  border-radius: 16px;
   transition: all 0.3s ease;
 }
 
@@ -1434,7 +1434,7 @@ input:focus, textarea:focus, select:focus {
   /* Anything laid out in columns collapses to one. */
   .grid, .g2, .g3, .g4 { grid-template-columns: 1fr !important; }
 
-  .glass-panel { border-radius: 12px; }
+  .glass-panel { border-radius: 10px; }
 
   /* Tables keep their shape and scroll inside their own box, so the page
      body never scrolls sideways — the thing that makes a site feel broken

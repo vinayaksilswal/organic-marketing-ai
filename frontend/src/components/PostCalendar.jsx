@@ -55,7 +55,7 @@ const Thumb = ({ post, size = 30 }) => {
   const url = (post.mediaUrls || [])[0];
   const { colour } = statusOf(post);
   const base = {
-    width: size, height: size, borderRadius: 7, objectFit: 'cover',
+    width: size, height: size, borderRadius: 8, objectFit: 'cover',
     display: 'block', background: '#0d0d12',
     border: `1.5px solid ${colour}`, flexShrink: 0,
   };
@@ -274,7 +274,7 @@ const PostCalendar = ({ posts = [], onSelect }) => {
 };
 
 const navBtn = {
-  width: 32, height: 32, borderRadius: 9, cursor: 'pointer',
+  width: 32, height: 32, borderRadius: 10, cursor: 'pointer',
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   background: 'rgba(11, 16, 32, 0.05)',
   border: '1px solid var(--border-color)',

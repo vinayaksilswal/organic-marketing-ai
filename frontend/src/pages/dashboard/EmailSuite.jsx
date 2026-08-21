@@ -422,7 +422,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {campaigns.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(11, 16, 32, 0.03)', borderRadius: '12px', border: '1px dashed var(--border-color)' }}>
+                <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)', background: 'rgba(11, 16, 32, 0.03)', borderRadius: '10px', border: '1px dashed var(--border-color)' }}>
                   No email campaigns created yet for this workspace.
                 </div>
               ) : (
@@ -455,7 +455,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
 
                       {/* Recorded all along, never shown. */}
                       {camp.status === 'FAILED' && camp.errorLog && (
-                        <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.7rem', borderRadius: 7, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', maxWidth: 480 }}>
+                        <div style={{ marginTop: '0.6rem', padding: '0.5rem 0.7rem', borderRadius: 8, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', maxWidth: 480 }}>
                           <p style={{ margin: 0, fontSize: '0.75rem', color: '#fca5a5', lineHeight: 1.5 }}>
                             {camp.errorLog}
                           </p>
@@ -480,7 +480,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
             {/* Metric Cards Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
               <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(168, 85, 247, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(168, 85, 247, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Users size={24} color="var(--primary-color)" />
                 </div>
                 <div>
@@ -490,7 +490,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
               </div>
 
               <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <TrendingUp size={24} color="var(--success)" />
                 </div>
                 <div>
@@ -502,7 +502,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
               </div>
 
               <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <MousePointer size={24} color="var(--secondary-color)" />
                 </div>
                 <div>
@@ -594,7 +594,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
         {/* EDIT / PREVIEW an existing campaign */}
         {editing && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-            <div className="glass-panel" style={{ width: '100%', maxWidth: 980, maxHeight: '90vh', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="glass-panel" style={{ width: '100%', maxWidth: 980, maxHeight: '90vh', borderRadius: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
               <div style={{ padding: '1.1rem 1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Mail size={18} color="var(--primary-color)" />

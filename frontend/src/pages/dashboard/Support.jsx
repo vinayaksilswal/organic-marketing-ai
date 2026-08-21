@@ -182,7 +182,7 @@ const Support = ({ token, showToast }) => {
                       key={key} type="button" onClick={() => setCategory(key)} aria-pressed={on}
                       style={{
                         minHeight: 38, padding: '0 0.85rem', borderRadius: 8, cursor: 'pointer',
-                        fontWeight: 650, fontSize: '0.82rem',
+                        fontWeight: 600, fontSize: '0.82rem',
                         background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
                         color: on ? '#fff' : 'var(--text-main)',
                         border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
@@ -217,7 +217,7 @@ const Support = ({ token, showToast }) => {
               />
               <button
                 type="submit" className="btn btn-primary" disabled={sending}
-                style={{ minHeight: 42, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', fontWeight: 650 }}
+                style={{ minHeight: 42, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.25rem', fontWeight: 600 }}
               >
                 {sending ? <span className="spinner" style={{ width: 15, height: 15 }} /> : <Send size={15} />}
                 {sending ? 'Submitting…' : 'Submit Ticket'}
@@ -243,12 +243,12 @@ const Support = ({ token, showToast }) => {
               const { Icon } = look;
               return (
                 <div key={t.id} style={{
-                  border: '1px solid var(--border-color)', borderRadius: 12,
+                  border: '1px solid var(--border-color)', borderRadius: 10,
                   padding: '1rem 1.15rem', marginBottom: '0.85rem', background: 'rgba(11, 16, 32, 0.02)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
                     <Icon size={16} color={look.colour} />
-                    <span style={{ fontWeight: 750, fontSize: '0.94rem', color: 'var(--text-main)' }}>{t.subject}</span>
+                    <span style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--text-main)' }}>{t.subject}</span>
                     <span style={{
                       fontSize: '0.7rem', fontWeight: 800, letterSpacing: '.04em',
                       textTransform: 'uppercase', color: look.colour, background: `${look.colour}18`,
@@ -324,7 +324,7 @@ const Support = ({ token, showToast }) => {
           />
           {!review?.isApproved && (
             <button onClick={submitReview} className="btn btn-primary" disabled={savingReview || !rating}
-                    style={{ minHeight: 42, padding: '0.6rem 1.35rem', fontWeight: 650 }}>
+                    style={{ minHeight: 42, padding: '0.6rem 1.35rem', fontWeight: 600 }}>
               {savingReview ? 'Saving…' : review ? 'Update Review' : 'Submit Review'}
             </button>
           )}

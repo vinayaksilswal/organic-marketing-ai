@@ -433,7 +433,7 @@ def _parse_json_response(text: str) -> dict | None:
 # Schema Validation & Guardrails
 # =============================================================================
 class OmnichannelContentSchema(BaseModel):
-    caption: str = Field(..., max_length=2200, description="Main social media caption (strict <2200 chars for TikTok).")
+    caption: str = Field(..., max_length=2200, description="Main social media caption (strict <2200 chars for Instagram).")
     hashtags: list[str] = Field(default_factory=list, max_items=15, description="Relevant hashtags.")
     email_subject: str = Field(..., max_length=100, description="Promotional email subject line.")
     email_headline: str = Field(..., max_length=100, description="Email headline (2-5 words).")

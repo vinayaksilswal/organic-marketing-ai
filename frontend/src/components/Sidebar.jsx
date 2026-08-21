@@ -82,7 +82,7 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
           style={{ 
             width: '100%', 
             padding: '0.42rem 0.55rem', 
-            borderRadius: '6px', 
+            borderRadius: '8px', 
             background: 'var(--bg-dark)', 
             color: 'var(--text-main)', 
             border: '1px solid var(--border-color)',

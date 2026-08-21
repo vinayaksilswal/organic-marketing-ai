@@ -46,7 +46,7 @@ const DesktopHint = () => {
         alignItems: 'center',
         gap: '0.6rem',
         padding: '0.7rem 0.8rem',
-        borderRadius: 12,
+        borderRadius: 10,
         background: 'rgba(109, 40, 217, 0.06)',
         border: '1px solid rgba(109, 40, 217, 0.18)',
         color: 'var(--text-main)',

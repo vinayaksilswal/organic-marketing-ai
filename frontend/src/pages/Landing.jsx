@@ -130,7 +130,7 @@ const styles = `
   -webkit-backdrop-filter: blur(18px) saturate(150%);
   border: 1px solid rgba(255,255,255,0.85);
   box-shadow: 0 1px 2px rgba(11,16,32,0.04), 0 12px 32px -12px rgba(11,16,32,0.14);
-  border-radius: 18px;
+  border-radius: 16px;
 }
 .omai .glass-lift { transition: transform .25s cubic-bezier(.4,0,.2,1), box-shadow .25s; }
 .omai .glass-lift:hover {
@@ -141,7 +141,7 @@ const styles = `
 /* Translucent buttons */
 .omai .b {
   display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-  font-weight: 650; font-size: .95rem; border-radius: 12px; padding: .85rem 1.5rem;
+  font-weight: 600; font-size: .95rem; border-radius: 10px; padding: .85rem 1.5rem;
   cursor: pointer; border: 1px solid transparent; text-decoration: none;
   transition: transform .18s, box-shadow .22s, background .22s;
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -183,7 +183,7 @@ const styles = `
 }
 .omai .brand {
   display: flex; align-items: center; gap: .55rem;
-  font-weight: 750; font-size: 1.1rem; cursor: pointer; letter-spacing: -.021em;
+  font-weight: 800; font-size: 1.1rem; cursor: pointer; letter-spacing: -.021em;
   margin-right: auto;
 }
 .omai .nav-actions { display: flex; align-items: center; gap: .55rem; margin-left: auto; }
@@ -193,8 +193,8 @@ const styles = `
 .omai .g3 { grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); }
 .omai .g4 { grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); }
 
-.omai .h1 { font-size: clamp(2.5rem, 5.4vw, 4rem); line-height: 1.04; font-weight: 780; }
-.omai .h2 { font-size: clamp(1.9rem, 3.2vw, 2.6rem); line-height: 1.12; font-weight: 740; }
+.omai .h1 { font-size: clamp(2.5rem, 5.4vw, 4rem); line-height: 1.04; font-weight: 800; }
+.omai .h2 { font-size: clamp(1.9rem, 3.2vw, 2.6rem); line-height: 1.12; font-weight: 800; }
 .omai .lede { font-size: clamp(1.02rem, 1.35vw, 1.18rem); line-height: 1.62; }
 /* One colour, not three.
    A violet-to-blue-to-pink gradient across a headline is the single most
@@ -208,7 +208,7 @@ const styles = `
 .omai .faq button {
   width: 100%; background: none; border: 0; padding: 1.35rem 0; cursor: pointer;
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  font-size: 1.02rem; font-weight: 640; color: var(--ink); text-align: left;
+  font-size: 1.02rem; font-weight: 600; color: var(--ink); text-align: left;
 }
 .omai .faq .a { overflow: hidden; max-height: 0; transition: max-height .3s ease; }
 .omai .faq .a.open { max-height: 420px; }
@@ -221,7 +221,7 @@ const styles = `
   box-shadow: 0 6px 18px -6px rgba(109,40,217,0.7);
 }
 .omai .field {
-  width: 100%; padding: .85rem 1rem; border-radius: 12px;
+  width: 100%; padding: .85rem 1rem; border-radius: 10px;
   background: rgba(255,255,255,0.8); border: 1px solid rgba(11,16,32,0.12);
   color: var(--ink); font-size: .95rem; outline: none;
 }
@@ -281,7 +281,7 @@ const InlineCTA = ({ line, onStart }) => (
   <section style={{ paddingTop: '1rem', paddingBottom: '1rem' }}>
     <div className="wrap" style={{ textAlign: 'center' }}>
       <div className="glass" style={{ padding: '1.9rem 1.5rem' }}>
-        <p style={{ fontSize: '1.05rem', fontWeight: 640, color: 'var(--ink)', marginBottom: '1.1rem' }}>
+        <p style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--ink)', marginBottom: '1.1rem' }}>
           {line}
         </p>
         <button className="b b-primary" style={{ padding: '.95rem 2.1rem', fontSize: '1rem' }} onClick={onStart}>
@@ -414,9 +414,9 @@ const Landing = () => {
     ['How does PostShip multi-platform repurposing work?',
      'Paste any idea, changelog line, or product URL. PostShip automatically writes 3 native variations for X (punchy build-in-public), LinkedIn (story-driven founder insight), and Reddit (authentic builder story with target subreddit). No generic copy-pasting.'],
     ['Does anything post without my approval?',
-     'No. Auto-approve is off by default. Every generated post waits in a review log where you can edit or delete it. You can also send videos to TikTok Drafts or publish as Private / Unlisted before going live.'],
+     'No. Auto-approve is off by default. Every generated post waits in a review log where you can edit or delete it. You can also send videos to Review Queue or publish as Private / Unlisted before going live.'],
     ['Which platforms does it publish to?',
-     'Facebook Pages, Instagram (including Reels), YouTube Shorts, TikTok, X (Twitter), and LinkedIn.'],
+     'Facebook Pages, Instagram (including Reels), YouTube Shorts, X (Twitter), and LinkedIn.'],
     ['How does it learn my brand?',
      'It reads your website and builds a profile: what you sell, who buys it, your tone, your content themes. Every caption is written from that profile plus a description of the specific image or video attached, so posts reference what is actually on screen.'],
     ['What do I actually get for free?',
@@ -502,7 +502,7 @@ const Landing = () => {
             <div style={{ background: 'linear-gradient(180deg,#fbfaff,#f4f6fd)', borderRadius: 14, padding: '1.6rem', border: '1px solid rgba(11,16,32,0.05)' }}>
               <div style={{ display: 'flex', gap: '.4rem', marginBottom: '1.3rem' }}>
                 {['#ef4444', '#f59e0b', '#10b981'].map(c => (
-                  <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: .75 }} />
+                  <span key={c} style={{ width: 10, height: 10, borderRadius: 999, background: c, opacity: .75 }} />
                 ))}
               </div>
               <div className="grid g3">
@@ -511,9 +511,9 @@ const Landing = () => {
                   { i: <Eye size={16} />, t: 'Caption drafted', s: 'From your brand profile and what the video shows.', c: 'var(--blue)' },
                   { i: <Send size={16} />, t: 'Published', s: 'Facebook ✓  Instagram ✓ — logged with the result.', c: 'var(--green)' },
                 ].map(x => (
-                  <div key={x.t} style={{ background: '#fff', borderRadius: 12, padding: '1.1rem', border: '1px solid rgba(11,16,32,0.07)' }}>
+                  <div key={x.t} style={{ background: '#fff', borderRadius: 10, padding: '1.1rem', border: '1px solid rgba(11,16,32,0.07)' }}>
                     <div style={{ color: x.c, marginBottom: '.55rem' }}>{x.i}</div>
-                    <div style={{ fontWeight: 660, fontSize: '.93rem', marginBottom: '.3rem' }}>{x.t}</div>
+                    <div style={{ fontWeight: 600, fontSize: '.93rem', marginBottom: '.3rem' }}>{x.t}</div>
                     <p style={{ fontSize: '.83rem', lineHeight: 1.5 }}>{x.s}</p>
                   </div>
                 ))}
@@ -526,10 +526,10 @@ const Landing = () => {
             <span style={{ fontSize: '.74rem', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-faint)', fontWeight: 700 }}>
               One-click publishing
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '.45rem', fontWeight: 640 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '.45rem', fontWeight: 600 }}>
               <Facebook size={18} color="#1877F2" /> Facebook
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '.45rem', fontWeight: 640 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '.45rem', fontWeight: 600 }}>
               <Instagram size={18} color="#E4405F" /> Instagram
             </span>
             <span style={{ fontSize: '.8rem', color: 'var(--ink-faint)' }}>
@@ -576,7 +576,7 @@ const Landing = () => {
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(219,39,119,0.09)', border: '1px solid rgba(219,39,119,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
                   <AlertCircle size={17} color="var(--pink)" />
                 </div>
-                <h3 style={{ fontSize: '1.03rem', marginBottom: '.55rem', fontWeight: 690 }}>{t}</h3>
+                <h3 style={{ fontSize: '1.03rem', marginBottom: '.55rem', fontWeight: 700 }}>{t}</h3>
                 <p style={{ fontSize: '.89rem', lineHeight: 1.65 }}>{b}</p>
               </div>
             ))}
@@ -614,7 +614,7 @@ const Landing = () => {
             ].map(([n, t, b]) => (
               <div key={n} className="glass glass-lift" style={{ padding: '1.75rem' }}>
                 <div style={{ fontSize: '.78rem', fontWeight: 800, letterSpacing: '.1em', color: 'var(--violet)', marginBottom: '.7rem' }}>{n}</div>
-                <h3 style={{ fontSize: '1.02rem', marginBottom: '.5rem', fontWeight: 680 }}>{t}</h3>
+                <h3 style={{ fontSize: '1.02rem', marginBottom: '.5rem', fontWeight: 700 }}>{t}</h3>
                 <p style={{ fontSize: '.88rem', lineHeight: 1.6 }}>{b}</p>
               </div>
             ))}
@@ -688,10 +688,10 @@ const Landing = () => {
             ]}
             renderItem={({ icon, title, body, colour }) => (
               <div className="glass glass-lift" style={{ padding: '1.85rem', height: '100%', boxSizing: 'border-box' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${colour}14`, border: `1px solid ${colour}2e`, color: colour, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: `${colour}14`, border: `1px solid ${colour}2e`, color: colour, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
                   {icon}
                 </div>
-                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 690 }}>{title}</h3>
+                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 700 }}>{title}</h3>
                 <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
             )}
@@ -717,7 +717,7 @@ const Landing = () => {
             interval={3900}
             items={[
               { key: 'faceless', icon: <Zap size={18} />, title: 'Faceless Channel', colour: '#f97316',
-                body: 'Dedicated faceless video brand on auto-pilot. Generates 8s–30s scroll-stopping hooks, voiceover scripts, Midjourney start frames, Kling/Veo motion diffusion prompts, outro cards, and publishes directly to YouTube Shorts, TikTok, & Reels.' },
+                body: 'Dedicated faceless video brand on auto-pilot. Generates 8s–30s scroll-stopping hooks, voiceover scripts, Midjourney start frames, Kling/Veo motion diffusion prompts, outro cards, and publishes directly to YouTube Shorts, & Reels.' },
               { key: 'saas', icon: <MonitorSmartphone size={18} />, title: 'SaaS & Data', colour: 'var(--blue)',
                 body: 'Software is the hardest thing to film, because the interface is what models cannot draw. So it films the person — the second the result lands, the shoulders dropping. Screens appear only as light on a face.' },
               { key: 'ecom', icon: <ShoppingBag size={18} />, title: 'E-commerce', colour: 'var(--violet)',
@@ -734,14 +734,14 @@ const Landing = () => {
             renderItem={({ icon, title, colour, body }) => (
               <div className="glass glass-lift" style={{ padding: '1.85rem', height: '100%', boxSizing: 'border-box' }}>
                 <div style={{
-                  width: 38, height: 38, borderRadius: 11,
+                  width: 38, height: 38, borderRadius: 10,
                   background: `${colour}14`, border: `1px solid ${colour}2e`, color: colour,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   marginBottom: '1rem',
                 }}>
                   {icon}
                 </div>
-                <h3 style={{ fontSize: '1.04rem', marginBottom: '.55rem', fontWeight: 690, color: colour }}>{title}</h3>
+                <h3 style={{ fontSize: '1.04rem', marginBottom: '.55rem', fontWeight: 700, color: colour }}>{title}</h3>
                 <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
             )}
@@ -769,10 +769,10 @@ const Landing = () => {
               ['Nothing is a black box', 'Every prompt is saved next to the asset it produced. Every post shows where it went and why it failed if it did. You can always see what it did on your behalf.', 'var(--pink)'],
             ].map(([t, b, c]) => (
               <div key={t} className="glass glass-lift" style={{ padding: '1.9rem' }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${c}14`, border: `1px solid ${c}2e`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: `${c}14`, border: `1px solid ${c}2e`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
                   <CheckCircle2 size={18} color={c} />
                 </div>
-                <h3 style={{ fontSize: '1.06rem', marginBottom: '.55rem', fontWeight: 690 }}>{t}</h3>
+                <h3 style={{ fontSize: '1.06rem', marginBottom: '.55rem', fontWeight: 700 }}>{t}</h3>
                 <p style={{ fontSize: '.9rem', lineHeight: 1.65 }}>{b}</p>
               </div>
             ))}
@@ -796,7 +796,7 @@ const Landing = () => {
               alignItems: 'center',
               gap: '0.4rem',
               padding: '0.25rem 0.85rem',
-              borderRadius: 20,
+              borderRadius: 16,
               background: 'rgba(249,115,22,0.15)',
               border: '1px solid rgba(249,115,22,0.35)',
               fontSize: '0.76rem',
@@ -808,7 +808,7 @@ const Landing = () => {
             }}>
               <Zap size={13} color="#f97316" /> Autonomous Channel Growth
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               Faceless Short Videos on Auto-Pilot
             </h2>
             <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
@@ -837,7 +837,7 @@ const Landing = () => {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
                     <span style={{ fontSize: '1.6rem' }}>{t.icon}</span>
-                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 6, background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>{t.badge}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800, padding: '0.15rem 0.5rem', borderRadius: 8, background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>{t.badge}</span>
                   </div>
                   <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--ink)', marginBottom: '0.35rem' }}>{t.title}</div>
                   <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', lineHeight: 1.45, margin: 0 }}>{t.desc}</p>
@@ -892,7 +892,7 @@ const Landing = () => {
               alignItems: 'center',
               gap: '0.4rem',
               padding: '0.25rem 0.85rem',
-              borderRadius: 20,
+              borderRadius: 16,
               background: 'rgba(239,68,68,0.15)',
               border: '1px solid rgba(239,68,68,0.35)',
               fontSize: '0.76rem',
@@ -904,7 +904,7 @@ const Landing = () => {
             }}>
               <Flame size={13} color="#f87171" /> Algorithmic View Prediction
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               Stop Guessing. Predict Views Before You Hit Upload.
             </h2>
             <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
@@ -929,7 +929,7 @@ const Landing = () => {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--ink)' }}>{m.title}</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#10b981' }}>{m.score}%</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981' }}>{m.score}%</span>
                 </div>
                 <p style={{ fontSize: '0.76rem', color: 'var(--ink-soft)', lineHeight: 1.45, margin: 0 }}>{m.desc}</p>
               </div>
@@ -982,7 +982,7 @@ const Landing = () => {
               alignItems: 'center',
               gap: '0.4rem',
               padding: '0.25rem 0.85rem',
-              borderRadius: 20,
+              borderRadius: 16,
               background: 'rgba(59,130,246,0.15)',
               border: '1px solid rgba(59,130,246,0.35)',
               fontSize: '0.76rem',
@@ -994,7 +994,7 @@ const Landing = () => {
             }}>
               <Send size={13} color="#60a5fa" /> PostShip Multi-Platform Engine
             </span>
-            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
+            <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: '0 0 1rem' }}>
               One click. Every platform, natively.
             </h2>
             <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
@@ -1005,7 +1005,7 @@ const Landing = () => {
           {/* 3 Native Platform Cards Preview */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
             {/* X Card */}
-            <div style={{ background: '#000', borderRadius: 16, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div style={{ background: '#000', borderRadius: 14, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
                 <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2563eb', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>MK</div>
                 <div>
@@ -1022,7 +1022,7 @@ const Landing = () => {
             </div>
 
             {/* LinkedIn Card */}
-            <div style={{ background: '#fff', color: '#18181b', borderRadius: 16, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div style={{ background: '#fff', color: '#18181b', borderRadius: 14, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
                 <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#0a66c2', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>MK</div>
                 <div>
@@ -1039,7 +1039,7 @@ const Landing = () => {
             </div>
 
             {/* Reddit Card */}
-            <div style={{ background: '#1a1a1b', borderRadius: 16, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div style={{ background: '#1a1a1b', borderRadius: 14, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.6rem' }}>
                 <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#ff4500', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>🤖</div>
                 <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#fff' }}>r/SideProject</span>
@@ -1107,7 +1107,7 @@ const Landing = () => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'var(--violet)', marginBottom: '1rem',
                 }}>{icon}</div>
-                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 690 }}>{title}</h3>
+                <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 700 }}>{title}</h3>
                 <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
             ))}
@@ -1145,9 +1145,9 @@ const Landing = () => {
                 }}>
                   {hero && <div className="price-pop">MOST POPULAR</div>}
                   <h3 style={{ fontSize: '1rem', fontWeight: 700, color: hero ? 'var(--violet)' : 'var(--ink)' }}>{p.name}</h3>
-                  <div style={{ margin: '.7rem 0 .3rem', fontSize: '2.3rem', fontWeight: 780, lineHeight: 1 }}>
+                  <div style={{ margin: '.7rem 0 .3rem', fontSize: '2.3rem', fontWeight: 800, lineHeight: 1 }}>
                     {custom ? 'Custom' : free ? 'Free' : <>
-                      <span style={{ fontSize: '1.2rem', verticalAlign: 'super', fontWeight: 640 }}>$</span>{p.price}
+                      <span style={{ fontSize: '1.2rem', verticalAlign: 'super', fontWeight: 600 }}>$</span>{p.price}
                       <span style={{ fontSize: '.9rem', fontWeight: 500, color: 'var(--ink-faint)' }}>/mo</span>
                     </>}
                   </div>
@@ -1184,7 +1184,7 @@ const Landing = () => {
             }}>
               <div style={{ minWidth: 220 }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>{p.name}</h3>
-                <div style={{ fontSize: '1.6rem', fontWeight: 780, lineHeight: 1.2, margin: '.25rem 0' }}>Custom</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.2, margin: '.25rem 0' }}>Custom</div>
                 <p style={{ fontSize: '.85rem', margin: 0 }}>{p.tagline}</p>
               </div>
               <ul style={{
@@ -1206,7 +1206,7 @@ const Landing = () => {
           ))}
 
           <div style={{ textAlign: 'center', marginTop: '2.5rem', display: 'grid', gap: '.5rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', color: 'var(--green)', fontSize: '.9rem', fontWeight: 620 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', color: 'var(--green)', fontSize: '.9rem', fontWeight: 600 }}>
               <ShieldCheck size={16} /> Billed monthly through PayPal · cancel any time
             </span>
             <span style={{ fontSize: '.84rem', color: 'var(--ink-faint)' }}>

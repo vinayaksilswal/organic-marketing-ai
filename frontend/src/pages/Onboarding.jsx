@@ -265,7 +265,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
             {/* The real stored analysis, not a fixed string. */}
             <div style={{
               background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.22)',
-              borderRadius: 16, padding: '1.4rem', marginBottom: '1.25rem', textAlign: 'left',
+              borderRadius: 14, padding: '1.4rem', marginBottom: '1.25rem', textAlign: 'left',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem', fontWeight: 700, color: 'var(--primary-color)' }}>
                 <Sparkles size={17} /> What we understood
@@ -314,12 +314,12 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
               ].map(([t, d], i) => (
                 <div key={t} style={{ display: 'flex', gap: '0.75rem', marginBottom: '0.85rem' }}>
                   <span style={{
-                    flexShrink: 0, width: 26, height: 26, borderRadius: 99,
+                    flexShrink: 0, width: 26, height: 26, borderRadius: 999,
                     background: 'var(--primary-color)', color: '#fff', fontWeight: 700,
                     fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   }}>{i + 1}</span>
                   <span>
-                    <span style={{ display: 'block', fontWeight: 650, fontSize: '0.92rem' }}>{t}</span>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: '0.92rem' }}>{t}</span>
                     <span style={{ display: 'block', fontSize: '0.83rem', color: 'var(--text-muted)' }}>{d}</span>
                   </span>
                 </div>
@@ -339,7 +339,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
                 style={{ width: '100%', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 onClick={() => navigate('/dashboard/workspaces')}
               >
-                <Building2 size={16} /> Connect Social Accounts (Meta / TikTok)
+                <Building2 size={16} /> Connect Social Accounts (Facebook & Instagram)
               </button>
               <button
                 className="btn"
@@ -356,7 +356,7 @@ const Onboarding = ({ user, token, showToast, updateAuth }) => {
                 card is asked for here on purpose -- nothing has been proven
                 yet, and the upgrade has to be earned by the work landing. */}
             <div style={{
-              marginTop: '1.25rem', padding: '0.9rem 1rem', borderRadius: 12,
+              marginTop: '1.25rem', padding: '0.9rem 1rem', borderRadius: 10,
               background: 'rgba(11,16,32,0.03)', border: '1px solid var(--border-color)',
               textAlign: 'left',
             }}>

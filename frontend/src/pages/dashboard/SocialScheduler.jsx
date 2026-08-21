@@ -12,14 +12,14 @@ const labelSm = {
 };
 
 const inputSm = {
-  width: '100%', padding: '0.6rem 0.7rem', borderRadius: 9,
+  width: '100%', padding: '0.6rem 0.7rem', borderRadius: 10,
   border: '1px solid var(--border-color)', background: 'rgba(11,16,32,0.03)',
   color: 'var(--text-main)', fontSize: '0.88rem', minHeight: 44,
 };
 
 const chipStyle = (on) => ({
-  minHeight: 40, padding: '0 0.85rem', borderRadius: 9, cursor: 'pointer',
-  fontSize: '0.82rem', fontWeight: 650,
+  minHeight: 40, padding: '0 0.85rem', borderRadius: 10, cursor: 'pointer',
+  fontSize: '0.82rem', fontWeight: 600,
   background: on ? 'var(--primary-color)' : 'rgba(11,16,32,0.04)',
   color: on ? '#fff' : 'var(--text-main)',
   border: `1px solid ${on ? 'var(--primary-color)' : 'var(--border-color)'}`,
@@ -323,7 +323,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
         body: JSON.stringify({ publishingMode: mode })
       }, token);
-      showToast(`Publishing mode updated to: ${mode === 'PUBLIC' ? 'Public (Direct Publish)' : mode === 'PRIVATE' ? 'Private / Unlisted' : 'Send to TikTok Drafts / Review Queue'}`);
+      showToast(`Publishing mode updated to: ${mode === 'PUBLIC' ? 'Public (Direct Publish)' : mode === 'PRIVATE' ? 'Private / Unlisted' : 'Hold for review'}`);
     } catch (err) {
       console.error('Failed to update publishing mode', err);
     }
@@ -445,7 +445,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
       <div className="container" style={{ padding: '3rem 0' }}>
         
         {/* HEADER SECTION */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', background: 'rgba(11, 16, 32, 0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', background: 'rgba(11, 16, 32, 0.03)', padding: '1.5rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '1.75rem' }}>Social Scheduler</h1>
             <p className="text-muted" style={{ margin: '0.25rem 0 0 0', fontSize: '0.95rem' }}>
@@ -492,7 +492,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   color: publishingMode === 'PUBLIC' ? '#10b981' : 'var(--text-muted)',
                   border: publishingMode === 'PUBLIC' ? '1px solid #10b981' : '1px solid transparent',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: 6,
+                  borderRadius: 8,
                   fontSize: '0.74rem',
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -508,7 +508,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   color: publishingMode === 'PRIVATE' ? '#f59e0b' : 'var(--text-muted)',
                   border: publishingMode === 'PRIVATE' ? '1px solid #f59e0b' : '1px solid transparent',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: 6,
+                  borderRadius: 8,
                   fontSize: '0.74rem',
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -524,13 +524,13 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                   color: publishingMode === 'DRAFT_REVIEW' ? '#60a5fa' : 'var(--text-muted)',
                   border: publishingMode === 'DRAFT_REVIEW' ? '1px solid #3b82f6' : '1px solid transparent',
                   padding: '0.25rem 0.5rem',
-                  borderRadius: 6,
+                  borderRadius: 8,
                   fontSize: '0.74rem',
                   fontWeight: 700,
                   cursor: 'pointer',
                 }}
               >
-                📱 TikTok Drafts
+                📝 Review Queue
               </button>
             </div>
 
@@ -576,7 +576,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
               <h2 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-main)', fontWeight: 800 }}>
                 One-Time Scheduled Releases ({scheduledPosts.length})
               </h2>
-              <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.55rem', borderRadius: 12, background: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 700 }}>
+              <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.55rem', borderRadius: 10, background: 'rgba(249,115,22,0.15)', color: '#f97316', fontWeight: 700 }}>
                 Publishes at exact set date/time
               </span>
             </div>
@@ -635,7 +635,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                 return (
                   <div key={p.id} style={{
                     background: 'rgba(11,16,32,0.04)',
-                    borderRadius: 12,
+                    borderRadius: 10,
                     border: '1px solid rgba(249,115,22,0.25)',
                     padding: '1rem',
                     display: 'flex',
@@ -694,7 +694,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                           color: '#fff',
                           border: 'none',
-                          borderRadius: 6,
+                          borderRadius: 8,
                           padding: '0.3rem 0.75rem',
                           fontSize: '0.76rem',
                           fontWeight: 800,
@@ -879,7 +879,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                       {post.status === 'FAILED' && post.errorLog && (
                         <div style={{
                           marginTop: '0.55rem', maxWidth: 340, padding: '0.5rem 0.65rem',
-                          borderRadius: 7, background: 'rgba(239,68,68,0.07)',
+                          borderRadius: 8, background: 'rgba(239,68,68,0.07)',
                           border: '1px solid rgba(239,68,68,0.2)',
                         }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.35rem' }}>
@@ -965,7 +965,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                             const file = e.target.files[0];
                             setEditMedia(URL.createObjectURL(file));
                             if (file.type.startsWith('video/')) {
-                              showToast('Tip: For best results on Reels/TikTok, use 9:16 aspect ratio (1080x1920)', false);
+                              showToast('Tip: For best results on Reels, use 9:16 aspect ratio (1080x1920)', false);
                             } else if (file.type.startsWith('image/')) {
                               showToast('Tip: Instagram supports 1:1, 4:5, or 1.91:1 ratios', false);
                             }
@@ -1053,7 +1053,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           {[['reels', 'Reels'], ['feed', 'Feed'], ['profile', 'Profile']].map(([k, label]) => (
                             <button key={k} onClick={() => setPreviewTab(k)}
                               style={{
-                                padding: '0.4rem 1.1rem', borderRadius: '20px', border: 'none', cursor: 'pointer',
+                                padding: '0.4rem 1.1rem', borderRadius: '16px', border: 'none', cursor: 'pointer',
                                 fontWeight: 600, fontSize: '0.85rem',
                                 background: previewTab === k ? 'var(--secondary-color)' : 'transparent',
                                 color: previewTab === k ? 'var(--text-main)' : 'var(--text-muted)',
@@ -1104,7 +1104,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                           </div>
                         ) : (
                           /* Feed post */
-                          <div style={{ width: '100%', maxWidth: 350, background: '#111', color: '#fff', borderRadius: 12, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                          <div style={{ width: '100%', maxWidth: 350, background: '#111', color: '#fff', borderRadius: 10, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                             <div style={{ padding: '0.7rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                               <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,var(--primary-color),var(--secondary-color))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.8rem' }}>
                                 {(business?.name || 'B').charAt(0).toUpperCase()}
@@ -1147,7 +1147,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         {isScheduleModalOpen && (
           <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}
             onClick={e => { if (e.target === e.currentTarget) setIsScheduleModalOpen(false); }}>
-            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 16, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
+            <div className="glass-panel keep-pad" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', padding: '1.75rem', background: 'rgba(11,16,32,0.03)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: 14, boxShadow: '0 20px 40px rgba(0,0,0,0.7)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{ width: 36, height: 36, borderRadius: 8, background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(249,115,22,0.3)' }}>
@@ -1249,7 +1249,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                       background: 'rgba(249,115,22,0.15)',
                       border: '1px solid rgba(249,115,22,0.4)',
                       color: '#f97316',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       padding: '0.2rem 0.6rem',
                       fontSize: '0.74rem',
                       fontWeight: 700,
@@ -1341,7 +1341,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                       background: 'rgba(255,255,255,0.06)',
                       border: '1px solid var(--border-color)',
                       color: 'var(--text-main)',
-                      borderRadius: 6,
+                      borderRadius: 8,
                       padding: '0.2rem 0.55rem',
                       fontSize: '0.72rem',
                       fontWeight: 700,

@@ -249,7 +249,7 @@ How do you decide what is worth building?`,
       {/* Platform Banner Card */}
       <div style={{
         background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%)',
-        borderRadius: 16,
+        borderRadius: 14,
         padding: '1.75rem 2rem',
         border: '1px solid rgba(59, 130, 246, 0.25)',
         display: 'flex',
@@ -265,7 +265,7 @@ How do you decide what is worth building?`,
               alignItems: 'center',
               gap: '0.35rem',
               padding: '0.2rem 0.65rem',
-              borderRadius: 20,
+              borderRadius: 16,
               background: 'rgba(37,99,235,0.12)',
               border: '1px solid rgba(37,99,235,0.3)',
               fontSize: '0.72rem',
@@ -282,7 +282,7 @@ How do you decide what is worth building?`,
               alignItems: 'center',
               gap: '0.35rem',
               padding: '0.2rem 0.65rem',
-              borderRadius: 20,
+              borderRadius: 16,
               background: 'rgba(16,185,129,0.12)',
               border: '1px solid rgba(16,185,129,0.3)',
               fontSize: '0.72rem',
@@ -327,7 +327,7 @@ How do you decide what is worth building?`,
       </div>
 
       {/* Input Form Box */}
-      <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-color)' }}>
+      <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)' }}>
         <form onSubmit={handleGenerate}>
           <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Sparkles size={14} color="var(--primary-color)" /> Idea, Ship Line, Changelog, or URL for {businessName}:
@@ -422,7 +422,7 @@ How do you decide what is worth building?`,
         {/* ========================================================================= */}
         <div style={{
           background: 'rgba(11,16,32,0.03)',
-          borderRadius: 16,
+          borderRadius: 14,
           border: '1px solid var(--border-color)',
           padding: '1.35rem',
           display: 'flex',
@@ -534,7 +534,7 @@ How do you decide what is worth building?`,
         {/* ========================================================================= */}
         <div style={{
           background: '#ffffff',
-          borderRadius: 16,
+          borderRadius: 14,
           border: '1px solid #e2e8f0',
           padding: '1.35rem',
           display: 'flex',
@@ -647,7 +647,7 @@ How do you decide what is worth building?`,
         {/* ========================================================================= */}
         <div style={{
           background: '#12141a',
-          borderRadius: 16,
+          borderRadius: 14,
           border: '1px solid var(--border-color)',
           padding: '1.35rem',
           display: 'flex',
@@ -679,7 +679,7 @@ How do you decide what is worth building?`,
                 justifyContent: 'center',
                 fontSize: '0.75rem',
                 color: 'var(--text-main)',
-                fontWeight: 900,
+                fontWeight: 800,
                 flexShrink: 0,
               }}>
                 r/
@@ -725,7 +725,7 @@ How do you decide what is worth building?`,
               color: 'var(--text-muted)',
               marginBottom: '0.85rem',
             }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.06)', padding: '0.2rem 0.5rem', borderRadius: 12 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.06)', padding: '0.2rem 0.5rem', borderRadius: 10 }}>
                 <ArrowUp size={13} color="#ff4500" /> {bundle?.reddit_post?.metrics_estimate?.upvotes || '248'}
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>

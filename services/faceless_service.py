@@ -298,7 +298,7 @@ async def generate_faceless_short(
     # 3. Calculate Narration Word Target (speech runs at ~2.4 words/second)
     word_target = int(duration_seconds * 2.4)
 
-    system_prompt = f"""You are the world's best viral Short/Reel creator specializing in Faceless YouTube Shorts, TikToks, and Instagram Reels.
+    system_prompt = f"""You are the world's best viral Short/Reel creator specializing in faceless Instagram Reels and Facebook Reels.
 
 Your task is to write a high-converting, viral faceless short video package for the topic: "{topic_info['title']}".
 Target Duration: {duration_seconds} seconds.
@@ -398,7 +398,7 @@ PUBLISHING_MODES: Dict[str, Dict[str, Any]] = {
         "label": "Public (Direct Publish)",
         "icon": "🌐",
         "badge": "LIVE",
-        "description": "Publish directly to your public audience on YouTube Shorts, Instagram Reels, TikTok, and Facebook Reels.",
+        "description": "Publish directly to your public audience on Instagram Reels and Facebook Reels.",
     },
     "PRIVATE": {
         "id": "PRIVATE",
@@ -409,10 +409,10 @@ PUBLISHING_MODES: Dict[str, Dict[str, Any]] = {
     },
     "DRAFT_REVIEW": {
         "id": "DRAFT_REVIEW",
-        "label": "Send to TikTok Drafts / Review Queue",
+        "label": "Hold for review",
         "icon": "📱",
         "badge": "DRAFT REVIEW",
-        "description": "Push directly to TikTok Drafts or the scheduler review queue for a 1-tap final sign-off before going live.",
+        "description": "Hold each post in the scheduler review queue for a one-tap sign-off before it goes live.",
     },
 }
 
@@ -423,7 +423,7 @@ PUBLISHING_MODES: Dict[str, Dict[str, Any]] = {
 async def analyze_short_form_content(
     content_text: str,
     niche: Optional[str] = None,
-    platform: str = "YouTube Shorts / TikTok / Reels",
+    platform: str = "Instagram Reels",
     media_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -431,7 +431,7 @@ async def analyze_short_form_content(
     score multi-dimensional radar metrics (Hook, Retention, Shareability, Likeability, Commentability),
     and output timestamped 'FIX THE FAIL' actionable optimizations.
     """
-    system_prompt = """You are the algorithmic brain behind Viral Validator. You analyze short-form vertical videos (TikTok, Shorts, Reels) and compute exact predictive metrics.
+    system_prompt = """You are the algorithmic brain behind Viral Validator. You analyze short-form vertical videos (Reels, Shorts, Reels) and compute exact predictive metrics.
 
 Calculate the following:
 1. viral_score (0-100 integer): Overall viral probability score.
