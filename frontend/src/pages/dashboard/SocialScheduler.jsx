@@ -898,9 +898,23 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
                     </td>
                     <td style={{ padding: '1rem 1.5rem', fontWeight: '600', fontSize: '0.9rem', verticalAlign: 'top' }}>
                       {post.platform || '—'}
-                      {(post.fbPostId || post.igPostId) && (
+                      {/* Every platform that actually carried this post. It
+                          used to read Facebook and Instagram only, so a post
+                          delivered to X and LinkedIn showed nothing at all and
+                          looked like it had gone nowhere. */}
+                      {[
+                        post.fbPostId && 'FB',
+                        post.igPostId && 'IG',
+                        post.twitterPostId && 'X',
+                        post.linkedinPostId && 'LinkedIn',
+                      ].filter(Boolean).length > 0 && (
                         <div style={{ marginTop: '0.3rem', fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-muted)' }}>
-                          {post.fbPostId ? 'FB ✓' : ''} {post.igPostId ? 'IG ✓' : ''}
+                          {[
+                            post.fbPostId && 'FB',
+                            post.igPostId && 'IG',
+                            post.twitterPostId && 'X',
+                            post.linkedinPostId && 'LinkedIn',
+                          ].filter(Boolean).map((name) => `${name} ✓`).join('  ')}
                         </div>
                       )}
                     </td>

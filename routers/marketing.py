@@ -872,6 +872,8 @@ async def run_automation_manually(
     # A run writes a caption with a paid AI call and may publish. Both are
     # metered, so check before doing any of the work.
     from services import billing_service as billing
+    from services import multi_publisher
+
     allowed, why = await billing.check_quota(user_id, "posts")
     if not allowed:
         raise HTTPException(status_code=402, detail=why)
@@ -936,26 +938,36 @@ async def run_automation_manually(
             #    status="POSTED" without calling the platform APIs at all, so
             #    the log claimed success while nothing ever reached Facebook or
             #    Instagram.
-            fb_post_id = ig_post_id = None
+            fb_post_id = ig_post_id = x_post_id = li_post_id = None
             errors: list[str] = []
             posted_at = None
 
             if auto_approve:
-                try:
-                    ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=media_urls)
-                    if not ig_post_id:
-                        errors.append("IG: publish returned no post id")
-                except Exception as e:
-                    errors.append(f"IG: {e}")
+                # The scheduled worker publishes to every platform a workspace
+                # has connected. This path -- the one behind "publish now" --
+                # only ever called Meta, so a customer who connected X or
+                # LinkedIn watched the automation post there and the manual
+                # button quietly not.
+                outcome = await multi_publisher.publish_everywhere(
+                    workspace_id, caption, media_urls=media_urls
+                )
+                for entry in outcome["published"]:
+                    platform, post_id = entry["platform"], entry["id"]
+                    if platform == "facebook":
+                        fb_post_id = post_id
+                    elif platform == "instagram":
+                        ig_post_id = post_id
+                    elif platform == "x":
+                        x_post_id = post_id
+                    elif platform == "linkedin":
+                        li_post_id = post_id
+                for f in outcome["failed"]:
+                    errors.append(f"{f['platform']}: {f['error']}")
 
-                try:
-                    fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=media_urls)
-                    if not fb_post_id:
-                        errors.append("FB: publish returned no post id")
-                except Exception as e:
-                    errors.append(f"FB: {e}")
-
-            published = bool(fb_post_id or ig_post_id)
+            published = any(
+                pid is not None
+                for pid in (fb_post_id, ig_post_id, x_post_id, li_post_id)
+            )
             if published:
                 posted_at = datetime.now()
 
@@ -978,6 +990,8 @@ async def run_automation_manually(
                 status=status,
                 fbPostId=fb_post_id,
                 igPostId=ig_post_id,
+                twitterPostId=x_post_id,
+                linkedinPostId=li_post_id,
                 postedAt=posted_at,
                 errorLog=" | ".join(errors) if errors else None,
             )
@@ -1104,6 +1118,10 @@ async def get_social_posts(request: Request) -> Any:
                 "errorLog": p.errorLog,
                 "fbPostId": p.fbPostId,
                 "igPostId": p.igPostId,
+                # Written on every publish, and until now never returned: a
+                # post delivered to X and LinkedIn looked like it went nowhere.
+                "twitterPostId": p.twitterPostId,
+                "linkedinPostId": p.linkedinPostId,
             }
             for p in posts
         ]

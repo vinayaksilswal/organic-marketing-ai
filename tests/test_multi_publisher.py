@@ -309,3 +309,52 @@ def test_the_actor_column_is_in_the_bootstrap_ddl():
         encoding="utf-8"
     )
     assert '"SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinActorUrn"' in src
+
+
+# =============================================================================
+# The other publishing path, and whether anyone can see the result
+# =============================================================================
+
+def test_the_manual_publish_button_reaches_every_connected_platform():
+    """The scheduled worker published everywhere; "publish now" called Meta
+    only. A customer who connected X watched the automation post there and the
+    button quietly not."""
+    import routers.marketing as m
+
+    src = inspect.getsource(m.run_automation_manually)
+    assert "publish_everywhere" in src, "the manual path is still Meta-only"
+    assert "x_post_id" in src and "li_post_id" in src
+
+
+def test_the_manual_path_counts_a_non_meta_delivery_as_published():
+    import routers.marketing as m
+
+    src = inspect.getsource(m.run_automation_manually)
+    assert "published = bool(fb_post_id or ig_post_id)" not in src
+    assert "twitterPostId=x_post_id" in src
+    assert "linkedinPostId=li_post_id" in src
+
+
+def test_the_api_returns_the_platforms_that_carried_the_post():
+    """Both columns were written on every publish and never returned, so a
+    delivery to X and LinkedIn was invisible to the customer."""
+    import pathlib
+
+    src = (
+        pathlib.Path(__file__).resolve().parent.parent / "routers" / "marketing.py"
+    ).read_text(encoding="utf-8")
+    assert '"twitterPostId": p.twitterPostId' in src
+    assert '"linkedinPostId": p.linkedinPostId' in src
+
+
+def test_the_interface_shows_all_four():
+    import pathlib
+
+    src = (
+        pathlib.Path(__file__).resolve().parent.parent
+        / "frontend" / "src" / "pages" / "dashboard" / "SocialScheduler.jsx"
+    ).read_text(encoding="utf-8")
+    assert "post.twitterPostId" in src
+    assert "post.linkedinPostId" in src
+    # The old form could only ever render two of them.
+    assert "{post.fbPostId ? 'FB ✓' : ''} {post.igPostId ? 'IG ✓' : ''}" not in src

@@ -450,6 +450,17 @@ const Landing = () => {
             <Logo size={46} showWordmark />
           </div>
           <div className="nav-actions">
+            {/* The price is the question people scroll looking for, so it gets
+                a way to jump straight to it. A real anchor rather than a click
+                handler: the browser does the scrolling, it survives JS
+                failing, and #pricing becomes a link worth sharing. */}
+            <a
+              href="#pricing"
+              className="b b-ghost"
+              style={{ padding: '.6rem 1rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+            >
+              Pricing
+            </a>
             <button className="b b-ghost" style={{ padding: '.6rem 1rem' }} onClick={() => navigate('/auth')}>Log in</button>
             <button className="b b-primary" style={{ padding: '.6rem 1.15rem' }} onClick={() => navigate('/auth')}>Start free</button>
           </div>
@@ -786,6 +797,221 @@ const Landing = () => {
         onStart={() => navigate('/auth')}
       />
 
+      {/* ========================================================================= */}
+      {/* SHOWCASE: THE THREE PROMPTS BEHIND ONE CLIP.
+          The engine this product is actually built on had no section at all,
+          while three smaller features had one each. Every string below is the
+          real output of services/keyframes.py and services/video_beats.py for
+          the Organiflo workspace — not a mock-up of what it might say. */}
+      {/* ========================================================================= */}
+      <section style={{ background: 'linear-gradient(180deg, rgba(37,99,235,0.05), rgba(139,92,246,0.04))' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="eyebrow"><Film size={13} /> Video Prompt Engine</span>
+            <h2 className="h2" style={{ margin: '1.1rem auto .9rem', maxWidth: 760 }}>
+              One idea becomes three prompts: opening frame, motion, closing card.
+            </h2>
+            <p className="lede" style={{ maxWidth: 700, margin: '0 auto' }}>
+              Video models drift when you hand them a paragraph. So you get an image prompt
+              for the first frame, a timeline for the motion, and an image prompt for the
+              end card — copy each into the tool you already use.
+            </p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', maxWidth: 700, margin: '0.85rem auto 0', opacity: 0.85 }}>
+              Below is exactly what Organiflo produces for its own account, at 15 seconds.
+            </p>
+          </div>
+
+          <div className="grid g3">
+            {/* FIRST FRAME */}
+            <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem' }}>
+                <span style={{
+                  fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.04em',
+                  padding: '0.2rem 0.55rem', borderRadius: 6,
+                  background: 'rgba(37,99,235,0.12)', color: 'var(--blue)',
+                }}>STEP 1 · IMAGE</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--ink-faint)' }}>first frame</span>
+              </div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+                The frame that stops the scroll
+              </h3>
+              <pre style={{
+                fontSize: '0.74rem', lineHeight: 1.6, color: 'var(--ink-soft)',
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                background: 'rgba(15,23,42,0.035)', borderRadius: 10, padding: '0.85rem',
+              }}>
+Editorial photograph, vertical 9:16, a small-business owner
+mid-reach for their phone at a cluttered kitchen table,
+natural ambient lighting, shallow depth of field,
+photographic, sharp focus, no text
+              </pre>
+              <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.85rem', lineHeight: 1.6 }}>
+                No logo, no fade-in, no establishing shot. The first frame opens already in motion.
+              </p>
+            </div>
+
+            {/* MOTION */}
+            <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem' }}>
+                <span style={{
+                  fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.04em',
+                  padding: '0.2rem 0.55rem', borderRadius: 6,
+                  background: 'rgba(124,58,237,0.12)', color: 'var(--violet)',
+                }}>STEP 2 · VIDEO</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--ink-faint)' }}>one block every 3s</span>
+              </div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+                A timeline, not a paragraph
+              </h3>
+              <div style={{
+                background: 'rgba(15,23,42,0.035)', borderRadius: 10, padding: '0.85rem',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.72rem',
+              }}>
+                {[
+                  ['0:00-0:03', 'HOOK', 'var(--pink)'],
+                  ['0:03-0:06', 'THE TURN', 'var(--violet)'],
+                  ['0:06-0:09', 'THE PROOF', 'var(--blue)'],
+                  ['0:09-0:12', 'THE REASON', 'var(--violet)'],
+                  ['0:12-0:15', 'OUTRO / CTA', 'var(--green)'],
+                ].map(([clock, role, colour]) => (
+                  <div key={clock} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.55rem',
+                    padding: '0.3rem 0', borderBottom: '1px dashed rgba(15,23,42,0.08)',
+                  }}>
+                    <span style={{ color: 'var(--ink-faint)', minWidth: 62 }}>{clock}</span>
+                    <span style={{ fontWeight: 700, color: colour }}>{role}</span>
+                  </div>
+                ))}
+                <div style={{ marginTop: '0.6rem', color: 'var(--ink-soft)', lineHeight: 1.55 }}>
+                  VISUAL: one camera move, one subject.<br />
+                  SCRIPT: the words spoken, verbatim.
+                </div>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.85rem', lineHeight: 1.6 }}>
+                Every block carries its own visual and its own spoken line, so nothing drifts
+                between them. 8 to 30 seconds — the blocks multiply, they do not stretch.
+              </p>
+            </div>
+
+            {/* LAST FRAME */}
+            <div className="glass" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem' }}>
+                <span style={{
+                  fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.04em',
+                  padding: '0.2rem 0.55rem', borderRadius: 6,
+                  background: 'rgba(16,185,129,0.14)', color: 'var(--green)',
+                }}>STEP 3 · IMAGE</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--ink-faint)' }}>last frame</span>
+              </div>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: 700, marginBottom: '0.6rem' }}>
+                Your name and your ask, held still
+              </h3>
+              {/* A render of the card the prompt describes, so the point lands
+                  without reading the prompt. */}
+              <div style={{
+                borderRadius: 10, padding: '1.6rem 1rem', textAlign: 'center',
+                background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff',
+              }}>
+                <div style={{ fontSize: '1.35rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Organiflo</div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 500, marginTop: '0.4rem', opacity: 0.95 }}>
+                  Visit organiflo.com today
+                </div>
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '0.85rem', lineHeight: 1.6 }}>
+                The ask is written from your business model, not chosen by you: a shop is told
+                to <em>Shop now</em>, a page to <em>Follow for more</em>, a site gets its own
+                domain. Two seconds, motionless — a call to action that moves gets scrolled past.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SHOWCASE: HOW A CAPTION IS WRITTEN.
+          Captions are the part every tool claims and most do badly, and the
+          page asserted quality without ever showing the mechanism. */}
+      {/* ========================================================================= */}
+      <section>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="eyebrow"><MessageSquare size={13} /> Caption Engine</span>
+            <h2 className="h2" style={{ margin: '1.1rem auto .9rem', maxWidth: 740 }}>
+              Written from the clip in front of it, not the category it belongs to
+            </h2>
+            <p className="lede" style={{ maxWidth: 680, margin: '0 auto' }}>
+              Generic captions come from generic inputs. Every caption here is written from
+              your brand profile plus a description of the specific asset attached.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
+            {/* WHAT GOES IN */}
+            <div className="glass" style={{ padding: '1.6rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '1rem', color: 'var(--ink)' }}>
+                What it reads first
+              </h3>
+              {[
+                ['Brand profile', 'Built from your website: what you sell, who buys it, your tone, your offer.'],
+                ['This specific asset', 'A description of the clip or image attached — not the product category.'],
+                ['What already worked', 'Offers and angles that converted before, so it repeats what earned money.'],
+                ['A claims gate', 'Any figure it cannot substantiate from your own material is removed before publishing.'],
+              ].map(([label, body]) => (
+                <div key={label} style={{ display: 'flex', gap: '0.7rem', marginBottom: '0.9rem' }}>
+                  <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700 }}>{label}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--ink-soft)', lineHeight: 1.55 }}>{body}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* WHAT COMES OUT */}
+            <div className="glass" style={{ padding: '1.6rem', display: 'flex', flexDirection: 'column' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.9rem', color: 'var(--ink)' }}>
+                What comes out — our own account
+              </h3>
+              <div style={{
+                background: 'rgba(15,23,42,0.035)', borderRadius: 10, padding: '1rem',
+                fontSize: '0.83rem', lineHeight: 1.65, color: 'var(--ink)', whiteSpace: 'pre-wrap', flex: 1,
+              }}>
+                You are not out of ideas. You are out of evenings.{"\n\n"}
+                The posting does not stop being important because the day was long — it just stops happening. Organiflo writes the week, schedules it to your hours, and publishes it while you run the actual business.{"\n\n"}
+                Free plan, no card. #smallbusiness #socialmediamarketing #contentstrategy #organicgrowth #Organiflo
+              </div>
+              <p style={{ fontSize: '0.76rem', color: 'var(--ink-faint)', marginTop: '0.8rem', lineHeight: 1.55 }}>
+                Your business name is added as a tag automatically, so the account is searchable
+                by the thing you are building.
+              </p>
+            </div>
+
+            {/* WHAT IT REFUSES */}
+            <div className="glass" style={{ padding: '1.6rem' }}>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.9rem', color: 'var(--ink)' }}>
+                What it refuses to write
+              </h3>
+              {[
+                'Numbers you never gave it — no invented follower counts, revenue figures or percentages.',
+                'Copy that would get the account actioned, checked against a policy list before it is sent.',
+                'A near-duplicate of something it posted for you recently.',
+                'Openers it has already used to death, which is what makes an account read as automated.',
+              ].map((line) => (
+                <div key={line} style={{ display: 'flex', gap: '0.7rem', marginBottom: '0.85rem' }}>
+                  <ShieldCheck size={16} style={{ color: 'var(--violet)', flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ fontSize: '0.82rem', color: 'var(--ink-soft)', lineHeight: 1.55 }}>{line}</div>
+                </div>
+              ))}
+              <p style={{ fontSize: '0.78rem', color: 'var(--ink-soft)', marginTop: '1rem', lineHeight: 1.6, borderTop: '1px solid var(--line)', paddingTop: '0.9rem' }}>
+                A blocked caption stops the post. It never publishes an empty one to fill the slot.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
       {/* ENTERPRISE SHOWCASE 1: FACELESS SHORT VIDEOS ON AUTO-PILOT */}
       {/* ========================================================================= */}
       <section style={{ background: 'linear-gradient(180deg, rgba(249,115,22,0.05), rgba(139,92,246,0.04))' }}>
@@ -1000,6 +1226,9 @@ const Landing = () => {
             <p style={{ fontSize: '1.05rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0 auto', lineHeight: 1.6 }}>
               The same ship line or product URL, rewritten for how each platform actually reads — not copy-pasted three times.
             </p>
+            <p style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', maxWidth: 680, margin: '0.85rem auto 0', lineHeight: 1.6, opacity: 0.85 }}>
+              Below is our own release note — "X and LinkedIn now connect in one click" — run through Organiflo. One input, three drafts, nothing retyped.
+            </p>
           </div>
 
           {/* 3 Native Platform Cards Preview */}
@@ -1007,34 +1236,34 @@ const Landing = () => {
             {/* X Card */}
             <div style={{ background: '#000', borderRadius: 14, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2563eb', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>MK</div>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2563eb', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>OF</div>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#fff' }}>Marta Kowalski <span style={{ color: '#38bdf8' }}>●</span></div>
-                  <div style={{ fontSize: '0.72rem', color: '#71717a' }}>@martabuilds · 2h</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#fff' }}>Organiflo <span style={{ color: '#38bdf8' }}>●</span></div>
+                  <div style={{ fontSize: '0.72rem', color: '#71717a' }}>@organiflo · 2h</div>
                 </div>
               </div>
               <p style={{ fontSize: '0.82rem', color: '#e4e4e7', lineHeight: 1.5, margin: '0 0 1rem', whiteSpace: 'pre-wrap' }}>
-                shipped writing styles today.{"\n\n"}the bug that almost stopped me: a render race that only appeared with 2+ tabs open. 3 hours, 1 line fix.{"\n\n"}it's always one line.
+                x and linkedin connect in one click now.{"\n\n"}before this, connecting linkedin meant getting an access token and pasting it in by hand. so the integration existed and nobody used it.{"\n\n"}we deleted the step instead of documenting it better.
               </p>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#71717a', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
-                <span>💬 12</span><span>🔁 48</span><span>❤️ 310</span><span>📊 21K</span>
+                <span>💬</span><span>🔁</span><span>❤️</span><span>📊</span>
               </div>
             </div>
 
             {/* LinkedIn Card */}
             <div style={{ background: '#fff', color: '#18181b', borderRadius: 14, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#0a66c2', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>MK</div>
+                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#0a66c2', color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>OF</div>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#000' }}>Marta Kowalski · 1st</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Founder at BuildLog · now · 🌐</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#000' }}>Organiflo · 1st</div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Organic social growth engine · now · 🌐</div>
                 </div>
               </div>
               <p style={{ fontSize: '0.8rem', color: '#1e293b', lineHeight: 1.5, margin: '0 0 1rem', whiteSpace: 'pre-wrap' }}>
-                Three weeks on workspace auth. Four people used it.{"\n\n"}Then I shipped autosave in an afternoon — 40 lines — and it's the change people actually thank me for.{"\n\n"}Build the boring thing that works.
+                Our LinkedIn integration asked people to fetch an access token and paste it in by hand.{"\n\n"}It worked. Almost nobody could complete it, and the token expired in sixty days with no warning — so a working feature had close to zero use.{"\n\n"}We replaced the whole thing with one button. A step most people can't finish is the same as a feature you never shipped.
               </p>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '0.6rem' }}>
-                <span>👍❤️💡 47 reactions</span><span>6 comments</span>
+                <span>👍❤️💡</span><span>Comment · Repost · Send</span>
               </div>
             </div>
 
@@ -1042,17 +1271,17 @@ const Landing = () => {
             <div style={{ background: '#1a1a1b', borderRadius: 14, padding: '1.35rem', border: '1px solid rgba(255,255,255,0.12)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.6rem' }}>
                 <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#ff4500', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>🤖</div>
-                <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#fff' }}>r/SideProject</span>
+                <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#fff' }}>r/SaaS</span>
                 <span style={{ fontSize: '0.7rem', color: '#71717a' }}>· 5h</span>
               </div>
               <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', margin: '0 0 0.5rem', lineHeight: 1.35 }}>
-                Spent 3 hours on a bug that was one line. Every time.
+                We deleted an onboarding step instead of documenting it better. Usage went from ~0.
               </h4>
               <p style={{ fontSize: '0.78rem', color: '#d4d4d8', lineHeight: 1.45, margin: '0 0 1rem' }}>
-                Render race that only showed up with 2+ tabs open. Logs looked fine. The fix was one line — it's always one line. Curious how others track these down...
+                Our LinkedIn integration asked users to obtain an access token and paste it in. It worked fine and nobody used it — turns out asking for a token is asking most people to give up. Swapped it for a normal OAuth button. Has anyone else found a "working" feature that was really just a step nobody could finish?
               </p>
               <div style={{ display: 'flex', gap: '1rem', fontSize: '0.72rem', color: '#a1a1aa', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
-                <span>🔺 248</span><span>💬 32</span><span>🔗 Share</span>
+                <span>🔺</span><span>💬</span><span>🔗 Share</span>
               </div>
             </div>
           </div>
@@ -1085,22 +1314,26 @@ const Landing = () => {
             </p>
           </div>
 
-          <div className="grid g3">
-            {[
-              [<Clock size={17} />, 'You choose the hours it posts',
-               'Pick the days and the time range, in your own timezone. A fixed interval drifts through the clock and starts posting at 3am; this does not.'],
-              [<Eye size={17} />, 'Nothing publishes unreviewed',
-               'Every post can sit as a draft until you approve it. Turn that off once you trust it, per business.'],
-              [<AlertCircle size={17} />, 'Pause without losing anything',
-               'Hold a business during a rebrand or a holiday. Your accounts stay connected, your catalog stays put, and nothing goes out.'],
-              [<Building2 size={17} />, 'Run more than one brand',
-               'Separate workspaces, each with its own voice, schedule, catalog and connected accounts. Add teammates to the ones they should see.'],
-              [<ShieldCheck size={17} />, 'Your accounts, your tokens',
-               'Connected through official Facebook and Instagram login. Revoke it from Meta at any time and posting simply stops.'],
-              [<Send size={17} />, 'A person answers you',
-               'Report a problem in the app and the reply lands on the same screen, with a status you can watch change. Not a ticket address that goes quiet.'],
-            ].map(([icon, title, body]) => (
-              <div key={title} className="glass" style={{ padding: '1.6rem' }}>
+          {/* Same rail as the capability row above: six cards in a four-wide
+              grid leave an orphaned row of two beside an empty gap, which
+              reads as a section that did not finish rendering. */}
+          <CardRail
+            items={[
+              { key: 'hours', icon: <Clock size={17} />, title: 'You choose the hours it posts',
+                body: 'Pick the days and the time range, in your own timezone. A fixed interval drifts through the clock and starts posting at 3am; this does not.' },
+              { key: 'review', icon: <Eye size={17} />, title: 'Nothing publishes unreviewed',
+                body: 'Every post can sit as a draft until you approve it. Turn that off once you trust it, per business.' },
+              { key: 'pause', icon: <AlertCircle size={17} />, title: 'Pause without losing anything',
+                body: 'Hold a business during a rebrand or a holiday. Your accounts stay connected, your catalog stays put, and nothing goes out.' },
+              { key: 'brands', icon: <Building2 size={17} />, title: 'Run more than one brand',
+                body: 'Separate workspaces, each with its own voice, schedule, catalog and connected accounts. Add teammates to the ones they should see.' },
+              { key: 'tokens', icon: <ShieldCheck size={17} />, title: 'Your accounts, your tokens',
+                body: 'Connected through official Facebook and Instagram login. Revoke it from Meta at any time and posting simply stops.' },
+              { key: 'support', icon: <Send size={17} />, title: 'A person answers you',
+                body: 'Report a problem in the app and the reply lands on the same screen, with a status you can watch change. Not a ticket address that goes quiet.' },
+            ]}
+            renderItem={({ icon, title, body }) => (
+              <div className="glass" style={{ padding: '1.6rem', height: '100%', boxSizing: 'border-box' }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10,
                   background: 'rgba(109,40,217,0.09)', border: '1px solid rgba(109,40,217,0.2)',
@@ -1110,8 +1343,8 @@ const Landing = () => {
                 <h3 style={{ fontSize: '1.02rem', marginBottom: '.55rem', fontWeight: 700 }}>{title}</h3>
                 <p style={{ fontSize: '.88rem', lineHeight: 1.65 }}>{body}</p>
               </div>
-            ))}
-          </div>
+            )}
+          />
         </div>
       </section>
 
@@ -1120,7 +1353,10 @@ const Landing = () => {
           above the price, because proof is what a price gets read against. */}
       <ReviewWall />
 
-      <section id="pricing">
+      {/* scrollMarginTop clears the sticky nav. Without it, jumping to
+          #pricing puts the heading underneath the bar and the section looks
+          like it starts at the plans. */}
+      <section id="pricing" style={{ scrollMarginTop: '92px' }}>
         <div className="wrap">
           <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
             <span className="eyebrow">Pricing</span>
