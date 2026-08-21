@@ -287,3 +287,25 @@ def test_ip_literals_in_every_notation_are_refused(encoded):
     rather than a formatting nicety, so it gets its own test — loosening it to
     accept IP-based sites would silently reopen every case below."""
     assert ga.normalise_url(encoded) is None, f"{encoded} was accepted"
+
+
+@pytest.mark.asyncio
+async def test_the_checklist_reads_past_the_model_size_cap(wired):
+    """Contact details and social links live in the footer. Truncating the
+    page before checking it failed both on every long site — organiflo.com's
+    own audit said it linked to nowhere while its footer linked to Instagram.
+
+    The cap exists to bound the model call, not to decide what is true.
+    """
+    filler = "Lorem ipsum about our services. " * 400   # well past MAX_SCRAPE_CHARS
+    wired["page"] = (
+        "We build custom furniture.\n"
+        + filler
+        + "\nContact us on 0512 555 0100. Follow us at instagram.com/example"
+    )
+    assert len(wired["page"]) > ga.MAX_SCRAPE_CHARS
+
+    out = await ga.run("longpage.example")
+    by_key = {f["key"]: f["passed"] for f in out["findings"]}
+    assert by_key["is_contactable"], "footer contact details were cut off"
+    assert by_key["links_social"], "footer social links were cut off"

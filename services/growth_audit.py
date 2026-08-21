@@ -260,7 +260,13 @@ async def run(website_url: str) -> Dict[str, Any]:
             ),
         }
 
-    page = page[:MAX_SCRAPE_CHARS]
+    # The cap belongs to the model call, not to the checklist. Contact
+    # details and social links live in the footer -- the far end of a long
+    # page -- so truncating first failed those two checks on every
+    # substantial site regardless of the truth. organiflo.com was told it
+    # linked to nowhere while its own footer linked to Instagram.
+    full_page = page
+    page_for_model = page[:MAX_SCRAPE_CHARS]
 
     view: Dict[str, Any] = {}
     try:
@@ -269,7 +275,7 @@ async def run(website_url: str) -> Dict[str, Any]:
 
         # A stranger's page. Whoever controls it controls these bytes, and the
         # model cannot tell an instruction from a description.
-        fenced = guarded_block(page, label="website_content", source=url)
+        fenced = guarded_block(page_for_model, label="website_content", source=url)
         raw = await _call_openrouter(
             _prompt(fenced, domain), system_prompt=_SYSTEM, json_response=True
         )
@@ -289,7 +295,7 @@ async def run(website_url: str) -> Dict[str, Any]:
     if len(week) < 7:
         week = _fallback_week(what)
 
-    findings = _run_checklist(page, view)
+    findings = _run_checklist(full_page, view)
     score = _score(findings)
 
     audit = {
