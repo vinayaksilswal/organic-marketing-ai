@@ -49,9 +49,22 @@ class LinkedInService:
                 return None, None
             
             access_token = decrypt_token(conn.linkedinAccessToken) or conn.linkedinAccessToken
-            # For now we use the platform default org ID, in a full version this would be in SocialConnection too.
-            org_id = self.default_org_id
-            return access_token, org_id
+
+            # Who the post is authored by, stored per connection.
+            #
+            # This used to return a single global LINKEDIN_ORGANIZATION_ID from
+            # the environment, which was never set -- so post_text returned
+            # None for every workspace and LinkedIn publishing never ran once.
+            #
+            # The connection carries a full URN now: urn:li:person:xxx for a
+            # personal profile, urn:li:organization:123 for a Company Page.
+            # The env var is still honoured as a fallback so an operator who
+            # has completed LinkedIn's app review can point every workspace at
+            # one Page without reconnecting them.
+            actor = getattr(conn, "linkedinActorUrn", None)
+            if not actor and self.default_org_id:
+                actor = f"urn:li:organization:{self.default_org_id}"
+            return access_token, actor
 
     def _headers(self, access_token: str) -> dict:
         return {
@@ -72,12 +85,14 @@ class LinkedInService:
         Returns:
             LinkedIn post URN on success, None on failure.
         """
-        access_token, org_id = await self._get_credentials(workspace_id)
-        if not access_token or not org_id:
+        access_token, actor_urn = await self._get_credentials(workspace_id)
+        if not access_token or not actor_urn:
             return None
 
         payload = {
-            "author": f"urn:li:organization:{org_id}",
+            # Already a complete URN. Wrapping it in another prefix here is
+            # what would break personal-profile posting.
+            "author": actor_urn,
             "commentary": text,
             "visibility": "PUBLIC",
             "distribution": {
@@ -132,12 +147,13 @@ class LinkedInService:
         Returns:
             LinkedIn post URN on success, None on failure.
         """
-        access_token, org_id = await self._get_credentials(workspace_id)
-        if not access_token or not org_id:
+        access_token, actor_urn = await self._get_credentials(workspace_id)
+        if not access_token or not actor_urn:
             return None
 
         payload = {
-            "author": f"urn:li:organization:{org_id}",
+            # Already a complete URN, same as post_text.
+            "author": actor_urn,
             "commentary": text,
             "visibility": "PUBLIC",
             "distribution": {

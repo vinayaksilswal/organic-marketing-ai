@@ -78,6 +78,22 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
     window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const li = params.get('linkedin');
+    if (!li) return;
+    const message = params.get('message');
+    if (li === 'connected') {
+      showToast(`Connected ${message || 'LinkedIn'}. Posts will publish there too.`);
+      refreshWorkspaces();
+    } else if (li === 'cancelled') {
+      showToast(message || 'LinkedIn connection cancelled.', true);
+    } else {
+      showToast(message || 'Could not connect LinkedIn.', true);
+    }
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
   const loadPageChoices = async (t) => {
     try {
       const res = await authFetch(`${API_BASE}/meta/pages?token=${encodeURIComponent(t)}`, {}, token);
@@ -146,6 +162,23 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
     } catch (err) {
       showToast(err.message, true);
       setConnectingX(false);
+    }
+  };
+
+  const [connectingLinkedIn, setConnectingLinkedIn] = useState(false);
+
+  const handleConnectLinkedIn = async (workspaceId) => {
+    setConnectingLinkedIn(true);
+    try {
+      const res = await authFetch(`${API_BASE}/linkedin/connect?workspace_id=${encodeURIComponent(workspaceId)}`, {}, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authUrl) {
+        throw new Error(data.detail || data.message || 'LinkedIn connection is unavailable right now.');
+      }
+      window.location.href = data.authUrl;
+    } catch (err) {
+      showToast(err.message, true);
+      setConnectingLinkedIn(false);
     }
   };
 
@@ -840,25 +873,28 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Linkedin size={16} color="#93c5fd" /> LinkedIn
                       </h4>
-                      <label style={labelStyle}>Access Token</label>
-                      <input style={inputStyle} type="password" placeholder={currentBp?.socialConnection?.hasLinkedin ? '••••••• (connected)' : 'Paste token...'} value={socialData.linkedinAccessToken} onChange={e => setSocialData({...socialData, linkedinAccessToken: e.target.value})} />
-                    </div>
-
-                    {/* Twitter */}
-                    <div style={{ padding: '1.25rem', background: 'rgba(11, 16, 32, 0.02)', borderRadius: '10px', border: '1px solid rgba(11, 16, 32, 0.06)' }}>
-                      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Twitter size={16} color="#e5e7eb" /> Twitter / X
-                      </h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div>
-                          <label style={labelStyle}>Access Token</label>
-                          <input style={inputStyle} type="password" placeholder={currentBp?.socialConnection?.hasTwitter ? '••••••• (connected)' : 'Paste token...'} value={socialData.twitterAccessToken} onChange={e => setSocialData({...socialData, twitterAccessToken: e.target.value})} />
-                        </div>
-                        <div>
-                          <label style={labelStyle}>Access Secret</label>
-                          <input style={inputStyle} type="password" placeholder="Paste secret..." value={socialData.twitterAccessSecret} onChange={e => setSocialData({...socialData, twitterAccessSecret: e.target.value})} />
-                        </div>
-                      </div>
+                      {/* One-click, like Meta and X. The field it replaces asked
+                          a customer to obtain and paste a LinkedIn access token
+                          by hand, which almost nobody can do -- and a token
+                          pasted that way expires in sixty days with no refresh
+                          and no warning when it does. */}
+                      <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        Sign in with LinkedIn and posts publish to your profile automatically. No tokens to copy.
+                      </p>
+                      <button
+                        onClick={() => handleConnectLinkedIn(editWorkspaceId)}
+                        disabled={connectingLinkedIn}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.55rem', width: '100%',
+                          justifyContent: 'center', padding: '0.7rem', borderRadius: 8,
+                          background: '#0a66c2', color: '#fff', border: 'none', fontSize: '0.9rem',
+                          fontWeight: 600, cursor: connectingLinkedIn ? 'wait' : 'pointer',
+                          opacity: connectingLinkedIn ? 0.7 : 1, minHeight: 44,
+                        }}
+                      >
+                        <Linkedin size={17} />
+                        {connectingLinkedIn ? 'Redirecting to LinkedIn…' : 'Connect LinkedIn'}
+                      </button>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

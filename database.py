@@ -329,6 +329,15 @@ class SocialConnection(Base):
     twitterAccessToken = Column(Text, nullable=True)
     twitterAccessSecret = Column(Text, nullable=True)
     linkedinAccessToken = Column(Text, nullable=True)
+    # Who the post is authored by: "urn:li:person:xxxx" for a personal
+    # profile, "urn:li:organization:123" for a Company Page.
+    #
+    # Both exist because they cost different things to obtain. Posting to a
+    # Company Page needs LinkedIn's Community Management API and app review;
+    # posting to a personal profile needs w_member_social and nothing else. A
+    # customer who wants to publish today gets the second, and the first when
+    # the review clears.
+    linkedinActorUrn = Column(String, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
