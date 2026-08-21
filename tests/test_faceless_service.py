@@ -2,6 +2,8 @@
 Tests for Faceless Short Videos on Auto-Pilot & Algorithm Analyzer
 """
 
+import json
+
 import pytest
 from services.faceless_service import (
     get_faceless_presets,
@@ -13,6 +15,54 @@ from services.faceless_service import (
     PUBLISHING_MODES,
     SCHEDULE_PRESETS,
 )
+
+import services.faceless_service as fs
+
+
+# These three used to call the live model, which made them a test of the
+# provider's uptime: green on a machine with an API key, red in CI without
+# one. The model is stubbed now, and the junk-reply path is covered too --
+# with a rate-limited free tier that fallback is the common case, not an
+# edge case.
+
+
+SHORT_JSON = json.dumps({
+    "title": "The Whisper in the Hallway",
+    "hook": "Stop scrolling if you have ever heard your name at 3am.",
+    "voiceover_script": "Stop scrolling. [pause] Nobody believed her either.",
+    "word_count": 45,
+    "first_frame_prompt": "Vertical 9:16, dark hallway, one door ajar, no text",
+    "video_prompt": "Vertical 9:16 slow push-in down a dark hallway, 4k",
+    "last_frame_prompt": "Minimal 9:16 end card, bold text",
+    "viral_caption": "Would you have opened the door? #scarystories",
+    "audio_music_recommendation": "low drone",
+})
+
+ANALYSIS_JSON = json.dumps({
+    "viral_score": 91,
+    "growth_tier": "High Growth",
+    "percentile_summary": "Better than 91% of content in this niche.",
+    "metrics": {"hook": 94, "retention": 88, "shareability": 90,
+                "likeability": 81, "commentability": 93},
+    "fix_the_fail": [
+        {"title": "Pacing drops.", "action": "Cut at 0:04.",
+         "severity": "CRITICAL OUTPUT", "timestamp": "At 0:04"},
+    ],
+    "optimized_rewrite": {"optimized_hook": "Everyone hears it. Nobody says it."},
+})
+
+
+@pytest.fixture
+def model(monkeypatch):
+    """Answers instantly and identically every run."""
+
+    def _set(response):
+        async def fake(*a, **kw):
+            return response
+
+        monkeypatch.setattr(fs, "_call_openrouter", fake)
+
+    return _set
 
 
 def test_presets_structure():
@@ -48,8 +98,8 @@ def test_publishing_modes():
 
 
 @pytest.mark.asyncio
-async def test_generate_faceless_short_mock():
-    # Test generation with fallback parsing
+async def test_generate_faceless_short_mock(model):
+    model(SHORT_JSON)
     result = await generate_faceless_short(
         topic_id="scary_stories",
         visual_style_id="cinematic_realism",
@@ -69,7 +119,8 @@ async def test_generate_faceless_short_mock():
 
 
 @pytest.mark.asyncio
-async def test_generate_faceless_short_custom_topic():
+async def test_generate_faceless_short_custom_topic(model):
+    model(SHORT_JSON)
     result = await generate_faceless_short(
         topic_id="custom",
         custom_topic="Dark Greek Mythology & Medusa's Curse",
@@ -84,7 +135,8 @@ async def test_generate_faceless_short_custom_topic():
 
 
 @pytest.mark.asyncio
-async def test_analyze_short_form_content():
+async def test_analyze_short_form_content(model):
+    model(ANALYSIS_JSON)
     content = "Stop scrolling. This one psychology trick makes anyone tell the truth in 3 seconds."
     analysis = await analyze_short_form_content(
         content_text=content,
@@ -98,3 +150,47 @@ async def test_analyze_short_form_content():
     assert "fix_the_fail" in analysis
     assert "optimized_rewrite" in analysis
     assert "optimized_hook" in analysis["optimized_rewrite"]
+
+
+@pytest.mark.asyncio
+async def test_junk_from_the_model_still_produces_a_usable_short(model):
+    """The customer gets a script they can edit, not an error. With a free
+    tier that rate-limits, this is the common path."""
+    model("I'm sorry, I can't help with that.")
+    result = await generate_faceless_short(
+        topic_id="scary_stories",
+        visual_style_id="cinematic_realism",
+        voice_id="shadow_whisper",
+        duration_seconds=20,
+        channel_name="Nightmare Chronicles",
+    )
+    for field in ("title", "hook", "voiceover_script", "first_frame_prompt",
+                  "video_prompt", "last_frame_prompt", "viral_caption"):
+        assert result.get(field), f"{field} came back empty"
+    assert result["duration_seconds"] == 20
+
+
+@pytest.mark.asyncio
+async def test_a_fenced_reply_is_still_read(model):
+    """Models wrap JSON in ``` fences constantly."""
+    model("```json\n" + SHORT_JSON + "\n```")
+    result = await generate_faceless_short(
+        topic_id="scary_stories",
+        visual_style_id="cinematic_realism",
+        voice_id="shadow_whisper",
+        duration_seconds=20,
+        channel_name="Nightmare Chronicles",
+    )
+    assert result["title"] == "The Whisper in the Hallway"
+
+
+@pytest.mark.asyncio
+async def test_junk_still_scores_the_content(model):
+    model("not json at all")
+    analysis = await analyze_short_form_content(
+        content_text="Stop scrolling.",
+        niche="Psychology",
+        platform="Reels / Shorts",
+    )
+    assert isinstance(analysis["viral_score"], int)
+    assert set(analysis["metrics"]) >= {"hook", "retention", "shareability"}

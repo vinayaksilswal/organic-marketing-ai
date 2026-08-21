@@ -33,7 +33,8 @@ def test_the_check_happens_before_publishing(task_source):
     """Checking after the post has gone out bills for something already given
     away."""
     check = task_source.index("check_quota")
-    publish = task_source.index("post_to_facebook")
+    assert "publish_everywhere" in task_source, "the publishing landmark moved again"
+    publish = task_source.index("publish_everywhere")
     assert check < publish
 
 

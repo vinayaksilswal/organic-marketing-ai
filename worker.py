@@ -35,6 +35,7 @@ from database import (
 )
 from services.ai_service import generate_campaign_variation
 from services.social_service import post_to_facebook, post_to_instagram
+from services import multi_publisher
 from services.twitter_service import twitter_service
 from services.linkedin_service import linkedin_service
 from services.crypto_service import decrypt_token
@@ -546,6 +547,8 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
             # 4. Post to all platforms
             fb_post_id = None
             ig_post_id = None
+            x_post_id = None
+            li_post_id = None
 
             # The plan is checked HERE, at the only point where the automation
             # actually publishes on someone's behalf.
@@ -573,52 +576,46 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                     errors.append(f"Plan limit: {why}")
 
             if auto_approve:
-                # Facebook
-                try:
-                    fb_post_id = await post_to_facebook(workspace_id, final_caption, media_urls=media_urls)
-                    if fb_post_id:
-                        logger.info(f"✓ Posted to Facebook: {fb_post_id}")
-                    else:
-                        errors.append("FB: Post returned None (credentials may be missing)")
-                except Exception as e:
-                    errors.append(f"FB: {str(e)}")
-                    logger.error(f"Facebook post failed: {e}")
-
-                # Instagram (requires media)
-                if media_urls:
-                    try:
-                        ig_post_id = await post_to_instagram(workspace_id, final_caption, media_urls=media_urls)
-                        if ig_post_id:
-                            logger.info(f"✓ Posted to Instagram: {ig_post_id}")
-                        else:
-                            errors.append("IG: Post returned None (credentials may be missing)")
-                    except Exception as e:
-                        errors.append(f"IG: {str(e)}")
-                        logger.error(f"Instagram post failed: {e}")
-
-                # Twitter
-                try:
-                    tweet_text = final_caption
-                    if len(tweet_text) > 280:
-                        tweet_text = tweet_text[:277] + "..."
-                    await twitter_service.post_tweet(workspace_id, tweet_text)
-                    logger.info("✓ Posted to Twitter")
-                except Exception as e:
-                    errors.append(f"Twitter: {str(e)}")
-                    logger.error(f"Twitter post failed: {e}")
-
-                # LinkedIn
-                try:
-                    await linkedin_service.post_text(workspace_id, final_caption)
-                    logger.info("✓ Posted to LinkedIn")
-                except Exception as e:
-                    errors.append(f"LinkedIn: {str(e)}")
-                    logger.error(f"LinkedIn post failed: {e}")
+                # Every platform this workspace has actually connected, each
+                # getting the caption shaped for how it is read there.
+                #
+                # This used to attempt all four unconditionally. A workspace
+                # with only Meta connected logged an X failure and a LinkedIn
+                # failure on every single post, because the services return
+                # None when there is no token. A delivery log where two lines
+                # are always red is a log nobody reads.
+                outcome = await multi_publisher.publish_everywhere(
+                    workspace_id, final_caption, media_urls=media_urls
+                )
+                for entry in outcome["published"]:
+                    platform, post_id = entry["platform"], entry["id"]
+                    if platform == "facebook":
+                        fb_post_id = post_id
+                    elif platform == "instagram":
+                        ig_post_id = post_id
+                    elif platform == "x":
+                        x_post_id = post_id
+                    elif platform == "linkedin":
+                        li_post_id = post_id
+                published_to = [e["platform"] for e in outcome["published"]]
+                logger.info(
+                    f"Published to {published_to or 'nowhere'}; "
+                    f"skipped {outcome['skipped'] or 'none'}"
+                )
+                for f in outcome["failed"]:
+                    errors.append(f"{f['platform']}: {f['error']}")
 
 
             # 5. Record the SocialPost (using correct field names!)
             if auto_approve:
-                is_success = fb_post_id is not None or ig_post_id is not None
+                # Success is 'it reached at least one platform'. This used
+                # to read Meta only, so a workspace connected to X and
+                # LinkedIn alone recorded every delivered post as FAILED
+                # and was never charged a post against its plan.
+                is_success = any(
+                    pid is not None
+                    for pid in (fb_post_id, ig_post_id, x_post_id, li_post_id)
+                )
                 status = "POSTED" if is_success else "FAILED"
                 if is_success:
                     # One published post, however many platforms carried it.
@@ -650,6 +647,10 @@ async def context_aggregation_task(ctx: dict, workspace_id: str) -> str:
                 postedAt=utc_now() if (auto_approve and is_success) else None,
                 fbPostId=fb_post_id,
                 igPostId=ig_post_id,
+                # These two columns have existed since the schema was
+                # written and nothing ever wrote to them.
+                twitterPostId=x_post_id,
+                linkedinPostId=li_post_id,
                 errorLog=" | ".join(errors) if errors else None,
             )
             session.add(post)

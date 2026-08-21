@@ -96,7 +96,11 @@ def test_the_gate_runs_before_publishing():
 
     src = inspect.getsource(worker.context_aggregation_task)
     gate = src.index("enforce_caption_policy")
-    publish = src.index("post_to_facebook")
+    # The single point where anything leaves for any platform. Asserting it is
+    # present first means a rename cannot turn this test into a pass by making
+    # the landmark disappear.
+    assert "publish_everywhere" in src, "the publishing landmark moved again"
+    publish = src.index("publish_everywhere")
     assert gate < publish, "captions are policy-checked after they are published"
 
 

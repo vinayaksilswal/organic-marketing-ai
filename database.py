@@ -757,6 +757,10 @@ async def init_db() -> AsyncEngine:
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessToken" TEXT',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "twitterAccessSecret" TEXT',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinAccessToken" TEXT',
+                    # Who LinkedIn posts are authored as. The model declares
+                    # this column, so if the bootstrap runs without Alembic
+                    # every SELECT on the table fails, not just LinkedIn.
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinActorUrn" VARCHAR',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR',
                     'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "errorLog" TEXT',
                     'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "twitterPostId" VARCHAR',

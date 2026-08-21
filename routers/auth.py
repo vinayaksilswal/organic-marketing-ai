@@ -7,7 +7,13 @@ Handles admin login (cookie-based JWT) and user API authentication
 =============================================================================
 """
 
-from __future__ import annotations
+# NOTE: `from __future__ import annotations` must NOT be added to this module.
+# It turns every annotation into a string, and `forgot_password` is wrapped by
+# @limiter.limit. FastAPI then resolves "ForgotPasswordRequest" against
+# slowapi's module globals, where it does not exist, gives up on the model and
+# reads the request body as a QUERY parameter. Password reset returned
+# {"loc": ["query", "data"], "msg": "Field required"} in production for every
+# caller, and /openapi.json returned 500, until this line was removed.
 
 import asyncio
 import re
