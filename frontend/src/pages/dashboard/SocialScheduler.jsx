@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError} from '../../config';
 import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw, CalendarDays, Sparkles, Plus } from 'lucide-react';
 import PostCalendar from '../../components/PostCalendar';
 
@@ -176,7 +176,7 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
         setScheduleCaption(data.caption);
         showToast('AI caption generated! ✨');
       } else {
-        throw new Error(data.detail || 'Could not generate caption');
+        throw new Error(apiError(data, 'Could not generate caption'));
       }
     } catch (err) {
       showToast(err.message, true);

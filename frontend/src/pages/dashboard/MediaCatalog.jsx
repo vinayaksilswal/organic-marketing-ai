@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError} from '../../config';
 import { Upload, Trash2, Edit, Play, Eye, X, Sparkles, Copy, AlertTriangle, RefreshCw, Music, ShieldAlert, Folder, FolderPlus, FolderOpen, Layers, Clock, Send } from 'lucide-react';
 
 const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
@@ -529,7 +529,7 @@ const MediaCatalog = ({ user, token, showToast, activeWorkspaceId }) => {
 
       if (!res.ok) {
         const detail = await res.json().catch(() => ({}));
-        throw new Error(detail.detail || `Save failed (error ${res.status})`);
+        throw new Error(apiError(detail, `Save failed (error ${res.status})`));
       }
 
       showToast(editFile ? 'Caption and media updated' : 'Base caption updated');

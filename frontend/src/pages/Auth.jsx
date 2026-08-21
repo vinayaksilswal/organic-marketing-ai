@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
-import { API_BASE } from '../config';
+import { API_BASE, apiError} from '../config';
 
 const Auth = ({ onLogin, showToast }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
@@ -109,7 +109,7 @@ const Auth = ({ onLogin, showToast }) => {
         }
       } else {
         const errJson = await userRes?.json().catch(() => ({}));
-        throw new Error(errJson?.detail || 'Failed to fetch user data. Please try again.');
+        throw new Error(apiError(errJson, 'Failed to fetch user data. Please try again.'));
       }
     } catch (err) {
       if (err.name === 'TypeError' && err.message === 'Failed to fetch') {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   LifeBuoy, Send, CheckCircle2, Clock, MessageSquare, Star,
 } from 'lucide-react';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError} from '../../config';
 
 /**
  * Where a customer says something is broken, and says what they think.
@@ -77,7 +77,7 @@ const Support = ({ token, showToast }) => {
         body: JSON.stringify({ subject: subject.trim(), body: body.trim(), category }),
       }, token);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || 'Could not send that.');
+      if (!res.ok) throw new Error(apiError(data, 'Could not send that.'));
       setSubject(''); setBody('');
       showToast('Sent. You will see the reply here.');
       await load();
@@ -97,7 +97,7 @@ const Support = ({ token, showToast }) => {
         body: JSON.stringify({ rating, body: reviewBody.trim() || null }),
       }, token);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || 'Could not save that.');
+      if (!res.ok) throw new Error(apiError(data, 'Could not save that.'));
       showToast(data.message || 'Thank you.');
       await load();
     } catch (err) {

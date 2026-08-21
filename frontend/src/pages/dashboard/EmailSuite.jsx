@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError} from '../../config';
 import { Mail, Users, Tag, Plus, Send, Eye, Search, X, CheckCircle2, TrendingUp, MousePointer, AlertOctagon, Sparkles, Edit3, AlertTriangle, Settings, Link2 } from 'lucide-react';
 
 const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
@@ -76,7 +76,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
         }),
       }, token);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || 'Could not save email settings');
+      if (!res.ok) throw new Error(apiError(data, 'Could not save email settings'));
       showToast(data.message || 'Email connected.');
       setCfgKey('');
       setShowCfg(false);
@@ -115,7 +115,7 @@ const EmailSuite = ({ user, token, showToast, activeWorkspaceId }) => {
         }),
       }, token);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+      if (!res.ok) throw new Error(apiError(data, `Request failed (${res.status})`));
 
       // The server decides whether a send actually succeeded — trust its
       // status, not the fact that the request returned 200.

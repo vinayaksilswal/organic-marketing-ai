@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError} from '../../config';
 import {
   CreditCard, Check, AlertTriangle, RefreshCw, Zap, ExternalLink,
 } from 'lucide-react';
@@ -63,7 +63,7 @@ const Billing = ({ user, token, showToast }) => {
         body: JSON.stringify({ planCode: code }),
       }, token);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || 'Could not start the subscription');
+      if (!res.ok) throw new Error(apiError(data, 'Could not start the subscription'));
       if (!data.approveUrl) throw new Error('PayPal did not return an approval link');
       // Full navigation, not a popup — popups are blocked more often than not.
       window.location.href = data.approveUrl;
@@ -81,7 +81,7 @@ const Billing = ({ user, token, showToast }) => {
     try {
       const res = await authFetch(`${API_BASE}/billing/cancel`, { method: 'POST' }, token);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || 'Could not cancel');
+      if (!res.ok) throw new Error(apiError(data, 'Could not cancel'));
       showToast(data.message || 'Subscription cancelled.');
       await load();
     } catch (err) {

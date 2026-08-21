@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { API_BASE } from '../config';
+import { API_BASE, apiError} from '../config';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -33,7 +33,7 @@ export default function ResetPassword() {
         setStatus({ type: 'success', message: 'Password reset! Redirecting to login...' });
         setTimeout(() => navigate('/auth'), 2000);
       } else {
-        setStatus({ type: 'error', message: data.detail || 'Reset failed' });
+        setStatus({ type: 'error', message: apiError(data, 'Reset failed') });
       }
     } catch (err) {
       setStatus({ type: 'error', message: 'Network error' });

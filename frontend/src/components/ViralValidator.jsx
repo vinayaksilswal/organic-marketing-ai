@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../config';
+import { API_BASE, authFetch, apiError} from '../config';
 import { 
   Flame, 
   Play, 
@@ -93,7 +93,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
         setAnalysis(data.analysis);
         showToast('Viral validation complete! 🚀');
       } else {
-        showToast(data.detail || 'Could not analyze video', false);
+        showToast(apiError(data, 'Could not analyze video'), false);
       }
     } catch (err) {
       showToast('Error validating content with AI', false);

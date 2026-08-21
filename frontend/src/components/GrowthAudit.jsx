@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Check, X as XIcon, Loader2 } from 'lucide-react';
-import { API_BASE } from '../config';
+import { API_BASE, apiError} from '../config';
 
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
@@ -40,7 +40,7 @@ export default function GrowthAudit() {
         // The server's own message is better than anything generic invented
         // here: it distinguishes "we could not read that page" from "you have
         // had your free runs".
-        setError(body.detail || 'Could not audit that site. Try the full address.');
+        setError(apiError(body, 'Could not audit that site. Try the full address.'));
         setState('error');
         return;
       }

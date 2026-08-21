@@ -59,3 +59,24 @@ export const authFetch = async (url, options = {}, token, onLogout) => {
     throw new Error('Network error. Please check your connection.');
   }
 };
+
+/**
+ * The server's reason for refusing, whatever shape it arrives in.
+ *
+ * FastAPI raises HTTPException with `detail`, but main.py has a global handler
+ * that reshapes every one into {success: false, message}. So `body.detail` is
+ * populated in a unit test and undefined in production, and fifteen call sites
+ * were reading only `detail` — meaning every real explanation ("that link has
+ * expired", "you have used the free preview a few times") was replaced by a
+ * generic fallback for every actual user.
+ *
+ * Reading both is the fix; having one function do it is what stops the
+ * sixteenth call site getting it wrong.
+ */
+export function apiError(body, fallback = 'Something went wrong. Please try again.') {
+  const raw = body?.message || body?.detail;
+  if (typeof raw === 'string' && raw.trim()) return raw;
+  // FastAPI validation errors arrive as a list of {loc, msg}.
+  if (Array.isArray(raw) && raw.length && raw[0]?.msg) return raw[0].msg;
+  return fallback;
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE, authFetch } from '../config';
+import { API_BASE, authFetch, apiError} from '../config';
 import { useWorkspace } from './WorkspaceContext';
 import { 
   Send, 
@@ -178,7 +178,7 @@ How do you decide what is worth building?`,
         setBundle(data.bundle);
         showToast?.(`Generated 3 native posts for ${businessName}! 🚀`);
       } else {
-        showToast?.(data.detail || 'Generation failed', true);
+        showToast?.(apiError(data, 'Generation failed'), true);
       }
     } catch (err) {
       showToast?.('Error generating multi-platform posts', true);
@@ -213,7 +213,7 @@ How do you decide what is worth building?`,
       if (res.ok) {
         showToast?.(`Scheduled native posts to Social Queue for ${businessName}! 📅`);
       } else {
-        showToast?.(data.detail || 'Could not schedule to queue', true);
+        showToast?.(apiError(data, 'Could not schedule to queue'), true);
       }
     } catch (err) {
       showToast?.('Error scheduling to queue', true);

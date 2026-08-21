@@ -15,7 +15,7 @@ import Logo from '../components/Logo';
 import CardRail from '../components/CardRail';
 import GrowthAudit from '../components/GrowthAudit';
 import CountUp from '../components/CountUp';
-import { API_BASE } from '../config';
+import { API_BASE, apiError} from '../config';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
 
 /*
@@ -394,7 +394,7 @@ const Landing = () => {
         // server string like "Not Found" that means nothing to them.
         throw new Error(
           res.status === 429
-            ? (data.detail || 'You have used the free preview a few times. Create an account to keep going — it is free.')
+            ? apiError(data, 'You have used the free preview a few times. Create an account to keep going — it is free.')
             : 'The preview is not available right now. You can still start free and write your first post inside the app.'
         );
       }
