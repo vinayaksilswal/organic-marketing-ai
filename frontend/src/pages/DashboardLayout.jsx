@@ -5,6 +5,7 @@ import Logo from '../components/Logo';
 import Sidebar from '../components/Sidebar';
 import Overview from './dashboard/Overview';
 import VideoStudio from './dashboard/VideoStudio';
+import FacelessStudio from './dashboard/FacelessStudio';
 import ViralValidatorPage from './dashboard/ViralValidatorPage';
 import MediaCatalog from './dashboard/MediaCatalog';
 import SocialScheduler from './dashboard/SocialScheduler';
@@ -87,6 +88,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
               localStorage and hard-reloading the page. */}
           <Route path="/" element={<Overview user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} onLogout={onLogout} />} />
           <Route path="/video-studio" element={<VideoStudio user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          <Route path="/faceless-studio" element={<FacelessStudio token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/viral-validator" element={<ViralValidatorPage user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/validator" element={<Navigate to="/dashboard/viral-validator" replace />} />
           <Route path="/account-insights" element={<AccountInsights user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame , BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame , BarChart3, Film, Inbox} from 'lucide-react';
 import { API_BASE, authFetch } from '../config';
 
 const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }) => {
@@ -136,6 +136,13 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
           </span>
         </NavLink>
 
+        <NavLink to="/dashboard/faceless-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Film size={16} /> <span>Faceless Shorts</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
+            No camera
+          </span>
+        </NavLink>
+
         <NavLink to="/dashboard/viral-validator" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Flame size={16} /> <span>Viral Validator</span>
           <span className="sidebar-badge" style={{ background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
@@ -189,6 +196,19 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
             24/7
           </span>
         </NavLink>
+
+        {/* The operator's inbox, where customers' tickets arrive. It was
+            routed and nothing linked to it, so the only way to read a ticket
+            was to know the URL. Server-side it is already superadmin-only;
+            this just stops it being invisible to the one person who needs it. */}
+        {user?.isSuperAdmin && (
+          <NavLink to="/dashboard/inbox" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            <Inbox size={16} /> <span>Customer Inbox</span>
+            <span className="sidebar-badge" style={{ background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
+              Admin
+            </span>
+          </NavLink>
+        )}
       </nav>
 
       {/* User Profile Footer */}
