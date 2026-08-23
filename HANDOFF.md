@@ -221,7 +221,41 @@ Viral Validator results panel.
 
 ### 4.3 Engineering work outstanding
 
-**a) 17 customer-facing routes still have no interface caller.** This is the
+**Updated 2026-08-23.** Since the last revision of this brief the following
+landed — do not redo them:
+
+- **Bring-your-own image/video API.** `VideoApiConfig` had existed for weeks
+  with nothing that could write to it. `services/media_providers.py` plus three
+  endpoints under `/api/v1/creatives/media-providers`, and a connect button on
+  both prompt studios. The key is encrypted and never returned to the browser;
+  the leak guard is mutation-checked. **No rendering call is wired** — storing
+  the key is done, spending it is not.
+- **The posting queue was lying.** `execute_due_scheduled_posts` branched only
+  on FACEBOOK/INSTAGRAM/BOTH. PostShip writes TWITTER and LINKEDIN rows, which
+  matched nothing, collected no errors, and were marked POSTED. Nothing had
+  been sent. Now a dispatch table covers all five platforms and POSTED requires
+  a published id. **If you touch that status line, keep the rule: evidence, not
+  absence of errors.**
+- **LinkedIn was dropping every image.** `post_text` had no media parameter, so
+  multi_publisher's images went nowhere silently. Images now upload via the
+  three-step register/PUT/reference dance. **Video is deliberately not
+  implemented** — it needs chunked upload and a finalize call.
+- **Disconnect for X, LinkedIn and YouTube.** All three endpoints existed with
+  no caller. The panels also never showed a connected account as connected.
+- **The Hook Engine** is now its own scored stage between angle scoring and
+  scene writing (`best_hook` in `services/creative_strategist.py`). Six
+  archetypes competed, scored in code, runners-up surfaced in the interface.
+- **/health reports x, linkedin and youtube** alongside meta, so app-level
+  credentials can be confirmed without connecting an account to test them.
+
+Still outstanding:
+
+
+**a) Roughly 30 customer-facing routes still have no interface caller.**
+(Re-audit before trusting the list below; it predates the work above. The
+OAuth callbacks and webhooks in it are reached by the browser or by the
+provider, not by fetch, and are false positives.)
+ This is the
 recurring failure mode of this codebase — capability that exists, is tested,
 is billed for, and cannot be reached. Audit each and either wire it up or
 delete it:
