@@ -1312,37 +1312,64 @@ async def generate_postship_endpoint(
 
     await billing.record_usage(user_id, "prompts")
 
-    # If user requests scheduling, schedule posts in the SocialPost queue
+    # Feed the automatic posting loop.
+    #
+    # This used to write two rows -- TWITTER and LINKEDIN -- without asking
+    # whether either was connected, and stamp both with utc_now() so they
+    # fired in the same tick. Three things are fixed here:
+    #
+    #   1. Only connected platforms are queued. A row for an account that was
+    #      never linked is a guaranteed failure in somebody's history.
+    #   2. Facebook is included. It takes text, it was simply never wired.
+    #      Instagram and YouTube are not: text alone cannot post to either,
+    #      which is a platform rule, not an oversight.
+    #   3. The posts are spaced. Three identical timestamps publish in one
+    #      burst, which is what an automated account looks like right before
+    #      it stops getting reach.
+    queued: list[dict[str, Any]] = []
     if data.schedule_to_queue and profile_id:
+        from database import SocialPost, utc_now
+        from datetime import timedelta
+        from services.multi_publisher import connected_platforms
+
         async with AsyncSessionLocal() as session:
-            from database import SocialPost, utc_now
-            # X post
-            x_post = SocialPost(
-                userId=user_id,
-                businessProfileId=profile_id,
-                platform="TWITTER",
-                type="AUTO",
-                status="SCHEDULED",
-                caption=bundle.get("x_post", {}).get("content"),
-                scheduledAt=utc_now(),
-            )
-            session.add(x_post)
-            # LinkedIn post
-            li_post = SocialPost(
-                userId=user_id,
-                businessProfileId=profile_id,
-                platform="LINKEDIN",
-                type="AUTO",
-                status="SCHEDULED",
-                caption=bundle.get("linkedin_post", {}).get("content"),
-                scheduledAt=utc_now(),
-            )
-            session.add(li_post)
-            await session.commit()
+            available = await connected_platforms(session, profile_id)
+
+            # The bundle also carries a Reddit draft. It is not queued: there
+            # is no Reddit publisher in this system, and queueing a post that
+            # nothing can send is the failure this block exists to stop.
+            plan = [
+                ("x", "TWITTER", bundle.get("x_post", {}).get("content")),
+                ("linkedin", "LINKEDIN", bundle.get("linkedin_post", {}).get("content")),
+                ("facebook", "FACEBOOK", bundle.get("linkedin_post", {}).get("content")),
+            ]
+
+            base = utc_now()
+            slot = 0
+            for key, platform, content in plan:
+                if not available.get(key) or not content:
+                    continue
+                session.add(SocialPost(
+                    userId=user_id,
+                    businessProfileId=profile_id,
+                    platform=platform,
+                    type="AUTO",
+                    status="SCHEDULED",
+                    caption=content,
+                    scheduledAt=base + timedelta(minutes=25 * slot),
+                ))
+                queued.append({"platform": platform, "inMinutes": 25 * slot})
+                slot += 1
+
+            if queued:
+                await session.commit()
 
     return {
         "success": True,
         "bundle": bundle,
+        # Reported so the interface can say what will go out and when, rather
+        # than implying everything was queued when nothing was connected.
+        "queued": queued,
     }
 
 

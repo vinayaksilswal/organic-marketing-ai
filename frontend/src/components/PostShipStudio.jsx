@@ -198,7 +198,21 @@ How do you decide what is worth building?`,
 
       const data = await res.json();
       if (res.ok) {
-        showToast?.(`Scheduled native posts to Social Queue for ${businessName}! 📅`);
+        // Say what was queued and where. The old message claimed success
+        // whatever came back -- including the case where no account was
+        // connected and nothing at all had been scheduled.
+        const queued = data.queued || [];
+        if (queued.length === 0) {
+          showToast?.(
+            'Nothing was queued — connect X, LinkedIn or Facebook first, then try again.',
+            true,
+          );
+        } else {
+          const names = queued
+            .map((q) => (q.platform === 'TWITTER' ? 'X' : q.platform[0] + q.platform.slice(1).toLowerCase()))
+            .join(', ');
+          showToast?.(`Queued to ${names}. First one goes out shortly, the rest are spaced out.`);
+        }
       } else {
         showToast?.(apiError(data, 'Could not schedule to queue'), true);
       }

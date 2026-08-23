@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -523,11 +523,27 @@ def is_post_due(hours_since_last: float, interval_hours: float,
 
 
 async def execute_due_scheduled_posts() -> None:
-    """Finds all one-time scheduled posts due for publishing and publishes them."""
+    """Publish one-time scheduled posts that have come due.
+
+    THE BUG THIS REPLACES
+    ---------------------
+    This used to test only for FACEBOOK, INSTAGRAM and BOTH. PostShip queues
+    rows with platform TWITTER and LINKEDIN. Those matched no branch, so no
+    publisher ran, no error was recorded -- and the status line
+
+        "POSTED" if not errors or fb_post_id or ig_post_id else "FAILED"
+
+    read an empty error list and marked them POSTED. The customer was told
+    their post went out; nothing had been sent anywhere.
+
+    A visible failure is recoverable. A false success is not: nobody goes
+    looking for a post the dashboard says already shipped. So the rule here
+    is now the opposite of what it was -- POSTED requires evidence that
+    something published, and anything this function does not understand is
+    FAILED with a reason, never quietly successful.
+    """
     now = utc_now()
     try:
-        from services.social_service import post_to_facebook, post_to_instagram
-
         async with AsyncSessionLocal() as session:
             stmt = select(SocialPost).where(
                 SocialPost.status == "SCHEDULED",
@@ -537,35 +553,152 @@ async def execute_due_scheduled_posts() -> None:
             due_posts = res.scalars().all()
 
             for post in due_posts:
-                workspace_id = post.businessProfileId
-                target_urls = post.mediaUrls or []
-                caption = post.caption or ""
-                fb_post_id, ig_post_id = None, None
-                errors = []
-
-                if post.platform in ("FACEBOOK", "BOTH"):
-                    try:
-                        fb_post_id = await post_to_facebook(workspace_id, message=caption, media_urls=target_urls)
-                    except Exception as e:
-                        errors.append(f"FB: {str(e)}")
-
-                if post.platform in ("INSTAGRAM", "BOTH"):
-                    try:
-                        ig_post_id = await post_to_instagram(workspace_id, message=caption, media_urls=target_urls)
-                    except Exception as e:
-                        errors.append(f"IG: {str(e)}")
-
-                post.status = "POSTED" if not errors or fb_post_id or ig_post_id else "FAILED"
-                post.postedAt = utc_now()
-                post.fbPostId = fb_post_id
-                post.igPostId = ig_post_id
-                post.errorLog = " | ".join(errors) if errors else None
-                logger.info(f"[SCHEDULED POST] Processed post {post.id} for {workspace_id} -> {post.status}")
+                try:
+                    await _publish_one_scheduled_post(post)
+                except Exception as e:
+                    # One bad row must not take the rest of the batch with it.
+                    post.status = "FAILED"
+                    post.errorLog = str(e)[:500]
+                    post.postedAt = utc_now()
+                logger.info(f"[SCHEDULED POST] Processed post {post.id} for {post.businessProfileId} -> {post.status}")
 
             if due_posts:
                 await session.commit()
     except Exception as e:
         logger.error(f"[SCHEDULED POSTS] Loop exception: {e}")
+
+
+# Which platform tokens this function knows how to publish. A row carrying
+# anything else is a bug somewhere upstream, and it fails loudly rather than
+# being counted as sent.
+_SCHEDULED_TARGETS = {
+    "FACEBOOK": ("facebook",),
+    "INSTAGRAM": ("instagram",),
+    "BOTH": ("facebook", "instagram"),
+    "TWITTER": ("x",),
+    "X": ("x",),
+    "LINKEDIN": ("linkedin",),
+    "YOUTUBE": ("youtube",),
+    "ALL": ("facebook", "instagram", "x", "linkedin", "youtube"),
+}
+
+_POST_ID_FIELD = {
+    "facebook": "fbPostId",
+    "instagram": "igPostId",
+    "x": "twitterPostId",
+    "linkedin": "linkedinPostId",
+}
+
+
+async def _publish_one_scheduled_post(post: Any) -> None:
+    """Send one row to every platform it names, and record what happened.
+
+    Split out of the loop above so a single post can be tested without
+    standing up a scheduler, a database and a clock.
+    """
+
+    workspace_id = post.businessProfileId
+    media_urls = post.mediaUrls or []
+    caption = post.caption or ""
+    token = (post.platform or "").upper()
+
+    targets = _SCHEDULED_TARGETS.get(token)
+    if not targets:
+        post.status = "FAILED"
+        post.errorLog = f"Unknown platform '{post.platform}' -- nothing was sent."
+        post.postedAt = utc_now()
+        return
+
+    website = None
+    try:
+        from database import BusinessProfile
+        async with AsyncSessionLocal() as s:
+            profile = await s.get(BusinessProfile, workspace_id)
+            website = getattr(profile, "website", None) if profile else None
+    except Exception:
+        pass
+
+    published: dict[str, str] = {}
+    errors: list[str] = []
+
+    for platform in targets:
+        try:
+            post_id = await _publish_to(
+                platform, workspace_id, caption, media_urls, website,
+                explicit=len(targets) == 1,
+            )
+        except _PlatformSkip as skip:
+            # A rule of the platform, not a failure of this workspace. Only
+            # reached on multi-target rows; a row aimed at one platform that
+            # cannot take it is a real failure and says so.
+            logger.info(f"[SCHEDULED POST] skipped {platform}: {skip}")
+            continue
+        except Exception as e:
+            errors.append(f"{platform}: {e}")
+            continue
+
+        if post_id:
+            published[platform] = str(post_id)
+            field = _POST_ID_FIELD.get(platform)
+            if field:
+                setattr(post, field, str(post_id))
+
+    # POSTED needs evidence. This is the line that used to lie.
+    post.status = "POSTED" if published else "FAILED"
+    post.postedAt = utc_now()
+    if errors:
+        post.errorLog = " | ".join(errors)[:500]
+    elif not published:
+        post.errorLog = "Nothing published."
+    else:
+        post.errorLog = None
+
+
+class _PlatformSkip(Exception):
+    """This platform cannot take this post, and that is not an error."""
+
+
+async def _publish_to(platform, workspace_id, caption, media_urls, website, *, explicit):
+    """One publish call. Raises _PlatformSkip when the platform's own rules
+    make the post impossible, and lets real failures propagate."""
+    from services.multi_publisher import caption_for, _looks_like_video
+
+    text = caption_for(platform, caption, website)
+
+    if platform == "facebook":
+        from services.social_service import post_to_facebook
+        return await post_to_facebook(workspace_id, message=text, media_urls=media_urls)
+
+    if platform == "instagram":
+        # Instagram will not accept a caption on its own.
+        if not media_urls:
+            if explicit:
+                raise RuntimeError("Instagram needs an image or video -- this post had neither.")
+            raise _PlatformSkip("no media")
+        from services.social_service import post_to_instagram
+        return await post_to_instagram(workspace_id, message=text, media_urls=media_urls)
+
+    if platform == "x":
+        from services.twitter_service import twitter_service
+        return await twitter_service.post_tweet(workspace_id, text, media_urls=media_urls)
+
+    if platform == "linkedin":
+        from services.linkedin_service import linkedin_service
+        return await linkedin_service.post_text(workspace_id, text)
+
+    if platform == "youtube":
+        video = next((u for u in media_urls if _looks_like_video(u)), None)
+        if not video:
+            if explicit:
+                raise RuntimeError("YouTube needs a video -- this post had none.")
+            raise _PlatformSkip("no video")
+        from services import youtube_service
+        return await youtube_service.upload_video(
+            workspace_id, video, title=text,
+            description=caption_for("facebook", caption, website),
+        )
+
+    raise RuntimeError(f"No publisher for '{platform}'.")
 
 
 async def _run_media_sweep() -> None:
