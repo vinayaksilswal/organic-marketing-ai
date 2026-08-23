@@ -167,3 +167,24 @@ def test_previews_state_the_real_platform_limits_instead():
     assert "/ 280 characters" in src, "X's real limit is not shown"
     assert "see more" in src, "LinkedIn's truncation point is not shown"
     assert "/ 300" in src, "Reddit's title limit is not shown"
+
+
+def test_the_postship_previews_survive_an_empty_start():
+    """The composer starts empty on purpose, so `bundle` is null until
+    something is generated. The workspace-sync effect spread `...prev.x_post`
+    unconditionally and threw "Cannot read properties of null" during render,
+    white-screening the whole PostShip page in production.
+
+    Any updater that reaches into `prev` has to tolerate there being no
+    bundle yet.
+    """
+    src = (ROOT / "components" / "PostShipStudio.jsx").read_text(encoding="utf-8")
+
+    assert "useState(null)" in src, "the composer no longer starts empty"
+
+    # Every `...prev.<field>` must sit behind a null check on prev.
+    if "...prev." in src:
+        assert "if (!prev) return prev;" in src, (
+            "an updater reaches into prev with no guard; null bundle will crash "
+            "the page on first render"
+        )

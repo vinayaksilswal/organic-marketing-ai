@@ -112,10 +112,17 @@ How do you decide what is worth building?`,
 
   const [bundle, setBundle] = useState(null);
 
-  // Re-synchronize preview data when active business changes
+  // Re-label the previews when the active business changes.
+  //
+  // `prev` is null until something has been generated — the composer starts
+  // empty on purpose. Spreading `...prev.x_post` in that state threw
+  // "Cannot read properties of null" during render and white-screened the
+  // whole page. There is nothing to re-label before there is a bundle.
   useEffect(() => {
-    if (businessName) {
-      setBundle(prev => ({
+    if (!businessName) return;
+    setBundle(prev => {
+      if (!prev) return prev;
+      return {
         ...prev,
         x_post: {
           ...prev.x_post,
@@ -126,9 +133,9 @@ How do you decide what is worth building?`,
           ...prev.linkedin_post,
           author_name: businessName,
           headline: `Founder at ${businessName}`,
-        }
-      }));
-    }
+        },
+      };
+    });
   }, [businessName, cleanHandle]);
 
   const handleGenerate = async (e) => {
