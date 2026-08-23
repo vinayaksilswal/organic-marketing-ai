@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
-import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter, Save, Edit3, Zap, Clock, CalendarDays, Bot, Trash2, AlertTriangle, Unplug, Pause, Play } from 'lucide-react';
+import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter, Save, Edit3, Zap, Clock, CalendarDays, Bot, Trash2, AlertTriangle, Unplug, Pause, Play, Youtube} from 'lucide-react';
 
 const Workspaces = ({ user, token, showToast, updateAuth }) => {
   const [isCreating, setIsCreating] = useState(false);
@@ -166,6 +166,22 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
   };
 
   const [connectingLinkedIn, setConnectingLinkedIn] = useState(false);
+  const [connectingYouTube, setConnectingYouTube] = useState(false);
+
+  const handleConnectYouTube = async (workspaceId) => {
+    setConnectingYouTube(true);
+    try {
+      const res = await authFetch(`${API_BASE}/youtube/connect?workspace_id=${encodeURIComponent(workspaceId)}`, {}, token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.authUrl) {
+        throw new Error(apiError(data, 'YouTube connection is unavailable right now.'));
+      }
+      window.location.href = data.authUrl;
+    } catch (err) {
+      showToast(err.message, true);
+      setConnectingYouTube(false);
+    }
+  };
 
   const handleConnectLinkedIn = async (workspaceId) => {
     setConnectingLinkedIn(true);
@@ -894,6 +910,36 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       >
                         <Linkedin size={17} />
                         {connectingLinkedIn ? 'Redirecting to LinkedIn…' : 'Connect LinkedIn'}
+                      </button>
+                    </div>
+
+                    <div style={{ padding: '1rem', borderRadius: 10, border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+                      <h4 style={{ margin: '0 0 0.35rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <Youtube size={17} color="#ff0000" /> YouTube
+                      </h4>
+                      {/* The quota is the honest headline here. An upload costs
+                          1,600 units against 10,000 a day for the whole
+                          application, so this is six uploads daily shared by
+                          every customer -- better said now than discovered as a
+                          403 on the seventh. */}
+                      <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        Sign in with Google and your videos publish to your channel automatically.
+                        YouTube allows a limited number of uploads per day, so this is used for
+                        video posts only.
+                      </p>
+                      <button
+                        onClick={() => handleConnectYouTube(editWorkspaceId)}
+                        disabled={connectingYouTube}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.55rem', width: '100%',
+                          justifyContent: 'center', padding: '0.7rem', borderRadius: 8,
+                          background: '#ff0000', color: '#fff', border: 'none', fontSize: '0.9rem',
+                          fontWeight: 600, cursor: connectingYouTube ? 'wait' : 'pointer',
+                          opacity: connectingYouTube ? 0.7 : 1, minHeight: 44,
+                        }}
+                      >
+                        <Youtube size={17} />
+                        {connectingYouTube ? 'Redirecting to Google…' : 'Connect YouTube'}
                       </button>
                     </div>
 

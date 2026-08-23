@@ -118,7 +118,10 @@ class _Session:
 @pytest.mark.asyncio
 async def test_a_workspace_with_no_connection_row_reports_nothing_connected():
     got = await mp.connected_platforms(_Session(None), "ws")
-    assert got == {"facebook": False, "instagram": False, "x": False, "linkedin": False}
+    assert got == {
+        "facebook": False, "instagram": False, "x": False,
+        "linkedin": False, "youtube": False,
+    }
 
 
 @pytest.mark.asyncio
@@ -212,7 +215,7 @@ async def test_an_unconnected_platform_is_skipped_not_failed(monkeypatch, stub):
     out = await mp.publish_everywhere("ws", IG_CAPTION, media_urls=["https://x/v.mp4"])
 
     assert out["failed"] == [], f"nothing failed, yet: {out['failed']}"
-    assert sorted(out["skipped"]) == ["linkedin", "x"]
+    assert sorted(out["skipped"]) == ["linkedin", "x", "youtube"]
     assert {e["platform"] for e in out["published"]} == {"facebook", "instagram"}
 
 
@@ -358,3 +361,28 @@ def test_the_interface_shows_all_four():
     assert "post.linkedinPostId" in src
     # The old form could only ever render two of them.
     assert "{post.fbPostId ? 'FB ✓' : ''} {post.igPostId ? 'IG ✓' : ''}" not in src
+
+
+@pytest.mark.asyncio
+async def test_youtube_is_skipped_when_there_is_no_video(monkeypatch, stub):
+    """YouTube takes a video and nothing else. An image-only cycle is a skip,
+    exactly as Instagram is when there is no media at all."""
+    _with_connections(monkeypatch, youtube=True)
+    out = await mp.publish_everywhere("ws", IG_CAPTION, media_urls=["https://x/photo.jpg"])
+    assert "youtube" in out["skipped"]
+    assert out["failed"] == []
+
+
+def test_a_youtube_title_fits_the_platform_limit():
+    """YouTube caps titles at 100 characters and rejects longer ones, so the
+    caption cannot be handed over unshaped."""
+    title = mp.caption_for("youtube", "word " * 200)
+    assert len(title) <= 100
+
+
+def test_the_youtube_title_is_one_line():
+    """A title with a newline in it is refused by the API."""
+    newline = chr(10)
+    title = mp.caption_for("youtube", "First line here" + newline * 2 + "Second paragraph")
+    assert newline not in title
+    assert title.startswith("First line")

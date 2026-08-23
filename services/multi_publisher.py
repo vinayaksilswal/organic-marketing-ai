@@ -68,6 +68,14 @@ def _truncate_on_a_word(text: str, limit: int) -> str:
     return cut.rstrip(" ,.;:-") + "…"
 
 
+_VIDEO_SUFFIXES = (".mp4", ".mov", ".m4v", ".webm")
+
+
+def _looks_like_video(url: str) -> bool:
+    lowered = (url or "").lower().split("?")[0]
+    return lowered.endswith(_VIDEO_SUFFIXES) or "/video/" in lowered
+
+
 def caption_for(platform: str, caption: str) -> str:
     """The same message, shaped for how each platform is read."""
     platform = (platform or "").lower()
@@ -80,6 +88,11 @@ def caption_for(platform: str, caption: str) -> str:
         room = X_LIMIT - (len(keep) + 1 if keep else 0)
         text = _truncate_on_a_word(body, room)
         return f"{text} {keep}".strip() if keep else text
+
+    if platform == "youtube":
+        # A title, not a caption: YouTube caps at 100 characters and shows
+        # roughly the first 60 in search. The hashtags go in the description.
+        return _truncate_on_a_word(body.splitlines()[0] if body else "", 100)
 
     if platform == "linkedin":
         # Hashtags move to their own line at the end rather than sitting in
@@ -102,7 +115,7 @@ async def connected_platforms(session: Any, workspace_id: str) -> dict[str, bool
     )).scalars().first()
 
     if not conn:
-        return {"facebook": False, "instagram": False, "x": False, "linkedin": False}
+        return {"facebook": False, "instagram": False, "x": False, "linkedin": False, "youtube": False}
 
     return {
         "facebook": bool(conn.fbPageId and conn.fbAccessToken),
@@ -111,6 +124,7 @@ async def connected_platforms(session: Any, workspace_id: str) -> dict[str, bool
         # Both halves are needed: a token with no actor URN cannot name an
         # author, and LinkedIn rejects the post.
         "linkedin": bool(conn.linkedinAccessToken and getattr(conn, "linkedinActorUrn", None)),
+        "youtube": bool(getattr(conn, "youtubeRefreshToken", None)),
     }
 
 
@@ -175,5 +189,20 @@ async def publish_everywhere(
 
     await attempt("linkedin", lambda: linkedin_service.post_text(
         workspace_id, caption_for("linkedin", caption)))
+
+    # YouTube takes a video and nothing else. An image post or a text-only
+    # cycle is a skip, not a failure -- the same rule as Instagram.
+    video = next((u for u in media_urls if _looks_like_video(u)), None)
+    if video:
+        from services import youtube_service
+
+        await attempt("youtube", lambda: youtube_service.upload_video(
+            workspace_id,
+            video,
+            title=caption_for("youtube", caption),
+            description=caption_for("facebook", caption),
+        ))
+    elif available.get("youtube"):
+        skipped.append("youtube")
 
     return {"published": published, "skipped": skipped, "failed": failed}
