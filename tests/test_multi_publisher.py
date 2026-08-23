@@ -166,8 +166,9 @@ def stub(monkeypatch):
         calls["instagram"] = caption
         return "ig_1"
 
-    async def tweet(ws, text):
+    async def tweet(ws, text, media_urls=None):
         calls["x"] = text
+        calls["x_media"] = media_urls or []
         return "x_1"
 
     async def li(ws, text):
@@ -431,3 +432,69 @@ def test_a_caption_without_the_phrase_is_untouched():
 def test_the_usual_phrasings_are_all_caught(phrasing):
     out = mp.caption_for("facebook", f"Start today - {phrasing}", website="https://organiflo.com")
     assert "bio" not in out.lower(), f"missed: {phrasing}"
+
+
+# =============================================================================
+# What goes where, by what kind of post it is
+# =============================================================================
+
+def _everything_connected(monkeypatch):
+    _with_connections(
+        monkeypatch,
+        facebook=True, instagram=True, x=True, linkedin=True, youtube=True,
+    )
+
+
+@pytest.fixture
+def yt_stub(monkeypatch, stub):
+    async def upload(ws, url, title, description="", privacy="public"):
+        stub["youtube"] = title
+        return "yt_1"
+
+    import services.youtube_service as ys
+    monkeypatch.setattr(ys, "upload_video", upload)
+    return stub
+
+
+@pytest.mark.asyncio
+async def test_a_text_post_skips_the_platforms_that_require_media(monkeypatch, yt_stub):
+    """Instagram cannot publish without media and YouTube needs a video.
+    Neither is a failure — it is what those platforms are."""
+    _everything_connected(monkeypatch)
+    out = await mp.publish_everywhere("ws", "A text-only update", media_urls=[])
+
+    went = sorted(e["platform"] for e in out["published"])
+    assert went == ["facebook", "linkedin", "x"], went
+    assert sorted(out["skipped"]) == ["instagram", "youtube"]
+    assert out["failed"] == []
+
+
+@pytest.mark.asyncio
+async def test_an_image_post_goes_everywhere_except_youtube(monkeypatch, yt_stub):
+    """YouTube takes video. An image post is a skip there and a real post
+    everywhere else."""
+    _everything_connected(monkeypatch)
+    out = await mp.publish_everywhere("ws", "With a picture", media_urls=["https://x/p.jpg"])
+
+    went = sorted(e["platform"] for e in out["published"])
+    assert went == ["facebook", "instagram", "linkedin", "x"], went
+    assert out["skipped"] == ["youtube"]
+
+
+@pytest.mark.asyncio
+async def test_a_video_post_reaches_every_connected_platform(monkeypatch, yt_stub):
+    _everything_connected(monkeypatch)
+    out = await mp.publish_everywhere("ws", "With a clip", media_urls=["https://x/c.mp4"])
+
+    went = sorted(e["platform"] for e in out["published"])
+    assert went == ["facebook", "instagram", "linkedin", "x", "youtube"], went
+    assert out["skipped"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_picture_actually_reaches_x(monkeypatch, yt_stub):
+    """X received text only, so an image post arrived there as a bare line and
+    the customer believed their picture had gone out."""
+    _everything_connected(monkeypatch)
+    await mp.publish_everywhere("ws", "With a picture", media_urls=["https://x/p.jpg"])
+    assert yt_stub.get("x_media") == ["https://x/p.jpg"]

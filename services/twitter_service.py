@@ -22,6 +22,8 @@ import logging
 from typing import Optional
 from database import AsyncSessionLocal, SocialConnection
 from sqlalchemy import select
+import asyncio
+
 from services.crypto_service import decrypt_token
 
 logger = logging.getLogger("organicai.twitter")
@@ -36,6 +38,29 @@ class TwitterService:
     def __init__(self):
         self.api_key = os.getenv("TWITTER_API_KEY", "")
         self.api_secret = os.getenv("TWITTER_API_SECRET", "")
+
+    async def _credentials(self, workspace_id: str):
+        """The decrypted OAuth1 token pair, or None.
+
+        Media upload needs these directly: uploading still goes through the
+        v1.1 API, which takes an OAuth1 handler rather than the v2 Client that
+        posts the tweet.
+        """
+        if not self.api_key or not self.api_secret:
+            return None
+
+        async with AsyncSessionLocal() as session:
+            conn = (await session.execute(
+                select(SocialConnection).where(
+                    SocialConnection.businessProfileId == workspace_id
+                )
+            )).scalars().first()
+            if not conn or not conn.twitterAccessToken or not conn.twitterAccessSecret:
+                return None
+            return (
+                decrypt_token(conn.twitterAccessToken) or conn.twitterAccessToken,
+                decrypt_token(conn.twitterAccessSecret) or conn.twitterAccessSecret,
+            )
 
     async def _get_client(self, workspace_id: str):
         """Initialize the tweepy Client for a specific tenant."""
@@ -69,7 +94,58 @@ class TwitterService:
             logger.error(f"Failed to initialize Twitter client: {e}")
             return None
 
-    async def post_tweet(self, workspace_id: str, text: str) -> Optional[str]:
+    async def _upload_media(self, workspace_id: str, media_url: str) -> Optional[str]:
+        """Put one image or clip on X and return its media id.
+
+        Uploading still goes through the v1.1 endpoint — v2 has no media
+        upload — so this needs the OAuth1 API object rather than the v2
+        Client the tweet itself uses.
+
+        Returns None on any failure, and the caller then posts the text alone:
+        a tweet without its picture is worth more than no tweet.
+        """
+        creds = await self._credentials(workspace_id)
+        if not creds:
+            return None
+        access_token, access_token_secret = creds
+
+        try:
+            import httpx
+            import tweepy
+
+            async with httpx.AsyncClient(timeout=120, follow_redirects=True) as http:
+                res = await http.get(media_url)
+            if res.status_code != 200 or not res.content:
+                logger.warning(f"X: could not fetch {media_url} ({res.status_code})")
+                return None
+
+            auth = tweepy.OAuth1UserHandler(
+                self.api_key, self.api_secret, access_token, access_token_secret
+            )
+            api = tweepy.API(auth)
+
+            lowered = media_url.lower().split("?")[0]
+            is_video = lowered.endswith((".mp4", ".mov", ".m4v")) or "/video/" in lowered
+            filename = "clip.mp4" if is_video else "image.jpg"
+
+            import io as _io
+
+            # chunked is required for video and harmless for stills.
+            uploaded = await asyncio.to_thread(
+                api.media_upload,
+                filename=filename,
+                file=_io.BytesIO(res.content),
+                chunked=is_video,
+                media_category="tweet_video" if is_video else "tweet_image",
+            )
+            return str(uploaded.media_id)
+        except Exception as e:
+            logger.warning(f"X: media upload failed, posting text only: {e}")
+            return None
+
+    async def post_tweet(
+        self, workspace_id: str, text: str, media_urls: Optional[list] = None
+    ) -> Optional[str]:
         """
         Post a single tweet. Returns the tweet ID on success.
         
@@ -83,8 +159,17 @@ class TwitterService:
         if not client:
             return None
 
+        media_ids = []
+        for url in (media_urls or [])[:4]:   # X allows four per tweet
+            mid = await self._upload_media(workspace_id, url)
+            if mid:
+                media_ids.append(mid)
+
         try:
-            response = client.create_tweet(text=text)
+            response = (
+                client.create_tweet(text=text, media_ids=media_ids)
+                if media_ids else client.create_tweet(text=text)
+            )
             tweet_id = response.data["id"]
             logger.info(f"Tweet posted successfully: {tweet_id}")
             return str(tweet_id)

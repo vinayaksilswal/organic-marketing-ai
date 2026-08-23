@@ -227,8 +227,11 @@ async def publish_everywhere(
 
     from services.twitter_service import twitter_service
 
+    # X takes up to four attachments. A post whose image never arrived is a
+    # post that reads as a bare link, and on X that is the difference between
+    # something people stop for and something they scroll past.
     await attempt("x", lambda: twitter_service.post_tweet(
-        workspace_id, caption_for("x", caption, website)))
+        workspace_id, caption_for("x", caption, website), media_urls=media_urls))
 
     from services.linkedin_service import linkedin_service
 
