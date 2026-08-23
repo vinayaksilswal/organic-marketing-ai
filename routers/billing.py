@@ -101,10 +101,28 @@ async def subscribe(
         cancel_url=f"{frontend}/dashboard/billing?cancelled=1",
     )
     if not result or not result.get("approveUrl"):
-        raise HTTPException(
-            status_code=502,
-            detail="PayPal could not start the subscription. Please try again shortly.",
+        # Recurring billing needs the Subscriptions product enabled on the
+        # PayPal app, and it is not. This used to raise a 502 saying "please
+        # try again shortly", which was false — it will never succeed until
+        # that is switched on — and it stopped the customer dead at the exact
+        # moment they were trying to hand over money.
+        #
+        # The one-time order path works today and buys the same access for a
+        # month, so send them there instead of nowhere. A sale that does not
+        # auto-renew beats no sale.
+        logger.warning(
+            f"Recurring subscription unavailable for {user_id}; offering the "
+            f"one-time checkout instead."
         )
+        return {
+            "success": False,
+            "recurringUnavailable": True,
+            "fallbackUrl": "/checkout",
+            "message": (
+                "Automatic monthly billing is not switched on yet. You can buy "
+                "a month now — it will not renew on its own."
+            ),
+        }
 
     async with AsyncSessionLocal() as session:
         sub = Subscription(

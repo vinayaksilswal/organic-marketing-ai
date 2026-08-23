@@ -20,7 +20,7 @@ briefs, schedules posts and publishes them automatically.
 | Hosting | Backend on Render (single gunicorn worker), frontend on Vercel |
 | Database | Neon Postgres |
 | Repo | `github.com/vinayaksilswal/organic-marketing-ai`, branch `main`, CI on push |
-| State at handoff | commit `e2cc348`, **978 tests passing, 2 skipped**, 61 test files |
+| State at handoff | commit `2a36351`, **979 tests passing, 2 skipped**, 62 test files |
 | Live | https://organiflo.com · API https://organic-marketing-ai-0abh.onrender.com |
 
 Run the suite with the project venv:
@@ -134,7 +134,24 @@ strings rather than running anything. Two habits are expected:
    line it existed to catch because it matched the *word* `message` from an
    unrelated object key.
 
-### 2.8 Environment quirk
+### 2.8 The suite cannot see a broken page
+
+Nothing here executes the React tree. There is no JS test runner, so a
+render-time crash passes every test and a clean build.
+
+This is not hypothetical. Making the PostShip composer start empty left
+`bundle` as null, and an effect that spread `...prev.x_post` unconditionally
+threw during render. `/dashboard/postship` served a completely blank page in
+production while 978 tests passed and the build was green.
+
+So: after any change to a dashboard component's initial state, **load the page**.
+If you cannot (they are behind a login), say so rather than reporting it as
+verified. Two specific traps:
+
+- an updater reading `prev.something` when the state can legitimately be null
+- an effect that runs on first render before data exists
+
+### 2.9 Environment quirk
 
 Heredocs in this shell collapse `\n` escapes — writing `\\n` inside a Python
 heredoc has repeatedly produced real newlines or stray control bytes in the
@@ -275,6 +292,6 @@ Do not start coding. Run this and confirm it matches what this document says:
 ./.venv/Scripts/python.exe -m pytest -q
 ```
 
-Expect **978 passed, 2 skipped**. If it differs, something changed after this
+Expect **979 passed, 2 skipped**. If it differs, something changed after this
 handoff was written, and you should find out what before trusting anything
 above.

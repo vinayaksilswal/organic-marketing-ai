@@ -64,6 +64,16 @@ const Billing = ({ user, token, showToast }) => {
       }, token);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(apiError(data, 'Could not start the subscription'));
+
+      // Recurring billing is not enabled on the PayPal app yet. Rather than
+      // stopping somebody who is actively trying to pay, take them to the
+      // one-time checkout, which buys the same access for a month.
+      if (data.recurringUnavailable && data.fallbackUrl) {
+        showToast(data.message || 'Taking you to checkout…', false);
+        window.location.href = data.fallbackUrl;
+        return;
+      }
+
       if (!data.approveUrl) throw new Error('PayPal did not return an approval link');
       // Full navigation, not a popup — popups are blocked more often than not.
       window.location.href = data.approveUrl;
