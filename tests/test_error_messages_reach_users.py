@@ -88,7 +88,6 @@ def test_the_places_that_were_broken_now_use_the_helper():
     expected = {
         "pages/ResetPassword.jsx": "Reset failed",
         "pages/dashboard/Billing.jsx": "Could not start the subscription",
-        "components/GrowthAudit.jsx": "Could not audit that site",
         "pages/dashboard/Support.jsx": "Could not send that.",
     }
     for rel, fallback in expected.items():

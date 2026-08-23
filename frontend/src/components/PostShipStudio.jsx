@@ -115,20 +115,17 @@ How do you decide what is worth building?`,
       handle: cleanHandle,
       display_name: businessName,
       content: sample.x,
-      metrics_estimate: { likes: '310', retweets: '48', replies: '12', views: '21K' }
     },
     linkedin_post: {
       author_name: businessName,
       headline: `Founder at ${businessName}`,
       hook_line: sample.hook,
       content: sample.li,
-      metrics_estimate: { reactions: '47', comments: '6' }
     },
     reddit_post: {
       subreddit: sample.sub,
       title: sample.title,
       body: sample.body,
-      metrics_estimate: { upvotes: '248', comments: '32' }
     }
   });
 
@@ -364,7 +361,7 @@ How do you decide what is worth building?`,
       </div>
 
       {/* Input Form Box */}
-      <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)' }}>
+      <div style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)' }}>
         <form onSubmit={handleGenerate}>
           <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <Sparkles size={14} color="var(--primary-color)" /> Idea, Ship Line, Changelog, or URL for {businessName}:
@@ -532,10 +529,18 @@ How do you decide what is worth building?`,
               color: 'var(--text-muted)',
               marginBottom: '0.85rem',
             }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><MessageSquare size={13} /> {bundle?.x_post?.metrics_estimate?.replies || '12'}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Repeat size={13} /> {bundle?.x_post?.metrics_estimate?.retweets || '48'}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Heart size={13} color="#f43f5e" /> {bundle?.x_post?.metrics_estimate?.likes || '310'}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><BarChart2 size={13} /> {bundle?.x_post?.metrics_estimate?.views || '21K'}</span>
+              {(() => {
+                const used = (bundle?.x_post?.content || '').length;
+                const over = used > 280;
+                return (
+                  <>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: over ? 'var(--error)' : 'var(--text-muted)', fontWeight: over ? 700 : 500 }}>
+                      <MessageSquare size={13} /> {used} / 280 characters
+                    </span>
+                    <span>{over ? 'Too long — X will refuse it' : 'Posts as one tweet'}</span>
+                  </>
+                );
+              })()}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -646,9 +651,15 @@ How do you decide what is worth building?`,
               marginBottom: '0.85rem',
             }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                👍❤️💡 {bundle?.linkedin_post?.metrics_estimate?.reactions || '47'} reactions
+                {(() => {
+                  const body = bundle?.linkedin_post?.content || '';
+                  const shown = body.slice(0, 140);
+                  return body.length > 140
+                    ? `First ${shown.length} characters show before “see more”`
+                    : 'Shows in full, no “see more”';
+                })()}
               </span>
-              <span>{bundle?.linkedin_post?.metrics_estimate?.comments || '6'} comments</span>
+              <span>{(bundle?.linkedin_post?.content || '').length} characters</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -683,7 +694,7 @@ How do you decide what is worth building?`,
         {/* CARD 3: REDDIT NATIVE CARD */}
         {/* ========================================================================= */}
         <div style={{
-          background: '#12141a',
+          background: 'var(--bg-card)',
           borderRadius: 14,
           border: '1px solid var(--border-color)',
           padding: '1.35rem',
@@ -762,14 +773,14 @@ How do you decide what is worth building?`,
               color: 'var(--text-muted)',
               marginBottom: '0.85rem',
             }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.06)', padding: '0.2rem 0.5rem', borderRadius: 10 }}>
-                <ArrowUp size={13} color="#ff4500" /> {bundle?.reddit_post?.metrics_estimate?.upvotes || '248'}
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,69,0,0.10)', padding: '0.2rem 0.5rem', borderRadius: 10 }}>
+                <ArrowUp size={13} color="#ff4500" /> {bundle?.reddit_post?.subreddit || 'r/SaaS'}
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <MessageSquare size={13} /> {bundle?.reddit_post?.metrics_estimate?.comments || '32'}
+                <MessageSquare size={13} /> Title {(bundle?.reddit_post?.title || '').length} / 300
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                <Share2 size={13} /> Share
+                <Share2 size={13} /> You post this one yourself
               </span>
             </div>
 

@@ -97,3 +97,73 @@ def test_the_landing_defines_the_token_it_uses():
     than failing loudly."""
     src = (ROOT / "pages" / "Landing.jsx").read_text(encoding="utf-8")
     assert "--violet:" in src, "the landing uses var(--violet) without defining it"
+
+
+# =============================================================================
+# Width and legibility
+# =============================================================================
+
+def test_no_dashboard_panel_wears_the_login_card():
+    """`.card` is the auth screen's login box: `max-width: 480px`. Three
+    dashboard panels wore it, so the Video Studio form, the Viral Validator
+    results and the PostShip composer each sat in a 480px column inside a
+    1040px page with the rest of the screen empty."""
+    css = (ROOT / "index.css").read_text(encoding="utf-8")
+    assert ".card { padding: 3rem; width: 100%; max-width: 480px; }" in css, (
+        "the login card changed shape; this test's premise needs rechecking"
+    )
+    for rel in ("components/PostShipStudio.jsx",
+                "components/ViralValidator.jsx",
+                "pages/dashboard/VideoStudio.jsx"):
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert 'className="card"' not in src, f"{rel} is capped at 480px again"
+
+
+def test_no_page_is_narrower_than_its_neighbours_for_no_reason():
+    """These three capped themselves below .container's own 1280, which is why
+    they alone had a wide empty margin."""
+    for rel in ("pages/dashboard/ViralValidatorPage.jsx",
+                "pages/dashboard/VideoStudio.jsx",
+                "pages/dashboard/AccountInsights.jsx"):
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        assert "maxWidth: 1080" not in src
+        assert "maxWidth: 1040" not in src
+        assert "maxWidth: 900" not in src
+
+
+def test_no_white_text_survives_on_the_white_cards():
+    """Left over from the dark theme. The Viral Validator's three value
+    headings were white on a white card -- invisible, not merely low
+    contrast -- and the Video Studio's active-business chip was a white smudge.
+    """
+    vv = (ROOT / "pages" / "dashboard" / "ViralValidatorPage.jsx").read_text(encoding="utf-8")
+    assert "color: '#fff' }}>" not in vv, "a heading is white-on-white again"
+
+    vs = (ROOT / "pages" / "dashboard" / "VideoStudio.jsx").read_text(encoding="utf-8")
+    assert "background: 'rgba(255,255,255,0.06)'" not in vs
+
+
+def test_the_reddit_preview_is_readable():
+    """It was #12141a with var(--text-main) on top: near-black text on a
+    near-black card. The post was there and could not be read."""
+    src = (ROOT / "components" / "PostShipStudio.jsx").read_text(encoding="utf-8")
+    assert "background: '#12141a'" not in src
+
+
+def test_previews_do_not_invent_engagement():
+    """These are previews of a post that has not been published. '310 likes'
+    beneath one is a performance claim about something that does not exist,
+    and it teaches the customer to disbelieve every other number here."""
+    src = (ROOT / "components" / "PostShipStudio.jsx").read_text(encoding="utf-8")
+    assert "metrics_estimate" not in src, "invented engagement is back"
+    for invented in ("'310'", "'21K'", "'248'", "'47'"):
+        assert invented not in src, f"a fabricated count survived: {invented}"
+
+
+def test_previews_state_the_real_platform_limits_instead():
+    """What replaced it has to be true and checkable, or the section is just
+    emptier rather than better."""
+    src = (ROOT / "components" / "PostShipStudio.jsx").read_text(encoding="utf-8")
+    assert "/ 280 characters" in src, "X's real limit is not shown"
+    assert "see more" in src, "LinkedIn's truncation point is not shown"
+    assert "/ 300" in src, "Reddit's title limit is not shown"

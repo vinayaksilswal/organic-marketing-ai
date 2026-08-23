@@ -9,7 +9,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
 
   return (
     <div className="view">
-      <div className="container" style={{ padding: '2.5rem 0', maxWidth: 1080 }}>
+      <div className="container" style={{ padding: '2.5rem 0', }}>
         
         {/* Top Header */}
         <div style={{
@@ -52,7 +52,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
           <div style={{ background: 'rgba(11,16,32,0.03)', borderRadius: 14, padding: '1.25rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
               <Eye size={18} color="var(--primary-color)" />
-              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Stop Posting Blindly</h4>
+              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)' }}>Stop Posting Blindly</h4>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
               Know exactly how your video will perform before you hit upload. Algorithmic prediction simulates 500M+ viral shorts.
@@ -62,7 +62,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
           <div style={{ background: 'rgba(11,16,32,0.03)', borderRadius: 14, padding: '1.25rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
               <Sparkles size={18} color="var(--primary-color)" />
-              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>Timestamped Fix The Fail</h4>
+              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)' }}>Timestamped Fix The Fail</h4>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
               Get precise algorithmic corrections: "Cut intro at 0:02", "Add visual zoom at 0:04", "Include polarizing CTA".
@@ -72,7 +72,7 @@ export default function ViralValidatorPage({ user, token, showToast, activeWorks
           <div style={{ background: 'rgba(11,16,32,0.03)', borderRadius: 14, padding: '1.25rem', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
               <TrendingUp size={18} color="var(--primary-color)" />
-              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#fff' }}>10x Organic Velocity</h4>
+              <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)' }}>10x Organic Velocity</h4>
             </div>
             <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
               Consistent high stop-rate hooks and watch time retention turn organic shorts into a predictable customer acquisition flywheel.

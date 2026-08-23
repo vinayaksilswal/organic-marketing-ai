@@ -13,7 +13,6 @@ import AccountsMarquee from '../components/AccountsMarquee';
 import ReviewWall from '../components/ReviewWall';
 import Logo from '../components/Logo';
 import CardRail from '../components/CardRail';
-import GrowthAudit from '../components/GrowthAudit';
 import CountUp from '../components/CountUp';
 import { API_BASE, apiError} from '../config';
 const PUBLIC_API = API_BASE.replace('/api/v1', '');
@@ -551,27 +550,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* THE FREE AUDIT.
-          Directly under the hero because it is the cheapest thing a stranger
-          can say yes to. Every other call to action asks them to sign up
-          before the product has done anything for them; this asks for a URL
-          and hands back a week of posts, so the ask afterwards is "publish
-          this" rather than "trust us". */}
-      <section style={{ padding: '0 0 4rem' }}>
-        <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: '1.6rem' }}>
-            <span className="eyebrow"><Sparkles size={13} /> Free · no account</span>
-            <h2 className="h2" style={{ margin: '1rem auto .8rem', maxWidth: 640 }}>
-              Paste your website. Get next week's posts.
-            </h2>
-            <p className="lede" style={{ maxWidth: 600, margin: '0 auto' }}>
-              We read your page and write seven posts for your business — the real ones,
-              not a template. Then you decide whether you want them published for you.
-            </p>
-          </div>
-          <GrowthAudit />
-        </div>
-      </section>
 
       {/* LIVE ACCOUNTS — real profiles, clickable, growing as customers connect.
           Placed directly under the hero because it is the evidence for the

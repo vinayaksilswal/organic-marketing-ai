@@ -186,7 +186,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
   return (
     <div className="view">
-      <div className="container" style={{ padding: '2.5rem 0', maxWidth: 1040 }}>
+      <div className="container" style={{ padding: '2.5rem 0', }}>
         
         {/* Header Section */}
         <div style={{
@@ -226,11 +226,11 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
                 gap: '0.35rem',
                 padding: '0.2rem 0.65rem',
                 borderRadius: 16,
-                background: 'rgba(255,255,255,0.06)',
+                background: 'rgba(109, 40, 217, 0.10)',
                 border: '1px solid var(--border-color)',
                 fontSize: '0.72rem',
                 fontWeight: 800,
-                color: '#fff',
+                color: 'var(--primary-color)',
               }}>
                 <Building2 size={12} /> Active: {businessName}
               </span>
@@ -268,7 +268,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
         </div>
 
         {/* Generator Controls Card */}
-        <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
+        <div style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
             

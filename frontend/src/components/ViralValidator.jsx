@@ -220,7 +220,7 @@ export default function ViralValidator({ token, showToast, activeWorkspaceId, in
   const selectedMedia = mediaList.find((m) => m.id === selectedMediaId);
 
   return (
-    <div className="card" style={{ padding: '1.5rem', background: 'rgba(11,16,32,0.03)', borderRadius: 14, border: '1px solid rgba(109, 40, 217, 0.25)', marginBottom: '2rem' }}>
+    <div style={{ padding: '1.5rem', background: 'rgba(11,16,32,0.03)', borderRadius: 14, border: '1px solid rgba(109, 40, 217, 0.25)', marginBottom: '2rem' }}>
       {/* Header Banner */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
         <div>

@@ -178,7 +178,7 @@ const AccountInsights = ({ token, activeWorkspaceId }) => {
   const accounts = data?.accounts || [];
 
   return (
-    <div className="container" style={{ padding: '2.5rem 0', maxWidth: 900 }}>
+    <div className="container" style={{ padding: '2.5rem 0', }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
         <BarChart3 size={25} color="var(--primary-color)" />
         <h1 style={{ margin: 0 }}>Account Insights</h1>

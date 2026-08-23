@@ -653,58 +653,6 @@ class DemoCaptionRequest(BaseModel):
     description: str = ""
 
 
-class GrowthAuditRequest(BaseModel):
-    websiteUrl: str
-
-
-# Costs a scrape and a model call, and takes the URL from anyone. Held to the
-# same budget as the caption demo. growth_audit caches per domain for a day,
-# so a shared link is charged once rather than once per visitor.
-_AUDIT_CALLS: dict[str, list[float]] = {}
-_AUDIT_LIMIT = 3
-_AUDIT_WINDOW_SECONDS = 3600
-
-
-@app.post("/api/public/growth-audit", tags=["Public"])
-async def public_growth_audit(data: GrowthAuditRequest, request: Request) -> dict:
-    """Audit a stranger's website from what is on it. No account needed."""
-    import time
-
-    from services import growth_audit
-
-    client_ip = (
-        (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
-        or (request.client.host if request.client else "unknown")
-    )
-    now = time.time()
-    hits = [t for t in _AUDIT_CALLS.get(client_ip, []) if now - t < _AUDIT_WINDOW_SECONDS]
-
-    # A cached domain costs nothing, so it must not spend the caller's budget:
-    # sharing one audit link should not lock the recipient out of running their
-    # own. Checked before the limit for that reason.
-    url = growth_audit.normalise_url(data.websiteUrl)
-    domain = growth_audit.domain_of(url) if url else ""
-    cached = growth_audit._cache.get(domain) if domain else None
-    is_cached = bool(cached and (now - cached["at"]) < growth_audit.CACHE_SECONDS)
-
-    if not is_cached:
-        if len(hits) >= _AUDIT_LIMIT:
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    "You have run a few audits already. Create an account to keep "
-                    "going — it is free."
-                ),
-            )
-        hits.append(now)
-        _AUDIT_CALLS[client_ip] = hits
-
-    result = await growth_audit.run(data.websiteUrl)
-    if not result.get("ok"):
-        raise HTTPException(status_code=422, detail=result.get("error", "Could not audit that site."))
-    return result
-
-
 @app.post("/api/public/demo-caption", tags=["Public"])
 async def public_demo_caption(data: DemoCaptionRequest, request: Request) -> dict:
     """Write one real caption for an unregistered visitor's business."""
