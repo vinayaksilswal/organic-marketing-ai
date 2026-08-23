@@ -922,6 +922,32 @@ async def refresh_brand_intelligence(
         }
 
 
+@router.get("/proven-offers")
+async def get_proven_offers_endpoint(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Return proven converting Meta ad angles and offers for the active business."""
+    from services.proven_offers import for_profile
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile or profile.userId != user_id:
+            raise HTTPException(status_code=404, detail="Workspace not found")
+
+        offers = for_profile(profile)
+        return {
+            "success": True,
+            "business": profile.name,
+            "hasProvenOffers": bool(offers),
+            "offers": offers,
+        }
+
+
 # =============================================================================
 # Faceless Short Videos on Auto-Pilot & Algorithm Analyzer Endpoints
 # =============================================================================
@@ -1160,6 +1186,84 @@ class PostShipGenerateRequest(BaseModel):
     input_text: str
     url: Optional[str] = None
     schedule_to_queue: bool = False
+
+
+class StrategistCampaignRequest(BaseModel):
+    count: int = 3
+    goal: Optional[str] = None
+
+
+@router.post("/strategist-campaign")
+async def generate_strategist_campaign(
+    data: StrategistCampaignRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> dict[str, Any]:
+    """Instagram creatives built in stages: angles, scored, then scene by scene.
+
+    Each creative costs its own model call, so this is metered per creative
+    rather than per request — otherwise asking for five would cost the same as
+    asking for one and the plan limits would mean nothing.
+    """
+    from services import billing_service as billing
+    from services import creative_strategist
+
+    # Bounded before anything is charged or spent. Without a ceiling a single
+    # request could ask for two hundred creatives and spend an afternoon of
+    # model budget on one click.
+    count = max(1, min(5, int(data.count or 3)))
+
+    for _ in range(count):
+        allowed, why = await billing.check_quota(user_id, "prompts")
+        if not allowed:
+            raise HTTPException(status_code=402, detail=why)
+
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    async with AsyncSessionLocal() as session:
+        profile = None
+        if workspace_id:
+            profile = await session.get(BusinessProfile, workspace_id)
+            if profile and profile.userId != user_id:
+                # Another tenant's business. Refused rather than quietly
+                # generating creatives from somebody else's brand.
+                raise HTTPException(status_code=404, detail="Workspace not found")
+        if not profile:
+            profile = (await session.execute(
+                select(BusinessProfile).where(BusinessProfile.userId == user_id)
+            )).scalars().first()
+
+        if not profile:
+            raise HTTPException(
+                status_code=400,
+                detail="Add a business first — the creatives are written from it.",
+            )
+
+        # Detached after this block, so everything needed is read now.
+        snapshot = _ProfileSnapshot(profile)
+
+    result = await creative_strategist.create_campaign(snapshot, count=count)
+
+    # Charged for what was produced, not for what was asked for. A run that
+    # degraded to two creatives must not bill for five.
+    for _ in range(len(result.get("creatives") or [])):
+        await billing.record_usage(user_id, "prompts")
+
+    return {"success": True, **result}
+
+
+class _ProfileSnapshot:
+    """A plain copy of the fields the strategist reads.
+
+    The ORM object is detached once its session closes, and a detached
+    instance is one lazy attribute away from raising inside a path the
+    customer has already been charged for.
+    """
+
+    def __init__(self, profile: Any) -> None:
+        for field in ("id", "name", "websiteUrl", "description", "businessModel",
+                      "industry", "niche", "targetAudience", "toneOfVoice",
+                      "primaryOffer", "logoUrl"):
+            setattr(self, field, getattr(profile, field, None))
 
 
 @router.post("/postship-generate")

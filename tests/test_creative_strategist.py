@@ -293,3 +293,75 @@ async def test_one_real_angle_is_kept_and_the_rest_topped_up(model):
     assert out[0]["score"] > 0
     assert sum(1 for a in out if a["score"] == 0) == 3   # the top-ups
     assert len({a["category"] for a in out}) == 4        # still all different
+
+
+# =============================================================================
+# The critic
+# =============================================================================
+
+def test_a_creative_with_no_hook_is_caught():
+    problems = cs.audit({"scenes": [{}, {}, {}, {}], "cta": ""})
+    assert any("hook" in p.lower() for p in problems)
+
+
+def test_an_opening_line_too_long_to_land_is_caught():
+    """Two seconds is roughly ten words spoken. Fifteen is a hook nobody
+    reaches the end of before the thumb moves."""
+    long_hook = " ".join(["word"] * 20)
+    problems = cs.audit({"scenes": [{"on_screen_text": long_hook, "visuals": "v"}],
+                         "cta": "Go"})
+    assert any("too long" in p.lower() for p in problems)
+
+
+def test_a_silent_creative_is_caught():
+    """Most of Instagram watches muted. No on-screen text anywhere means the
+    story does not exist for most viewers."""
+    problems = cs.audit({"scenes": [{"visuals": "v", "script": "spoken only"}],
+                         "cta": "Go"})
+    assert any("muted" in p.lower() for p in problems)
+
+
+def test_a_missing_cta_is_caught():
+    assert any("call to action" in p.lower()
+               for p in cs.audit({"scenes": [{"on_screen_text": "hi", "visuals": "v"}]}))
+
+
+def test_scenes_with_no_visual_direction_are_named():
+    problems = cs.audit({
+        "scenes": [{"on_screen_text": "hi", "visuals": "v"}, {}, {"visuals": "v"}, {}],
+        "cta": "Go",
+    })
+    assert any("2, 4" in p for p in problems), problems
+
+
+def test_a_sound_creative_reports_nothing():
+    """A critic that always complains is a critic nobody reads."""
+    good = {
+        "scenes": [
+            {"on_screen_text": "When did you last post?", "visuals": "a"},
+            {"on_screen_text": "x", "visuals": "b"},
+            {"visuals": "c"}, {"visuals": "d"},
+        ],
+        "cta": "Start free",
+    }
+    assert cs.audit(good) == []
+
+
+@pytest.mark.asyncio
+async def test_the_structural_audit_still_runs_when_the_model_is_dead(model):
+    """The checkable failures are checked in code, so a rate-limited tier
+    costs the second opinion rather than the whole review."""
+    def boom():
+        raise RuntimeError("429")
+    model(boom)
+
+    out = await cs.critique({"scenes": [{}, {}, {}, {}], "cta": ""}, "Organiflo")
+    assert out["problems"], "the audit did not run without the model"
+
+
+@pytest.mark.asyncio
+async def test_the_model_can_add_to_the_findings(model):
+    model('{"problems": ["The product never appears on screen."]}')
+    out = await cs.critique({"scenes": [{"on_screen_text": "hi", "visuals": "v"}],
+                             "cta": "Go"}, "Organiflo")
+    assert any("never appears" in p for p in out["problems"])

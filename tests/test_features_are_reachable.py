@@ -47,6 +47,8 @@ def test_the_frontend_was_actually_read():
 SOLD_FEATURES = [
     ("creatives/faceless-generate", "Faceless Shorts"),
     ("creatives/faceless-presets", "Faceless Shorts presets"),
+    ("creatives/faceless-autopilot", "Faceless Auto-Pilot"),
+    ("creatives/proven-offers", "Proven Meta Ad Angles"),
     ("marketing/account-insights", "Account Insights"),
     ("marketing/leads", "Leads"),
     ("creatives/postship-generate", "PostShip"),
@@ -97,3 +99,10 @@ def test_every_dashboard_page_has_a_route_and_a_way_in():
     assert not unreachable, (
         "routed but nothing links to them:\n  " + "\n  ".join(unreachable)
     )
+
+
+def test_the_campaign_builder_can_be_reached():
+    """The strategist pipeline is the most expensive thing in this codebase to
+    build and the easiest to leave unreachable — a strategist nobody can run
+    is worth nothing."""
+    assert "creatives/strategist-campaign" in SOURCE

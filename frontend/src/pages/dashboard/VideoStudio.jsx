@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError } from '../../config';
+import StrategistCampaign from '../../components/StrategistCampaign';
 import {
   Sparkles, Film, Copy, Check, Wand2, Package, Building2,
   AlertTriangle, Video, Image as ImageIcon,
@@ -23,6 +24,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
 
   // Form State
   const [products, setProducts] = useState([]);
+  const [provenOffers, setProvenOffers] = useState([]);
   const [productId, setProductId] = useState('');
   const [goal, setGoal] = useState('conversion');
   const [duration, setDuration] = useState(10);
@@ -59,10 +61,6 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
   const fetchProducts = useCallback(async () => {
     if (!activeWorkspaceId) return;
     try {
-      // Products live on the ecommerce router. This called /marketing/products,
-      // which has never existed -- every workspace load fired a 404 and the
-      // product picker silently stayed empty, so a shop could only ever make
-      // creatives about the business in general and never about an item.
       const res = await authFetch(`${API_BASE}/ecommerce/products`, {
         headers: { 'X-Workspace-Id': activeWorkspaceId },
       }, token);
@@ -75,10 +73,26 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
     }
   }, [activeWorkspaceId, token]);
 
+  const fetchProvenOffers = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    try {
+      const res = await authFetch(`${API_BASE}/creatives/proven-offers`, {
+        headers: { 'X-Workspace-Id': activeWorkspaceId },
+      }, token);
+      if (res.ok) {
+        const data = await res.json();
+        setProvenOffers(Array.isArray(data.offers) ? data.offers : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch proven offers', err);
+    }
+  }, [activeWorkspaceId, token]);
+
   useEffect(() => {
     fetchHistory();
     fetchProducts();
-  }, [fetchHistory, fetchProducts]);
+    fetchProvenOffers();
+  }, [fetchHistory, fetchProducts, fetchProvenOffers]);
 
   const handleGenerate = async () => {
     if (!activeWorkspaceId) {
@@ -101,7 +115,7 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
       }, token);
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.detail || data.message || 'Generation failed');
+      if (!res.ok) throw new Error(apiError(data, 'Generation failed'));
 
       showToast('Writing your 3-part video creative prompts... 🚀');
       
@@ -266,6 +280,76 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
             {generating ? 'Compiling Video Brief...' : 'Generate 2 Image + 1 Video Prompt'}
           </button>
         </div>
+
+        {/* Several creatives at once, each on a different trigger. Placed
+            above the single-prompt generator because a campaign is what
+            somebody starting a month of posting actually needs, and the
+            one-off is the follow-up rather than the entry point. */}
+        <StrategistCampaign
+          token={token}
+          activeWorkspaceId={activeWorkspaceId}
+          showToast={showToast}
+        />
+
+        {/* Proven Meta Ad Demand Banner */}
+        {provenOffers.length > 0 && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(109, 40, 217, 0.04) 100%)',
+            borderRadius: 14,
+            padding: '1.25rem 1.5rem',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            marginBottom: '1.75rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={16} color="var(--success)" />
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                  Proven Meta Ad Angles Detected
+                </span>
+              </div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                Measured revenue from paid ads
+              </span>
+            </div>
+            {provenOffers.map((po, idx) => (
+              <div key={idx} style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem',
+                padding: '0.85rem 1rem',
+                background: 'var(--bg-card)',
+                borderRadius: 10,
+                border: '1px solid var(--border-color)',
+                marginTop: idx > 0 ? '0.6rem' : '0',
+              }}>
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    {po.product}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    {po.problem && <span><strong>Problem:</strong> {po.problem} • </span>}
+                    {po.proof && <span style={{ color: 'var(--primary-color)', fontWeight: 600 }}>{po.proof}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    const matchedProd = products.find(p => p.title?.toLowerCase().includes(po.product.toLowerCase().slice(0, 15)));
+                    if (matchedProd) setProductId(matchedProd.id);
+                    setGoal('problem_agitation_solution');
+                    handleGenerate();
+                  }}
+                  disabled={generating}
+                  className="btn btn-secondary"
+                  style={{ minHeight: 36, fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
+                >
+                  <Wand2 size={13} /> Prompt with this Angle
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Generator Controls Card */}
         <div style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: 14, border: '1px solid var(--border-color)', marginBottom: '2rem' }}>

@@ -155,6 +155,9 @@ def classify(profile: Any) -> str:
 
 REQUIRED_SCENES = 4
 
+# Paragraph break for prompt assembly.
+BREAK = chr(10) * 2
+
 
 def render_creative(concept: Dict[str, Any], business_name: str) -> str:
     """The mandatory shape, produced deterministically.
@@ -483,6 +486,99 @@ def _fallback_concept(profile: Any, angle: Dict[str, Any],
     }
 
 
+# =============================================================================
+# The critic
+#
+# A second pass by a model told to be hostile catches the things a generating
+# model will not: a hook that needs three seconds, a product that never
+# appears, a scene nothing could film. It returns findings, not a rewrite —
+# a critic that rewrites tends to flatten the specific detail that made the
+# creative good, and the fixes it names are cheap to apply here.
+# =============================================================================
+
+_CRITIC = (
+    "You are a hostile creative director reviewing a short-form video brief. "
+    "You are looking for reasons it will fail. Be specific and brief. You "
+    "answer only with the JSON asked for."
+)
+
+# Applied in code, because these are the failures that matter and a model
+# asked to 'check quality' reports whatever it thought of first.
+CHECKS = [
+    ("hook_in_two_seconds", "The hook has to land before the thumb moves."),
+    ("product_appears", "A creative the product never appears in sells nothing."),
+    ("readable_without_sound", "Most of Instagram watches muted."),
+    ("scenes_are_filmable", "One subject and one move, or no video model can render it."),
+    ("no_invented_claims", "A figure nobody can substantiate is the one thing this product must never print."),
+    ("cta_is_clear", "A creative with no ask converts whoever was already going to buy."),
+]
+
+
+def audit(concept: Dict[str, Any]) -> List[str]:
+    """Structural problems, found in code rather than asked of a model.
+
+    These are checkable facts about the concept, so they are checked. Sending
+    them to a model would trade a certain answer for a plausible one.
+    """
+    problems: List[str] = []
+    scenes = concept.get("scenes") or []
+
+    first = (scenes[0] if scenes else {}) or {}
+    opening = f"{first.get('on_screen_text', '')} {first.get('script', '')}".strip()
+    if not opening:
+        problems.append("Scene 1 has no hook — nothing is said or shown in the first two seconds.")
+    elif len(opening.split()) > 14:
+        problems.append("The opening line is too long to land in two seconds.")
+
+    if not any((s.get("on_screen_text") or "").strip() for s in scenes):
+        problems.append("No on-screen text anywhere — the creative is unreadable muted.")
+
+    if not (concept.get("cta") or "").strip():
+        problems.append("No call to action.")
+
+    empty = [i + 1 for i, s in enumerate(scenes) if not (s.get("visuals") or "").strip()]
+    if empty:
+        problems.append(f"Scene(s) {', '.join(map(str, empty))} have no visual direction.")
+
+    return problems
+
+
+async def critique(concept: Dict[str, Any], business_name: str) -> Dict[str, Any]:
+    """Structural audit plus one hostile read. Never raises."""
+    problems = audit(concept)
+
+    try:
+        from services.ai_service import _call_openrouter
+
+        raw = await _call_openrouter(
+            "Review this Instagram Reel brief and name what will make it fail."
+            + BREAK
+            + (concept.get("markdown", "") or "")
+            + BREAK
+            + "Check: does the hook land in two seconds; does the product appear; "
+            "is it understandable with the sound off; could a video model "
+            "actually render each scene; are there invented statistics, prices "
+            "or testimonials; is the call to action clear; does it read like "
+            "generic AI advertising."
+            + BREAK
+            + 'Return ONLY JSON: {"problems": ["short specific problem", "..."]}',
+            system_prompt=_CRITIC,
+            json_response=True,
+        )
+        parsed = _parse(raw)
+        if isinstance(parsed, dict):
+            for item in (parsed.get("problems") or [])[:5]:
+                if isinstance(item, str) and item.strip():
+                    problems.append(item.strip())
+    except Exception as e:
+        # The structural audit already ran, so a dead model costs the second
+        # opinion rather than the review.
+        logger.warning(f"Creative critic unavailable: {e}")
+
+    concept["problems"] = problems
+    return concept
+
+
 async def create_campaign(profile: Any, count: int = 5) -> Dict[str, Any]:
     """The whole pipeline. Returns finished creatives, never raises."""
     brain = None
@@ -498,6 +594,7 @@ async def create_campaign(profile: Any, count: int = 5) -> Dict[str, Any]:
     creatives = []
     for angle in angles[:count]:
         concept = await build_concept(profile, brain, angle)
+        concept = await critique(concept, getattr(profile, "name", "") or "this business")
         creatives.append(concept)
 
     return {
