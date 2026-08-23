@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   BarChart3, Instagram, Facebook, RefreshCw, ExternalLink,
-  AlertTriangle, Users, Heart, MessageCircle,
+  AlertTriangle, Users, Heart, MessageCircle, Eye,
 } from 'lucide-react';
 import { API_BASE, authFetch } from '../../config';
+import LeadsPanel from '../../components/LeadsPanel';
 
 /**
  * What the connected accounts are actually doing.
@@ -77,6 +78,31 @@ const AccountCard = ({ account }) => {
         </div>
       ) : (
         <>
+          {(account.observations || []).length > 0 && (
+            <div style={{ marginBottom: '1.4rem', display: 'grid', gap: '0.7rem' }}>
+              {account.observations.map((o, i) => (
+                <div key={i} style={{
+                  padding: '0.85rem 1rem',
+                  borderRadius: 10,
+                  background: o.action ? 'rgba(109, 40, 217, 0.06)' : 'rgba(11,16,32,0.03)',
+                  border: '1px solid ' + (o.action ? 'rgba(109, 40, 217, 0.18)' : 'var(--border-color)'),
+                }}>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>{o.title}</div>
+                  {o.evidence && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: 1.5 }}>
+                      {o.evidence}
+                    </div>
+                  )}
+                  {o.action && (
+                    <div style={{ fontSize: '0.81rem', color: 'var(--primary-color)', marginTop: '0.45rem', fontWeight: 600, lineHeight: 1.5 }}>
+                      → {o.action}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: s.available ? '1.25rem' : 0 }}>
             <Stat label="Followers" value={nf(account.followers)} />
             {typeof account.totalPosts === 'number' && <Stat label="Posts" value={nf(account.totalPosts)} />}
@@ -136,6 +162,11 @@ const AccountCard = ({ account }) => {
                       </span>
                     </span>
                     <span style={{ display: 'flex', gap: '0.6rem', fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                      {typeof p.views === 'number' && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700, color: 'var(--text-main)' }}>
+                          <Eye size={12} /> {nf(p.views)}
+                        </span>
+                      )}
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                         <Heart size={12} /> {p.likes ?? '—'}
                       </span>
@@ -190,6 +221,11 @@ const AccountInsights = ({ token, activeWorkspaceId }) => {
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.75rem' }}>
         Read live from each account connected to this business — not from what we published.
       </p>
+
+      {/* Leads first. Reach and engagement are proxies for this; somebody
+          asking the price in public and waiting for an answer is the thing
+          itself, and it is perishable in a way a view count is not. */}
+      <LeadsPanel token={token} activeWorkspaceId={activeWorkspaceId} />
 
       {loading ? (
         <p style={{ color: 'var(--text-muted)' }}>Reading your accounts…</p>

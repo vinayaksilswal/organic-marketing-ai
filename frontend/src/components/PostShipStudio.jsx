@@ -30,7 +30,7 @@ export default function PostShipStudio({ token, showToast, activeWorkspaceId }) 
   const cleanHandle = `@${(businessName || 'organiflo').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
   const industry = currentWorkspace?.industry || currentWorkspace?.businessModel || 'AI SaaS';
 
-  const [inputText, setInputText] = useState('Shipped writing styles and multi-platform native repurposing today.');
+  const [inputText, setInputText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
@@ -110,24 +110,7 @@ How do you decide what is worth building?`,
 
   const sample = sampleFor(currentWorkspace?.businessModel || industry);
 
-  const [bundle, setBundle] = useState({
-    x_post: {
-      handle: cleanHandle,
-      display_name: businessName,
-      content: sample.x,
-    },
-    linkedin_post: {
-      author_name: businessName,
-      headline: `Founder at ${businessName}`,
-      hook_line: sample.hook,
-      content: sample.li,
-    },
-    reddit_post: {
-      subreddit: sample.sub,
-      title: sample.title,
-      body: sample.body,
-    }
-  });
+  const [bundle, setBundle] = useState(null);
 
   // Re-synchronize preview data when active business changes
   useEffect(() => {
@@ -277,6 +260,35 @@ How do you decide what is worth building?`,
 
   const quickIdeas = quickIdeasFor(currentWorkspace?.businessModel || industry);
 
+  // What the composer starts from when somebody would rather not think of a
+  // line themselves. Built from the workspace's own description and audience,
+  // so it is a sentence about this business rather than a prompt template.
+  const [fillIndex, setFillIndex] = useState(0);
+
+  const autofillLines = () => {
+    const audience = (currentWorkspace?.targetAudience || '').trim();
+    const summary = (currentWorkspace?.description || '').trim();
+    const lines = [];
+
+    if (summary) {
+      // Their own first sentence is the most accurate thing available.
+      const firstSentence = summary.split(/(?<=[.!?])\s/)[0].trim();
+      if (firstSentence.length > 12) lines.push(firstSentence);
+    }
+    if (audience) {
+      lines.push(`The thing ${audience} get wrong before they find ${businessName}`);
+    }
+    lines.push(...quickIdeas);
+    return lines;
+  };
+
+  const autofill = () => {
+    const lines = autofillLines();
+    if (!lines.length) return;
+    setInputText(lines[fillIndex % lines.length]);
+    setFillIndex((i) => i + 1);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
@@ -396,6 +408,27 @@ How do you decide what is worth building?`,
             </div>
 
             <button
+              type="button"
+              onClick={autofill}
+              title="Fill this from your business details"
+              style={{
+                marginTop: '0.6rem',
+                marginRight: '0.6rem',
+                background: 'transparent',
+                border: '1px solid var(--border-color)',
+                borderRadius: 10,
+                padding: '0.5rem 0.85rem',
+                minHeight: 40,
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: 'var(--primary-color)',
+                cursor: 'pointer',
+              }}
+            >
+              ✨ Autofill from {businessName}
+            </button>
+
+            <button
               type="submit"
               disabled={generating}
               className="btn btn-primary"
@@ -513,7 +546,11 @@ How do you decide what is worth building?`,
               margin: '0 0 1.25rem',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
             }}>
-              {bundle?.x_post?.content}
+              {bundle?.x_post?.content || (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Your X post appears here — short, lowercase, one idea.
+                </span>
+              )}
             </p>
           </div>
 
@@ -634,7 +671,11 @@ How do you decide what is worth building?`,
               margin: '0 0 1.25rem',
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
             }}>
-              {bundle?.linkedin_post?.content}
+              {bundle?.linkedin_post?.content || (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  Your LinkedIn post appears here — a hook line, then the story.
+                </span>
+              )}
             </p>
           </div>
 
@@ -746,7 +787,11 @@ How do you decide what is worth building?`,
               color: 'var(--text-main)',
               lineHeight: 1.35,
             }}>
-              {bundle?.reddit_post?.title}
+              {bundle?.reddit_post?.title || (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontWeight: 400 }}>
+                  Your Reddit title appears here
+                </span>
+              )}
             </h4>
 
             {/* Reddit Body */}
@@ -757,7 +802,11 @@ How do you decide what is worth building?`,
               whiteSpace: 'pre-wrap',
               margin: '0 0 1.25rem',
             }}>
-              {bundle?.reddit_post?.body}
+              {bundle?.reddit_post?.body || (
+                <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  …and the body, written to read like a person rather than a pitch.
+                </span>
+              )}
             </p>
           </div>
 

@@ -338,6 +338,14 @@ class SocialConnection(Base):
     # customer who wants to publish today gets the second, and the first when
     # the review clears.
     linkedinActorUrn = Column(String, nullable=True)
+
+    # YouTube. The refresh token is the durable one and the only thing worth
+    # storing: Google's access tokens expire in an hour, so a stored one is
+    # almost always stale by the time the scheduler wants it. It is exchanged
+    # for a fresh access token on each upload.
+    youtubeRefreshToken = Column(Text, nullable=True)
+    youtubeChannelId = Column(String, nullable=True)
+    youtubeChannelTitle = Column(String, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
@@ -761,6 +769,9 @@ async def init_db() -> AsyncEngine:
                     # this column, so if the bootstrap runs without Alembic
                     # every SELECT on the table fails, not just LinkedIn.
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "linkedinActorUrn" VARCHAR',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "youtubeRefreshToken" TEXT',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "youtubeChannelId" VARCHAR',
+                    'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "youtubeChannelTitle" VARCHAR',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR',
                     'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "errorLog" TEXT',
                     'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "twitterPostId" VARCHAR',

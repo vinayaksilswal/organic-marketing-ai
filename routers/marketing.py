@@ -2247,6 +2247,38 @@ def _is_branded(media) -> bool:
     return "_branded" in (media.url or "")
 
 
+@router.get("/leads")
+async def get_leads(request: Request) -> Any:
+    """People in your comments who were asking about buying.
+
+    Same Graph read as /account-insights — the comments arrive with the posts,
+    so this costs nothing extra against Meta's hourly budget. Read-only and
+    unmetered for the same reason: looking at your own comments should not
+    spend a plan quota.
+    """
+    workspace_id = request.headers.get("x-workspace-id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="X-Workspace-Id header required")
+
+    from services import lead_finder
+    from services.account_insights import for_workspace
+
+    try:
+        async with get_tenant_session(workspace_id) as session:
+            insights = await for_workspace(session, workspace_id)
+        accounts = insights.get("accounts") or []
+        return {"success": True, **lead_finder.from_accounts(accounts)}
+    except Exception as e:
+        logger.exception(f"Lead scan failed for {workspace_id}")
+        # An empty, explained result beats a 500: the customer can tell the
+        # difference between "nobody asked" and "we could not look".
+        return {
+            "success": False,
+            "leads": [], "total": 0, "unanswered": 0, "commentsScanned": 0,
+            "summary": f"Could not read your comments just now ({str(e)[:120]}).",
+        }
+
+
 @router.get("/account-insights")
 async def get_account_insights(request: Request) -> Any:
     """Numbers for every social account connected to the active workspace.

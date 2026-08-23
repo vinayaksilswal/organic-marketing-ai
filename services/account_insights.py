@@ -62,6 +62,25 @@ async def _get(client: httpx.AsyncClient, path: str, params: dict) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def _insight_values(media: dict) -> dict:
+    """Flatten the nested insights payload into {metric: value}.
+
+    Graph returns insights as {"data": [{"name": "views", "values":
+    [{"value": 123}]}]}, and returns the key not at all when a metric does not
+    apply to that media type -- so every read here is defensive by necessity.
+    """
+    out: dict = {}
+    for entry in ((media.get("insights") or {}).get("data") or []):
+        name = entry.get("name")
+        values = entry.get("values") or []
+        if not name or not values:
+            continue
+        value = values[0].get("value")
+        if isinstance(value, int):
+            out[name] = value
+    return out
+
+
 async def _instagram(client: httpx.AsyncClient, ig_id: str, token: str) -> dict:
     profile = await _get(client, ig_id, {
         "access_token": token,
@@ -70,14 +89,33 @@ async def _instagram(client: httpx.AsyncClient, ig_id: str, token: str) -> dict:
     if not profile:
         return {}
 
+    # Views are the metric that matters for Reels and the only one that
+    # explains a like count, but they live on the /insights edge rather than
+    # on the media itself. Requested inline as a nested field so the whole
+    # history costs one call: per-post insight calls would spend forty of
+    # Meta's two hundred an hour to render one screen.
+    BASE_FIELDS = (
+        "id,caption,media_type,media_product_type,timestamp,"
+        "like_count,comments_count,permalink,thumbnail_url,media_url"
+    )
     media = await _get(client, f"{ig_id}/media", {
         "access_token": token,
         "limit": POST_LIMIT,
-        "fields": (
-            "id,caption,media_type,media_product_type,timestamp,"
-            "like_count,comments_count,permalink,thumbnail_url,media_url"
-        ),
+        "fields": BASE_FIELDS + ",insights.metric(views,reach)"
+                  # Comments come along in the same request. They are
+                  # what lead_finder reads, and fetching them per post
+                  # afterwards would double the calls for the same data.
+                  ",comments.limit(25){id,text,username,timestamp,replies{username,text}}",
     })
+    if not (media.get("data") or []):
+        # A metric that is invalid for one media type fails the whole request.
+        # Falling back keeps the page working without views rather than
+        # showing nothing at all.
+        media = await _get(client, f"{ig_id}/media", {
+            "access_token": token,
+            "limit": POST_LIMIT,
+            "fields": BASE_FIELDS,
+        })
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=LOOKBACK_DAYS)
     posts = []
@@ -86,6 +124,7 @@ async def _instagram(client: httpx.AsyncClient, ig_id: str, token: str) -> dict:
         if not when or when < cutoff:
             continue
         likes, comments = m.get("like_count"), m.get("comments_count")
+        metrics = _insight_values(m)
         posts.append({
             "id": m.get("id"),
             "caption": (m.get("caption") or "").strip(),
@@ -95,8 +134,13 @@ async def _instagram(client: httpx.AsyncClient, ig_id: str, token: str) -> dict:
             # engagement and unavailable engagement mean opposite things.
             "likes": likes,
             "comments": comments,
+            # None, never 0: "nobody saw it" and "we could not read how many
+            # saw it" are different facts and lead to different decisions.
+            "views": metrics.get("views"),
+            "reach": metrics.get("reach"),
             "engagement": (likes or 0) + (comments or 0) if likes is not None else None,
             "permalink": m.get("permalink"),
+            "comments_list": ((m.get("comments") or {}).get("data") or []),
             "thumbnail": m.get("thumbnail_url") or m.get("media_url"),
         })
 
@@ -169,6 +213,129 @@ def _summarise(posts: list) -> dict:
     }
 
 
+def observations(account: dict) -> list:
+    """What is actually happening on this account, and what to do about it.
+
+    A page of totals tells somebody their median engagement is 1 and leaves
+    them to work out the rest. These are the readings a person would make from
+    the same numbers, each one stated with the figure it came from so it can
+    be argued with.
+
+    Every observation is derived. Nothing here is a rule of thumb dressed up
+    as a measurement, and anything the data cannot support is simply absent --
+    an empty list is the honest output for an account with three posts.
+    """
+    posts = account.get("posts") or []
+    followers = account.get("followers")
+    out: list = []
+
+    viewed = [p for p in posts if isinstance(p.get("views"), int) and p["views"] > 0]
+    engaged = [p for p in posts if p.get("engagement") is not None]
+
+    # --- Are people seeing it at all, and does seeing it convert? ----------
+    if viewed:
+        median_views = int(statistics.median([p["views"] for p in viewed]))
+        out.append({
+            "kind": "reach",
+            "title": f"Your typical post is seen {median_views:,} times",
+            "evidence": (
+                f"Measured across {len(viewed)} posts in the last "
+                f"{LOOKBACK_DAYS} days."
+            ),
+            "action": None,
+        })
+
+        if isinstance(followers, int) and followers >= 0 and median_views >= 50:
+            # Views without follows is the specific failure of an account that
+            # posts consistently and does not grow -- which is what the raw
+            # numbers on this page usually describe.
+            out.append({
+                "kind": "conversion",
+                "title": f"{median_views:,} people see a post; you have {followers} followers",
+                "evidence": (
+                    "Reach is not the bottleneck. What is missing is a reason "
+                    "to follow: the posts are being watched and then scrolled past."
+                ),
+                "action": (
+                    "Put one sentence in the caption that says who the account "
+                    "is for and what they get by staying. Same line every time."
+                ),
+            })
+
+    # --- Which format earns its slot --------------------------------------
+    by_kind: dict = {}
+    for p in viewed:
+        by_kind.setdefault(p["kind"], []).append(p["views"])
+    comparable = {k: v for k, v in by_kind.items() if len(v) >= 3}
+    if len(comparable) >= 2:
+        ranked = sorted(
+            ((k, statistics.median(v), len(v)) for k, v in comparable.items()),
+            key=lambda r: r[1], reverse=True,
+        )
+        top, second = ranked[0], ranked[-1]
+        if second[1] > 0 and top[1] >= second[1] * 1.5:
+            out.append({
+                "kind": "format",
+                "title": f"{top[0].title()} posts get {top[1] / second[1]:.1f}x the views of {second[0].title()}",
+                "evidence": (
+                    f"{top[0].title()}: {int(top[1]):,} views typical across {top[2]} posts. "
+                    f"{second[0].title()}: {int(second[1]):,} across {second[2]}."
+                ),
+                "action": f"Move the next few posts to {top[0].title()} and watch whether the gap holds.",
+            })
+
+    # --- The one that worked ----------------------------------------------
+    if viewed:
+        best = max(viewed, key=lambda p: p["views"])
+        median_views = statistics.median([p["views"] for p in viewed])
+        if median_views > 0 and best["views"] >= median_views * 2:
+            first_line = (best.get("caption") or "").strip().splitlines()
+            opening = first_line[0][:90] if first_line else ""
+            out.append({
+                "kind": "outlier",
+                "title": f"One post did {best['views'] / median_views:.1f}x your usual reach",
+                "evidence": f"“{opening}…”" if opening else "Your best-performing post.",
+                "action": "Write three more that open the same way, and see whether it repeats.",
+            })
+
+    # --- Is anything landing ----------------------------------------------
+    if engaged and len(engaged) >= 5:
+        silent = [p for p in engaged if (p["engagement"] or 0) == 0]
+        if len(silent) >= len(engaged) * 0.5:
+            out.append({
+                "kind": "engagement",
+                "title": f"{len(silent)} of your last {len(engaged)} posts got no likes or comments at all",
+                "evidence": (
+                    "Consistent posting with no response usually means the post "
+                    "never asks for one."
+                ),
+                "action": (
+                    "End one post this week with a question somebody could "
+                    "answer in four words."
+                ),
+            })
+
+    # --- Cadence ----------------------------------------------------------
+    stamps = [_parse_ts(p.get("postedAt")) for p in posts]
+    stamps = sorted([t for t in stamps if t])
+    if len(stamps) >= 4:
+        span_days = (stamps[-1] - stamps[0]).total_seconds() / 86400
+        if span_days >= 1:
+            per_week = len(stamps) / (span_days / 7)
+            if per_week >= 14:
+                out.append({
+                    "kind": "cadence",
+                    "title": f"You are posting about {per_week:.0f} times a week",
+                    "evidence": (
+                        "Above roughly twice a day an account competes with "
+                        "itself: each post is shown to fewer of the same people."
+                    ),
+                    "action": "Try one a day for two weeks and compare the view counts.",
+                })
+
+    return out
+
+
 async def for_workspace(session: Any, workspace_id: str) -> dict:
     """Every connected account for one business, with its numbers."""
     from sqlalchemy import select
@@ -216,4 +383,11 @@ async def for_workspace(session: Any, workspace_id: str) -> dict:
 
     if not accounts:
         return {"accounts": [], "note": "No Facebook Page or Instagram account is connected."}
+
+    # Attached here rather than computed in the interface, so the reading and
+    # the numbers it was read from can never drift apart.
+    for account in accounts:
+        if account.get("posts"):
+            account["observations"] = observations(account)
+
     return {"accounts": accounts}
