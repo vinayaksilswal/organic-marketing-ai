@@ -1346,3 +1346,93 @@ async def generate_postship_endpoint(
     }
 
 
+
+# ---------------------------------------------------------------------------
+# Bring-your-own image and video generation accounts
+#
+# The prompt studios write the brief; rendering it costs money at Runway or
+# Replicate. A workspace connects its own key so the studio finishes the job
+# instead of being something you copy out of.
+#
+# The key is written encrypted and never read back to the browser — the
+# responses below carry a masked hint and a connected flag, which is all the
+# interface needs to be honest about the state.
+# ---------------------------------------------------------------------------
+
+class MediaProviderRequest(BaseModel):
+    kind: str
+    provider: str
+    apiKey: str
+    model: Optional[str] = None
+
+
+@router.get("/media-providers")
+async def list_media_providers(
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """What can be connected, and what this workspace already has connected."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    from services import media_providers
+
+    async with AsyncSessionLocal() as session:
+        connected = await media_providers.connections(session, user_id, workspace_id)
+
+    return {"success": True, **media_providers.catalogue(), "connected": connected}
+
+
+@router.post("/media-providers")
+async def connect_media_provider(
+    body: MediaProviderRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """Connect or replace one key.
+
+    Validated against the catalogue before it is stored. A provider id nobody
+    supports would otherwise be saved, reported as connected, and only fail
+    at render time — long after the customer believed it was set up.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    from services import media_providers
+
+    key = (body.apiKey or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Paste the API key first.")
+
+    problem = media_providers.is_supported(body.kind, body.provider, body.model)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+
+    async with AsyncSessionLocal() as session:
+        saved = await media_providers.save(
+            session, user_id, workspace_id,
+            kind=body.kind, provider=body.provider, api_key=key, model=body.model,
+        )
+
+    return {"success": True, **saved}
+
+
+@router.delete("/media-providers/{kind}")
+async def disconnect_media_provider(
+    kind: str,
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """Forget one connection."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    from services import media_providers
+
+    async with AsyncSessionLocal() as session:
+        removed = await media_providers.disconnect(session, user_id, workspace_id, kind)
+
+    return {"success": True, "removed": removed, "kind": kind}

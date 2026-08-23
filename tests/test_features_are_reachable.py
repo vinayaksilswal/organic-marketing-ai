@@ -15,6 +15,7 @@ interface only calls endpoints that exist. This checks that endpoints a
 customer is sold can be reached from the interface.
 """
 
+import json
 import pathlib
 
 import pytest
@@ -106,3 +107,77 @@ def test_the_campaign_builder_can_be_reached():
     build and the easiest to leave unreachable — a strategist nobody can run
     is worth nothing."""
     assert "creatives/strategist-campaign" in SOURCE
+
+
+# ---------------------------------------------------------------------------
+# Bring-your-own rendering account
+#
+# The schema for this shipped long before anything could set it: VideoApiConfig
+# was read at render time and there was no way for a customer to fill it in.
+# These pin the whole path — endpoints exist, the interface calls them, and the
+# button sits on the pages that need it.
+# ---------------------------------------------------------------------------
+
+def test_the_media_provider_endpoints_exist():
+    from routers.creative_api import router
+
+    paths = {r.path for r in router.routes}
+    assert "/api/v1/creatives/media-providers" in paths
+    assert "/api/v1/creatives/media-providers/{kind}" in paths
+
+
+def test_the_interface_calls_the_media_provider_endpoints():
+    assert "creatives/media-providers" in SOURCE, (
+        "the endpoints exist but nothing in the interface calls them — "
+        "that is the VideoApiConfig situation all over again"
+    )
+
+
+@pytest.mark.parametrize("page", [
+    "pages/dashboard/VideoStudio.jsx",
+    "pages/dashboard/FacelessStudio.jsx",
+])
+def test_the_connect_button_sits_on_the_prompt_generators(page):
+    """Asked for explicitly: a connect button on every prompt generator."""
+    text = (FRONTEND / page).read_text(encoding="utf-8")
+    assert "MediaProviderConnect" in text, f"{page} generates prompts with no way to connect a renderer"
+
+
+def test_the_api_key_never_comes_back_to_the_browser():
+    """A key returned in a response ends up in logs, caches and error reports.
+
+    Mutation-checked: removing the mask() call from connections() fails this.
+    """
+    import asyncio
+    from types import SimpleNamespace
+    from services import media_providers
+    from services.crypto_service import encrypt_token
+
+    secret = "r8_this_is_the_real_key_do_not_leak"
+
+    class _Result:
+        def scalars(self):
+            return SimpleNamespace(all=lambda: [SimpleNamespace(
+                kind="video", provider="runway", model="gen4_turbo",
+                apiKey=encrypt_token(secret),
+            )])
+
+    class _Session:
+        async def execute(self, *_a, **_k):
+            return _Result()
+
+    out = asyncio.run(media_providers.connections(_Session(), "u1", "w1"))
+
+    assert out["video"]["connected"] is True
+    assert secret not in json.dumps(out), "the plaintext key was returned to the caller"
+    assert out["video"]["keyHint"] and len(out["video"]["keyHint"]) < len(secret)
+
+
+def test_an_unsupported_provider_is_refused_before_it_is_stored():
+    """Otherwise it saves, reports 'connected', and fails only at render time."""
+    from services import media_providers
+
+    assert media_providers.is_supported("video", "runway", "gen4_turbo") is None
+    assert media_providers.is_supported("video", "not-a-provider", None)
+    assert media_providers.is_supported("nonsense", "runway", None)
+    assert media_providers.is_supported("video", "runway", "some-model-runway-lacks")

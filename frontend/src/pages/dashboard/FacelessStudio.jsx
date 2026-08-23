@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Film, Sparkles, Copy, Check, RefreshCw } from 'lucide-react';
+import { Film, Sparkles, Copy, Check, RefreshCw, Clock, Zap, Settings, CheckCircle2 } from 'lucide-react';
 import { API_BASE, authFetch, apiError } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
+import MediaProviderConnect from '../../components/MediaProviderConnect';
 
 /**
  * Faceless Shorts.
@@ -28,6 +29,13 @@ export default function FacelessStudio({ token, activeWorkspaceId, showToast }) 
   const [voiceId, setVoiceId] = useState('adam_storyteller');
   const [duration, setDuration] = useState(20);
 
+  // Auto-Pilot State
+  const [schedulePreset, setSchedulePreset] = useState('daily');
+  const [publishingMode, setPublishingMode] = useState('PUBLIC');
+  const [autoApprove, setAutoApprove] = useState(false);
+  const [savingAutopilot, setSavingAutopilot] = useState(false);
+  const [autopilotConfigured, setAutopilotConfigured] = useState(false);
+
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState('');
@@ -42,6 +50,33 @@ export default function FacelessStudio({ token, activeWorkspaceId, showToast }) 
   }, [token]);
 
   useEffect(() => { loadPresets(); }, [loadPresets]);
+
+  const saveAutopilot = async () => {
+    if (!activeWorkspaceId) {
+      showToast?.('Please select a workspace first.', true);
+      return;
+    }
+    setSavingAutopilot(true);
+    try {
+      const res = await authFetch(`${API_BASE}/creatives/faceless-autopilot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({
+          schedule_preset: schedulePreset,
+          publishing_mode: publishingMode,
+          auto_approve: autoApprove,
+        }),
+      }, token);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(apiError(body, 'Could not save autopilot settings.'));
+      setAutopilotConfigured(true);
+      showToast?.('Auto-Pilot channel schedule activated! 🚀');
+    } catch (err) {
+      showToast?.(err.message, true);
+    } finally {
+      setSavingAutopilot(false);
+    }
+  };
 
   const generate = async () => {
     setGenerating(true);
@@ -203,6 +238,16 @@ export default function FacelessStudio({ token, activeWorkspaceId, showToast }) 
           </div>
         )}
 
+        {/* Shorts are rendered on the customer's own video account, so the
+            connect control belongs beside the button that needs it rather
+            than buried in a settings page they would never find. */}
+        <MediaProviderConnect
+          kind="video"
+          token={token}
+          activeWorkspaceId={activeWorkspaceId}
+          showToast={showToast}
+        />
+
         <button
           onClick={generate}
           disabled={generating || (topicId === 'custom' && !customTopic.trim())}
@@ -211,6 +256,96 @@ export default function FacelessStudio({ token, activeWorkspaceId, showToast }) 
         >
           {generating ? <RefreshCw size={16} className="spin" /> : <Sparkles size={16} />}
           {generating ? 'Writing the short…' : 'Generate the short'}
+        </button>
+      </div>
+
+      {/* Auto-Pilot Channel Schedule Panel */}
+      <div style={{
+        padding: '1.5rem',
+        background: 'var(--bg-card)',
+        borderRadius: 14,
+        border: '1px solid var(--border-color)',
+        marginBottom: '2rem',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+              <Zap size={16} color="var(--primary-color)" />
+              <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800 }}>Auto-Pilot Channel Posting</h2>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)' }}>
+              Automatically generate and schedule viral shorts to your social queue on a recurring cadence.
+            </p>
+          </div>
+          {autopilotConfigured && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.25rem 0.65rem',
+              borderRadius: 12,
+              background: 'rgba(16, 185, 129, 0.1)',
+              color: 'var(--success)',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+            }}>
+              <CheckCircle2 size={13} /> Active
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div>
+            <label style={label}>Posting Cadence</label>
+            <select
+              value={schedulePreset}
+              onChange={(e) => setSchedulePreset(e.target.value)}
+              style={field}
+            >
+              <option value="daily">Daily (7 posts / week)</option>
+              <option value="weekdays">Weekdays (Mon - Fri, 5 posts / wk)</option>
+              <option value="three_per_week">3x per week (Mon, Wed, Fri)</option>
+              <option value="twice_daily">2x Daily (High Growth, 14 posts / wk)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={label}>Publishing Visibility</label>
+            <select
+              value={publishingMode}
+              onChange={(e) => setPublishingMode(e.target.value)}
+              style={field}
+            >
+              <option value="PUBLIC">Direct to Queue (Auto-Publish)</option>
+              <option value="DRAFT">Save as Draft (Review First)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={label}>Auto-Approve Creatives</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 44 }}>
+              <input
+                type="checkbox"
+                id="autoApproveCheck"
+                checked={autoApprove}
+                onChange={(e) => setAutoApprove(e.target.checked)}
+                style={{ width: 18, height: 18, cursor: 'pointer', accentColor: 'var(--primary-color)' }}
+              />
+              <label htmlFor="autoApproveCheck" style={{ fontSize: '0.84rem', color: 'var(--text-main)', cursor: 'pointer' }}>
+                Auto-approve queued shorts
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={saveAutopilot}
+          disabled={savingAutopilot}
+          className="btn btn-secondary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', minHeight: 40, fontWeight: 700, fontSize: '0.84rem' }}
+        >
+          {savingAutopilot ? <RefreshCw size={14} className="spin" /> : <Clock size={14} />}
+          {savingAutopilot ? 'Activating Auto-Pilot…' : 'Save Auto-Pilot Schedule'}
         </button>
       </div>
 

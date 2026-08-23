@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE, authFetch, apiError } from '../../config';
 import StrategistCampaign from '../../components/StrategistCampaign';
+import MediaProviderConnect from '../../components/MediaProviderConnect';
 import {
   Sparkles, Film, Copy, Check, Wand2, Package, Building2,
   AlertTriangle, Video, Image as ImageIcon,
@@ -285,6 +286,24 @@ const VideoStudio = ({ user, token, showToast, activeWorkspaceId }) => {
             above the single-prompt generator because a campaign is what
             somebody starting a month of posting actually needs, and the
             one-off is the follow-up rather than the entry point. */}
+        {/* Both kinds sit here: this page writes image prompts and video
+            prompts, and a customer who connected one has no reason to guess
+            that the other lives somewhere else. */}
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+          <MediaProviderConnect
+            kind="video"
+            token={token}
+            activeWorkspaceId={activeWorkspaceId}
+            showToast={showToast}
+          />
+          <MediaProviderConnect
+            kind="image"
+            token={token}
+            activeWorkspaceId={activeWorkspaceId}
+            showToast={showToast}
+          />
+        </div>
+
         <StrategistCampaign
           token={token}
           activeWorkspaceId={activeWorkspaceId}
