@@ -74,20 +74,98 @@ class LinkedInService:
             "X-Restli-Protocol-Version": "2.0.0",
         }
 
-    async def post_text(self, workspace_id: str, text: str) -> Optional[str]:
+    async def _upload_image(self, workspace_id: str, access_token: str,
+                            actor_urn: str, media_url: str) -> Optional[str]:
+        """Put one image on LinkedIn and return its urn:li:image: id.
+
+        LinkedIn will not take a URL in a post the way Facebook does. The
+        bytes have to be registered, PUT to a signed URL, and then referenced
+        by URN -- three round trips before the post itself.
+
+        Returns None on any failure. The caller then posts the text alone,
+        because a post without its picture still beats no post.
         """
-        Publish a text-only post to the LinkedIn Company Page.
-        
-        Args:
-            workspace_id: Tenant Workspace ID
-            text: Post content (max ~3000 chars recommended).
-        
+        try:
+            init = await self._client_post(
+                access_token,
+                f"{LINKEDIN_API_BASE}/rest/images?action=initializeUpload",
+                {"initializeUploadRequest": {"owner": actor_urn}},
+            )
+            if not init:
+                return None
+
+            value = (init.get("value") or {})
+            upload_url = value.get("uploadUrl")
+            image_urn = value.get("image")
+            if not upload_url or not image_urn:
+                logger.warning("LinkedIn: upload was not initialized")
+                return None
+
+            async with httpx.AsyncClient(timeout=120, follow_redirects=True) as http:
+                fetched = await http.get(media_url)
+                if fetched.status_code != 200 or not fetched.content:
+                    logger.warning(f"LinkedIn: could not fetch {media_url} ({fetched.status_code})")
+                    return None
+
+                put = await http.put(
+                    upload_url,
+                    content=fetched.content,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                )
+                if put.status_code not in (200, 201):
+                    logger.warning(f"LinkedIn: image upload rejected [{put.status_code}]")
+                    return None
+
+            logger.info(f"LinkedIn image registered: {image_urn}")
+            return image_urn
+        except Exception as e:
+            logger.error(f"LinkedIn image upload error: {e}")
+            return None
+
+    async def _client_post(self, access_token: str, url: str, payload: dict) -> Optional[dict]:
+        """One JSON POST, returning the decoded body or None."""
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.post(url, headers=self._headers(access_token), json=payload)
+            if resp.status_code not in (200, 201):
+                logger.error(f"LinkedIn {url} failed [{resp.status_code}]: {resp.text[:300]}")
+                return None
+            return resp.json()
+        except Exception as e:
+            logger.error(f"LinkedIn request error: {e}")
+            return None
+
+    async def post_text(self, workspace_id: str, text: str,
+                        media_urls: Optional[list] = None) -> Optional[str]:
+        """Publish to LinkedIn, with images when there are any.
+
+        Media used to be dropped here without a word: multi_publisher
+        passed image posts to this method, which had no parameter for them,
+        so LinkedIn alone received the caption with nothing attached.
+
+        Video is not handled. LinkedIn wants chunked uploads with a
+        separate finalize call, and a half-guessed implementation would
+        fail after the customer believed it had worked. Video posts go out
+        as text, which is what happened before, but now deliberately.
+
         Returns:
             LinkedIn post URN on success, None on failure.
         """
         access_token, actor_urn = await self._get_credentials(workspace_id)
         if not access_token or not actor_urn:
             return None
+
+        # Imported here, not at module scope: multi_publisher imports this
+        # module, and a top-level import would close the cycle.
+        from services.multi_publisher import _looks_like_video
+
+        image_urns = []
+        for url in (media_urls or [])[:9]:
+            if _looks_like_video(url):
+                continue
+            urn = await self._upload_image(workspace_id, access_token, actor_urn, url)
+            if urn:
+                image_urns.append(urn)
 
         payload = {
             # Already a complete URN. Wrapping it in another prefix here is
@@ -102,6 +180,15 @@ class LinkedInService:
             },
             "lifecycleState": "PUBLISHED",
         }
+
+        # One image is "media"; several is "multiImage". Sending the
+        # single-image shape with a list is rejected outright.
+        if len(image_urns) == 1:
+            payload["content"] = {"media": {"id": image_urns[0]}}
+        elif len(image_urns) > 1:
+            payload["content"] = {
+                "multiImage": {"images": [{"id": u} for u in image_urns]}
+            }
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:

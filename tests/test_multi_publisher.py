@@ -171,8 +171,12 @@ def stub(monkeypatch):
         calls["x_media"] = media_urls or []
         return "x_1"
 
-    async def li(ws, text):
+    async def li(ws, text, media_urls=None):
         calls["linkedin"] = text
+        # Recorded like the X double above. LinkedIn used to be handed
+        # the caption with its images stripped, and a stub that ignored
+        # media could not have noticed.
+        calls["linkedin_media"] = media_urls or []
         return "li_1"
 
     import services.linkedin_service as ls
@@ -498,3 +502,15 @@ async def test_the_picture_actually_reaches_x(monkeypatch, yt_stub):
     _everything_connected(monkeypatch)
     await mp.publish_everywhere("ws", "With a picture", media_urls=["https://x/p.jpg"])
     assert yt_stub.get("x_media") == ["https://x/p.jpg"]
+
+
+@pytest.mark.asyncio
+async def test_the_picture_actually_reaches_linkedin(monkeypatch, yt_stub):
+    """The same bug as X, found later and on the platform where it costs most.
+
+    post_text had no media parameter at all, so multi_publisher handed
+    LinkedIn the caption and dropped the image on the floor without an error.
+    """
+    _everything_connected(monkeypatch)
+    await mp.publish_everywhere("ws", "With a picture", media_urls=["https://x/p.jpg"])
+    assert yt_stub.get("linkedin_media") == ["https://x/p.jpg"]

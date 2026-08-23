@@ -235,8 +235,11 @@ async def publish_everywhere(
 
     from services.linkedin_service import linkedin_service
 
+    # LinkedIn was the one platform receiving the caption with its images
+    # stripped off, because post_text had nowhere to put them.
     await attempt("linkedin", lambda: linkedin_service.post_text(
-        workspace_id, caption_for("linkedin", caption, website)))
+        workspace_id, caption_for("linkedin", caption, website),
+        media_urls=media_urls))
 
     # YouTube takes a video and nothing else. An image post or a text-only
     # cycle is a skip, not a failure -- the same rule as Instagram.

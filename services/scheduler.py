@@ -684,7 +684,7 @@ async def _publish_to(platform, workspace_id, caption, media_urls, website, *, e
 
     if platform == "linkedin":
         from services.linkedin_service import linkedin_service
-        return await linkedin_service.post_text(workspace_id, text)
+        return await linkedin_service.post_text(workspace_id, text, media_urls=media_urls)
 
     if platform == "youtube":
         video = next((u for u in media_urls if _looks_like_video(u)), None)

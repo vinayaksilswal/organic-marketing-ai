@@ -75,7 +75,10 @@ def test_an_x_post_is_actually_sent_to_x(monkeypatch):
 
 def test_a_linkedin_post_is_actually_sent_to_linkedin(monkeypatch):
     class _LI:
-        async def post_text(self, workspace_id, text):
+        # media_urls is part of the real signature; a double without it
+        # fails the call rather than the assertion, which is a confusing
+        # way to learn the code changed underneath the test.
+        async def post_text(self, workspace_id, text, media_urls=None):
             return "urn:li:share:9"
 
     monkeypatch.setattr("services.linkedin_service.linkedin_service", _LI())
