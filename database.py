@@ -182,8 +182,17 @@ class VideoApiConfig(Base):
 
     id = Column(String, primary_key=True, default=generate_uuid)
     userId = Column(String, ForeignKey("User.id", ondelete="CASCADE"), nullable=False)
+    # "image" or "video". One row per kind per workspace, so a business can
+    # bring a Replicate key for stills and a Kling key for motion.
+    kind = Column(String, default="video", nullable=False)
     provider = Column(String, default="json2video", nullable=False)
-    apiKey = Column(String, nullable=False)
+    # Fernet-encrypted at rest, like the email sending key. This is a
+    # customer's own paid credential; storing it readable would be handing it
+    # to anyone who ever reads a database backup.
+    apiKey = Column(Text, nullable=False)
+    # Which model to ask for. The provider alone is not enough — the same key
+    # reaches a dozen models with very different cost and output.
+    model = Column(String, nullable=True)
     endpoint = Column(String, nullable=True)
     createdAt = Column(DateTime(timezone=True), default=utc_now, nullable=False)
     updatedAt = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
@@ -772,6 +781,9 @@ async def init_db() -> AsyncEngine:
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "youtubeRefreshToken" TEXT',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "youtubeChannelId" VARCHAR',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "youtubeChannelTitle" VARCHAR',
+                    "ALTER TABLE \"VideoApiConfig\" ADD COLUMN IF NOT EXISTS \"kind\" VARCHAR",
+                    'ALTER TABLE "VideoApiConfig" ADD COLUMN IF NOT EXISTS "model" VARCHAR',
+                    'ALTER TABLE "VideoApiConfig" ALTER COLUMN "apiKey" TYPE TEXT',
                     'ALTER TABLE "SocialConnection" ADD COLUMN IF NOT EXISTS "businessProfileId" VARCHAR',
                     'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "errorLog" TEXT',
                     'ALTER TABLE "SocialPost" ADD COLUMN IF NOT EXISTS "twitterPostId" VARCHAR',

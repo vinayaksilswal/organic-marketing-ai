@@ -386,3 +386,48 @@ def test_the_youtube_title_is_one_line():
     title = mp.caption_for("youtube", "First line here" + newline * 2 + "Second paragraph")
     assert newline not in title
     assert title.startswith("First line")
+
+
+# =============================================================================
+# "Link in bio" is right on exactly one platform
+# =============================================================================
+
+BIO_CAPTION = "Posting when you remember means posting never.\n\nStart free - link in bio\n\n#marketing"
+
+
+def test_instagram_keeps_link_in_bio():
+    """Correct there and nowhere else: IG captions are not clickable and a raw
+    URL gets the post demoted, which is why the writer is told to say it."""
+    out = mp.caption_for("instagram", BIO_CAPTION, website="https://organiflo.com")
+    assert "link in bio" in out
+    assert "organiflo.com" not in out
+
+
+@pytest.mark.parametrize("platform", ["facebook", "linkedin", "x"])
+def test_linkable_platforms_get_the_real_address(platform):
+    """The same caption goes everywhere. On Facebook and LinkedIn a bio link
+    is something the reader cannot see, so every one of those posts ended with
+    a call to action that led nowhere."""
+    out = mp.caption_for(platform, BIO_CAPTION, website="https://organiflo.com")
+    assert "link in bio" not in out.lower(), f"{platform} still points at a bio"
+    assert "organiflo.com" in out
+
+
+def test_a_business_with_no_website_does_not_get_a_dangling_phrase():
+    """Nowhere to point. Dropping the phrase beats sending a Facebook reader
+    to a bio Facebook does not have."""
+    out = mp.caption_for("facebook", BIO_CAPTION, website="")
+    assert "link in bio" not in out.lower()
+
+
+def test_a_caption_without_the_phrase_is_untouched():
+    plain = "Just a post about the work.\n\n#marketing"
+    assert mp.caption_for("facebook", plain, website="https://organiflo.com") == plain.strip()
+
+
+@pytest.mark.parametrize("phrasing", [
+    "link in bio", "Link In Bio", "the link in my bio", "link in our bio",
+])
+def test_the_usual_phrasings_are_all_caught(phrasing):
+    out = mp.caption_for("facebook", f"Start today - {phrasing}", website="https://organiflo.com")
+    assert "bio" not in out.lower(), f"missed: {phrasing}"

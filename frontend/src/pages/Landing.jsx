@@ -558,6 +558,110 @@ const Landing = () => {
         <AccountsMarquee />
       </section>
 
+      {/* PRICING */}
+      {/* Renders nothing until a review has been approved. Placed immediately
+          above the price, because proof is what a price gets read against. */}
+      <ReviewWall />
+
+      {/* scrollMarginTop clears the sticky nav. Without it, jumping to
+          #pricing puts the heading underneath the bar and the section looks
+          like it starts at the plans. */}
+      <section id="pricing" style={{ scrollMarginTop: '92px' }}>
+        <div className="wrap">
+          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+            <span className="eyebrow">Pricing</span>
+            <h2 className="h2" style={{ margin: '1.1rem 0 .8rem' }}>Start free. Pay only when you want more.</h2>
+            <p className="lede" style={{ maxWidth: 580, margin: '0 auto' }}>
+              The free plan publishes five posts a month, for as long as you like. Upgrade when you want it running every day.
+            </p>
+          </div>
+
+          <div className="grid g4" style={{ alignItems: 'stretch' }}>
+            {plans.filter(p => !p.custom).map(p => {
+              // Enterprise is quoted, not listed. Without this it rendered at
+              // $0 as "Free" — reading as the cheapest tier, not the dearest.
+              const custom = !!p.custom;
+              const free = !custom && p.price <= 0;
+              const hero = p.code === 'starter';
+              return (
+                <div key={p.code} className="glass glass-lift" style={{
+                  padding: '2rem 1.6rem', display: 'flex', flexDirection: 'column', position: 'relative',
+                  border: hero ? '1.5px solid rgba(109,40,217,0.42)' : undefined,
+                  boxShadow: hero ? '0 20px 50px -18px rgba(109,40,217,0.42)' : undefined,
+                }}>
+                  {hero && <div className="price-pop">MOST POPULAR</div>}
+                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: hero ? 'var(--violet)' : 'var(--ink)' }}>{p.name}</h3>
+                  <div style={{ margin: '.7rem 0 .3rem', fontSize: '2.3rem', fontWeight: 800, lineHeight: 1 }}>
+                    {custom ? 'Custom' : free ? 'Free' : <>
+                      <span style={{ fontSize: '1.2rem', verticalAlign: 'super', fontWeight: 600 }}>$</span>{p.price}
+                      <span style={{ fontSize: '.9rem', fontWeight: 500, color: 'var(--ink-faint)' }}>/mo</span>
+                    </>}
+                  </div>
+                  <p style={{ fontSize: '.85rem', lineHeight: 1.55, minHeight: 42, marginBottom: '1.3rem' }}>{p.tagline}</p>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.7rem', display: 'grid', gap: '.6rem', flex: 1 }}>
+                    {p.features.map(f => (
+                      <li key={f} style={{ display: 'flex', gap: '.5rem', fontSize: '.86rem', lineHeight: 1.5 }}>
+                        <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button className={`b ${hero ? 'b-primary' : 'b-ghost'}`} style={{ width: '100%' }}
+                    onClick={() => custom
+                      ? (window.location.href = 'mailto:vinayaksilswal@gmail.com?subject=Enterprise%20plan%20enquiry')
+                      : navigate('/auth')}>
+                    {custom ? (p.cta || 'Contact us') : free ? 'Start free' : `Choose ${p.name}`}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* A quoted tier as the fifth card left a lonely half-width box on
+              desktop. A full-width band reads as deliberate, and is the
+              conventional place buyers look for "call us" pricing. */}
+          {plans.filter(p => p.custom).map(p => (
+            <div key={p.code} className="glass" style={{
+              marginTop: '1.1rem', padding: '1.6rem 1.8rem', display: 'flex',
+              flexWrap: 'wrap', alignItems: 'center', gap: '1.2rem',
+              justifyContent: 'space-between',
+            }}>
+              <div style={{ minWidth: 220 }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>{p.name}</h3>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.2, margin: '.25rem 0' }}>Custom</div>
+                <p style={{ fontSize: '.85rem', margin: 0 }}>{p.tagline}</p>
+              </div>
+              <ul style={{
+                listStyle: 'none', padding: 0, margin: 0, flex: '1 1 320px',
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.5rem',
+              }}>
+                {p.features.map(f => (
+                  <li key={f} style={{ display: 'flex', gap: '.5rem', fontSize: '.85rem' }}>
+                    <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+              <button className="b b-ghost" style={{ whiteSpace: 'nowrap' }}
+                onClick={() => (window.location.href = 'mailto:vinayaksilswal@gmail.com?subject=Enterprise%20plan%20enquiry')}>
+                {p.cta || 'Contact us'}
+              </button>
+            </div>
+          ))}
+
+          <div style={{ textAlign: 'center', marginTop: '2.5rem', display: 'grid', gap: '.5rem' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', color: 'var(--green)', fontSize: '.9rem', fontWeight: 600 }}>
+              <ShieldCheck size={16} /> Billed monthly through PayPal · cancel any time
+            </span>
+            <span style={{ fontSize: '.84rem', color: 'var(--ink-faint)' }}>
+              Cancelling keeps your access to the end of the period you already paid for. We never see or store card details.
+            </span>
+          </div>
+        </div>
+      </section>
+
       {/* THE PROBLEM */}
       <section style={{ background: 'linear-gradient(180deg, rgba(219,39,119,0.045), rgba(139,92,246,0.04))' }}>
         <div className="wrap">
@@ -1349,110 +1453,6 @@ photographic, sharp focus, no text
         </div>
       </section>
 
-      {/* PRICING */}
-      {/* Renders nothing until a review has been approved. Placed immediately
-          above the price, because proof is what a price gets read against. */}
-      <ReviewWall />
-
-      {/* scrollMarginTop clears the sticky nav. Without it, jumping to
-          #pricing puts the heading underneath the bar and the section looks
-          like it starts at the plans. */}
-      <section id="pricing" style={{ scrollMarginTop: '92px' }}>
-        <div className="wrap">
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <span className="eyebrow">Pricing</span>
-            <h2 className="h2" style={{ margin: '1.1rem 0 .8rem' }}>Start free. Pay when it earns its keep.</h2>
-            <p className="lede" style={{ maxWidth: 580, margin: '0 auto' }}>
-              Run the whole pipeline on the free plan first. Upgrade when you want it posting daily.
-            </p>
-          </div>
-
-          <div className="grid g4" style={{ alignItems: 'stretch' }}>
-            {plans.filter(p => !p.custom).map(p => {
-              // Enterprise is quoted, not listed. Without this it rendered at
-              // $0 as "Free" — reading as the cheapest tier, not the dearest.
-              const custom = !!p.custom;
-              const free = !custom && p.price <= 0;
-              const hero = p.code === 'starter';
-              return (
-                <div key={p.code} className="glass glass-lift" style={{
-                  padding: '2rem 1.6rem', display: 'flex', flexDirection: 'column', position: 'relative',
-                  border: hero ? '1.5px solid rgba(109,40,217,0.42)' : undefined,
-                  boxShadow: hero ? '0 20px 50px -18px rgba(109,40,217,0.42)' : undefined,
-                }}>
-                  {hero && <div className="price-pop">MOST POPULAR</div>}
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700, color: hero ? 'var(--violet)' : 'var(--ink)' }}>{p.name}</h3>
-                  <div style={{ margin: '.7rem 0 .3rem', fontSize: '2.3rem', fontWeight: 800, lineHeight: 1 }}>
-                    {custom ? 'Custom' : free ? 'Free' : <>
-                      <span style={{ fontSize: '1.2rem', verticalAlign: 'super', fontWeight: 600 }}>$</span>{p.price}
-                      <span style={{ fontSize: '.9rem', fontWeight: 500, color: 'var(--ink-faint)' }}>/mo</span>
-                    </>}
-                  </div>
-                  <p style={{ fontSize: '.85rem', lineHeight: 1.55, minHeight: 42, marginBottom: '1.3rem' }}>{p.tagline}</p>
-
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 1.7rem', display: 'grid', gap: '.6rem', flex: 1 }}>
-                    {p.features.map(f => (
-                      <li key={f} style={{ display: 'flex', gap: '.5rem', fontSize: '.86rem', lineHeight: 1.5 }}>
-                        <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button className={`b ${hero ? 'b-primary' : 'b-ghost'}`} style={{ width: '100%' }}
-                    onClick={() => custom
-                      ? (window.location.href = 'mailto:vinayaksilswal@gmail.com?subject=Enterprise%20plan%20enquiry')
-                      : navigate('/auth')}>
-                    {custom ? (p.cta || 'Contact us') : free ? 'Start free' : `Choose ${p.name}`}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* A quoted tier as the fifth card left a lonely half-width box on
-              desktop. A full-width band reads as deliberate, and is the
-              conventional place buyers look for "call us" pricing. */}
-          {plans.filter(p => p.custom).map(p => (
-            <div key={p.code} className="glass" style={{
-              marginTop: '1.1rem', padding: '1.6rem 1.8rem', display: 'flex',
-              flexWrap: 'wrap', alignItems: 'center', gap: '1.2rem',
-              justifyContent: 'space-between',
-            }}>
-              <div style={{ minWidth: 220 }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>{p.name}</h3>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.2, margin: '.25rem 0' }}>Custom</div>
-                <p style={{ fontSize: '.85rem', margin: 0 }}>{p.tagline}</p>
-              </div>
-              <ul style={{
-                listStyle: 'none', padding: 0, margin: 0, flex: '1 1 320px',
-                display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '.5rem',
-              }}>
-                {p.features.map(f => (
-                  <li key={f} style={{ display: 'flex', gap: '.5rem', fontSize: '.85rem' }}>
-                    <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0, marginTop: 2 }} />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <button className="b b-ghost" style={{ whiteSpace: 'nowrap' }}
-                onClick={() => (window.location.href = 'mailto:vinayaksilswal@gmail.com?subject=Enterprise%20plan%20enquiry')}>
-                {p.cta || 'Contact us'}
-              </button>
-            </div>
-          ))}
-
-          <div style={{ textAlign: 'center', marginTop: '2.5rem', display: 'grid', gap: '.5rem' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', color: 'var(--green)', fontSize: '.9rem', fontWeight: 600 }}>
-              <ShieldCheck size={16} /> Billed monthly through PayPal · cancel any time
-            </span>
-            <span style={{ fontSize: '.84rem', color: 'var(--ink-faint)' }}>
-              Cancelling keeps your access to the end of the period you already paid for. We never see or store card details.
-            </span>
-          </div>
-        </div>
-      </section>
-
       {/* FAQ */}
       <section style={{ paddingTop: '2rem' }}>
         <div className="wrap" style={{ maxWidth: 780 }}>
@@ -1512,6 +1512,28 @@ photographic, sharp focus, no text
                 rel="me" states the link is our own profile; noopener is the
                 usual protection on any target=_blank. */}
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>|</span>
+            <a
+              href="https://www.facebook.com/1246693861869878"
+              target="_blank"
+              rel="me noopener noreferrer"
+              aria-label="Organiflo on Facebook"
+              title="Organiflo on Facebook"
+              style={{
+                color: 'var(--ink-soft)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 44,
+                height: 44,
+                margin: '-14px 0',
+              }}
+            >
+              <Facebook size={17} />
+            </a>
+            {/* The numeric page id, not /organiflo — that slug belongs to a
+                different business called "Organi-Flo", and a footer link that
+                sends our customers to somebody else's page is worse than no
+                link at all. */}
             <a
               href="https://www.instagram.com/organiflo.ai/"
               target="_blank"

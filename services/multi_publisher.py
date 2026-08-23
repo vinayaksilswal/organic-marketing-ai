@@ -76,10 +76,41 @@ def _looks_like_video(url: str) -> bool:
     return lowered.endswith(_VIDEO_SUFFIXES) or "/video/" in lowered
 
 
-def caption_for(platform: str, caption: str) -> str:
+# "Link in bio" is the right call to action on Instagram and only there.
+# Instagram captions are not clickable and a raw URL is demoted, so the caption
+# writer is told to say "link in bio" — correctly.
+#
+# That same caption then goes to Facebook, LinkedIn and X, where links ARE
+# clickable and are the normal path to a sale. On those platforms "link in bio"
+# points at something the reader cannot see, so every one of those posts ended
+# with a dead call to action and no route to the website at all.
+_BIO_CTA = re.compile(
+    r"(?:the\s+)?link\s+in\s+(?:my\s+|our\s+)?bio",
+    re.IGNORECASE,
+)
+
+# Platforms where a URL in the body is clickable and expected.
+_LINKABLE = {"facebook", "linkedin", "x", "twitter"}
+
+
+def _resolve_bio_cta(text: str, platform: str, website: str) -> str:
+    """Turn "link in bio" into the actual address, where that is clickable."""
+    if not text or platform not in _LINKABLE:
+        return text
+    if not _BIO_CTA.search(text):
+        return text
+    if not website:
+        # Nowhere to point. Dropping the phrase beats sending a Facebook
+        # reader to a bio that Facebook does not have.
+        return _BIO_CTA.sub("below", text)
+    return _BIO_CTA.sub(website, text)
+
+
+def caption_for(platform: str, caption: str, website: str = "") -> str:
     """The same message, shaped for how each platform is read."""
     platform = (platform or "").lower()
-    body, tags = _split_hashtags(caption or "")
+    caption = _resolve_bio_cta(caption or "", platform, website)
+    body, tags = _split_hashtags(caption)
 
     if platform in ("x", "twitter"):
         # Two tags at most: on X a wall of them reads as spam and eats the
@@ -150,6 +181,20 @@ async def publish_everywhere(
     async with AsyncSessionLocal() as session:
         available = await connected_platforms(session, workspace_id)
 
+        # Where "link in bio" should point on the platforms where a link is
+        # clickable. Read here rather than passed in, so every caller gets it
+        # right without having to know the rule.
+        website = ""
+        try:
+            from database import BusinessProfile
+
+            profile = await session.get(BusinessProfile, workspace_id)
+            website = (getattr(profile, "websiteUrl", None) or "").strip() if profile else ""
+        except Exception as e:
+            # A destination is a nicety; publishing is the job. Without it the
+            # call to action degrades to "below" rather than the post failing.
+            logger.warning(f"Could not read the website for {workspace_id}: {e}")
+
     async def attempt(name: str, coro_factory) -> None:
         if not available.get(name):
             skipped.append(name)
@@ -170,25 +215,25 @@ async def publish_everywhere(
     from services.social_service import post_to_facebook, post_to_instagram
 
     await attempt("facebook", lambda: post_to_facebook(
-        workspace_id, caption_for("facebook", caption), media_urls=media_urls))
+        workspace_id, caption_for("facebook", caption, website), media_urls=media_urls))
 
     # Instagram cannot publish without media. That is a platform rule, not a
     # failure of this workspace, so it is a skip.
     if media_urls:
         await attempt("instagram", lambda: post_to_instagram(
-            workspace_id, caption_for("instagram", caption), media_urls=media_urls))
+            workspace_id, caption_for("instagram", caption, website), media_urls=media_urls))
     elif available.get("instagram"):
         skipped.append("instagram")
 
     from services.twitter_service import twitter_service
 
     await attempt("x", lambda: twitter_service.post_tweet(
-        workspace_id, caption_for("x", caption)))
+        workspace_id, caption_for("x", caption, website)))
 
     from services.linkedin_service import linkedin_service
 
     await attempt("linkedin", lambda: linkedin_service.post_text(
-        workspace_id, caption_for("linkedin", caption)))
+        workspace_id, caption_for("linkedin", caption, website)))
 
     # YouTube takes a video and nothing else. An image post or a text-only
     # cycle is a skip, not a failure -- the same rule as Instagram.
@@ -199,8 +244,8 @@ async def publish_everywhere(
         await attempt("youtube", lambda: youtube_service.upload_video(
             workspace_id,
             video,
-            title=caption_for("youtube", caption),
-            description=caption_for("facebook", caption),
+            title=caption_for("youtube", caption, website),
+            description=caption_for("facebook", caption, website),
         ))
     elif available.get("youtube"):
         skipped.append("youtube")
