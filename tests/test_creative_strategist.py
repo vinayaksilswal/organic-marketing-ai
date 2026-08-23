@@ -365,3 +365,48 @@ async def test_the_model_can_add_to_the_findings(model):
     out = await cs.critique({"scenes": [{"on_screen_text": "hi", "visuals": "v"}],
                              "cta": "Go"}, "Organiflo")
     assert any("never appears" in p for p in out["problems"])
+
+
+# =============================================================================
+# Two configuration bugs that read as "the model is too weak"
+# =============================================================================
+
+def test_a_token_ceiling_is_set_explicitly():
+    """With none set the provider applies its own, and on the free tier that
+    default starves a reasoning model: it spends the budget thinking and
+    returns finish_reason None with an empty body. Measured — at 900 the
+    request comes back empty, at 2000 the same one completes with room."""
+    from services import ai_service
+
+    assert ai_service.DEFAULT_MAX_TOKENS >= 2000, (
+        "below this a reasoning model returns nothing and it looks like a "
+        "weak model rather than a starved one"
+    )
+
+    import inspect
+    src = inspect.getsource(ai_service._call_openrouter_once)
+    assert '"max_tokens"' in src
+
+
+def test_the_json_shape_asked_for_matches_the_shape_enforced():
+    """json_response sets response_format to json_object, which requires the
+    reply to BE an object. Asking for a bare array inside that constraint is a
+    contradiction, and the model resolves it by returning a single object —
+    which is exactly what it did, so the angle stage silently used seeds."""
+    import inspect
+
+    src = inspect.getsource(cs.propose_angles)
+    assert '"angles"' in src, "the prompt no longer asks for the wrapper object"
+    assert "Return ONLY a JSON array" not in src, (
+        "asking for a bare array under json_object mode returns one object"
+    )
+
+
+def test_the_angle_request_is_sized_to_the_budget():
+    """Fifteen angles with eight dimensions overflows the reply and comes back
+    empty. That looked like model weakness and was an oversized request."""
+    import inspect
+
+    src = inspect.getsource(cs.propose_angles)
+    assert "max(12, wanted * 3)" not in src
+    assert "wanted + 3" in src

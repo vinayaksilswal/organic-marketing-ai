@@ -45,6 +45,11 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Overridable from the environment: see settings.ai_primary_model. Paying for
 # a stronger model is the single highest-leverage quality change available to
 # this product, and it should not require a code change to make.
+# Room for a reasoning model to think and still answer. Measured, not guessed:
+# at 900 this provider returns an empty body with no finish reason; at 2000
+# the same request completes with tokens to spare.
+DEFAULT_MAX_TOKENS = 2400
+
 MARKETING_MODEL = (
     (settings.ai_primary_model or "").strip()
     or "z-ai/glm-5.2:free"
@@ -88,6 +93,7 @@ async def _call_openrouter_once(
     model: str = MARKETING_MODEL,
     json_response: bool = False,
     system_prompt: str | None = None,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> str:
     """
     Core async function to call OpenRouter's chat completions API.
@@ -120,6 +126,12 @@ async def _call_openrouter_once(
     payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
+        # Set explicitly. With no ceiling the provider applies its own, and
+        # on the free tier that default is small enough to starve a reasoning
+        # model: it spends the budget thinking and returns finish_reason None
+        # with an empty body. That read as 'the model is too weak for this'
+        # and was actually 'we never gave it room to answer'.
+        "max_tokens": max_tokens,
     }
 
     if json_response:
@@ -321,6 +333,7 @@ async def _call_openrouter(
     model: str = MARKETING_MODEL,
     json_response: bool = False,
     system_prompt: str | None = None,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> str:
     """Call an LLM, degrading through providers rather than failing outright.
 
@@ -346,6 +359,7 @@ async def _call_openrouter(
                 model=candidate,
                 json_response=json_response,
                 system_prompt=system_prompt,
+                max_tokens=max_tokens,
             )
             if result:
                 if tried:
@@ -363,6 +377,7 @@ async def _call_openrouter(
                         model=candidate,
                         json_response=False,
                         system_prompt=system_prompt,
+                        max_tokens=max_tokens,
                     )
                     if result:
                         logger.info(

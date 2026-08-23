@@ -302,20 +302,29 @@ async def propose_angles(profile: Any, brain: Optional[Dict[str, Any]],
 
     prompt = (
         f"{_brain_summary(profile, brain)}\n\n"
-        f"Propose {max(12, wanted * 3)} distinct short-form video angles for this "
+        # Sized to the token budget rather than to ambition. Fifteen angles with
+        # eight dimensions each overflows the reply and comes back empty, which
+        # looked like a weak model and was an oversized request.
+        f"Propose {max(6, wanted + 3)} distinct short-form video angles for this "
         f"business. An angle is the reason a stranger stops scrolling, not a "
         f"description of the product.\n\n"
         f"Use these categories: {', '.join(ANGLE_CATEGORIES)}.\n\n"
         "Rate every angle on each dimension from 0 to 10. Rate honestly — an "
         "angle that does not fit this business should score low.\n\n"
-        "Return ONLY a JSON array:\n"
-        '[{"category":"curiosity","angle":"one line naming the angle",'
+        # json_response sets response_format to json_object, which requires the
+        # reply to BE an object. Asking for a bare array inside that constraint
+        # is a contradiction, and the model resolves it by returning one angle
+        # as an object — which is exactly what it was doing. Ask for the shape
+        # the constraint permits and the list survives.
+        'Return ONLY a JSON object of the form {"angles": [ ... ]}, where each '
+        "entry is:\n"
+        '{"category":"curiosity","angle":"one line naming the angle",'
         '"hook":"the actual first line somebody hears or reads",'
         '"pain":"the customer problem it presses on",'
         '"promise":"what the viewer gets",'
         '"dimensions":{"hook_strength":0,"customer_relevance":0,'
         '"product_relevance":0,"visual_potential":0,"curiosity":0,'
-        '"shareability":0,"conversion_potential":0,"instagram_fit":0}}]'
+        '"shareability":0,"conversion_potential":0,"instagram_fit":0}}'
     )
 
     try:
