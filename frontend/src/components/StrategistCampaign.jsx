@@ -20,6 +20,7 @@ const STAGES = [
   'Reading your business',
   'Finding the angles that fit it',
   'Ranking them',
+  'Competing the opening lines',
   'Writing the scenes',
   'Checking the format',
 ];
@@ -181,6 +182,51 @@ export default function StrategistCampaign({ token, activeWorkspaceId, showToast
                   {copied === `c${i}` ? 'Copied' : 'Copy'}
                 </button>
               </div>
+
+              {/* The runners-up from the hook stage. Shown because the
+                  alternative is regenerating the whole creative to see a
+                  second opening — four scenes rewritten to change one line.
+                  Their scores are not shown, for the same reason the angle
+                  score is not: a number on an unpublished creative reads as
+                  a prediction, and this product does not make those. */}
+              {(c.hook_alternatives?.length > 0) && (
+                <details style={{ marginBottom: '0.85rem' }}>
+                  <summary style={{
+                    cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700,
+                    color: 'var(--text-muted)',
+                  }}>
+                    Other openings ({c.hook_alternatives.length})
+                  </summary>
+                  <div style={{ display: 'grid', gap: '0.4rem', marginTop: '0.55rem' }}>
+                    {c.hook_alternatives.map((alt, j) => (
+                      <div
+                        key={j}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          fontSize: '0.8rem', lineHeight: 1.5,
+                        }}
+                      >
+                        <span style={{
+                          fontSize: '0.66rem', fontWeight: 800, padding: '0.1rem 0.4rem',
+                          borderRadius: 999, background: 'rgba(11,16,32,0.06)',
+                          color: 'var(--text-muted)', textTransform: 'capitalize',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {(alt.archetype || '').replace(/_/g, ' ')}
+                        </span>
+                        <span style={{ flex: 1 }}>{alt.hook}</span>
+                        <button
+                          onClick={() => copy(alt.hook, `h${i}-${j}`)}
+                          className="btn btn-secondary"
+                          style={{ minHeight: 30, fontSize: '0.7rem', padding: '0 0.5rem' }}
+                        >
+                          {copied === `h${i}-${j}` ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
 
               <pre style={{
                 margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',

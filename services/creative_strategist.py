@@ -409,20 +409,179 @@ def _fallback_angles(profile: Any, wanted: int) -> List[Dict[str, Any]]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# The Hook Engine
+#
+# Hooks used to arrive bundled with their angle: one call produced the angle
+# and the single line it opened on, and that line was used. But the angle and
+# the hook are different problems. An angle is what the creative argues; the
+# hook is the two seconds that decide whether anybody hears the argument. The
+# best angle opened badly loses to a weaker angle opened well, and a model
+# asked for both at once spends its attention on the angle.
+#
+# So the winning angle comes back here and the hook is competed separately:
+# several variants across different archetypes, scored, best one used.
+# ---------------------------------------------------------------------------
+
+# Distinct ways of opening. Named so the model spreads its attempts instead of
+# writing the same sentence six times, which is what "give me six hooks" gets.
+HOOK_ARCHETYPES = [
+    ("question", "Ask the thing the customer is already privately asking."),
+    ("bold_claim", "State something specific and slightly hard to believe."),
+    ("callout", "Name exactly who this is for, so everyone else scrolls."),
+    ("mistake", "Name the thing they are doing wrong right now."),
+    ("number", "Open on a concrete figure, cost or timeframe."),
+    ("contradiction", "Say the opposite of what they expect to hear."),
+]
+
+# Scored on what a first line has to do, not on what a whole creative has to
+# do. Stop power dominates: a hook that does not stop the thumb has no other
+# qualities worth measuring.
+HOOK_WEIGHTS = {
+    "stop_power": 1.5,
+    "specificity": 1.2,
+    "relevance": 1.2,
+    "curiosity_gap": 1.0,
+    "clarity": 1.0,
+}
+MAX_HOOK_SCORE = sum(HOOK_WEIGHTS.values()) * 10
+
+
+def hook_word_count(text: str) -> int:
+    return len((text or "").split())
+
+
+def score_hook(text: str, dimensions: Dict[str, Any]) -> float:
+    """Rank one hook out of 100.
+
+    The model rates the subjective dimensions. Length is measured here, not
+    rated: a model asked whether its own hook is short says yes. Spoken aloud,
+    roughly twelve words is two seconds, and two seconds is the whole budget.
+    """
+    total = 0.0
+    for key, weight in HOOK_WEIGHTS.items():
+        try:
+            value = float(dimensions.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            value = 0.0
+        total += max(0.0, min(10.0, value)) * weight
+
+    pct = (total / MAX_HOOK_SCORE) * 100 if MAX_HOOK_SCORE else 0.0
+
+    # Measured, not rated. Past about twelve words the hook cannot land inside
+    # the two seconds it has, however good the sentence is.
+    words = hook_word_count(text)
+    if words == 0:
+        return 0.0
+    if words > 12:
+        pct -= min(25.0, (words - 12) * 2.5)
+    if words < 3:
+        pct -= 10.0
+
+    return round(max(0.0, min(100.0, pct)), 1)
+
+
+async def best_hook(profile: Any, brain: Optional[Dict[str, Any]],
+                    angle: Dict[str, Any]) -> Dict[str, Any]:
+    """Compete several openings for one angle and return the winner.
+
+    Never raises. On any failure the angle's own hook is returned with the
+    score it earns, so the pipeline continues with what it already had.
+    """
+    from services.ai_service import _call_openrouter
+
+    original = (angle.get("hook") or "").strip()
+    name = getattr(profile, "name", "") or "this business"
+
+    archetypes = "\n".join(f"- {k}: {d}" for k, d in HOOK_ARCHETYPES)
+    prompt = (
+        f"{_brain_summary(profile, brain)}\n\n"
+        f"ANGLE: {angle.get('angle')}\n"
+        f"CATEGORY: {angle.get('category')}\n"
+        f"PAIN: {angle.get('pain')}\n"
+        f"PROMISE: {angle.get('promise')}\n\n"
+        f"Write one opening line for {name} in each of these styles:\n"
+        f"{archetypes}\n\n"
+        "Rules. Each hook is the FIRST thing somebody hears in a Reel. Twelve "
+        "words at most — it has two seconds. No hashtags, no emoji, no brand "
+        "name unless the brand is the point. Say something specific: a hook "
+        "that would fit any business in this industry is a failed hook.\n\n"
+        "Rate each from 0 to 10 on every dimension. Rate honestly.\n\n"
+        'Return ONLY a JSON object of the form {"hooks": [ ... ]}, where each '
+        "entry is:\n"
+        '{"archetype":"question","hook":"the line itself",'
+        '"dimensions":{"stop_power":0,"specificity":0,"relevance":0,'
+        '"curiosity_gap":0,"clarity":0}}'
+    )
+
+    candidates: List[Dict[str, Any]] = []
+    try:
+        raw = await _call_openrouter(prompt, system_prompt=_STRATEGIST, json_response=True)
+        data = _parse(raw)
+        for entry in _as_list(data):
+            if not isinstance(entry, dict):
+                continue
+            text = (entry.get("hook") or "").strip()
+            if not text:
+                continue
+            candidates.append({
+                "hook": text,
+                "archetype": (entry.get("archetype") or "unknown").strip().lower(),
+                "words": hook_word_count(text),
+                "score": score_hook(text, entry.get("dimensions") or {}),
+            })
+    except Exception as e:
+        logger.warning(f"Hook engine failed, keeping the angle's own hook: {e}")
+
+    # The angle's hook competes too. It was written with the angle in front of
+    # it, and sometimes it wins -- discarding it unseen would be a downgrade
+    # dressed up as an extra stage.
+    if original and not any(c["hook"].lower() == original.lower() for c in candidates):
+        candidates.append({
+            "hook": original,
+            "archetype": "from_angle",
+            "words": hook_word_count(original),
+            # No dimensions were rated for it, so it is scored on length alone
+            # against a neutral middle. It wins only if nothing else showed up.
+            "score": score_hook(original, {k: 5 for k in HOOK_WEIGHTS}),
+        })
+
+    if not candidates:
+        return {"hook": original, "archetype": "from_angle", "score": 0.0, "alternatives": []}
+
+    candidates.sort(key=lambda c: c["score"], reverse=True)
+    winner = candidates[0]
+    return {
+        "hook": winner["hook"],
+        "archetype": winner["archetype"],
+        "score": winner["score"],
+        # Kept so a customer who dislikes the winner has the runners-up
+        # instead of having to regenerate the whole creative.
+        "alternatives": candidates[1:4],
+    }
+
+
 async def build_concept(profile: Any, brain: Optional[Dict[str, Any]],
-                        angle: Dict[str, Any]) -> Dict[str, Any]:
-    """One angle becomes a four-scene concept. Never raises."""
+                        angle: Dict[str, Any],
+                        hook: Optional[str] = None) -> Dict[str, Any]:
+    """One angle becomes a four-scene concept. Never raises.
+
+    `hook` is the winner from the Hook Engine. It falls back to the
+    angle's own line so this stays callable on its own.
+    """
     from services.ai_service import _call_openrouter
 
     kind = classify(profile)
     grammar = GRAMMAR[kind]
     name = getattr(profile, "name", "") or "this business"
+    # The competed winner, falling back to the line the angle came with.
+    opening = (hook or angle.get("hook") or "").strip()
 
     prompt = (
         f"{_brain_summary(profile, brain)}\n\n"
         f"CHOSEN ANGLE: {angle.get('angle')}\n"
         f"CATEGORY: {angle.get('category')}\n"
-        f"HOOK TO OPEN ON: {angle.get('hook')}\n\n"
+        f"HOOK TO OPEN ON: {opening}\n\n"
         f"This business is shot as: {grammar['format']}.\n"
         f"Beat structure: {' -> '.join(grammar['beats'])}.\n"
         f"Camera language: {grammar['camera']}.\n\n"
@@ -451,7 +610,7 @@ async def build_concept(profile: Any, brain: Optional[Dict[str, Any]],
         concept = None
 
     if not isinstance(concept, dict) or not (concept.get("scenes") or []):
-        concept = _fallback_concept(profile, angle, grammar)
+        concept = _fallback_concept(profile, angle, grammar, opening)
 
     # The model routinely returns three scenes or six. The output format is
     # four, so it is made four here rather than hoped for.
@@ -463,7 +622,7 @@ async def build_concept(profile: Any, brain: Optional[Dict[str, Any]],
     concept.setdefault("format", f"Instagram Reel, 9:16 vertical, 10–12 seconds, {grammar['format']}")
     concept.setdefault("style", grammar["style"])
     concept["creative_angle"] = angle.get("category", "general")
-    concept["hook"] = angle.get("hook", "")
+    concept["hook"] = opening or angle.get("hook", "")
     concept["angle_score"] = angle.get("score", 0.0)
     concept["business_kind"] = kind
     concept["markdown"] = render_creative(concept, name)
@@ -471,9 +630,10 @@ async def build_concept(profile: Any, brain: Optional[Dict[str, Any]],
 
 
 def _fallback_concept(profile: Any, angle: Dict[str, Any],
-                      grammar: Dict[str, Any]) -> Dict[str, Any]:
+                      grammar: Dict[str, Any],
+                      hook_override: Optional[str] = None) -> Dict[str, Any]:
     name = getattr(profile, "name", "") or "this business"
-    hook = angle.get("hook") or "Stop scrolling."
+    hook = hook_override or angle.get("hook") or "Stop scrolling."
     return {
         "title": (angle.get("angle") or "A Reel For This Business")[:70],
         "format": f"Instagram Reel, 9:16 vertical, 10–12 seconds, {grammar['format']}",
@@ -602,7 +762,14 @@ async def create_campaign(profile: Any, count: int = 5) -> Dict[str, Any]:
 
     creatives = []
     for angle in angles[:count]:
-        concept = await build_concept(profile, brain, angle)
+        # The hook competes on its own before the scenes are written. The
+        # angle decides what the creative argues; these two seconds decide
+        # whether anybody hears the argument.
+        chosen = await best_hook(profile, brain, angle)
+        concept = await build_concept(profile, brain, angle, chosen["hook"])
+        concept["hook_score"] = chosen["score"]
+        concept["hook_archetype"] = chosen["archetype"]
+        concept["hook_alternatives"] = chosen["alternatives"]
         concept = await critique(concept, getattr(profile, "name", "") or "this business")
         creatives.append(concept)
 

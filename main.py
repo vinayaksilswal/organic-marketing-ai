@@ -309,6 +309,17 @@ async def health_check(request: Request) -> JSONResponse:
                 settings.resend_api_key and "your_resend" not in (settings.resend_api_key or "")
             ),
             "json2video": bool(settings.json2video_api_key),
+            # X, LinkedIn and YouTube publish for real now, and their
+            # app-level credentials are set separately from Meta's. An
+            # operator who adds them in Render had no way to confirm
+            # they took, short of connecting an account and watching a
+            # post fail.
+            "x": bool(settings.twitter_api_key and settings.twitter_api_secret),
+            "linkedin": bool(settings.linkedin_client_id and settings.linkedin_client_secret),
+            "youtube": bool(
+                (settings.youtube_client_id or settings.google_client_id)
+                and (settings.youtube_client_secret or settings.google_client_secret)
+            ),
         }
     except Exception:
         integrations = {}

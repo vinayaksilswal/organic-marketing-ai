@@ -150,6 +150,35 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
   // half.
   const [connectingX, setConnectingX] = useState(false);
 
+  // X, LinkedIn and YouTube each had a working /disconnect endpoint and no
+  // button anywhere that called it. Meta had one; the other three did not, so
+  // an account you connected here could only be revoked from the platform's
+  // own settings -- if you knew to look.
+  const disconnectPlatform = async (platform, workspaceId, label) => {
+    try {
+      // Written out rather than built from the platform name so the route
+      // guard can still see them. A `${platform}` in the path is invisible to
+      // static checking, which is how a typo'd endpoint reaches production
+      // and 404s in silence.
+      const paths = {
+        x: `${API_BASE}/x/disconnect`,
+        linkedin: `${API_BASE}/linkedin/disconnect`,
+        youtube: `${API_BASE}/youtube/disconnect`,
+      };
+      const res = await authFetch(
+        `${paths[platform]}?workspace_id=${encodeURIComponent(workspaceId)}`,
+        { method: 'POST' },
+        token,
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(apiError(body, `Could not disconnect ${label}.`));
+      showToast(`${label} disconnected. Nothing will be posted there.`);
+      refreshWorkspaces();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  };
+
   const handleConnectX = async (workspaceId) => {
     setConnectingX(true);
     try {
@@ -865,6 +894,23 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Twitter size={16} color="#0f172a" /> X (Twitter)
                       </h4>
+                      {currentBp?.socialConnection?.hasTwitter ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                            <CheckCircle2 size={14} color="#10b981" />
+                            <Twitter size={13} color="#0f172a" />
+                            <span>{'Connected to X'}</span>
+                          </div>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#f87171', alignSelf: 'flex-start' }}
+                            onClick={() => disconnectPlatform('x', editWorkspaceId, 'X')}
+                          >
+                            <Unplug size={13} /> Disconnect
+                          </button>
+                        </div>
+                      ) : (
+                        <>
                       <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                         Sign in with X and posts go out to your account automatically. No tokens to copy.
                       </p>
@@ -882,6 +928,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <Twitter size={17} />
                         {connectingX ? 'Redirecting to X…' : 'Connect X'}
                       </button>
+                        </>
+                      )}
                     </div>
 
                     {/* LinkedIn */}
@@ -894,6 +942,23 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                           by hand, which almost nobody can do -- and a token
                           pasted that way expires in sixty days with no refresh
                           and no warning when it does. */}
+                      {currentBp?.socialConnection?.hasLinkedin ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                            <CheckCircle2 size={14} color="#10b981" />
+                            <Linkedin size={13} color="#93c5fd" />
+                            <span>{'Connected to LinkedIn'}</span>
+                          </div>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#f87171', alignSelf: 'flex-start' }}
+                            onClick={() => disconnectPlatform('linkedin', editWorkspaceId, 'LinkedIn')}
+                          >
+                            <Unplug size={13} /> Disconnect
+                          </button>
+                        </div>
+                      ) : (
+                        <>
                       <p style={{ margin: '0 0 0.9rem 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                         Sign in with LinkedIn and posts publish to your profile automatically. No tokens to copy.
                       </p>
@@ -911,6 +976,8 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <Linkedin size={17} />
                         {connectingLinkedIn ? 'Redirecting to LinkedIn…' : 'Connect LinkedIn'}
                       </button>
+                        </>
+                      )}
                     </div>
 
                     <div style={{ padding: '1rem', borderRadius: 10, border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
@@ -927,6 +994,25 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         YouTube allows a limited number of uploads per day, so this is used for
                         video posts only.
                       </p>
+                      {currentBp?.socialConnection?.hasYoutube ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                            <CheckCircle2 size={14} color="#10b981" />
+                            <Youtube size={13} color="#ff0000" />
+                            {/* The channel name, when the callback captured it.
+                                A person with several channels needs to know
+                                which one this is going to. */}
+                            <span>{currentBp.socialConnection.youtubeChannelTitle || 'Connected to YouTube'}</span>
+                          </div>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#f87171', alignSelf: 'flex-start' }}
+                            onClick={() => disconnectPlatform('youtube', editWorkspaceId, 'YouTube')}
+                          >
+                            <Unplug size={13} /> Disconnect
+                          </button>
+                        </div>
+                      ) : (
                       <button
                         onClick={() => handleConnectYouTube(editWorkspaceId)}
                         disabled={connectingYouTube}
@@ -941,6 +1027,7 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
                         <Youtube size={17} />
                         {connectingYouTube ? 'Redirecting to Google…' : 'Connect YouTube'}
                       </button>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

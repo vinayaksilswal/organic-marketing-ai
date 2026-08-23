@@ -181,3 +181,53 @@ def test_an_unsupported_provider_is_refused_before_it_is_stored():
     assert media_providers.is_supported("video", "not-a-provider", None)
     assert media_providers.is_supported("nonsense", "runway", None)
     assert media_providers.is_supported("video", "runway", "some-model-runway-lacks")
+
+
+# ---------------------------------------------------------------------------
+# Disconnecting an account
+#
+# Meta had a disconnect button. X, LinkedIn and YouTube each had a working
+# endpoint and nothing that called it, so an account linked here could only
+# be revoked from the platform's own settings -- if the customer knew to look.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("platform", ["x", "linkedin", "youtube"])
+def test_every_connectable_platform_can_also_be_disconnected(platform):
+    assert f"{platform}/disconnect" in SOURCE or "disconnectPlatform" in SOURCE, (
+        f"{platform} can be connected from the interface but never unlinked"
+    )
+
+
+def test_the_disconnect_button_uses_the_method_the_endpoint_accepts():
+    """These three are POST. Meta's is DELETE. Calling the wrong one 405s."""
+    import importlib
+
+    src = (FRONTEND / "pages" / "dashboard" / "Workspaces.jsx").read_text(encoding="utf-8")
+    block = src[src.index("const disconnectPlatform"):]
+    block = block[: block.index("const handleConnectX")]
+    assert "method: 'POST'" in block
+
+    for mod in ("x_oauth", "linkedin_oauth", "youtube_oauth"):
+        router = importlib.import_module(f"routers.{mod}").router
+        route = next(r for r in router.routes if "disconnect" in r.path)
+        assert "POST" in route.methods, f"{mod} disconnect is not POST"
+
+
+@pytest.mark.parametrize("flag,platform", [
+    ("hasTwitter", "X"), ("hasLinkedin", "LinkedIn"), ("hasYoutube", "YouTube"),
+])
+def test_a_connected_account_is_shown_as_connected(flag, platform):
+    """All three panels used to render "Connect" forever, with no confirmation
+    the link had worked and no hint that clicking again would redo it."""
+    src = (FRONTEND / "pages" / "dashboard" / "Workspaces.jsx").read_text(encoding="utf-8")
+    assert f"socialConnection?.{flag}" in src, f"{platform} never shows as connected"
+
+
+def test_youtube_connection_state_is_actually_served():
+    """The flag has to exist in the payload, or the panel reads undefined and
+    shows a connected account as disconnected forever."""
+    src = (ROOT / "routers" / "user_api.py").read_text(encoding="utf-8")
+    assert src.count('"hasYoutube"') >= 2, "hasYoutube missing from one of the two payloads"
+    # The refresh token is the durable one. An access token expires in an hour,
+    # so keying off it would report a connection that dies the same morning.
+    assert '"hasYoutube": bool(getattr(active_conn, "youtubeRefreshToken", None))' in src

@@ -145,6 +145,11 @@ async def get_current_user(request: Request, user_id: str = Depends(verify_user)
                     "igAccountName": getattr(active_conn, "igAccountName", None),
                     "hasTwitter": bool(getattr(active_conn, "twitterAccessToken", None)),
                     "hasLinkedin": bool(getattr(active_conn, "linkedinAccessToken", None)),
+                    # The refresh token is the durable one; an access
+                    # token alone expires in an hour and would report
+                    # a connection that stops working the same morning.
+                    "hasYoutube": bool(getattr(active_conn, "youtubeRefreshToken", None)),
+                    "youtubeChannelTitle": getattr(active_conn, "youtubeChannelTitle", None),
                 }
 
             return {
@@ -445,6 +450,8 @@ async def get_user_businesses(request: Request, user_id: str = Depends(verify_us
                         "hasTwitter": bool(getattr(sc, "twitterAccessToken", None)),
                         "hasLinkedin": bool(getattr(sc, "linkedinAccessToken", None)),
                         "hasFacebook": bool(getattr(sc, "fbAccessToken", None)),
+                        "hasYoutube": bool(getattr(sc, "youtubeRefreshToken", None)),
+                        "youtubeChannelTitle": getattr(sc, "youtubeChannelTitle", None),
                     } if sc else None,
                 })
             return result
