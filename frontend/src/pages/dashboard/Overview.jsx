@@ -5,7 +5,7 @@ import {
   BarChart3, Clock, RefreshCw, Image as ImageIcon, AlertTriangle,
   Building2, Sparkles, XCircle, LogOut, Send, ArrowRight
 } from 'lucide-react';
-import { API_BASE, authFetch } from '../../config';
+import { API_BASE, authFetch, apiError } from '../../config';
 
 /**
  * Command Center — a read-only status view.
@@ -41,6 +41,35 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/';
+  };
+
+  // Run one posting cycle now.
+  //
+  // /social/trigger existed and nothing called it, so the only way to see the
+  // product work was to connect an account and wait for the next scheduled
+  // cycle -- four hours by default. That is the wrong first experience for
+  // somebody deciding whether this is worth paying for: the moment that sells
+  // this is watching a post appear on your own account.
+  const [posting, setPosting] = useState(false);
+
+  const postNow = async () => {
+    setPosting(true);
+    try {
+      const res = await authFetch(`${API_BASE}/social/trigger`, {
+        method: 'POST',
+        headers: activeWorkspaceId ? { 'X-Workspace-Id': activeWorkspaceId } : {},
+      }, token);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(apiError(body, 'Could not start a posting run.'));
+      // The loop runs in the background, so there is nothing to show yet.
+      // Saying "posted" here would be the same lie the queue used to tell.
+      showToast?.('Posting run started. Your posts will appear below shortly.');
+      setTimeout(load, 12000);
+    } catch (err) {
+      showToast?.(err.message, true);
+    } finally {
+      setPosting(false);
+    }
   };
 
   const load = useCallback(async () => {
@@ -171,6 +200,16 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+            {/* Only offered once an account is actually connected. A button
+                that runs a posting loop with nowhere to post is a button that
+                reports success and does nothing. */}
+            {live && (
+              <button onClick={postNow} disabled={posting} className="btn btn-primary"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', fontSize: '0.85rem', fontWeight: 700 }}>
+                <Send size={14} style={posting ? { animation: 'spin 1s linear infinite' } : undefined} />
+                {posting ? 'Starting…' : 'Post now'}
+              </button>
+            )}
             <button onClick={load} disabled={refreshing} className="btn btn-secondary"
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.95rem', fontSize: '0.85rem', fontWeight: 600 }}>
               <RefreshCw size={14} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} /> Refresh

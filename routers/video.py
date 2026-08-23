@@ -31,37 +31,54 @@ class RenderVideoRequest(BaseModel):
     payload: Dict[str, Any]
     prompt: str
 
+# These two predate services/media_providers.py and were left unreachable when
+# the connect UI was built against the newer path. Two writers to one table is
+# how a customer's image key gets clobbered by a video save, so they delegate
+# rather than keeping a second implementation alive.
+#
+# The GET also used to return `config.apiKey` straight to the browser. That is
+# the customer's stored credential leaving the server on an endpoint that never
+# needed it -- it now returns the same masked hint as the newer path.
+
 @router.get("/config")
 async def get_video_config(request: Request, user_id: str = Depends(verify_user), workspace_id: Optional[str] = Depends(get_workspace_id)):
+    from services import media_providers
+
     async with AsyncSessionLocal() as session:
-        stmt = select(VideoApiConfig).where(and_(
-            VideoApiConfig.userId == user_id,
-            VideoApiConfig.businessProfileId == workspace_id
-        ))
-        res = await session.execute(stmt)
-        config = res.scalars().first()
-        if config:
-            return {"success": True, "data": {"provider": config.provider, "apiKey": config.apiKey, "endpoint": config.endpoint}}
-        return {"success": True, "data": {"provider": "json2video", "apiKey": "", "endpoint": ""}}
+        connected = await media_providers.connections(session, user_id, workspace_id)
+
+    video = connected.get("video") or {}
+    return {"success": True, "data": {
+        "provider": video.get("provider") or "json2video",
+        "model": video.get("model"),
+        "connected": bool(video.get("connected")),
+        # A hint, never the key. Named differently from the old "apiKey" field
+        # on purpose: anything still reading apiKey should break loudly rather
+        # than silently send a masked string somewhere expecting a credential.
+        "keyHint": video.get("keyHint", ""),
+    }}
+
 
 @router.post("/config")
 async def save_video_config(data: VideoConfigUpdate, request: Request, user_id: str = Depends(verify_user), workspace_id: Optional[str] = Depends(get_workspace_id)):
+    from services import media_providers
+
+    key = (data.apiKey or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Paste the API key first.")
+
+    problem = media_providers.is_supported("video", data.provider, None)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+
     async with AsyncSessionLocal() as session:
-        stmt = select(VideoApiConfig).where(and_(
-            VideoApiConfig.userId == user_id,
-            VideoApiConfig.businessProfileId == workspace_id
-        ))
-        res = await session.execute(stmt)
-        config = res.scalars().first()
-        if config:
-            config.provider = data.provider
-            config.apiKey = encrypt_token(data.apiKey) if data.apiKey else ""
-            config.endpoint = data.endpoint
-        else:
-            config = VideoApiConfig(userId=user_id, businessProfileId=workspace_id, provider=data.provider, apiKey=encrypt_token(data.apiKey) if data.apiKey else "", endpoint=data.endpoint)
-            session.add(config)
-        await session.commit()
-        return {"success": True, "message": "Video API configuration saved successfully"}
+        await media_providers.save(
+            session, user_id, workspace_id,
+            kind="video", provider=data.provider, api_key=key,
+        )
+
+    return {"success": True, "message": "Video API configuration saved successfully"}
+
 
 @router.post("/generate-prompt")
 async def generate_video_prompt(data: GeneratePromptRequest, request: Request, user_id: str = Depends(verify_user)):

@@ -231,3 +231,81 @@ def test_youtube_connection_state_is_actually_served():
     # The refresh token is the durable one. An access token expires in an hour,
     # so keying off it would report a connection that dies the same morning.
     assert '"hasYoutube": bool(getattr(active_conn, "youtubeRefreshToken", None))' in src
+
+
+# ---------------------------------------------------------------------------
+# Post now
+#
+# /social/trigger runs one marketing loop on demand and nothing called it, so
+# the only way to see the product work was to connect an account and wait for
+# the next scheduled cycle -- four hours by default. That is the wrong first
+# experience for somebody deciding whether to pay.
+# ---------------------------------------------------------------------------
+
+def test_a_posting_run_can_be_started_by_hand():
+    assert "social/trigger" in SOURCE, (
+        "the loop can only be triggered by waiting for the scheduler"
+    )
+
+
+def test_post_now_is_hidden_until_an_account_is_connected():
+    """A loop with nowhere to post reports success and does nothing."""
+    src = (FRONTEND / "pages" / "dashboard" / "Overview.jsx").read_text(encoding="utf-8")
+    block = src[src.index("{live && ("):]
+    block = block[: block.index("</button>")]
+    assert "postNow" in block, "Post now is not behind the connected check"
+
+
+def test_post_now_does_not_claim_the_post_went_out():
+    """The loop runs in the background; there is nothing to report yet.
+
+    Saying "posted" here would be the same lie the scheduler used to tell.
+    """
+    src = (FRONTEND / "pages" / "dashboard" / "Overview.jsx").read_text(encoding="utf-8")
+    block = src[src.index("const postNow"):]
+    block = block[: block.index("const load")]
+
+    happy = [ln for ln in block.splitlines() if "showToast" in ln and "true)" not in ln]
+    assert happy, "no success message found"
+    for line in happy:
+        low = line.lower()
+        assert "posted to" not in low and "published" not in low, (
+            f"claims a result the server has not produced yet: {line.strip()}"
+        )
+
+
+def test_the_old_video_config_endpoint_no_longer_returns_the_key():
+    """It used to send `config.apiKey` straight to the browser.
+
+    That is the customer's stored credential leaving the server on an endpoint
+    that never needed it. Nothing called the endpoint, which is the only reason
+    it was not an incident.
+    """
+    src = (ROOT / "routers" / "video.py").read_text(encoding="utf-8")
+    block = src[src.index('@router.get("/config")'):]
+    block = block[: block.index('@router.post("/config")')]
+
+    # Comments in that block discuss the old field by name, so only real
+    # code counts here -- otherwise the guard trips on its own explanation.
+    code = " ".join(
+        ln for ln in block.splitlines() if not ln.strip().startswith("#")
+    )
+    assert '"apiKey"' not in code, "the stored key is still being returned"
+    assert "config.apiKey" not in code
+    assert "keyHint" in code
+
+
+def test_there_is_only_one_writer_to_the_media_provider_table():
+    """Two writers is how an image key gets clobbered by a video save.
+
+    routers/video.py predates services/media_providers.py and wrote the same
+    table without setting `kind`, so its .first() could pick up -- and
+    overwrite -- the row the newer connect UI had written.
+    """
+    src = (ROOT / "routers" / "video.py").read_text(encoding="utf-8")
+    block = src[src.index('@router.post("/config")'):]
+    block = block[: block.index('@router.post("/generate-prompt")')]
+
+    assert "media_providers.save" in block, "video.py still writes the table itself"
+    assert "VideoApiConfig(" not in block, "video.py still constructs rows directly"
+    assert 'kind="video"' in block, "a row written without a kind collides with the image row"
