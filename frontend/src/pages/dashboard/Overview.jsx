@@ -416,6 +416,13 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                   const ok = p.status === 'POSTED' || p.status === 'PUBLISHED';
                   const failed = p.status === 'FAILED';
                   const scheduled = p.status === 'SCHEDULED' || p.status === 'PENDING' || p.status === 'DRAFT';
+                  // A post can succeed on one platform and be rejected on
+                  // another. That used to be invisible: the error was only
+                  // rendered when status was FAILED, and a post that reached
+                  // Instagram is POSTED. One workspace had Facebook rejecting
+                  // every attempt for two weeks behind a green POSTED badge,
+                  // and the only way to find out was to read the database.
+                  const partial = ok && !!p.errorLog;
                   const color = ok ? '#10b981' : failed ? '#f87171' : '#f59e0b';
                   return (
                     <div key={p.id || i} style={{
@@ -445,17 +452,25 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
                           <span style={{ fontWeight: 600 }}>{p.platform || 'INSTAGRAM / FACEBOOK'}</span>
                           {p.scheduledAt && <span>{new Date(p.scheduledAt).toLocaleString()}</span>}
                         </div>
-                        {failed && p.errorLog && (
+                        {(failed || partial) && p.errorLog && (
                           <div style={{
                             fontSize: '0.76rem',
-                            color: '#fca5a5',
+                            // Amber for a partial failure, red for a total one.
+                            // A post that did reach Instagram should not be
+                            // dressed as a disaster, but it must not be silent.
+                            color: partial ? '#fcd34d' : '#fca5a5',
                             marginTop: '0.4rem',
                             padding: '0.4rem 0.65rem',
                             borderRadius: 8,
-                            background: 'rgba(239,68,68,0.06)',
-                            border: '1px solid rgba(239,68,68,0.2)',
+                            background: partial ? 'rgba(245,158,11,0.07)' : 'rgba(239,68,68,0.06)',
+                            border: `1px solid ${partial ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.2)'}`,
                             lineHeight: 1.4,
                           }}>
+                            {partial && (
+                              <strong style={{ display: 'block', marginBottom: '0.15rem' }}>
+                                Published, but not everywhere:
+                              </strong>
+                            )}
                             {p.errorLog}
                           </div>
                         )}

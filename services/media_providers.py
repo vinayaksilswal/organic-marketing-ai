@@ -55,19 +55,12 @@ PROVIDERS: Dict[str, List[Dict[str, Any]]] = {
             "keyHint": "From fal.ai/dashboard/keys",
         },
     ],
+    # Runway and Kling were listed here and have been removed. Runway's video
+    # endpoint needs an input image rather than a prompt, and Kling signs each
+    # request with a JWT built from a key pair. Neither is prompt in, file out,
+    # and services/media_render.py cannot spend a key for either -- so offering
+    # them would let somebody connect a credential that never renders anything.
     "video": [
-        {
-            "id": "runway",
-            "name": "Runway",
-            "models": ["gen4_turbo", "gen3a_turbo"],
-            "keyHint": "From dev.runwayml.com",
-        },
-        {
-            "id": "kling",
-            "name": "Kling",
-            "models": ["kling-v2-master", "kling-v1-6-pro"],
-            "keyHint": "From klingai.com developer settings",
-        },
         {
             "id": "replicate",
             "name": "Replicate",

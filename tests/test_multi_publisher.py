@@ -514,3 +514,66 @@ async def test_the_picture_actually_reaches_linkedin(monkeypatch, yt_stub):
     _everything_connected(monkeypatch)
     await mp.publish_everywhere("ws", "With a picture", media_urls=["https://x/p.jpg"])
     assert yt_stub.get("linkedin_media") == ["https://x/p.jpg"]
+
+
+# ---------------------------------------------------------------------------
+# Standing holds on the account
+#
+# Two Pages spent a fortnight rejecting every post with Meta code 368/4854002.
+# Meta's message says to open the phone app; it does not say the hold blocks
+# every future post, which is the part that made it look like a bad post
+# rather than a blocked Page.
+# ---------------------------------------------------------------------------
+
+def test_a_standing_hold_says_it_is_the_page_not_the_post():
+    from services.social_service import _graph_error_message
+
+    class _R:
+        status_code = 400
+        text = ""
+        def json(self):
+            return {"error": {
+                "message": "Confirm your identity before you can publish as this Page.",
+                "code": 368, "error_subcode": 4854002,
+            }}
+
+    msg = _graph_error_message(_R())
+
+    assert "hold on the Page itself" in msg
+    assert "every post" in msg
+    # And it must not send somebody off reconnecting a token that is fine.
+    assert "nothing to reconnect" in msg
+    assert "[code 368/4854002]" in msg
+
+
+def test_an_ordinary_error_is_not_given_invented_advice():
+    """Only codes actually seen in production carry guidance.
+
+    Confident wrong advice in front of somebody debugging their own Page is
+    worse than Meta's bare message.
+    """
+    from services.social_service import _graph_error_message
+
+    class _R:
+        status_code = 400
+        text = ""
+        def json(self):
+            return {"error": {"message": "Invalid parameter", "code": 100, "error_subcode": 33}}
+
+    msg = _graph_error_message(_R())
+    assert msg == "Invalid parameter [code 100/33]"
+
+
+def test_a_malformed_code_does_not_crash_the_error_formatter():
+    """This runs on the failure path. Raising here would replace a diagnosable
+    error with a stack trace, which is the bug this formatter exists to fix."""
+    from services.social_service import _graph_error_message
+
+    for code, sub in ((None, None), ("x", "y"), (368, None)):
+        class _R:
+            status_code = 400
+            text = ""
+            def json(self):
+                return {"error": {"message": "m", "code": code, "error_subcode": sub}}
+
+        assert "m" in _graph_error_message(_R())

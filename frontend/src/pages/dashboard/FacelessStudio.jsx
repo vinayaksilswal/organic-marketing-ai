@@ -238,15 +238,29 @@ export default function FacelessStudio({ token, activeWorkspaceId, showToast }) 
           </div>
         )}
 
-        {/* Shorts are rendered on the customer's own video account, so the
-            connect control belongs beside the button that needs it rather
-            than buried in a settings page they would never find. */}
-        <MediaProviderConnect
-          kind="video"
-          token={token}
-          activeWorkspaceId={activeWorkspaceId}
-          showToast={showToast}
-        />
+        {/* Shorts are rendered on the customer's own account, so the connect
+            control belongs beside the button that needs it rather than buried
+            in a settings page they would never find.
+
+            The prompts are passed in so the Generate button can appear the
+            moment there is something to render -- before that, `result` is
+            null, the prompt is undefined and only the connect control shows. */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <MediaProviderConnect
+            kind="video"
+            token={token}
+            activeWorkspaceId={activeWorkspaceId}
+            showToast={showToast}
+            prompt={result?.video_prompt}
+          />
+          <MediaProviderConnect
+            kind="image"
+            token={token}
+            activeWorkspaceId={activeWorkspaceId}
+            showToast={showToast}
+            prompt={result?.first_frame_prompt}
+          />
+        </div>
 
         <button
           onClick={generate}

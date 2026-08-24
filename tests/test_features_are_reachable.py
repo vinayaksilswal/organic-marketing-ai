@@ -177,10 +177,14 @@ def test_an_unsupported_provider_is_refused_before_it_is_stored():
     """Otherwise it saves, reports 'connected', and fails only at render time."""
     from services import media_providers
 
-    assert media_providers.is_supported("video", "runway", "gen4_turbo") is None
+    assert media_providers.is_supported("video", "replicate", "minimax/video-01") is None
     assert media_providers.is_supported("video", "not-a-provider", None)
-    assert media_providers.is_supported("nonsense", "runway", None)
-    assert media_providers.is_supported("video", "runway", "some-model-runway-lacks")
+    assert media_providers.is_supported("nonsense", "replicate", None)
+    assert media_providers.is_supported("video", "replicate", "a-model-replicate-lacks")
+    # Runway was offered until services/media_render.py made it clear nothing
+    # could spend the key: its video endpoint takes an input image, not a
+    # prompt. Offering it again would let somebody connect a dead credential.
+    assert media_providers.is_supported("video", "runway", None)
 
 
 # ---------------------------------------------------------------------------
@@ -309,3 +313,28 @@ def test_there_is_only_one_writer_to_the_media_provider_table():
     assert "media_providers.save" in block, "video.py still writes the table itself"
     assert "VideoApiConfig(" not in block, "video.py still constructs rows directly"
     assert 'kind="video"' in block, "a row written without a kind collides with the image row"
+
+
+def test_a_partial_failure_is_visible_not_just_a_total_one():
+    """One workspace had Facebook rejecting every post for two weeks.
+
+    The post reached Instagram, so its status was POSTED, so the green badge
+    showed and the error was never rendered -- it was only rendered when
+    status was FAILED. The only way to discover it was to read the database.
+    """
+    src = (FRONTEND / "pages" / "dashboard" / "Overview.jsx").read_text(encoding="utf-8")
+
+    assert "const partial = ok && !!p.errorLog" in src, (
+        "a post that succeeded on one platform and failed on another is still silent"
+    )
+    assert "(failed || partial) && p.errorLog" in src, (
+        "the error block still only renders for a total failure"
+    )
+
+
+def test_the_recent_posts_payload_carries_the_error():
+    """The interface cannot show what the server does not send."""
+    src = (ROOT / "routers" / "api.py").read_text(encoding="utf-8")
+    block = src[src.index('"/social/recent-posts"'):]
+    block = block[: block.index("return")]
+    assert '"errorLog"' in block

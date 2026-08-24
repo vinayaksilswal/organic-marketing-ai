@@ -77,6 +77,24 @@ def _is_video(url: str) -> bool:
 # =============================================================================
 # HTTP Helper — Retry-wrapped async POST to Graph API
 # =============================================================================
+# Meta failures that are a standing hold on the account rather than a problem
+# with one post. Only codes actually observed in production are listed --
+# guessing at the rest would put confident wrong advice in front of somebody
+# trying to fix their own Page.
+#
+# 368/4854002 blocked two Pages for a fortnight. Meta's own message tells you
+# to open the phone app, but not that it will reject EVERY post until you do,
+# which is the part that turns a puzzling failure into an obvious one.
+_STANDING_BLOCKS = {
+    (368, 4854002): (
+        "This is a hold on the Page itself, not this post -- every post to it "
+        "will be rejected until identity confirmation is finished in the "
+        "Facebook mobile app. Posting resumes on its own afterwards; there is "
+        "nothing to reconnect here."
+    ),
+}
+
+
 def _graph_error_message(response: httpx.Response) -> str:
     """Meta's own explanation of a failure, in the words it used.
 
@@ -99,6 +117,15 @@ def _graph_error_message(response: httpx.Response) -> str:
 
     code = error.get("code")
     subcode = error.get("error_subcode")
+
+    # Say when a failure is a standing hold, so it is not read as a bad post.
+    try:
+        guidance = _STANDING_BLOCKS.get((int(code), int(subcode)))
+    except (TypeError, ValueError):
+        guidance = None
+    if guidance:
+        detail = f"{detail} {guidance}".strip()
+
     marker = f"code {code}" + (f"/{subcode}" if subcode else "") if code else ""
     return f"{detail} [{marker}]" if marker else (detail or f"HTTP {response.status_code}")
 

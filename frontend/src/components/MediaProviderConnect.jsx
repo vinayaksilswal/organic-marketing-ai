@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Plug, Check, X, Loader2 } from 'lucide-react';
+import { Plug, Check, X, Loader2, Wand2 } from 'lucide-react';
 import { API_BASE, authFetch, apiError } from '../config';
 
 /**
  * Connect your own rendering account.
  *
  * The studios write prompts. Turning a prompt into a file costs money at
- * Runway or Replicate, so the workspace brings its own key and picks its own
- * model rather than metering through a shared account.
+ * Replicate, OpenAI or fal, so the workspace brings its own key and picks its
+ * own model rather than metering through a shared account.
  *
  * The key leaves the browser once and never comes back. What returns is a
  * masked hint — enough to recognise which key is connected, useless to
@@ -17,7 +17,7 @@ import { API_BASE, authFetch, apiError } from '../config';
  *
  * `kind` is 'image' or 'video'. One of these sits on each prompt generator.
  */
-export default function MediaProviderConnect({ kind, token, activeWorkspaceId, showToast }) {
+export default function MediaProviderConnect({ kind, token, activeWorkspaceId, showToast, prompt }) {
   const [open, setOpen] = useState(false);
   const [catalogue, setCatalogue] = useState([]);
   const [current, setCurrent] = useState({ connected: false });
@@ -25,6 +25,7 @@ export default function MediaProviderConnect({ kind, token, activeWorkspaceId, s
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [busy, setBusy] = useState(false);
+  const [rendering, setRendering] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -98,6 +99,35 @@ export default function MediaProviderConnect({ kind, token, activeWorkspaceId, s
     }
   };
 
+  // Spend the key. Until this existed the connect button stored a credential
+  // and nothing ever called the provider -- a working setup screen attached to
+  // nothing, which is the failure this codebase keeps producing.
+  const generate = async () => {
+    const text = (prompt || '').trim();
+    if (!text) {
+      showToast?.('Write or generate a prompt first.', true);
+      return;
+    }
+    setRendering(true);
+    try {
+      const res = await authFetch(`${API_BASE}/creatives/media-render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': activeWorkspaceId },
+        body: JSON.stringify({ kind, prompt: text }),
+      }, token);
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(apiError(body, 'Could not start the render.'));
+      // The server says "started", not "done". The render is detached and
+      // there is no file yet -- claiming one would be the same lie the
+      // posting queue was telling.
+      showToast?.(body.message || 'Rendering started.');
+    } catch (err) {
+      showToast?.(err.message, true);
+    } finally {
+      setRendering(false);
+    }
+  };
+
   const label = kind === 'image' ? 'image' : 'video';
 
   return (
@@ -117,6 +147,24 @@ export default function MediaProviderConnect({ kind, token, activeWorkspaceId, s
           ? `${entry?.name || current.provider} connected`
           : `Connect your ${label} API`}
       </button>
+
+      {/* Only once a key is connected, and only where a prompt was passed in.
+          A generate button with nothing to render is a button that reports
+          success and produces nothing. */}
+      {current.connected && prompt !== undefined && (
+        <button
+          onClick={generate}
+          disabled={rendering}
+          className="btn btn-primary"
+          style={{
+            marginLeft: '0.5rem', minHeight: 40, fontSize: '0.8rem', fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+          }}
+        >
+          {rendering ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}
+          {rendering ? 'Starting…' : `Generate ${label}`}
+        </button>
+      )}
 
       {current.connected && !open && (
         <span style={{ marginLeft: '0.6rem', fontSize: '0.76rem', color: 'var(--text-muted)' }}>

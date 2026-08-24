@@ -1463,3 +1463,65 @@ async def disconnect_media_provider(
         removed = await media_providers.disconnect(session, user_id, workspace_id, kind)
 
     return {"success": True, "removed": removed, "kind": kind}
+
+
+class MediaRenderRequest(BaseModel):
+    kind: str
+    prompt: str
+
+
+@router.post("/media-render")
+async def render_media(
+    body: MediaRenderRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """Spend the connected key on one prompt.
+
+    Backgrounded on purpose. A video model takes minutes and Render's proxy
+    closes the connection long before that, so waiting here would turn every
+    video render into a gateway timeout the customer reads as a failure --
+    while their provider account is billed for a file that did render.
+
+    The finished asset lands in the Media catalog, which is where the rest of
+    the product already looks for things to post.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    from services import media_providers, media_render
+    from services.task_utils import spawn_background
+
+    if body.kind not in media_providers.KINDS:
+        raise HTTPException(status_code=400, detail=f"Unknown kind '{body.kind}'.")
+
+    prompt = (body.prompt or "").strip()
+    if not prompt:
+        raise HTTPException(status_code=400, detail="There is no prompt to render.")
+
+    # Checked before the work is detached. Once it is backgrounded there is
+    # nowhere to report "you never connected an account", and the customer
+    # would be left watching a catalog that never fills.
+    async with AsyncSessionLocal() as session:
+        connected = await media_providers.connections(session, user_id, workspace_id)
+    if not connected.get(body.kind, {}).get("connected"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Connect a {body.kind} account first, then generate.",
+        )
+
+    spawn_background(
+        media_render.render_and_store(
+            user_id, workspace_id, kind=body.kind, prompt=prompt
+        ),
+        f"media_render({body.kind}, workspace={workspace_id})",
+    )
+
+    return {
+        "success": True,
+        # Deliberately not "generated". Nothing exists yet, and saying it does
+        # is the mistake the posting queue was making until this morning.
+        "message": f"Rendering started on your {connected[body.kind]['provider']} account. "
+                   "It will appear in your Media library when it finishes.",
+    }
