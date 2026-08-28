@@ -617,9 +617,21 @@ async def _generate_post_caption(profile, media, product=None) -> str:
         asset_lines.append(f"--- brief (do not paraphrase) ---\n{(asset_caption or asset_prompt)[:900]}")
     else:
         # Be explicit rather than letting the model invent a scene.
+        #
+        # The shot-list prohibition used to live only in the branch above, the
+        # one that has a director's brief to guard against. But a caption with
+        # no attached asset is the case where the model is MOST likely to
+        # invent a scene — it has nothing to describe, so it reaches for
+        # "watch the", "zoom in", "the camera" to fill the space. The public
+        # demo always takes this branch, and a live smoke test caught captions
+        # narrating camera work that nothing in this prompt forbade.
         asset_lines.append(
             "No description of the visual is available — write about the "
-            "business itself and do not describe what is on screen."
+            "business itself and do not describe what is on screen. Never "
+            "narrate the visual or direct the viewer's eye: no 'watch the', "
+            "'see how', 'zoom in', 'pan to', 'cut to', 'the camera', and no "
+            "describing what appears or moves. You are writing a caption, "
+            "not a shot list."
         )
     if asset_tags:   asset_lines.append(f"Asset tags: {asset_tags}")
     asset_lines.append(f"Format: {'short video / reel' if is_video else 'single image'}")

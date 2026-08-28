@@ -567,3 +567,32 @@ async def get_scheduler_status(
                 "lastEmailIdx": state.lastEmailIdx if state else 0,
             },
         )
+
+
+@router.get("/social/publishing-health", response_model=StandardResponse)
+async def publishing_health(
+    request: Request,
+    user_id: str = Depends(verify_user),
+) -> StandardResponse:
+    """Whether each connected platform is actually publishing, and what to do.
+
+    A per-post error is the wrong altitude for a standing problem. Two Pages
+    rejected every Facebook post for a fortnight with the reason sitting in the
+    errorLog column of individual posts, behind a green POSTED badge, while
+    Instagram succeeded on the same posts. Nobody found it without reading the
+    database.
+
+    Derived from what actually happened rather than a stored flag: a flag has
+    to be written by something, that something can fail, and then the flag
+    lies about the very thing this exists to report.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        return StandardResponse(success=True, data=[])
+
+    from services import publishing_health as health
+
+    async with AsyncSessionLocal() as session:
+        rows = await health.report(session, workspace_id)
+
+    return StandardResponse(success=True, data=rows)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE, authFetch } from '../../config';
 import { useWorkspace } from '../../components/WorkspaceContext';
+import PublishingHealth from '../../components/PublishingHealth';
 import { Building2, Sparkles, Globe, Target, ArrowRight, Plus, CheckCircle2, Settings, X, Link2, Facebook, Instagram, Linkedin, Twitter, Save, Edit3, Zap, Clock, CalendarDays, Bot, Trash2, AlertTriangle, Unplug, Pause, Play, Youtube} from 'lucide-react';
 
 const Workspaces = ({ user, token, showToast, updateAuth }) => {
@@ -397,6 +398,18 @@ const Workspaces = ({ user, token, showToast, updateAuth }) => {
             </button>
           )}
         </div>
+
+        {/* Every connected account and whether it is actually
+            publishing. The full list here, healthy ones included:
+            this is the page somebody opens to reason about
+            connections, so "Instagram is fine" is information rather
+            than furniture. */}
+        <PublishingHealth
+          token={token}
+          activeWorkspaceId={editWorkspaceId || activeWorkspaceId}
+          alwaysShow
+        />
+
 
         {!isCreating && businessList.length === 0 ? (
           <div className="glass-panel" style={{ padding: '4rem 2rem', textAlign: 'center', maxWidth: 520, margin: '0 auto' }}>

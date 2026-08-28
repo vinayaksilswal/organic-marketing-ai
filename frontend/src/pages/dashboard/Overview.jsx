@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { API_BASE, authFetch, apiError } from '../../config';
 import GetStarted from '../../components/GetStarted';
+import PublishingHealth from '../../components/PublishingHealth';
 
 /**
  * Command Center — a read-only status view.
@@ -241,6 +242,13 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
             </button>
           </div>
         </div>
+
+        {/* A platform that has stopped publishing is the most urgent thing on
+            this page, so it sits above everything else. Renders nothing when
+            every account is healthy -- a row of green ticks is furniture, and
+            furniture at the top of a dashboard trains people to stop reading
+            the top of the dashboard. */}
+        {!loading && <PublishingHealth token={token} activeWorkspaceId={activeWorkspaceId} />}
 
         {/* The ordered path to a first post. Shown instead of the blocker
             list while setup is incomplete: five problems presented at once

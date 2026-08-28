@@ -432,7 +432,7 @@ const Landing = () => {
       <style>{styles}</style>
       <Helmet>
         <title>Organiflo — Organic marketing that runs itself</title>
-        <meta name="description" content="AI writes brand-matched social posts and publishes them to your Facebook Page and Instagram on a schedule you set. Free plan, no card required." />
+        <meta name="description" content="AI writes brand-matched social posts and publishes them to Facebook, Instagram, LinkedIn and YouTube on a schedule you set. Free plan, no card required." />
         <script type="application/ld+json">{JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
@@ -487,8 +487,8 @@ const Landing = () => {
 
           <p className="lede" style={{ maxWidth: 640, margin: '1.5rem auto 0' }}>
             So Organiflo does it. Add your website once — it learns what you sell, writes the
-            copy and the creative brief, and publishes to your Facebook Page and Instagram on
-            the schedule you set. Your marketing runs while you run the business.
+            copy and the creative brief, and publishes to Facebook, Instagram, LinkedIn and
+            YouTube on the schedule you set. Your marketing runs while you run the business.
           </p>
 
           {/* One action, not two.
@@ -796,9 +796,11 @@ const Landing = () => {
               { key: 'captions', icon: <Eye size={17} />, title: 'Captions that know the visual',
                 body: 'Each caption is written from your brand profile plus a description of the specific asset attached, so it speaks to what is on screen instead of the category in general.', colour: 'var(--pink)' },
               { key: 'publish', icon: <Send size={17} />, title: 'Publishing with a real delivery log',
-                body: 'Facebook Pages and Instagram, including Reels. Every attempt is recorded per platform with the reason if it failed — no post that silently went nowhere.', colour: 'var(--green)' },
+                body: 'Facebook Pages, Instagram including Reels, LinkedIn and YouTube. Every attempt is recorded per platform with the reason if it failed — no post that silently went nowhere.', colour: 'var(--green)' },
               { key: 'schedule', icon: <Clock size={17} />, title: 'Runs on your schedule',
                 body: 'Every two hours, or whatever interval you choose. Auto-approve is off until you switch it on, so nothing reaches an audience you have not approved.', colour: 'var(--violet)' },
+              { key: 'news', icon: <Clock size={17} />, title: 'Something to say every day',
+                body: 'It reads this week’s news in your industry and writes a short, opinionated LinkedIn post about it — with the source shown, so you can check it before it goes out. An account that only talks about itself runs out of material by week three.', colour: 'var(--pink)' },
               { key: 'email', icon: <CheckCircle2 size={17} />, title: 'Email campaigns from the same brain',
                 body: 'Drafts written from the same profile, sent from your own domain, to your own subscriber list — with edit and preview before anything goes out.', colour: 'var(--blue)' },
             ]}
@@ -1433,7 +1435,7 @@ photographic, sharp focus, no text
               { key: 'brands', icon: <Building2 size={17} />, title: 'Run more than one brand',
                 body: 'Separate workspaces, each with its own voice, schedule, catalog and connected accounts. Add teammates to the ones they should see.' },
               { key: 'tokens', icon: <ShieldCheck size={17} />, title: 'Your accounts, your tokens',
-                body: 'Connected through official Facebook and Instagram login. Revoke it from Meta at any time and posting simply stops.' },
+                body: 'Connected through each platform’s own login — Meta, LinkedIn, Google. Revoke it at any time and posting simply stops.' },
               { key: 'support', icon: <Send size={17} />, title: 'A person answers you',
                 body: 'Report a problem in the app and the reply lands on the same screen, with a status you can watch change. Not a ticket address that goes quiet.' },
             ]}

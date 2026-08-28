@@ -488,3 +488,33 @@ def test_the_log_distinguishes_a_partial_failure_from_a_success():
     src = (FRONTEND / "pages" / "dashboard" / "Activity.jsx").read_text(encoding="utf-8")
     assert "partial" in src
     assert "published && p.errorLog" in src
+
+
+def test_the_landing_page_only_names_platforms_that_can_publish():
+    """It claimed Facebook and Instagram only, long after LinkedIn and YouTube
+    could publish — and the reverse mistake, naming a platform that cannot,
+    is a false claim on a page taking paid traffic."""
+    landing = (FRONTEND / "pages" / "Landing.jsx").read_text(encoding="utf-8")
+
+    from services.multi_publisher import connected_platforms  # noqa: F401
+    import services.scheduler as sched
+
+    publishable = {
+        "Facebook": "FACEBOOK", "Instagram": "INSTAGRAM",
+        "LinkedIn": "LINKEDIN", "YouTube": "YOUTUBE",
+    }
+    for name, token in publishable.items():
+        if name in landing:
+            assert token in sched._SCHEDULED_TARGETS, (
+                f"the landing page names {name} and the scheduler cannot publish to it"
+            )
+
+
+def test_the_landing_page_claims_the_news_feature_only_because_it_exists():
+    landing = (FRONTEND / "pages" / "Landing.jsx").read_text(encoding="utf-8")
+    if "week\u2019s news in your industry" in landing:
+        from services import news_service
+        assert hasattr(news_service, "linkedin_post_from_news")
+        assert "creatives/news-post" in SOURCE, (
+            "the page sells daily news posts and nothing in the interface makes one"
+        )
