@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import Logo from './Logo';
-import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame , BarChart3, Film, Inbox} from 'lucide-react';
+import { LayoutDashboard, Video, Image as ImageIcon, Send, Mail, Building2, Plus, Sparkles, Users, CreditCard, LifeBuoy, LogOut, Flame , BarChart3, Film, Inbox, ScrollText } from 'lucide-react';
 import { API_BASE, authFetch } from '../config';
 
 const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }) => {
@@ -112,77 +112,84 @@ const Sidebar = ({ user, token, activeWorkspaceId, onWorkspaceChange, onLogout }
         flexDirection: 'column',
         gap: '0.15rem',
       }}>
-        <div className="sidebar-section-title" style={{ marginTop: '0.1rem' }}>
-          Core Platform
-        </div>
-        
+        {/* Grouped by what somebody is trying to DO, not by which subsystem
+            built it. The old grouping put Overview, Businesses, two studios,
+            the validator, insights and the media library all under one
+            heading called "Core Platform", which told a new customer nothing
+            about where to start.
+
+            The order is the actual sequence of work: set the business up,
+            make something, publish it, see what happened. */}
+
         <NavLink to="/dashboard" end className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <LayoutDashboard size={16} /> <span>Overview</span>
+          <LayoutDashboard size={16} /> <span>Home</span>
         </NavLink>
 
+        <div className="sidebar-section-title" style={{ marginTop: '0.35rem' }}>
+          Create
+        </div>
+
+        <NavLink to="/dashboard/video-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Video size={16} /> <span>Campaigns &amp; video</span>
+        </NavLink>
+
+        <NavLink to="/dashboard/faceless-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Film size={16} /> <span>Faceless shorts</span>
+        </NavLink>
+
+        {/* Was "PostShip Multi-Platform" with an "X·LI·RD" badge. Nobody
+            arriving for the first time knows what either means. */}
+        <NavLink to="/dashboard/postship" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Sparkles size={16} /> <span>Write a post</span>
+        </NavLink>
+
+        <NavLink to="/dashboard/viral-validator" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Flame size={16} /> <span>Check an idea</span>
+        </NavLink>
+
+        <div className="sidebar-section-title">
+          Publish
+        </div>
+
+        <NavLink to="/dashboard/social-scheduler" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Send size={16} /> <span>Schedule &amp; queue</span>
+          <span className="sidebar-badge" style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--success)' }}>
+            Auto
+          </span>
+        </NavLink>
+
+        <NavLink to="/dashboard/media-catalog" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <ImageIcon size={16} /> <span>Media library</span>
+        </NavLink>
+
+        <NavLink to="/dashboard/email-suite" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Mail size={16} /> <span>Email</span>
+        </NavLink>
+
+        <div className="sidebar-section-title">
+          Results
+        </div>
+
+        <NavLink to="/dashboard/account-insights" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <BarChart3 size={16} /> <span>Insights &amp; leads</span>
+        </NavLink>
+
+        <NavLink to="/dashboard/activity" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <ScrollText size={16} /> <span>Activity log</span>
+        </NavLink>
+
+        <div className="sidebar-section-title">
+          Setup
+        </div>
+
         <NavLink to="/dashboard/workspaces" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Building2 size={16} /> <span>Businesses</span>
+          <Building2 size={16} /> <span>Businesses &amp; accounts</span>
           {workspaces.length > 0 && (
             <span className="sidebar-badge" style={{ background: 'rgba(139,92,246,0.12)', color: 'var(--primary-color)' }}>
               {workspaces.length}
             </span>
           )}
         </NavLink>
-
-        <NavLink to="/dashboard/video-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Video size={16} /> <span>Brand Video Studio</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(139,92,246,0.15)', color: 'var(--primary-color)' }}>
-            2 Img + 1 Vid
-          </span>
-        </NavLink>
-
-        <NavLink to="/dashboard/faceless-studio" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Film size={16} /> <span>Faceless Shorts</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
-            No camera
-          </span>
-        </NavLink>
-
-        <NavLink to="/dashboard/viral-validator" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Flame size={16} /> <span>Viral Validator</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(109, 40, 217,0.15)', color: 'var(--primary-color)' }}>
-            AI Radar
-          </span>
-        </NavLink>
-
-        <NavLink to="/dashboard/account-insights" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <BarChart3 size={16} /> <span>Account Insights</span>
-        </NavLink>
-
-        <NavLink to="/dashboard/media-catalog" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <ImageIcon size={16} /> <span>Media & Catalog</span>
-        </NavLink>
-
-        <div className="sidebar-section-title">
-          Publishing Engine
-        </div>
-
-        <NavLink to="/dashboard/social-scheduler" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Send size={16} /> <span>Social Scheduler</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--success)' }}>
-            Auto
-          </span>
-        </NavLink>
-
-        <NavLink to="/dashboard/postship" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Sparkles size={16} /> <span>PostShip Multi-Platform</span>
-          <span className="sidebar-badge" style={{ background: 'rgba(37, 99, 235,0.15)', color: 'var(--secondary-color)' }}>
-            X·LI·RD
-          </span>
-        </NavLink>
-
-        <NavLink to="/dashboard/email-suite" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Mail size={16} /> <span>Email Suite</span>
-        </NavLink>
-
-        <div className="sidebar-section-title">
-          System & Support
-        </div>
 
         <NavLink to="/dashboard/team" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Users size={16} /> <span>Team & Roles</span>

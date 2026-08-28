@@ -6,6 +6,7 @@ import {
   Building2, Sparkles, XCircle, LogOut, Send, ArrowRight
 } from 'lucide-react';
 import { API_BASE, authFetch, apiError } from '../../config';
+import GetStarted from '../../components/GetStarted';
 
 /**
  * Command Center — a read-only status view.
@@ -120,6 +121,8 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
   const canPublish = connected.length > 0;
   const hasMedia = (mediaCount ?? 0) > 0;
   const live = canPublish && hasMedia;
+  // GetStarted owns the page until the basics are in place.
+  const setupDone = !!business && canPublish && hasMedia;
 
   const blockers = [
     !canPublish && { text: 'No social account connected', where: 'Businesses → Edit → Social Accounts', action: () => navigate('/dashboard/workspaces') },
@@ -239,8 +242,26 @@ const Dashboard = ({ user, token, showToast, activeWorkspaceId, onLogout }) => {
           </div>
         </div>
 
+        {/* The ordered path to a first post. Shown instead of the blocker
+            list while setup is incomplete: five problems presented at once
+            read as five reasons to close the tab, while one lit step with a
+            button reads as a next action. Disappears when setup is done, and
+            the blocker list below takes over for an account that is running
+            and has developed a problem. */}
+        {!loading && (
+          <GetStarted
+            hasBusiness={!!business}
+            hasAccount={canPublish}
+            hasMedia={hasMedia}
+            hasPlan={['ACTIVE', 'TRIALING'].includes(user?.subscriptionStatus)}
+            hasPosted={recentPosts.some((p) => p.status === 'POSTED' || p.status === 'PUBLISHED')}
+            onPostNow={live ? postNow : null}
+            posting={posting}
+          />
+        )}
+
         {/* Blockers / Setup Checklist */}
-        {!loading && blockers.length > 0 && (
+        {!loading && setupDone && blockers.length > 0 && (
           <div style={{ ...panel, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.04)', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
               <AlertTriangle size={16} color="#f59e0b" />

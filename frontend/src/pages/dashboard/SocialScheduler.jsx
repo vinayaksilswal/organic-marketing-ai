@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import PostPreview from '../../components/PostPreview';
 import { API_BASE, authFetch, apiError} from '../../config';
 import { CheckCircle2, Clock, Play, FileText, X, Image as ImageIcon, Video, Send, Settings, Mail, Users, Edit3, AlertTriangle, RefreshCw, CalendarDays, Sparkles, Plus } from 'lucide-react';
 import PostCalendar from '../../components/PostCalendar';
@@ -1063,6 +1064,34 @@ const SocialScheduler = ({ user, token, showToast, activeWorkspaceId }) => {
 
                 {/* Right Side: Preview */}
                 <div style={{ flex: 1, padding: '1.5rem', background: 'rgba(11,16,32,0.04)', overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+                  {/* The same caption goes to every connected account, and
+                      each one cuts it somewhere different -- 125 characters on
+                      Instagram, 210 on LinkedIn, a hard 280 on X. Writing
+                      without seeing that is how a hook ends up three lines
+                      below the fold.
+
+                      Instagram keeps its own preview below, which models the
+                      Reels/Feed/Profile crops this cannot. */}
+                  <div style={{ width: '100%', maxWidth: 420, marginBottom: '1.5rem' }}>
+                    <div style={{
+                      fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', marginBottom: '0.5rem',
+                    }}>
+                      Everywhere else it goes
+                    </div>
+                    <PostPreview
+                      caption={editCaption}
+                      media={editMedia ? [editMedia] : []}
+                      platforms={['facebook', 'x', 'linkedin', 'youtube']}
+                      business={{
+                        name: business?.name || 'Your business',
+                        handle: `@${(business?.name || 'yourbrand').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+                        headline: business?.industry,
+                      }}
+                    />
+                  </div>
+
                   
                   {(() => {
                     const isVideo = !!editMedia && (editMedia.includes('video') || /\.(mp4|mov|webm)$/i.test(editMedia));

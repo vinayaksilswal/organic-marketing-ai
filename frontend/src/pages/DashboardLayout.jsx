@@ -9,6 +9,7 @@ import FacelessStudio from './dashboard/FacelessStudio';
 import ViralValidatorPage from './dashboard/ViralValidatorPage';
 import MediaCatalog from './dashboard/MediaCatalog';
 import SocialScheduler from './dashboard/SocialScheduler';
+import Activity from './dashboard/Activity';
 import PostShip from './dashboard/PostShip';
 import EmailSuite from './dashboard/EmailSuite';
 import Workspaces from './dashboard/Workspaces';
@@ -94,6 +95,7 @@ const DashboardLayout = ({ user, token, showToast, onLogout, updateAuth }) => {
           <Route path="/account-insights" element={<AccountInsights user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/media-catalog" element={<MediaCatalog user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/social-scheduler" element={<SocialScheduler user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
+          <Route path="/activity" element={<Activity token={token} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/postship" element={<PostShip user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />
           <Route path="/repurpose" element={<Navigate to="/dashboard/postship" replace />} />
           <Route path="/email-suite" element={<EmailSuite user={user} token={token} showToast={showToast} activeWorkspaceId={activeWorkspaceId} />} />

@@ -338,3 +338,153 @@ def test_the_recent_posts_payload_carries_the_error():
     block = src[src.index('"/social/recent-posts"'):]
     block = block[: block.index("return")]
     assert '"errorLog"' in block
+
+
+# ---------------------------------------------------------------------------
+# The dashboard as one product
+#
+# The sidebar grouped Overview, Businesses, two studios, the validator,
+# insights and the media library under a single heading called "Core
+# Platform", which tells somebody arriving for the first time nothing about
+# where to start. Grouped by intent now, in the order the work happens.
+# ---------------------------------------------------------------------------
+
+def _sidebar_code() -> str:
+    """The sidebar with its JSX comments removed.
+
+    The comments explain what the old labels were and why they changed, so a
+    naive substring search finds "Core Platform" in the note saying it was
+    removed. Only what actually renders counts.
+    """
+    import re
+
+    src = (FRONTEND / "components" / "Sidebar.jsx").read_text(encoding="utf-8")
+    return re.sub(r"\{/\*.*?\*/\}", "", src, flags=re.DOTALL)
+
+
+def test_the_sidebar_is_grouped_by_what_a_person_is_doing():
+    src = _sidebar_code()
+
+    for heading in ("Create", "Publish", "Results", "Setup"):
+        assert f">\n          {heading}\n        <" in src or f">{heading}<" in src, (
+            f"the '{heading}' group is missing from the sidebar"
+        )
+    assert "Core Platform" not in src, "the old catch-all grouping is still there"
+
+
+def test_navigation_labels_are_plain_words():
+    """"PostShip Multi-Platform" with an "X·LI·RD" badge means nothing to
+    somebody who has just signed up."""
+    src = _sidebar_code()
+    assert "Write a post" in src
+    assert "PostShip Multi-Platform" not in src
+    assert "X·LI·RD" not in src
+
+
+def test_every_sidebar_link_points_at_a_real_route():
+    """A nav item with no route is a dead end on the main navigation."""
+    import re
+
+    sidebar = (FRONTEND / "components" / "Sidebar.jsx").read_text(encoding="utf-8")
+    layout = (FRONTEND / "pages" / "DashboardLayout.jsx").read_text(encoding="utf-8")
+
+    dead = []
+    for target in re.findall(r'NavLink to="(/dashboard[^"]*)"', sidebar):
+        tail = target.replace("/dashboard", "") or "/"
+        if f'path="{tail}"' not in layout:
+            dead.append(target)
+
+    assert not dead, "sidebar links with no route: " + ", ".join(dead)
+
+
+# ---------------------------------------------------------------------------
+# Getting to a first post
+# ---------------------------------------------------------------------------
+
+def test_the_onboarding_path_exists_and_is_ordered():
+    src = (FRONTEND / "components" / "GetStarted.jsx").read_text(encoding="utf-8")
+
+    for step in ("Add your business", "Connect a social account",
+                 "Add something to post", "Choose your plan",
+                 "Publish your first post"):
+        assert step in src, f"the onboarding sequence is missing '{step}'"
+
+    # The plan sits after setup and before the first post: asking on step one
+    # is a closed tab, asking after the first post gives the product away.
+    assert src.index("Choose your plan") < src.index("Publish your first post")
+    assert src.index("Connect a social account") < src.index("Choose your plan")
+
+
+def test_only_the_next_step_gets_a_button():
+    """Five buttons at once is five decisions. One is a next action."""
+    src = (FRONTEND / "components" / "GetStarted.jsx").read_text(encoding="utf-8")
+    assert "const nextIndex = steps.findIndex((s) => !s.done)" in src
+    assert "{isNext && (" in src
+
+
+def test_the_checklist_disappears_when_setup_is_done():
+    src = (FRONTEND / "components" / "GetStarted.jsx").read_text(encoding="utf-8")
+    assert "if (doneCount === steps.length) return null;" in src
+
+
+def test_overview_shows_the_checklist_instead_of_the_blocker_list():
+    """Both at once would put two competing to-do lists at the top."""
+    src = (FRONTEND / "pages" / "dashboard" / "Overview.jsx").read_text(encoding="utf-8")
+    assert "<GetStarted" in src
+    assert "setupDone && blockers.length > 0" in src
+
+
+# ---------------------------------------------------------------------------
+# Previews
+# ---------------------------------------------------------------------------
+
+def test_the_preview_knows_where_each_platform_cuts_the_caption():
+    """The fold is the whole point: it decides whether the second sentence
+    is ever read."""
+    src = (FRONTEND / "components" / "PostPreview.jsx").read_text(encoding="utf-8")
+
+    for platform in ("instagram", "facebook", "x", "linkedin", "youtube"):
+        assert f"{platform}:" in src, f"no fold rule for {platform}"
+
+    # X is a hard limit, not a fold — the post is refused, not collapsed.
+    assert "at: 280" in src
+
+
+def test_the_preview_warns_about_media_a_platform_cannot_accept():
+    src = (FRONTEND / "components" / "PostPreview.jsx").read_text(encoding="utf-8")
+    assert "Instagram cannot publish without" in src
+    assert "YouTube needs a video" in src
+    assert "over the 280 limit" in src
+
+
+def test_the_preview_is_actually_used():
+    assert "PostPreview" in SOURCE, "the component exists and no page renders it"
+
+
+# ---------------------------------------------------------------------------
+# The activity log
+# ---------------------------------------------------------------------------
+
+def test_the_activity_log_is_reachable():
+    """/marketing/logs existed with nothing calling it."""
+    assert "marketing/logs" in SOURCE, "the log endpoint still has no caller"
+
+    layout = (FRONTEND / "pages" / "DashboardLayout.jsx").read_text(encoding="utf-8")
+    assert 'path="/activity"' in layout
+
+    sidebar = (FRONTEND / "components" / "Sidebar.jsx").read_text(encoding="utf-8")
+    assert "/dashboard/activity" in sidebar, "routed but nothing links to it"
+
+
+def test_the_log_merges_runs_and_posts():
+    """A loop that ran and published nothing looks identical to a healthy one
+    if you only read the run log."""
+    src = (FRONTEND / "pages" / "dashboard" / "Activity.jsx").read_text(encoding="utf-8")
+    assert "social/recent-posts" in src and "marketing/logs" in src
+    assert "sort" in src, "two sources with independent clocks must be merged by time"
+
+
+def test_the_log_distinguishes_a_partial_failure_from_a_success():
+    src = (FRONTEND / "pages" / "dashboard" / "Activity.jsx").read_text(encoding="utf-8")
+    assert "partial" in src
+    assert "published && p.errorLog" in src
