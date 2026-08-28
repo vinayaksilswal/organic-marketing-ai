@@ -1525,3 +1525,170 @@ async def render_media(
         "message": f"Rendering started on your {connected[body.kind]['provider']} account. "
                    "It will appear in your Media library when it finishes.",
     }
+
+
+# ---------------------------------------------------------------------------
+# Industry news -> LinkedIn text posts
+#
+# A business account that only talks about itself runs out of things to say by
+# week three. Reacting to something that happened this week gives it a reason
+# to post daily that is not "buy our thing" -- and on LinkedIn, a text-first
+# feed, that is the format that actually travels.
+#
+# Google News RSS: free, no key. A paid news API billing per request per
+# workspace per day is exactly the recurring cost this cannot carry.
+# ---------------------------------------------------------------------------
+
+class NewsPostRequest(BaseModel):
+    title: str
+    source: Optional[str] = None
+    link: Optional[str] = None
+    angle: int = 0
+    schedule_to_queue: bool = False
+
+
+@router.get("/news")
+async def industry_news(
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """This week's stories for the workspace's industry."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    # SocialPost is not imported at module scope in this file; without this
+    # the endpoint 500s on its first real call, which is exactly what
+    # test_no_undefined_names exists to catch.
+    from database import SocialPost
+    from services import news_service
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Business not found.")
+
+        # Stories already written about are filtered out here rather than
+        # after generation: posting the same headline twice in a week is the
+        # fastest way for an account to look automated.
+        recent = (await session.execute(
+            select(SocialPost.caption)
+            .where(SocialPost.businessProfileId == workspace_id)
+            .order_by(SocialPost.createdAt.desc()).limit(40)
+        )).scalars().all()
+
+    stories = await news_service.fetch(profile, limit=8)
+
+    blob = " ".join(c or "" for c in recent).lower()
+    fresh = [s for s in stories if s["title"].lower()[:45] not in blob]
+
+    return {"success": True, "stories": fresh, "query": news_service._query_for(profile)}
+
+
+@router.post("/news-post")
+async def news_linkedin_post(
+    body: NewsPostRequest,
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """One LinkedIn post reacting to one story."""
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    from services import news_service
+    from services import billing_service as billing
+
+    if not (body.title or "").strip():
+        raise HTTPException(status_code=400, detail="No story to write about.")
+
+    allowed, why = await billing.check_quota(user_id, "prompts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Business not found.")
+        profile_id = profile.id
+
+    post = await news_service.linkedin_post_from_news(
+        profile,
+        {"title": body.title, "source": body.source or "the press", "link": body.link or ""},
+        angle_index=body.angle,
+    )
+    if not post:
+        raise HTTPException(status_code=502, detail="Could not write a post about that story. Try another.")
+
+    await billing.record_usage(user_id, "prompts")
+
+    queued = False
+    if body.schedule_to_queue:
+        from datetime import timedelta
+
+        from database import SocialPost as SP, utc_now
+        from services.multi_publisher import connected_platforms
+
+        async with AsyncSessionLocal() as session:
+            available = await connected_platforms(session, profile_id)
+            # LinkedIn only. This is a text post about industry news -- it has
+            # no image, so Instagram cannot take it, and it is written in
+            # LinkedIn's register rather than X's.
+            if available.get("linkedin"):
+                session.add(SP(
+                    userId=user_id,
+                    businessProfileId=profile_id,
+                    platform="LINKEDIN",
+                    type="AUTO",
+                    status="SCHEDULED",
+                    caption=post["content"],
+                    scheduledAt=utc_now() + timedelta(minutes=10),
+                ))
+                await session.commit()
+                queued = True
+
+    return {"success": True, **post, "queued": queued}
+
+
+@router.post("/newsletter")
+async def weekly_newsletter(
+    request: Request,
+    user_id: str = Depends(verify_user),
+):
+    """The week in this business's industry, as a sendable email.
+
+    Same source as the LinkedIn posts, different job: a post is one opinion
+    about one story, this is the week summarised by somebody who read it so
+    the reader did not have to. That is why a list stays subscribed to a
+    business it has not bought from yet.
+
+    Returns the draft. It is not sent from here -- a newsletter that goes out
+    the instant it is generated is one nobody read first.
+    """
+    workspace_id = request.headers.get("x-workspace-id") or request.headers.get("X-Workspace-Id")
+    if not workspace_id:
+        raise HTTPException(status_code=400, detail="No workspace selected.")
+
+    from services import news_service
+    from services import billing_service as billing
+
+    allowed, why = await billing.check_quota(user_id, "prompts")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=why)
+
+    async with AsyncSessionLocal() as session:
+        profile = await session.get(BusinessProfile, workspace_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Business not found.")
+
+    draft = await news_service.weekly_newsletter(profile)
+    if not draft:
+        raise HTTPException(
+            status_code=422,
+            detail="Not enough industry news this week to fill a newsletter. "
+                   "Try again in a day or two, or widen the industry on your "
+                   "business profile.",
+        )
+
+    await billing.record_usage(user_id, "prompts")
+    return {"success": True, **draft}

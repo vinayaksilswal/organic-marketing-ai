@@ -701,6 +701,120 @@ async def _publish_to(platform, workspace_id, caption, media_urls, website, *, e
     raise RuntimeError(f"No publisher for '{platform}'.")
 
 
+async def daily_linkedin_news() -> None:
+    """One LinkedIn post per workspace per day, reacting to industry news.
+
+    WHY A SEPARATE JOB
+    ------------------
+    The marketing loop runs every couple of hours and publishes media. This is
+    daily, text-only, and goes to one platform. Threading it into that loop
+    would mean either posting news four times a day or adding a "have I done
+    this today" check to a function that already carries enough state.
+
+    WHAT IT COSTS
+    -------------
+    One model call per workspace per day, and only for workspaces that have
+    LinkedIn connected. A workspace with no LinkedIn spends nothing here --
+    checked before the news is fetched, not after.
+
+    Never raises. A job that throws can take its next run with it.
+    """
+    from database import BusinessProfile, SocialPost, utc_now
+    from services import news_service
+    from services.multi_publisher import connected_platforms
+
+    try:
+        async with AsyncSessionLocal() as session:
+            profiles = (await session.execute(select(BusinessProfile))).scalars().all()
+            candidates = [
+                (p.id, p.name, p.userId, bool(getattr(p, "automationPaused", False)))
+                for p in profiles
+            ]
+
+        posted = 0
+        for workspace_id, name, owner_id, paused in candidates:
+            if paused:
+                continue
+
+            try:
+                async with AsyncSessionLocal() as session:
+                    available = await connected_platforms(session, workspace_id)
+                    if not available.get("linkedin"):
+                        continue
+
+                    # One a day. The job runs daily, but a restart re-runs it,
+                    # and two takes on the news in one morning reads worse than
+                    # none at all.
+                    since = utc_now() - timedelta(hours=20)
+                    already = (await session.execute(
+                        select(SocialPost.id).where(
+                            SocialPost.businessProfileId == workspace_id,
+                            SocialPost.platform == "LINKEDIN",
+                            SocialPost.type == "NEWS",
+                            SocialPost.createdAt >= since,
+                        ).limit(1)
+                    )).scalars().first()
+                    if already:
+                        continue
+
+                    profile = await session.get(BusinessProfile, workspace_id)
+                    if not profile:
+                        continue
+
+                    # What this workspace has already said, so the same story
+                    # is not covered twice in a week.
+                    recent = (await session.execute(
+                        select(SocialPost.caption)
+                        .where(SocialPost.businessProfileId == workspace_id)
+                        .order_by(SocialPost.createdAt.desc()).limit(30)
+                    )).scalars().all()
+
+                stories = await news_service.fetch(profile, limit=5)
+                if not stories:
+                    logger.info(f"[NEWS] No fresh stories for {name}")
+                    continue
+
+                blob = " ".join(c or "" for c in recent).lower()
+                fresh = [s for s in stories if s["title"].lower()[:45] not in blob]
+                if not fresh:
+                    continue
+
+                # The angle rotates with the day, so a week of posts is five
+                # different kinds of take rather than five summaries.
+                angle = utc_now().timetuple().tm_yday % len(news_service.ANGLES)
+                post = await news_service.linkedin_post_from_news(
+                    profile, fresh[0], angle_index=angle
+                )
+                if not post:
+                    continue
+
+                async with AsyncSessionLocal() as session:
+                    session.add(SocialPost(
+                        userId=owner_id,
+                        businessProfileId=workspace_id,
+                        platform="LINKEDIN",
+                        # Marked so tomorrow's run can tell that today's went
+                        # out, and so the activity log can say what it was.
+                        type="NEWS",
+                        status="SCHEDULED",
+                        caption=post["content"],
+                        scheduledAt=utc_now() + timedelta(minutes=15),
+                    ))
+                    await session.commit()
+
+                posted += 1
+                logger.info(f"[NEWS] Queued a LinkedIn post for {name}: {post['source_title'][:60]}")
+
+            except Exception as e:
+                # One workspace failing must not stop the rest.
+                logger.warning(f"[NEWS] {name} skipped: {e}")
+
+        if posted:
+            logger.info(f"[NEWS] {posted} LinkedIn posts queued")
+    except Exception as e:
+        logger.error(f"[NEWS] Loop exception: {e}")
+
+
 async def _run_media_sweep() -> None:
     """Daily sweep, never raising into the scheduler.
 
@@ -758,6 +872,17 @@ def create_scheduler() -> AsyncIOScheduler:
     # rather than hourly: the input only changes on the scale of days, and a
     # job that DELETES published content should run as seldom as it can while
     # still doing its work.
+    # Daily, in the morning. News is stale by the afternoon and a take on
+    # yesterday's story reads as an account that is not paying attention.
+    scheduler.add_job(
+        daily_linkedin_news,
+        trigger=IntervalTrigger(hours=24),
+        id="daily_linkedin_news",
+        name="Daily LinkedIn News Post",
+        replace_existing=True,
+        max_instances=1,
+    )
+
     scheduler.add_job(
         _run_post_cleanup,
         trigger=IntervalTrigger(hours=24),
